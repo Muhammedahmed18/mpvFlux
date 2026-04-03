@@ -83,7 +83,7 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.FileOperationProgressDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.FolderPickerDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.LoadingDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
-import app.marlboroadvance.mpvex.ui.browser.dialogs.SortDialog
+import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.fab.FabScrollHelper
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
@@ -264,14 +264,9 @@ data class VideoListScreen(
               }
             }
           },
-          onShareClick = { selectionManager.shareSelected() },
-          onPlayClick = { selectionManager.playSelected() },
           onSelectAll = { selectionManager.selectAll() },
           onInvertSelection = { selectionManager.invertSelection() },
           onDeselectAll = { selectionManager.clear() },
-          onAddToPlaylistClick = if (!BuildConfig.ENABLE_UPDATE_FEATURE) {
-            { addToPlaylistDialogOpen.value = true }
-          } else null,
         )
       },
       floatingActionButton = {
@@ -381,8 +376,8 @@ data class VideoListScreen(
         }
       }
 
-      // Sort Dialog
-      VideoSortDialog(
+      // Sort Sheet
+      VideoSortBottomSheet(
         isOpen = sortDialogOpen.value,
         onDismiss = { sortDialogOpen.value = false },
         sortType = videoSortType,
@@ -723,7 +718,7 @@ private fun VideoListContent(
 }
 
 @Composable
-private fun VideoSortDialog(
+private fun VideoSortBottomSheet(
   isOpen: Boolean,
   onDismiss: () -> Unit,
   sortType: VideoSortType,
@@ -741,7 +736,7 @@ private fun VideoSortDialog(
   val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
   val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
 
-  SortDialog(
+  SortBottomSheet(
     isOpen = isOpen,
     onDismiss = onDismiss,
     title = "Sort & View Options",

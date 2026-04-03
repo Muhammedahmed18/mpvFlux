@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -73,45 +74,61 @@ fun FolderCard(
   Surface(
     modifier = modifier
       .fillMaxWidth()
+      .padding(horizontal = 12.dp, vertical = 4.dp)
+      .clip(RoundedCornerShape(28.dp))
       .combinedClickable(
         onClick = onClick,
         onLongClick = onLongClick,
+      )
+      .then(
+        if (isSelected) Modifier.border(
+          width = 1.5.dp,
+          color = MaterialTheme.colorScheme.primary,
+          shape = RoundedCornerShape(28.dp)
+        ) else Modifier
       ),
-    color = MaterialTheme.colorScheme.surface,
-    tonalElevation = 0.dp,
+    color = if (isSelected) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+            else MaterialTheme.colorScheme.surface,
+    shape = RoundedCornerShape(28.dp),
+    tonalElevation = if (isSelected) 2.dp else 0.dp,
   ) {
-      // List layout with modern Android 16 styling
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(horizontal = 12.dp, vertical = 4.dp) // Outer gap
-          .clip(RoundedCornerShape(16.dp)) // Rounded selection bounds
-          .background(
-            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent,
-          )
-          .padding(horizontal = 12.dp, vertical = 12.dp), // Inner content padding
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(16.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
         Box(
-          modifier = Modifier.size(40.dp), // Slightly smaller, cleaner icon area
+          modifier = Modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
           contentAlignment = Alignment.Center
         ) {
           Icon(
-            customIcon ?: Icons.Rounded.Folder, // Softer rounded folder
+            customIcon ?: Icons.Rounded.Folder,
             contentDescription = "Folder",
             modifier = Modifier
-              .size(32.dp)
+              .size(26.dp)
               .semantics { contentDescription = "Folder icon" },
-            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), // Primary based, no pink
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
           )
           
           if (newVideoCount > 0) {
-            Box(
+            Surface(
               modifier = Modifier
-                .size(12.dp)
                 .align(Alignment.TopEnd)
-                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(100))
-            )
+                .padding(2.dp),
+              color = MaterialTheme.colorScheme.primary,
+              shape = RoundedCornerShape(100)
+            ) {
+              Text(
+                text = newVideoCount.toString(),
+                modifier = Modifier.padding(horizontal = 4.dp),
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.onPrimary
+              )
+            }
           }
         }
         Spacer(modifier = Modifier.width(16.dp))
@@ -120,7 +137,10 @@ fun FolderCard(
         ) {
           Text(
             folder.name,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium.copy(
+              fontWeight = FontWeight.Bold,
+              letterSpacing = 0.sp
+            ),
             color = if (isRecentlyPlayed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,
@@ -129,52 +149,36 @@ fun FolderCard(
           if (showFolderPath && parentPath.isNotEmpty()) {
             Text(
               parentPath,
-              style = MaterialTheme.typography.bodySmall,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              maxLines = maxLines,
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Medium
+              ),
+              color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+              maxLines = 1,
               overflow = TextOverflow.Ellipsis,
             )
-            Spacer(modifier = Modifier.height(4.dp))
-          } else {
-            Spacer(modifier = Modifier.height(4.dp))
           }
+          Spacer(modifier = Modifier.height(6.dp))
           
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+          FlowRow(
+            verticalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
           ) {
-            // Video count in Primary color
+            // Video count chip
             if (showTotalVideosChip && folder.videoCount > 0) {
-              Text(
+              MetadataPill(
                 text = if (folder.videoCount == 1) "1 Video" else "${folder.videoCount} Videos",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = MaterialTheme.colorScheme.primary,
+                isPrimary = true
               )
             }
 
-            val metadataParts = remember(folder, showTotalSizeChip, showTotalDurationChip, showDateChip) {
-              buildList {
-                if (showTotalSizeChip && folder.totalSize > 0) add(formatFileSize(folder.totalSize))
-                if (showTotalDurationChip && folder.totalDuration > 0) add(formatDuration(folder.totalDuration))
-                if (showDateChip && folder.lastModified > 0) add(formatDate(folder.lastModified))
-              }
+            if (showTotalSizeChip && folder.totalSize > 0) {
+              MetadataPill(text = formatFileSize(folder.totalSize))
             }
-
-            if (metadataParts.isNotEmpty()) {
-              if (showTotalVideosChip && folder.videoCount > 0) {
-                Text(
-                  " • ",
-                  style = MaterialTheme.typography.labelSmall,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                )
-              }
-              Text(
-                text = metadataParts.joinToString(" • "),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-              )
+            if (showTotalDurationChip && folder.totalDuration > 0) {
+              MetadataPill(text = formatDuration(folder.totalDuration))
+            }
+            if (showDateChip && folder.lastModified > 0) {
+              MetadataPill(text = formatDate(folder.lastModified))
             }
             
             // Invoke custom content if any
@@ -185,6 +189,29 @@ fun FolderCard(
     }
   }
 
+@Composable
+private fun MetadataPill(
+  text: String,
+  isPrimary: Boolean = false
+) {
+  Surface(
+    shape = RoundedCornerShape(8.dp),
+    color = if (isPrimary) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+    modifier = Modifier.padding(vertical = 2.dp)
+  ) {
+    Text(
+      text = text,
+      modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+      style = MaterialTheme.typography.labelSmall.copy(
+        fontWeight = if (isPrimary) FontWeight.Bold else FontWeight.Medium,
+        fontSize = 10.sp
+      ),
+      color = if (isPrimary) MaterialTheme.colorScheme.primary
+              else MaterialTheme.colorScheme.onSurfaceVariant
+    )
+  }
+}
 
 private fun formatDuration(durationMs: Long): String {
   val seconds = durationMs / 1000
