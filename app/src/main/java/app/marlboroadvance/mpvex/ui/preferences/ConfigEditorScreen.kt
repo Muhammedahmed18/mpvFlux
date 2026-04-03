@@ -34,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -215,7 +214,6 @@ data class ConfigEditorScreen(
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 12.dp),
           textStyle = TextStyle(
-            fontFamily = FontFamily.Monospace,
             fontSize = 14.sp,
             color = MaterialTheme.colorScheme.onSurface,
           ),

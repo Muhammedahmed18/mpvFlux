@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -70,8 +69,7 @@ fun TextPlayerUpdate(
   PlayerUpdate(modifier) {
     Text(
       text = text,
-      fontFamily = FontFamily.Monospace,
-      fontWeight = FontWeight.Bold,
+            fontWeight = FontWeight.Bold,
       textAlign = TextAlign.Center,
       color = MaterialTheme.colorScheme.onSurface,
       style = MaterialTheme.typography.bodyMedium,
@@ -104,16 +102,14 @@ fun SeekPlayerUpdate(
     ) {
       Text(
         text = currentTime,
-        fontFamily = FontFamily.Monospace,
-        fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.Bold,
         textAlign = TextAlign.Center,
         color = MaterialTheme.colorScheme.onSurface,
       )
       
       Text(
         text = " $seekDelta",
-        fontFamily = FontFamily.Monospace,
-        fontWeight = FontWeight.Normal,
+                fontWeight = FontWeight.Normal,
         textAlign = TextAlign.Center,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),

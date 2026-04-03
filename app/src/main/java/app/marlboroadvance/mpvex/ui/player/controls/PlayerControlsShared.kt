@@ -70,7 +70,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -173,8 +172,7 @@ fun RenderPlayerButton(
               style = MaterialTheme.typography.bodyMedium,
               maxLines = 1,
               overflow = TextOverflow.Visible,
-              fontFamily = FontFamily.Monospace,
-              color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.primary,
             )
             Text(
               text = Typography.bullet.toString(),
@@ -190,8 +188,7 @@ fun RenderPlayerButton(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.bodyMedium,
-            fontFamily = FontFamily.Monospace,
-            color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
+                        color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f, fill = false),
           )
         }
@@ -251,8 +248,7 @@ fun RenderPlayerButton(
               text = String.format("%.2fx", playbackSpeed),
               maxLines = 1,
               style = MaterialTheme.typography.bodyMedium,
-              fontFamily = FontFamily.Monospace,
-            )
+                          )
           }
         }
       } else {
@@ -504,8 +500,7 @@ fun RenderPlayerButton(
               text = String.format("%.0f%%", currentZoom * 100),
               maxLines = 1,
               style = MaterialTheme.typography.bodyMedium,
-              fontFamily = FontFamily.Monospace,
-            )
+                          )
           }
         }
       } else {
@@ -746,8 +741,7 @@ fun RenderPlayerButton(
                   Text(
                     text = if (loopA != null) viewModel.formatTimestamp(loopA!!) else "A",
                     style = MaterialTheme.typography.labelLarge,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (loopA != null) {
+                                        color = if (loopA != null) {
                       MaterialTheme.colorScheme.onTertiaryContainer
                     } else {
                       if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface
@@ -794,8 +788,7 @@ fun RenderPlayerButton(
                   Text(
                     text = if (loopB != null) viewModel.formatTimestamp(loopB!!) else "B",
                     style = MaterialTheme.typography.labelLarge,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (loopB != null) {
+                                        color = if (loopB != null) {
                       MaterialTheme.colorScheme.onTertiaryContainer
                     } else {
                       if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface

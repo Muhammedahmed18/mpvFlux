@@ -123,23 +123,30 @@ object MainScreen : Screen {
     val density = LocalDensity.current
 
     // Shared state (across the app)
-    val isInSelectionMode = remember { mutableStateOf(isInSelectionModeShared) }
-    val hideNavigationBar = remember { mutableStateOf(shouldHideNavigationBar) }
+    val isInSelectionModeState = remember { mutableStateOf(isInSelectionModeShared) }
+    val hideNavigationBarState = remember { mutableStateOf(shouldHideNavigationBar) }
+    val isPermissionDeniedState = remember { mutableStateOf(isPermissionDenied) }
     val videoSelectionManager = remember { mutableStateOf<SelectionManager<*, *>?>(sharedVideoSelectionManager as? SelectionManager<*, *>) }
     
     // Check for state changes to ensure UI updates
     LaunchedEffect(Unit) {
       while (true) {
         // Update FAB visibility state
-        if (isInSelectionMode.value != isInSelectionModeShared) {
-          isInSelectionMode.value = isInSelectionModeShared
+        if (isInSelectionModeState.value != isInSelectionModeShared) {
+          isInSelectionModeState.value = isInSelectionModeShared
           android.util.Log.d("MainScreen", "Selection mode changed to: $isInSelectionModeShared")
         }
         
         // Update navigation bar visibility state - now considers if only videos are selected
-        if (hideNavigationBar.value != shouldHideNavigationBar) {
-          hideNavigationBar.value = shouldHideNavigationBar
+        if (hideNavigationBarState.value != shouldHideNavigationBar) {
+          hideNavigationBarState.value = shouldHideNavigationBar
           android.util.Log.d("MainScreen", "Navigation bar visibility changed to: ${!shouldHideNavigationBar}, onlyVideosSelected: $onlyVideosSelected")
+        }
+        
+        // Update permission denied state
+        if (isPermissionDeniedState.value != isPermissionDenied) {
+          isPermissionDeniedState.value = isPermissionDenied
+          android.util.Log.d("MainScreen", "Permission denied state changed to: $isPermissionDenied")
         }
         
         // Update selection manager
@@ -163,53 +170,56 @@ object MainScreen : Screen {
     Scaffold(
       modifier = Modifier.fillMaxSize(),
       bottomBar = {
-        // Animated bottom navigation bar with slide animations
-        AnimatedVisibility(
-          visible = !hideNavigationBar.value,
-          enter = slideInVertically(
-            animationSpec = tween(durationMillis = 300),
-            initialOffsetY = { fullHeight -> fullHeight }
-          ),
-          exit = slideOutVertically(
-            animationSpec = tween(durationMillis = 300),
-            targetOffsetY = { fullHeight -> fullHeight }
-          )
-        ) {
-          NavigationBar(
-            modifier = Modifier
-              .clip(
-                RoundedCornerShape(
-                  topStart = 28.dp,
-                  topEnd = 28.dp,
-                  bottomStart = 0.dp,
-                  bottomEnd = 0.dp
-                )
-              )
+        // Hide bottom navigation when permission is denied
+        if (!isPermissionDeniedState.value) {
+          // Animated bottom navigation bar with slide animations
+          AnimatedVisibility(
+            visible = !hideNavigationBarState.value,
+            enter = slideInVertically(
+              animationSpec = tween(durationMillis = 300),
+              initialOffsetY = { fullHeight -> fullHeight }
+            ),
+            exit = slideOutVertically(
+              animationSpec = tween(durationMillis = 300),
+              targetOffsetY = { fullHeight -> fullHeight }
+            )
           ) {
-            NavigationBarItem(
-              icon = { Icon(Icons.Filled.Home, contentDescription = "Home") },
-              label = { Text("Home") },
-              selected = selectedTab == 0,
-              onClick = { selectedTab = 0 }
-            )
-            NavigationBarItem(
-              icon = { Icon(Icons.Filled.History, contentDescription = "Recents") },
-              label = { Text("Recents") },
-              selected = selectedTab == 1,
-              onClick = { selectedTab = 1 }
-            )
-            NavigationBarItem(
-              icon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = "Playlists") },
-              label = { Text("Playlists") },
-              selected = selectedTab == 2,
-              onClick = { selectedTab = 2 }
-            )
-            NavigationBarItem(
-              icon = { Icon(Icons.Filled.Language, contentDescription = "Network") },
-              label = { Text("Network") },
-              selected = selectedTab == 3,
-              onClick = { selectedTab = 3 }
-            )
+            NavigationBar(
+              modifier = Modifier
+                .clip(
+                  RoundedCornerShape(
+                    topStart = 28.dp,
+                    topEnd = 28.dp,
+                    bottomStart = 0.dp,
+                    bottomEnd = 0.dp
+                  )
+                )
+            ) {
+              NavigationBarItem(
+                icon = { Icon(Icons.Filled.Home, contentDescription = "Home") },
+                label = { Text("Home") },
+                selected = selectedTab == 0,
+                onClick = { selectedTab = 0 }
+              )
+              NavigationBarItem(
+                icon = { Icon(Icons.Filled.History, contentDescription = "Recents") },
+                label = { Text("Recents") },
+                selected = selectedTab == 1,
+                onClick = { selectedTab = 1 }
+              )
+              NavigationBarItem(
+                icon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, contentDescription = "Playlists") },
+                label = { Text("Playlists") },
+                selected = selectedTab == 2,
+                onClick = { selectedTab = 2 }
+              )
+              NavigationBarItem(
+                icon = { Icon(Icons.Filled.Language, contentDescription = "Network") },
+                label = { Text("Network") },
+                selected = selectedTab == 3,
+                onClick = { selectedTab = 3 }
+              )
+            }
           }
         }
       }

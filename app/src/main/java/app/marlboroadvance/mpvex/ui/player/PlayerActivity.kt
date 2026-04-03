@@ -846,15 +846,16 @@ class PlayerActivity :
         if (playerPreferences.showSystemStatusBar.get()) 0 else View.SYSTEM_UI_FLAG_LOW_PROFILE
   }
 
-  @RequiresApi(Build.VERSION_CODES.P)
   private fun restoreSystemUI() {
     // Clear flags first for immediate effect
     window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
     window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
-    // Set cutout mode before showing bars for smoother transition
-    window.attributes.layoutInDisplayCutoutMode =
-      WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+    // Set cutout mode before showing bars for smoother transition (API 28+)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      window.attributes.layoutInDisplayCutoutMode =
+        WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+    }
 
     // Update window insets configuration
     WindowCompat.setDecorFitsSystemWindows(window, true)
@@ -2783,7 +2784,6 @@ class PlayerActivity :
    * Manually triggers background playback when the user clicks the background playback button.
    * This works independently of the automaticBackgroundPlayback preference.
    */
-  @RequiresApi(Build.VERSION_CODES.P)
   fun triggerBackgroundPlayback() {
     if (fileName.isBlank() || !isReady) {
       Log.w(TAG, "Cannot trigger background playback: video not ready")

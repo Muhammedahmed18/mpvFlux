@@ -26,7 +26,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.preferences.PlayerButton
@@ -117,8 +116,7 @@ fun TopLeftPlayerControlsLandscape(
               style = MaterialTheme.typography.bodyMedium,
               maxLines = 1,
               overflow = TextOverflow.Visible,
-              fontFamily = FontFamily.Monospace,
-              color = MaterialTheme.colorScheme.primary,
+                            color = MaterialTheme.colorScheme.primary,
             )
             Text(
               text = Typography.bullet.toString(),
@@ -134,8 +132,7 @@ fun TopLeftPlayerControlsLandscape(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.bodyMedium,
-            fontFamily = FontFamily.Monospace,
-            color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
+                        color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f, fill = false),
           )
         }
