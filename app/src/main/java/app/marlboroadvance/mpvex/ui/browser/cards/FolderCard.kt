@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
@@ -30,6 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
@@ -80,41 +84,34 @@ fun FolderCard(
       Row(
         modifier = Modifier
           .fillMaxWidth()
+          .padding(horizontal = 12.dp, vertical = 4.dp) // Outer gap
+          .clip(RoundedCornerShape(16.dp)) // Rounded selection bounds
           .background(
-            if (isSelected) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f) else Color.Transparent,
+            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f) else Color.Transparent,
           )
-          .padding(16.dp),
+          .padding(horizontal = 12.dp, vertical = 12.dp), // Inner content padding
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Box(
-          modifier = Modifier.size(48.dp)
+          modifier = Modifier.size(40.dp), // Slightly smaller, cleaner icon area
+          contentAlignment = Alignment.Center
         ) {
           Icon(
-            customIcon ?: Icons.Outlined.Folder,
+            customIcon ?: Icons.Rounded.Folder, // Softer rounded folder
             contentDescription = "Folder",
             modifier = Modifier
-              .size(40.dp)
-              .align(Alignment.Center)
+              .size(32.dp)
               .semantics { contentDescription = "Folder icon" },
-            tint = MaterialTheme.colorScheme.secondary,
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), // Primary based, no pink
           )
-
-          // Show new video count badge if folder contains new videos
+          
           if (newVideoCount > 0) {
-            Surface(
+            Box(
               modifier = Modifier
+                .size(12.dp)
                 .align(Alignment.TopEnd)
-                .padding(end = 4.dp, top = 4.dp),
-              shape = RoundedCornerShape(12.dp),
-              color = MaterialTheme.colorScheme.primary,
-            ) {
-              Text(
-                "NEW",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-              )
-            }
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(100))
+            )
           }
         }
         Spacer(modifier = Modifier.width(16.dp))
@@ -124,7 +121,7 @@ fun FolderCard(
           Text(
             folder.name,
             style = MaterialTheme.typography.titleMedium,
-            color = if (isRecentlyPlayed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
+            color = if (isRecentlyPlayed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.semantics { contentDescription = "Folder: ${folder.name}" },
@@ -141,93 +138,47 @@ fun FolderCard(
           } else {
             Spacer(modifier = Modifier.height(4.dp))
           }
-          // Modern chips with simple Surface-based implementation
-          FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+          
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
           ) {
-            // Custom chip content
-            customChipContent?.invoke()
-
-            // Video count chip
+            // Video count in Primary color
             if (showTotalVideosChip && folder.videoCount > 0) {
-              Surface(
-                modifier = Modifier
-                  .combinedClickable(
-                    onClick = {},
-                    onLongClick = null,
-                  ),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-              ) {
-                Text(
-                  if (folder.videoCount == 1) "1 Video" else "${folder.videoCount} Videos",
-                  style = MaterialTheme.typography.labelSmall,
-                  color = MaterialTheme.colorScheme.onSurface,
-                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                )
+              Text(
+                text = if (folder.videoCount == 1) "1 Video" else "${folder.videoCount} Videos",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.primary,
+              )
+            }
+
+            val metadataParts = remember(folder, showTotalSizeChip, showTotalDurationChip, showDateChip) {
+              buildList {
+                if (showTotalSizeChip && folder.totalSize > 0) add(formatFileSize(folder.totalSize))
+                if (showTotalDurationChip && folder.totalDuration > 0) add(formatDuration(folder.totalDuration))
+                if (showDateChip && folder.lastModified > 0) add(formatDate(folder.lastModified))
               }
             }
 
-            // File size chip
-            if (showTotalSizeChip && folder.totalSize > 0) {
-              Surface(
-                modifier = Modifier
-                  .combinedClickable(
-                    onClick = {},
-                    onLongClick = null,
-                  ),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-              ) {
+            if (metadataParts.isNotEmpty()) {
+              if (showTotalVideosChip && folder.videoCount > 0) {
                 Text(
-                  formatFileSize(folder.totalSize),
+                  " • ",
                   style = MaterialTheme.typography.labelSmall,
-                  color = MaterialTheme.colorScheme.onSurface,
-                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                  color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                 )
               }
+              Text(
+                text = metadataParts.joinToString(" • "),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+              )
             }
-
-            // Duration chip
-            if (showTotalDurationChip && folder.totalDuration > 0) {
-              Surface(
-                modifier = Modifier
-                  .combinedClickable(
-                    onClick = {},
-                    onLongClick = null,
-                  ),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-              ) {
-                Text(
-                  formatDuration(folder.totalDuration),
-                  style = MaterialTheme.typography.labelSmall,
-                  color = MaterialTheme.colorScheme.onSurface,
-                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                )
-              }
-            }
-
-            // Date chip
-            if (showDateChip && folder.lastModified > 0) {
-              Surface(
-                modifier = Modifier
-                  .combinedClickable(
-                    onClick = {},
-                    onLongClick = null,
-                  ),
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-              ) {
-                Text(
-                  formatDate(folder.lastModified),
-                  style = MaterialTheme.typography.labelSmall,
-                  color = MaterialTheme.colorScheme.onSurface,
-                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                )
-              }
-            }
+            
+            // Invoke custom content if any
+            customChipContent?.invoke()
           }
         }
       }
