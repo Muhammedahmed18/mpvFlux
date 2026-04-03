@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -24,7 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -53,12 +52,13 @@ object GesturePreferencesScreen : Screen {
   @Composable
   override fun Content() {
     val preferences = koinInject<GesturePreferences>()
-    val context = LocalContext.current
     val backstack = LocalBackStack.current
     val useSingleTapForCenter by preferences.useSingleTapForCenter.collectAsState()
 
     var showCustomSeekDialog by remember { mutableStateOf(false) }
     var customSeekValue by remember { mutableStateOf("") }
+    
+    val gestureNames = SingleActionGesture.entries.associateWith { stringResource(it.titleRes) }
 
     Scaffold(
       topBar = {
@@ -74,7 +74,7 @@ object GesturePreferencesScreen : Screen {
           navigationIcon = {
             IconButton(onClick = backstack::removeLastOrNull) {
               Icon(
-                Icons.AutoMirrored.Default.ArrowBack, 
+                Icons.AutoMirrored.Rounded.ArrowBack,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.secondary,
               )
@@ -198,10 +198,10 @@ object GesturePreferencesScreen : Screen {
             value = leftDoubleTap,
             onValueChange = { preferences.leftSingleActionGesture.set(it) },
             values = SingleActionGesture.entries,
-            valueToText = { AnnotatedString(context.getString(it.titleRes)) },
+            valueToText = { AnnotatedString(gestureNames[it] ?: "") },
             title = { Text(text = stringResource(R.string.pref_gesture_double_tap_left_title)) },
             summary = { Text(
-              text = stringResource(leftDoubleTap.titleRes),
+              text = gestureNames[leftDoubleTap] ?: "",
               color = MaterialTheme.colorScheme.outline,
             ) },
           )
@@ -209,16 +209,16 @@ object GesturePreferencesScreen : Screen {
           PreferenceDivider()
 
           val centerDoubleTap by preferences.centerSingleActionGesture.collectAsState()
-          ListPreference(
-            value = centerDoubleTap,
-            onValueChange = { preferences.centerSingleActionGesture.set(it) },
-            values =
-              listOf(
+          val centerValues = listOf(
                 SingleActionGesture.None,
                 SingleActionGesture.PlayPause,
                 SingleActionGesture.Custom,
-              ),
-            valueToText = { AnnotatedString(context.getString(it.titleRes)) },
+              )
+          ListPreference(
+            value = centerDoubleTap,
+            onValueChange = { preferences.centerSingleActionGesture.set(it) },
+            values = centerValues,
+            valueToText = { AnnotatedString(gestureNames[it] ?: "") },
             title = {
               Text(
                 text =
@@ -228,7 +228,7 @@ object GesturePreferencesScreen : Screen {
               )
             },
             summary = { Text(
-              text = stringResource(centerDoubleTap.titleRes),
+              text = gestureNames[centerDoubleTap] ?: "",
               color = MaterialTheme.colorScheme.outline,
             ) },
           )
@@ -240,19 +240,19 @@ object GesturePreferencesScreen : Screen {
             value = rightDoubleTap,
             onValueChange = { preferences.rightSingleActionGesture.set(it) },
             values = SingleActionGesture.entries,
-            valueToText = { AnnotatedString(context.getString(it.titleRes)) },
+            valueToText = { AnnotatedString(gestureNames[it] ?: "") },
             title = { Text(text = stringResource(R.string.pref_gesture_double_tap_right_title)) },
             summary = { Text(
-              text = stringResource(rightDoubleTap.titleRes),
+              text = gestureNames[rightDoubleTap] ?: "",
               color = MaterialTheme.colorScheme.outline,
             ) },
           )
           
           PreferenceDivider()
 
-          val useSingleTapForCenter by preferences.useSingleTapForCenter.collectAsState()
+          val useSingleTapForCenterVal by preferences.useSingleTapForCenter.collectAsState()
           SwitchPreference(
-            value = useSingleTapForCenter,
+            value = useSingleTapForCenterVal,
             onValueChange = { preferences.useSingleTapForCenter.set(it) },
             title = {
               Text(
@@ -281,17 +281,19 @@ object GesturePreferencesScreen : Screen {
                 }
 
               doubleTapKeyCodes.forEach { keyCode ->
-                annotatedString =
-                  buildAnnotatedString {
-                    val startIndex = annotatedString.indexOf(keyCode)
+                val startIndex = annotatedString.indexOf(keyCode)
+                if (startIndex != -1) {
                     val endIndex = startIndex + keyCode.length
-                    append(annotatedString)
-                    addStyle(
-                      style = SpanStyle(fontWeight = FontWeight.Bold),
-                      start = startIndex,
-                      end = endIndex,
-                    )
-                  }
+                    val currentString = annotatedString
+                    annotatedString = buildAnnotatedString {
+                        append(currentString)
+                        addStyle(
+                          style = SpanStyle(fontWeight = FontWeight.Bold),
+                          start = startIndex,
+                          end = endIndex,
+                        )
+                    }
+                }
               }
 
               Text(
@@ -309,89 +311,50 @@ object GesturePreferencesScreen : Screen {
           
           item {
             PreferenceCard {
-          val mediaPreviousGesture by preferences.mediaPreviousGesture.collectAsState()
-          ListPreference(
-            value = mediaPreviousGesture,
-            onValueChange = { preferences.mediaPreviousGesture.set(it) },
-            values = SingleActionGesture.entries,
-            valueToText = { AnnotatedString(context.getString(it.titleRes)) },
-            title = { Text(text = stringResource(R.string.pref_gesture_media_previous)) },
-            summary = { Text(
-              text = stringResource(mediaPreviousGesture.titleRes),
-              color = MaterialTheme.colorScheme.outline,
-            ) },
-          )
-          
-          PreferenceDivider()
-          val mediaPlayGesture by preferences.mediaPlayGesture.collectAsState()
-          ListPreference(
-            value = mediaPlayGesture,
-            onValueChange = { preferences.mediaPlayGesture.set(it) },
-            values =
-              listOf(
-                SingleActionGesture.None,
-                SingleActionGesture.PlayPause,
-                SingleActionGesture.Custom,
-              ),
-            valueToText = { AnnotatedString(context.getString(it.titleRes)) },
-            title = { Text(text = stringResource(R.string.pref_gesture_media_play)) },
-            summary = { Text(
-              text = stringResource(mediaPlayGesture.titleRes),
-              color = MaterialTheme.colorScheme.outline,
-            ) },
-          )
-          
-          PreferenceDivider()
-          val mediaNextGesture by preferences.mediaNextGesture.collectAsState()
-          ListPreference(
-            value = mediaNextGesture,
-            onValueChange = { preferences.mediaNextGesture.set(it) },
-            values = SingleActionGesture.entries,
-            valueToText = { AnnotatedString(context.getString(it.titleRes)) },
-            title = { Text(text = stringResource(R.string.pref_gesture_media_next)) },
-            summary = { Text(
-              text = stringResource(mediaNextGesture.titleRes),
-              color = MaterialTheme.colorScheme.outline,
-            ) },
-          )
-
-          val mediaKeyCodes =
-            listOf(
-              CustomKeyCodes.MediaPrevious,
-              CustomKeyCodes.MediaPlay,
-              CustomKeyCodes.MediaNext,
-            ).map { it.keyCode }.toImmutableList()
-          FooterPreference(
-            summary = {
-              var annotatedString =
-                buildAnnotatedString {
-                  append(stringResource(R.string.pref_gesture_media_custom_info))
-                }
-
-              mediaKeyCodes.forEach { keyCode ->
-                annotatedString =
-                  buildAnnotatedString {
-                    val startIndex = annotatedString.indexOf(keyCode)
-                    val endIndex = startIndex + keyCode.length
-                    append(annotatedString)
-                    addStyle(
-                      style = SpanStyle(fontWeight = FontWeight.Bold),
-                      start = startIndex,
-                      end = endIndex,
-                    )
-                  }
-              }
-
-              Text(
-                text = annotatedString,
-                color = MaterialTheme.colorScheme.outline,
+              val mediaPrevious by preferences.mediaPreviousGesture.collectAsState()
+              ListPreference(
+                value = mediaPrevious,
+                onValueChange = { preferences.mediaPreviousGesture.set(it) },
+                values = SingleActionGesture.entries,
+                valueToText = { AnnotatedString(gestureNames[it] ?: "") },
+                title = { Text(text = stringResource(R.string.pref_gesture_media_previous)) },
+                summary = { Text(
+                  text = gestureNames[mediaPrevious] ?: "",
+                  color = MaterialTheme.colorScheme.outline,
+                ) },
               )
-            },
-          )
+
+              PreferenceDivider()
+
+              val mediaPlay by preferences.mediaPlayGesture.collectAsState()
+              ListPreference(
+                value = mediaPlay,
+                onValueChange = { preferences.mediaPlayGesture.set(it) },
+                values = SingleActionGesture.entries,
+                valueToText = { AnnotatedString(gestureNames[it] ?: "") },
+                title = { Text(text = stringResource(R.string.pref_gesture_media_play)) },
+                summary = { Text(
+                  text = gestureNames[mediaPlay] ?: "",
+                  color = MaterialTheme.colorScheme.outline,
+                ) },
+              )
+
+              PreferenceDivider()
+
+              val mediaNext by preferences.mediaNextGesture.collectAsState()
+              ListPreference(
+                value = mediaNext,
+                onValueChange = { preferences.mediaNextGesture.set(it) },
+                values = SingleActionGesture.entries,
+                valueToText = { AnnotatedString(gestureNames[it] ?: "") },
+                title = { Text(text = stringResource(R.string.pref_gesture_media_next)) },
+                summary = { Text(
+                  text = gestureNames[mediaNext] ?: "",
+                  color = MaterialTheme.colorScheme.outline,
+                ) },
+              )
             }
           }
-
-          // View Section removed - "Tap thumbnail to select" moved to Appearance Preferences
         }
       }
     }

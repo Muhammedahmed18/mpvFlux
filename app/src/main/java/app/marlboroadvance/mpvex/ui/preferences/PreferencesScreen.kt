@@ -10,18 +10,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.ViewQuilt
-import androidx.compose.material.icons.outlined.Audiotrack
-import androidx.compose.material.icons.outlined.Code
-import androidx.compose.material.icons.outlined.Folder
-import androidx.compose.material.icons.outlined.Gesture
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.Palette
-import androidx.compose.material.icons.outlined.PlayCircle
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Subtitles
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ViewQuilt
+import androidx.compose.material.icons.rounded.Audiotrack
+import androidx.compose.material.icons.rounded.Code
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Gesture
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Memory
+import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Subtitles
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,7 +63,7 @@ object PreferencesScreen : Screen {
           navigationIcon = {
             IconButton(onClick = backstack::removeLastOrNull) {
               Icon(
-                Icons.AutoMirrored.Outlined.ArrowBack, 
+                Icons.AutoMirrored.Rounded.ArrowBack, 
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.secondary,
               )
@@ -97,7 +97,7 @@ object PreferencesScreen : Screen {
                 verticalAlignment = Alignment.CenterVertically,
               ) {
                 Icon(
-                  imageVector = Icons.Outlined.Search,
+                  imageVector = Icons.Rounded.Search,
                   contentDescription = null,
                   tint = MaterialTheme.colorScheme.outline,
                 )
@@ -128,7 +128,7 @@ object PreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.Palette, 
+                    Icons.Rounded.Palette, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -149,7 +149,7 @@ object PreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.AutoMirrored.Outlined.ViewQuilt, 
+                    Icons.AutoMirrored.Rounded.ViewQuilt, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -177,7 +177,7 @@ object PreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.PlayCircle, 
+                    Icons.Rounded.PlayCircle, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -198,7 +198,7 @@ object PreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.Gesture, 
+                    Icons.Rounded.Gesture, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -226,7 +226,7 @@ object PreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.Folder, 
+                    Icons.Rounded.Folder, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -254,7 +254,7 @@ object PreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.Memory, 
+                    Icons.Rounded.Memory, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -275,7 +275,7 @@ object PreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.Subtitles, 
+                    Icons.Rounded.Subtitles, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -296,7 +296,7 @@ object PreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.Audiotrack, 
+                    Icons.Rounded.Audiotrack, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -324,7 +324,7 @@ object PreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.Code, 
+                    Icons.Rounded.Code, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -345,7 +345,7 @@ object PreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.Info, 
+                    Icons.Rounded.Info,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 

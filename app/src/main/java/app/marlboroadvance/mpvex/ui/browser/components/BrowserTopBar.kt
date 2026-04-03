@@ -8,23 +8,24 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Block
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DriveFileRenameOutline
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.RemoveCircle
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.SortByAlpha
-import androidx.compose.material.icons.filled.ViewComfy
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.automirrored.rounded.Sort
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.RemoveCircle
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.SortByAlpha
+import androidx.compose.material.icons.rounded.ViewComfy
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -32,6 +33,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -238,7 +240,7 @@ private fun NormalTopBar(
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            Icons.AutoMirrored.Filled.ArrowBack,
+            Icons.AutoMirrored.Rounded.ArrowBack,
             contentDescription = stringResource(R.string.back),
             modifier = Modifier.size(24.dp),
             tint = MaterialTheme.colorScheme.secondary,
@@ -254,7 +256,7 @@ private fun NormalTopBar(
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            Icons.Filled.Search,
+            Icons.Rounded.Search,
             contentDescription = "Search",
             modifier = Modifier.size(24.dp),
             tint = MaterialTheme.colorScheme.secondary,
@@ -267,7 +269,7 @@ private fun NormalTopBar(
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            Icons.Default.ViewComfy,
+            Icons.Rounded.ViewComfy,
             contentDescription = stringResource(R.string.sort),
             modifier = Modifier.size(24.dp),
             tint = MaterialTheme.colorScheme.secondary,
@@ -280,7 +282,7 @@ private fun NormalTopBar(
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            Icons.Filled.Settings,
+            Icons.Rounded.Settings,
             contentDescription = "Settings",
             modifier = Modifier.size(24.dp),
             tint = MaterialTheme.colorScheme.secondary,
@@ -338,7 +340,7 @@ private fun SelectionTopBar(
           overflow = TextOverflow.Ellipsis,
         )
         Icon(
-          Icons.Filled.ArrowDropDown,
+          Icons.Rounded.ArrowDropDown,
           contentDescription = stringResource(R.string.selection_options),
           modifier = Modifier.size(24.dp),
           tint = MaterialTheme.colorScheme.primary,
@@ -384,7 +386,7 @@ private fun SelectionTopBar(
         modifier = Modifier.padding(horizontal = 2.dp),
       ) {
         Icon(
-          Icons.Filled.Close,
+          Icons.Rounded.Close,
           contentDescription = stringResource(R.string.generic_cancel),
           modifier = Modifier.size(28.dp),
           tint = MaterialTheme.colorScheme.secondary,
@@ -399,7 +401,7 @@ private fun SelectionTopBar(
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            Icons.Filled.PlayArrow,
+            Icons.Rounded.PlayArrow,
             contentDescription = "Play",
             modifier = Modifier.size(28.dp),
             tint = MaterialTheme.colorScheme.primary,
@@ -414,7 +416,7 @@ private fun SelectionTopBar(
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            Icons.AutoMirrored.Filled.PlaylistAdd,
+            Icons.AutoMirrored.Rounded.PlaylistAdd,
             contentDescription = "Add to Playlist",
             modifier = Modifier.size(28.dp),
             tint = MaterialTheme.colorScheme.secondary,
@@ -430,7 +432,7 @@ private fun SelectionTopBar(
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            Icons.Filled.DriveFileRenameOutline,
+            Icons.Rounded.DriveFileRenameOutline,
             contentDescription = stringResource(R.string.rename),
             modifier = Modifier.size(24.dp),
             tint =
@@ -443,24 +445,31 @@ private fun SelectionTopBar(
         }
       }
 
-      // Info icon
-      if (onInfo != null) {
-        IconButton(
+      // Media Info pill button
+      if (onInfo != null && isSingleSelection) {
+        Surface(
           onClick = onInfo,
-          enabled = isSingleSelection,
-          modifier = Modifier.padding(horizontal = 2.dp),
+          shape = CircleShape,
+          color = MaterialTheme.colorScheme.secondaryContainer,
+          contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+          modifier = Modifier.padding(horizontal = 4.dp)
         ) {
-          Icon(
-            Icons.Filled.Info,
-            contentDescription = stringResource(R.string.info),
-            modifier = Modifier.size(24.dp),
-            tint =
-              if (isSingleSelection) {
-                MaterialTheme.colorScheme.secondary
-              } else {
-                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-              },
-          )
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+          ) {
+            Icon(
+              Icons.Rounded.Info,
+              contentDescription = null,
+              modifier = Modifier.size(18.dp)
+            )
+            Text(
+              text = "Media Info",
+              style = MaterialTheme.typography.labelMedium,
+              fontWeight = FontWeight.SemiBold,
+              modifier = Modifier.padding(start = 6.dp)
+            )
+          }
         }
       }
 
@@ -471,7 +480,7 @@ private fun SelectionTopBar(
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            Icons.Filled.Share,
+            Icons.Rounded.Share,
             contentDescription = stringResource(R.string.generic_share),
             modifier = Modifier.size(24.dp),
             tint = MaterialTheme.colorScheme.secondary,
@@ -486,7 +495,7 @@ private fun SelectionTopBar(
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            Icons.Filled.Block,
+            Icons.Rounded.Block,
             contentDescription = stringResource(R.string.pref_folders_blacklist),
             modifier = Modifier.size(24.dp),
             tint = MaterialTheme.colorScheme.secondary,
@@ -501,7 +510,7 @@ private fun SelectionTopBar(
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            imageVector = if (useRemoveIcon) Icons.Filled.RemoveCircle else Icons.Filled.Delete,
+            imageVector = if (useRemoveIcon) Icons.Rounded.RemoveCircle else Icons.Rounded.Delete,
             contentDescription = stringResource(R.string.delete),
             modifier = Modifier.size(24.dp),
             tint = MaterialTheme.colorScheme.error,

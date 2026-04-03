@@ -13,8 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -172,7 +172,7 @@ data class ConfigEditorScreen(
         navigationIcon = {
           IconButton(onClick = backStack::removeLastOrNull) {
             Icon(
-              Icons.AutoMirrored.Default.ArrowBack,
+              Icons.AutoMirrored.Rounded.ArrowBack,
               contentDescription = "Back",
               tint = MaterialTheme.colorScheme.secondary,
             )
@@ -193,7 +193,7 @@ data class ConfigEditorScreen(
             ),
             shape = RoundedCornerShape(8.dp),
           ) {
-            Icon(Icons.Default.Check, contentDescription = "Save")
+            Icon(Icons.Rounded.Check, contentDescription = "Save")
           }
         },
       )

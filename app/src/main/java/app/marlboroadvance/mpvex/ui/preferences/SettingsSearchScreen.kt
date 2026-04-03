@@ -20,10 +20,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Clear
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,7 +73,7 @@ object SettingsSearchScreen : Screen {
         val searchResults by remember(searchQuery) {
             derivedStateOf {
                 SearchablePreferences.search(searchQuery) { resId ->
-                    context.getString(resId)
+                    context.resources.getString(resId)
                 }
             }
         }
@@ -97,7 +97,7 @@ object SettingsSearchScreen : Screen {
                     navigationIcon = {
                         IconButton(onClick = backstack::removeLastOrNull) {
                             Icon(
-                                Icons.AutoMirrored.Outlined.ArrowBack,
+                                Icons.AutoMirrored.Rounded.ArrowBack,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.secondary,
                             )
@@ -127,7 +127,7 @@ object SettingsSearchScreen : Screen {
                     },
                     leadingIcon = {
                         Icon(
-                            imageVector = Icons.Outlined.Search,
+                            imageVector = Icons.Rounded.Search,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.outline,
                         )
@@ -140,7 +140,7 @@ object SettingsSearchScreen : Screen {
                         ) {
                             IconButton(onClick = { searchQuery = "" }) {
                                 Icon(
-                                    imageVector = Icons.Outlined.Clear,
+                                    imageVector = Icons.Rounded.Clear,
                                     contentDescription = "Clear",
                                     tint = MaterialTheme.colorScheme.outline,
                                 )
@@ -172,7 +172,7 @@ object SettingsSearchScreen : Screen {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
-                                imageVector = Icons.Outlined.Search,
+                                imageVector = Icons.Rounded.Search,
                                 contentDescription = null,
                                 modifier = Modifier.size(64.dp),
                                 tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
@@ -193,7 +193,7 @@ object SettingsSearchScreen : Screen {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(
-                                imageVector = Icons.Outlined.Settings,
+                                imageVector = Icons.Rounded.Settings,
                                 contentDescription = null,
                                 modifier = Modifier.size(64.dp),
                                 tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
@@ -260,7 +260,7 @@ private fun SearchResultItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Icons.Outlined.Settings,
+                imageVector = Icons.Rounded.Settings,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(24.dp),

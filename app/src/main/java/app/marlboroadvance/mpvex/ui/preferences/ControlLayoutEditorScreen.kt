@@ -20,10 +20,10 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.ui.draw.rotate
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.RemoveCircle
-import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.AddCircle
+import androidx.compose.material.icons.rounded.RemoveCircle
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -187,12 +187,12 @@ data class ControlLayoutEditorScreen(
           title = { Text(text = title) },
           navigationIcon = {
             IconButton(onClick = backstack::removeLastOrNull) {
-              Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
+              Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back")
             }
           },
           actions = {
             IconButton(onClick = { showResetDialog = true }) {
-              Icon(Icons.Outlined.Restore, contentDescription = "Reset to default")
+              Icon(Icons.Rounded.Restore, contentDescription = "Reset to default")
             }
           },
         )
@@ -255,7 +255,7 @@ data class ControlLayoutEditorScreen(
                              verticalArrangement = Arrangement.Center
                          ) {
                              Icon(
-                                 imageVector = Icons.Default.AddCircle,
+                                 imageVector = Icons.Rounded.AddCircle,
                                  contentDescription = null,
                                  modifier = Modifier
                                      .size(32.dp)
@@ -315,7 +315,7 @@ data class ControlLayoutEditorScreen(
                                 button = button,
                                 enabled = true,
                                 onClick = { selectedButtons = selectedButtons - button },
-                                badgeIcon = Icons.Default.RemoveCircle,
+                                badgeIcon = Icons.Rounded.RemoveCircle,
                                 badgeColor = Color(0xFFEF5350),
                             )
                        }
@@ -351,7 +351,7 @@ data class ControlLayoutEditorScreen(
                                 button = button,
                                 enabled = isEnabled,
                                 onClick = { selectedButtons = selectedButtons + button },
-                                badgeIcon = Icons.Default.AddCircle,
+                                badgeIcon = Icons.Rounded.AddCircle,
                                 badgeColor = if (isEnabled) MaterialTheme.colorScheme.primary 
                                              else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                             )
@@ -463,5 +463,3 @@ private fun IconsLegend() {
         }
     }
 }
-
-

@@ -13,16 +13,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FileOpen
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.filled.Title
+import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FileOpen
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.Title
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -291,7 +291,7 @@ object FolderListScreen : Screen {
                   placeholder = { Text("Search folders and videos...") },
                   leadingIcon = {
                     Icon(
-                      imageVector = Icons.Filled.Search,
+                      imageVector = Icons.Rounded.Search,
                       contentDescription = "Search",
                     )
                   },
@@ -303,7 +303,7 @@ object FolderListScreen : Screen {
                       },
                     ) {
                       Icon(
-                        imageVector = Icons.Filled.Close,
+                        imageVector = Icons.Rounded.Close,
                         contentDescription = "Cancel",
                       )
                     }
@@ -419,7 +419,7 @@ object FolderListScreen : Screen {
               ) {
                 val imageVector by remember {
                   derivedStateOf {
-                    if (checkedProgress > 0.5f) Icons.Filled.Close else Icons.Filled.PlayArrow
+                    if (checkedProgress > 0.5f) Icons.Rounded.Close else Icons.Rounded.PlayArrow
                   }
                 }
                 Icon(
@@ -436,7 +436,7 @@ object FolderListScreen : Screen {
               isFabExpanded.value = false
               filePicker.launch(arrayOf("video/*"))
             },
-            icon = { Icon(Icons.Filled.FileOpen, contentDescription = null) },
+            icon = { Icon(Icons.Rounded.FileOpen, contentDescription = null) },
             text = { Text(text = "Open File") },
           )
 
@@ -451,7 +451,7 @@ object FolderListScreen : Screen {
                 }
               }
             },
-            icon = { Icon(Icons.Filled.History, contentDescription = null) },
+            icon = { Icon(Icons.Rounded.History, contentDescription = null) },
             text = { Text(text = "Recently Played") },
           )
 
@@ -460,7 +460,7 @@ object FolderListScreen : Screen {
               isFabExpanded.value = false
               showLinkDialog.value = true
             },
-            icon = { Icon(Icons.Filled.Link, contentDescription = null) },
+            icon = { Icon(Icons.Rounded.Link, contentDescription = null) },
             text = { Text(text = "Open Link") },
           )
         }
@@ -483,7 +483,7 @@ object FolderListScreen : Screen {
                 } else if (searchResults.isEmpty()) {
                   // No results
                   EmptyState(
-                    icon = Icons.Filled.Search,
+                    icon = Icons.Rounded.Search,
                     title = "No results found",
                     message = "No folders or videos match your search query",
                     modifier = Modifier.fillMaxSize(),
@@ -615,13 +615,13 @@ private fun FolderListContent(
       ) {
         if (showLoading) {
           LoadingState(
-            icon = Icons.Filled.Folder,
+            icon = Icons.Rounded.Folder,
             title = "Scanning for videos...",
             message = scanStatus ?: "Please wait while we search your device",
           )
         } else {
           EmptyState(
-            icon = Icons.Filled.Folder,
+            icon = Icons.Rounded.Folder,
             title = "No video folders found",
             message = "Add some video files to your device to see them here",
           )
@@ -764,9 +764,9 @@ private fun FolderSortDialog(
       FolderSortType.Size.displayName,
     ),
     icons = listOf(
-      Icons.Filled.Title,
-      Icons.Filled.CalendarToday,
-      Icons.Filled.SwapVert,
+      Icons.Rounded.Title,
+      Icons.Rounded.CalendarToday,
+      Icons.Rounded.SwapVert,
     ),
     getLabelForType = { type, _ ->
       when (type) {

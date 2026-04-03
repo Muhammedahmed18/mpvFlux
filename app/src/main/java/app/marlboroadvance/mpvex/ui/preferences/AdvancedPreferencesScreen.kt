@@ -16,10 +16,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.outlined.FileDownload
-import androidx.compose.material.icons.outlined.FileUpload
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -83,6 +83,9 @@ object AdvancedPreferencesScreen : Screen {
     var showExportDialog by remember { mutableStateOf(false) }
     var importStats by remember { mutableStateOf<SettingsManager.ImportStats?>(null) }
     var exportStats by remember { mutableStateOf<SettingsManager.ExportStats?>(null) }
+    
+    val clearedHistoryMsg = stringResource(R.string.pref_advanced_cleared_playback_history)
+    val clearedFontsMsg = stringResource(R.string.pref_advanced_cleared_fonts_cache)
 
     // Export settings launcher
     val exportLauncher =
@@ -191,7 +194,7 @@ object AdvancedPreferencesScreen : Screen {
           navigationIcon = {
             IconButton(onClick = backStack::removeLastOrNull) {
               Icon(
-                Icons.AutoMirrored.Default.ArrowBack, 
+                Icons.AutoMirrored.Rounded.ArrowBack, 
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.secondary,
               )
@@ -264,7 +267,7 @@ object AdvancedPreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.FileUpload, 
+                    Icons.Rounded.FileUpload, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -286,7 +289,7 @@ object AdvancedPreferencesScreen : Screen {
                 },
                 icon = { 
                   Icon(
-                    Icons.Outlined.FileDownload, 
+                    Icons.Rounded.FileDownload, 
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   ) 
@@ -379,7 +382,7 @@ object AdvancedPreferencesScreen : Screen {
                 onClick = { locationPicker.launch(null) },
                 iconButtonIcon = { 
                   Icon(
-                    Icons.Default.Clear, 
+                    Icons.Rounded.Clear,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.error,
                   ) 
@@ -482,7 +485,7 @@ object AdvancedPreferencesScreen : Screen {
                           Toast
                             .makeText(
                               context,
-                              context.getString(R.string.pref_advanced_cleared_playback_history),
+                              clearedHistoryMsg,
                               Toast.LENGTH_SHORT,
                             ).show()
                         }
@@ -610,7 +613,7 @@ object AdvancedPreferencesScreen : Screen {
                       Toast
                         .makeText(
                           context,
-                          context.getString(R.string.pref_advanced_cleared_fonts_cache),
+                          clearedFontsMsg,
                           Toast.LENGTH_SHORT,
                         ).show()
                     }

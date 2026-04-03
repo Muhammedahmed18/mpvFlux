@@ -75,10 +75,15 @@
   <!-- Player Preferences Hardcoded -->
   <string name="pref_autoplay_title">Enable next/previous navigation</string>
   <string name="pref_autoplay_summary">Show next/previous buttons for all videos in folder</string>
+  <string name="pref_autoplay_summary_off">Play videos individually (select multiple for playlist)</string>
   <string name="pref_autoplay_next_video_title">Autoplay next video</string>
   <string name="pref_autoplay_next_video_summary">Automatically play next video when current ends</string>
+  <string name="pref_autoplay_next_video_summary_off">Stay on current video when it ends</string>
   <string name="pref_auto_pip_title">Auto Picture-in-Picture</string>
   <string name="pref_auto_pip_summary">Automatically enter PIP mode when pressing home or back</string>
+  <string name="pref_player_keep_screen_on_paused_title">Keep screen on when paused</string>
+  <string name="pref_player_keep_screen_on_paused_summary_on">Screen stays awake while video is paused</string>
+  <string name="pref_player_keep_screen_on_paused_summary_off">Screen can turn off while video is paused</string>
   <string name="pref_dynamic_speed_overlay_title">Dynamic Speed Overlay</string>
   <string name="pref_dynamic_speed_overlay_summary">Show advance overlay for speed control during long press and swipe</string>
   <string name="pref_show_navigation_bar_title">Show navigation bar with controls</string>
@@ -134,6 +139,10 @@
   <string name="pref_player_gestures_horizontal_swipe_to_seek_summary">Swipe left or right on screen to seek forward or backward</string>
   <string name="pref_player_gestures_horizontal_swipe_sensitivity">Horizontal swipe sensitivity</string>
   <string name="pref_player_gestures_horizontal_swipe_sensitivity_summary">Adjust how much distance is covered per swipe</string>
+  <string name="pref_player_gestures_horizontal_swipe_sensitivity_low">Low</string>
+  <string name="pref_player_gestures_horizontal_swipe_sensitivity_medium">Medium</string>
+  <string name="pref_player_gestures_horizontal_swipe_sensitivity_high">High</string>
+  <string name="pref_player_gestures_horizontal_swipe_sensitivity_current_summary">Current: %1$d/100 (%2$s)</string>
   <string name="pref_player_gestures_hold_for_multiple_speed">Hold for multi - x speed</string>
   <string name="pref_player_controls">Controls</string>
   <string name="pref_player_controls_allow_gestures_in_panels">Allow gestures in panels</string>

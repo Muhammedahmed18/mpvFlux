@@ -17,11 +17,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.FolderOff
-import androidx.compose.material.icons.filled.RemoveCircle
-import androidx.compose.material.icons.outlined.Restore
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.FolderOff
+import androidx.compose.material.icons.rounded.RemoveCircle
+import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -114,7 +114,7 @@ object FoldersPreferencesScreen : Screen {
                 modifier = Modifier.padding(horizontal = 2.dp),
               ) {
                 Icon(
-                  Icons.Outlined.Restore,
+                  Icons.Rounded.Restore,
                   contentDescription = stringResource(R.string.pref_folders_clear_all),
                   modifier = Modifier.size(28.dp),
                   tint = MaterialTheme.colorScheme.error,
@@ -149,7 +149,7 @@ object FoldersPreferencesScreen : Screen {
               .weight(1f),
           ) {
             EmptyState(
-              icon = Icons.Filled.FolderOff,
+              icon = Icons.Rounded.FolderOff,
               title = stringResource(R.string.pref_folders_empty_title),
               message = stringResource(R.string.pref_folders_empty_message),
             )
@@ -210,7 +210,7 @@ object FoldersPreferencesScreen : Screen {
               verticalAlignment = Alignment.CenterVertically,
             ) {
               Icon(
-                imageVector = Icons.Default.Folder,
+                imageVector = Icons.Rounded.Folder,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
               )
@@ -322,7 +322,7 @@ private fun BlacklistedFolderItem(
       if (!isInSelectionMode) {
         IconButton(onClick = onRemove) {
           Icon(
-            imageVector = Icons.Default.RemoveCircle,
+            imageVector = Icons.Rounded.RemoveCircle,
             contentDescription = stringResource(R.string.delete),
             tint = MaterialTheme.colorScheme.error,
           )
@@ -373,7 +373,7 @@ private fun AddFolderDialog(
         )
         if (!isLoading && availableFolders.isNotEmpty()) {
           Icon(
-            Icons.Filled.ArrowDropDown,
+            Icons.Rounded.ArrowDropDown,
             contentDescription = stringResource(R.string.selection_options),
             modifier = Modifier.size(24.dp),
           )
@@ -487,4 +487,3 @@ private suspend fun scanAllVideoFolders(context: Application): List<VideoFolder>
       context = context
     )
 }
-

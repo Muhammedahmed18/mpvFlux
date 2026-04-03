@@ -97,7 +97,7 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.FileOperationProgressDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.FolderPickerDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
-import app.marlboroadvance.mpvex.ui.browser.dialogs.SortDialog
+import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.PlayLinkSheet
@@ -912,7 +912,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
       onPlayLink = { url -> MediaUtils.playFile(url, context, "play_link") },
     )
 
-    FileSystemSortDialog(
+    FileSystemSortBottomSheet(
       isOpen = sortDialogOpen.value,
       onDismiss = { sortDialogOpen.value = false },
     )
@@ -1525,7 +1525,7 @@ private fun FileSystemSearchContent(
 }
 
 @Composable
-fun FileSystemSortDialog(
+fun FileSystemSortBottomSheet(
   isOpen: Boolean,
   onDismiss: () -> Unit,
 ) {
@@ -1544,7 +1544,7 @@ fun FileSystemSortDialog(
   val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
   val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
 
-  SortDialog(
+  SortBottomSheet(
     isOpen = isOpen,
     onDismiss = onDismiss,
     title = "Sort & View Options",

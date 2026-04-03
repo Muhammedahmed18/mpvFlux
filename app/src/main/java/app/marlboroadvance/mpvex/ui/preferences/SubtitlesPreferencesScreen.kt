@@ -18,11 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieEncodings
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieFormats
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieSources
@@ -98,7 +98,7 @@ object SubtitlesPreferencesScreen : Screen {
               onClick = backstack::removeLastOrNull,
             ) {
               Icon(
-                Icons.AutoMirrored.Outlined.ArrowBack,
+                Icons.AutoMirrored.Rounded.ArrowBack,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.secondary,
               )
@@ -330,7 +330,7 @@ object SubtitlesPreferencesScreen : Screen {
                           },
                         ) {
                           Icon(
-                            Icons.Default.Refresh,
+                            Icons.Rounded.Refresh,
                             contentDescription = stringResource(R.string.reload_fonts),
                             tint = MaterialTheme.colorScheme.primary,
                           )
@@ -345,7 +345,7 @@ object SubtitlesPreferencesScreen : Screen {
                         },
                       ) {
                         Icon(
-                          Icons.Default.Clear,
+                          Icons.Rounded.Clear,
                           contentDescription = stringResource(R.string.clear_font_directory),
                           tint = MaterialTheme.colorScheme.tertiary,
                         )
@@ -453,7 +453,7 @@ object SubtitlesPreferencesScreen : Screen {
                     fontWeight = FontWeight.Bold
                   )
                   Icon(
-                    imageVector = if (showAdvanced) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    imageVector = if (showAdvanced) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                   )

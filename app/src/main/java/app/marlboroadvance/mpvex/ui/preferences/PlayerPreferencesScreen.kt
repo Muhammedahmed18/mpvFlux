@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -15,7 +15,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -40,8 +39,10 @@ object PlayerPreferencesScreen : Screen {
   @Composable
   override fun Content() {
     val backstack = LocalBackStack.current
-    val context = LocalContext.current
     val preferences = koinInject<PlayerPreferences>()
+    
+    val orientationNames = PlayerOrientation.entries.associateWith { stringResource(it.titleRes) }
+    
     Scaffold(
       topBar = {
         TopAppBar(
@@ -56,7 +57,7 @@ object PlayerPreferencesScreen : Screen {
           navigationIcon = {
             IconButton(onClick = backstack::removeLastOrNull) {
               Icon(
-                Icons.AutoMirrored.Outlined.ArrowBack, 
+                Icons.AutoMirrored.Rounded.ArrowBack,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.secondary,
               )
@@ -72,7 +73,6 @@ object PlayerPreferencesScreen : Screen {
               .fillMaxSize()
               .padding(padding),
         ) {
-          // General Section
           item {
             PreferenceSectionHeader(title = "General")
           }
@@ -84,11 +84,11 @@ object PlayerPreferencesScreen : Screen {
                 value = orientation,
                 onValueChange = preferences.orientation::set,
                 values = PlayerOrientation.entries,
-                valueToText = { AnnotatedString(context.getString(it.titleRes)) },
+                valueToText = { AnnotatedString(orientationNames[it] ?: "") },
                 title = { Text(text = stringResource(id = R.string.pref_player_orientation)) },
                 summary = { 
                   Text(
-                    text = stringResource(id = orientation.titleRes),
+                    text = orientationNames[orientation] ?: "",
                     color = MaterialTheme.colorScheme.outline,
                   ) 
                 },
@@ -191,7 +191,7 @@ object PlayerPreferencesScreen : Screen {
               )
             }
           }
-          // Seeking Section
+
           item {
             PreferenceSectionHeader(title = stringResource(R.string.pref_player_seeking_title))
           }
@@ -243,7 +243,7 @@ object PlayerPreferencesScreen : Screen {
               )
             }
           }
-          // Gestures Section
+
           item {
             PreferenceSectionHeader(title = stringResource(R.string.pref_player_gestures))
           }
@@ -338,76 +338,6 @@ object PlayerPreferencesScreen : Screen {
                     color = MaterialTheme.colorScheme.outline,
                   ) 
                 }
-              )
-            }
-          }
-          // Controls Section
-          item {
-            PreferenceSectionHeader(title = stringResource(R.string.pref_player_controls))
-          }
-
-          item {
-            PreferenceCard {
-              val allowGesturesInPanels by preferences.allowGesturesInPanels.collectAsState()
-              SwitchPreference(
-                value = allowGesturesInPanels,
-                onValueChange = preferences.allowGesturesInPanels::set,
-                title = {
-                  Text(
-                    text = stringResource(id = R.string.pref_player_controls_allow_gestures_in_panels),
-                  )
-                },
-              )
-              
-              PreferenceDivider()
-              
-              val swapVolumeAndBrightness by preferences.swapVolumeAndBrightness.collectAsState()
-              SwitchPreference(
-                value = swapVolumeAndBrightness,
-                onValueChange = preferences.swapVolumeAndBrightness::set,
-                title = { Text(stringResource(R.string.swap_the_volume_and_brightness_slider)) },
-              )
-              
-              PreferenceDivider()
-              
-              val showLoadingCircle by preferences.showLoadingCircle.collectAsState()
-              SwitchPreference(
-                value = showLoadingCircle,
-                onValueChange = preferences.showLoadingCircle::set,
-                title = { Text(stringResource(R.string.pref_player_controls_show_loading_circle)) },
-              )
-            }
-          }
-          // Display Section
-          item {
-            PreferenceSectionHeader(title = stringResource(R.string.pref_player_display))
-          }
-          
-          item {
-            PreferenceCard {
-              val showSystemStatusBar by preferences.showSystemStatusBar.collectAsState()
-              SwitchPreference(
-                value = showSystemStatusBar,
-                onValueChange = preferences.showSystemStatusBar::set,
-                title = { Text(stringResource(R.string.pref_player_display_show_status_bar)) },
-              )
-
-              PreferenceDivider()
-
-              val showSystemNavigationBar by preferences.showSystemNavigationBar.collectAsState()
-              SwitchPreference(
-                value = showSystemNavigationBar,
-                onValueChange = preferences.showSystemNavigationBar::set,
-                title = { Text("Show navigation bar with controls") },
-              )
-              
-              PreferenceDivider()
-              
-              val reduceMotion by preferences.reduceMotion.collectAsState()
-              SwitchPreference(
-                value = reduceMotion,
-                onValueChange = preferences.reduceMotion::set,
-                title = { Text(stringResource(R.string.pref_player_display_reduce_player_animation)) },
               )
             }
           }

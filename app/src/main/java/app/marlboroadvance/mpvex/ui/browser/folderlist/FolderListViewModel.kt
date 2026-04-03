@@ -24,8 +24,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import java.io.File
 
 data class FolderWithNewCount(
   val folder: VideoFolder,
@@ -170,7 +172,7 @@ class FolderListViewModel(
         prefs.edit().putString("folders", json).apply()
         Log.d(TAG, "Saved ${folders.size} folders to cache")
       } catch (e: Exception) {
-        Log.e(TAG, "Error saving folders to cache", e)
+        Log.e(TAG, "Error saving folders to cache")
       }
     }
   }
@@ -302,7 +304,38 @@ class FolderListViewModel(
     calculateNewVideoCounts(_videoFolders.value)
   }
 
+  /**
+   * Renames a folder on the filesystem and updates MediaStore
+   */
+  suspend fun renameFolder(folder: VideoFolder, newName: String): Result<Unit> = withContext(Dispatchers.IO) {
+    try {
+      val oldFile = File(folder.path)
+      val newFile = File(oldFile.parent, newName)
 
+      if (newFile.exists()) {
+        return@withContext Result.failure(Exception("A folder with this name already exists"))
+      }
+
+      val success = oldFile.renameTo(newFile)
+      if (success) {
+        Log.d(TAG, "Successfully renamed folder from ${oldFile.path} to ${newFile.path}")
+
+        // Notify MediaStore about both paths to trigger indexing updates
+        android.media.MediaScannerConnection.scanFile(
+          getApplication(),
+          arrayOf(oldFile.absolutePath, newFile.absolutePath),
+          null
+        ) { _, _ -> }
+
+        Result.success(Unit)
+      } else {
+        Result.failure(Exception("Could not rename folder. Check permissions."))
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "Error renaming folder", e)
+      Result.failure(e)
+    }
+  }
 
   /**
    * Scans the filesystem recursively to find all folders containing videos.
