@@ -111,7 +111,7 @@ class FolderListViewModel(
     // Filter folders based on blacklist
     viewModelScope.launch {
       combine(_allVideoFolders, foldersPreferences.blacklistedFolders.changes()) { folders, blacklist ->
-        folders.filter { folder -> folder.path !in blacklist }
+        folders.filter { folder -> folder.path !in blacklist && folder.videoCount > 0 }
       }.collectLatest { filteredFolders ->
         // Check if folders became empty after having folders
         if (previousFolderCount > 0 && filteredFolders.isEmpty()) {
@@ -129,8 +129,8 @@ class FolderListViewModel(
         // Calculate new video counts for each folder
         calculateNewVideoCounts(filteredFolders)
 
-        // Save to cache for next app launch (save unfiltered list)
-        saveFoldersToCache(_allVideoFolders.value)
+        // Save to cache for next app launch (save filtered list)
+        saveFoldersToCache(filteredFolders)
       }
     }
   }
