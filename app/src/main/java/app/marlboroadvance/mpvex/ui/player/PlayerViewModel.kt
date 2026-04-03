@@ -32,7 +32,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -164,17 +163,17 @@ class PlayerViewModel(
   private val volumeBoostCap by MPVLib.propInt["volume-max"].collectAsState(viewModelScope)
 
   init {
-    // Poll precise position only when playing
+    // REMOVED: High-frequency polling loop for performance optimization
+    // Position is now handled by MPV property observation via pos StateFlow
+    // This eliminates unnecessary CPU usage and battery drain
+    
+    // Observe position changes efficiently instead of polling
     viewModelScope.launch {
-      while (isActive) {
-        val time = MPVLib.getPropertyDouble("time-pos")
-        if (time != null) {
-          _precisePosition.value = time.toFloat()
-        }
-        delay(42) // ~24fps updates
+      MPVLib.propInt["time-pos"].collect { position ->
+        _precisePosition.value = position?.toFloat() ?: 0f
       }
     }
-
+    
     // Update precise duration when the integer duration changes (avoid polling)
     viewModelScope.launch {
       MPVLib.propInt["duration"].collect { _ ->
@@ -784,6 +783,9 @@ class PlayerViewModel(
 
   // ==================== Playback Control ====================
 
+  // Callback for progress saving when pause is triggered from ViewModel
+  var onPauseCallback: (() -> Unit)? = null
+
   fun pauseUnpause() {
     viewModelScope.launch(Dispatchers.IO) {
       val isPaused = MPVLib.getPropertyBoolean("pause") ?: false
@@ -792,7 +794,8 @@ class PlayerViewModel(
         withContext(Dispatchers.Main) { host.requestAudioFocus() }
         MPVLib.setPropertyBoolean("pause", false)
       } else {
-        // We are about to pause
+        // We are about to pause - trigger progress save callback
+        onPauseCallback?.invoke()
         MPVLib.setPropertyBoolean("pause", true)
         withContext(Dispatchers.Main) { host.abandonAudioFocus() }
       }
@@ -801,6 +804,8 @@ class PlayerViewModel(
 
   fun pause() {
     viewModelScope.launch(Dispatchers.IO) {
+      // Trigger progress save callback before pausing
+      onPauseCallback?.invoke()
       MPVLib.setPropertyBoolean("pause", true)
       withContext(Dispatchers.Main) { host.abandonAudioFocus() }
     }
@@ -1819,7 +1824,7 @@ class PlayerViewModel(
       return
     }
 
-    val currentPos = MPVLib.getPropertyDouble("time-pos") ?: return
+    val currentPos = MPVLib.getPropertyDouble("time-pos") ?: 0.0
     _abLoopA.value = currentPos
     MPVLib.setPropertyDouble("ab-loop-a", currentPos)
   }
@@ -1832,7 +1837,7 @@ class PlayerViewModel(
       return
     }
 
-    val currentPos = MPVLib.getPropertyDouble("time-pos") ?: return
+    val currentPos = MPVLib.getPropertyDouble("time-pos") ?: 0.0
     _abLoopB.value = currentPos
     MPVLib.setPropertyDouble("ab-loop-b", currentPos)
   }

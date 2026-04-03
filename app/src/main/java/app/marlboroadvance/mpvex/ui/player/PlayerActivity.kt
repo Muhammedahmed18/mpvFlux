@@ -58,6 +58,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.android.inject
 import java.io.File
 
@@ -89,6 +90,13 @@ class PlayerActivity :
    */
   private val viewModel: PlayerViewModel by viewModels<PlayerViewModel> {
     PlayerViewModelProviderFactory(this)
+  }
+  
+  // Initialize ViewModel callback for progress saving on pause
+  private fun setupViewModelCallbacks() {
+    viewModel.onPauseCallback = {
+      saveVideoProgress()
+    }
   }
 
   /**
@@ -226,6 +234,13 @@ class PlayerActivity :
   private var mpvInitialized = false // Track MPV initialization state
   private var savePlaybackStateJob: kotlinx.coroutines.Job? = null // Track ongoing save job
   private var wasPlayingBeforePause = false // Track if video was playing before pause
+  
+  // ==================== Progress Save Management ====================
+  
+  /**
+   * Centralized manager for video progress saving operations.
+   */
+  private val progressSaveManager = ProgressSaveManager()
 
   // ==================== Background Playback ====================
 
@@ -341,6 +356,7 @@ class PlayerActivity :
     setupPlayerControls()
     setupPipHelper()
     setupMediaSession()
+    setupViewModelCallbacks()
 
     playlistId = intent.getIntExtra("playlist_id", -1).takeIf { it != -1 }
     playlistIndex = intent.getIntExtra("playlist_index", 0)
@@ -470,6 +486,9 @@ class PlayerActivity :
       return
     }
 
+    // Save progress when user navigates back from player (condition 2)
+    saveVideoProgress()
+    
     isUserFinishing = true
     finish()
   }
@@ -481,6 +500,8 @@ class PlayerActivity :
         PlayerControls(
           viewModel = viewModel,
           onBackPress = {
+            // Save progress when user closes player via controls (condition 2)
+            saveVideoProgress()
             isUserFinishing = true
             finish()
           },
@@ -577,17 +598,8 @@ class PlayerActivity :
       // Wait for any pending save operation to complete before destroying MPV
       // This prevents the race condition where the save coroutine tries to access
       // MPV properties after MPVLib.destroy() has been called
-      savePlaybackStateJob?.let { job ->
-        Log.d(TAG, "Waiting for save playback state job to complete...")
-        runCatching {
-          // Use runBlocking to ensure we wait for the job to finish
-          // This is safe here as onDestroy is already on the main thread
-          kotlinx.coroutines.runBlocking {
-            job.join()
-          }
-        }
-        Log.d(TAG, "Save playback state job completed")
-      }
+      progressSaveManager.cancelPendingSave()
+      Log.d(TAG, "All pending save operations cancelled")
 
       cleanupMPV()
       cleanupAudio()
@@ -679,10 +691,9 @@ class PlayerActivity :
         restoreSystemUI()
       }
 
-      // OPTIMIZATION: Only save if not finishing (onDestroy will handle final save)
-      if (!isFinishing) {
-        saveVideoPlaybackState(fileName)
-      }
+      // REMOVED: Progress saving now handled by specific conditions
+      // Progress is saved on: pause, video close, app close, video end
+      // No longer saving here to avoid redundant saves with onStop()
     }.onFailure { e ->
       Log.e(TAG, "Error during onPause", e)
     }
@@ -693,6 +704,9 @@ class PlayerActivity :
   @RequiresApi(Build.VERSION_CODES.P)
   override fun finish() {
     runCatching {
+      // Save progress when app is closed/finished (condition 3)
+      saveVideoProgress()
+      
       // Don't restore UI during normal finish to prevent flickering
       // System will handle UI restoration automatically
       isReady = false
@@ -713,6 +727,9 @@ class PlayerActivity :
   // finishAndRemoveTask() was added in API 21, but since our minSdk is 26, it's always available
   override fun finishAndRemoveTask() {
     runCatching {
+      // Save progress when app is closed/finished (condition 3)
+      saveVideoProgress()
+      
       // Don't restore UI during normal finish to prevent flickering
       // System will handle UI restoration automatically
       isReady = false
@@ -734,7 +751,10 @@ class PlayerActivity :
   override fun onStop() {
     runCatching {
       pipHelper.onStop()
-      saveVideoPlaybackState(fileName)
+      
+      // REMOVED: Progress saving now handled by specific conditions
+      // Progress is saved on: pause, video close, app close, video end
+      // No longer saving here to avoid redundant saves with onPause()
 
       if (noisyReceiverRegistered) {
         unregisterReceiver(noisyReceiver)
@@ -1465,12 +1485,15 @@ class PlayerActivity :
   }
 
   /**
-   * Handles pause state changes by managing screen-on flag and MediaSession state.
+   * Handles pause state changes by managing screen-on flag, MediaSession state, and saving progress.
    *
    * @param isPaused true if playback is paused, false if playing
    */
   private fun handlePauseStateChange(isPaused: Boolean) {
     if (isPaused) {
+      // Save progress when video is paused (every pause as requested)
+      saveVideoProgress()
+      
       // Only clear keep-screen-on if the preference is NOT enabled
       if (!playerPreferences.keepScreenOnWhenPaused.get()) {
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -1487,13 +1510,16 @@ class PlayerActivity :
   }
 
   /**
-   * Handles end-of-file event by playing next in playlist if available, otherwise finishing activity if configured.
+   * Handles end-of-file event by saving progress, playing next in playlist if available, otherwise finishing activity if configured.
    *
    * @param isEof true if end of file reached
    */
   private fun handleEndOfFile(isEof: Boolean) {
     if (isEof) {
-      // Check if we should repeat the current file
+      // Save progress when video reaches end (condition 4)
+      saveVideoProgress()
+      
+      // Check if we should repeat current file
       if (viewModel.shouldRepeatCurrentFile()) {
         MPVLib.command("seek", "0", "absolute")
         viewModel.unpause()
@@ -1666,7 +1692,10 @@ class PlayerActivity :
 
     // Reset AB loop values when video changes
     viewModel.clearABLoop()
-
+    
+    // Reset progress save tracking when new media loads
+    progressSaveManager.resetTracking()
+    
     setIntentExtras(intent.extras)
 
     lifecycleScope.launch(Dispatchers.IO) {
@@ -1962,69 +1991,45 @@ class PlayerActivity :
   private fun Int.toColorHexString() = "#" + this.toHexString().uppercase()
 
   /**
-   * Saves the current playback state to the database.
-   *
-   * Uses lifecycleScope to save state; cancels previous pending saves.
-   *
-   * @param mediaTitle The title of the media being played
+   * Saves current video progress using the centralized ProgressSaveManager.
+   * This method should be called for all 4 save conditions.
    */
-  private fun saveVideoPlaybackState(mediaTitle: String) {
+  private fun saveVideoProgress() {
     if (mediaIdentifier.isBlank()) return
-
-    // Cancel any previous pending save operation
-    savePlaybackStateJob?.cancel()
-
-    // Launch new save job and track it
-    savePlaybackStateJob = lifecycleScope.launch(Dispatchers.IO) {
-      runCatching {
-        val oldState = playbackStateRepository.getVideoDataByTitle(mediaIdentifier)
-        Log.d(TAG, "Saving playback state for: $mediaTitle (identifier: $mediaIdentifier)")
-
-        val lastPosition = calculateSavePosition(oldState)
-        val duration = viewModel.duration ?: 0
-        val timeRemaining = if (duration > lastPosition) duration - lastPosition else 0
-
-        playbackStateRepository.upsert(
-          PlaybackStateEntity(
-            mediaTitle = mediaIdentifier,
-            lastPosition = lastPosition,
-            playbackSpeed = MPVLib.getPropertyDouble("speed") ?: DEFAULT_PLAYBACK_SPEED,
-            videoZoom = MPVLib.getPropertyDouble("video-zoom")?.toFloat() ?: 0f,
-            sid = player.sid,
-            secondarySid = player.secondarySid,
-            subDelay = ((MPVLib.getPropertyDouble("sub-delay") ?: 0.0) * MILLISECONDS_TO_SECONDS).toInt(),
-            subSpeed = MPVLib.getPropertyDouble("sub-speed") ?: DEFAULT_SUB_SPEED,
-            aid = player.aid,
-            audioDelay =
-              (
-                (MPVLib.getPropertyDouble("audio-delay") ?: 0.0) * MILLISECONDS_TO_SECONDS
-                ).toInt(),
-            timeRemaining = timeRemaining,
-            externalSubtitles = viewModel.externalSubtitles.joinToString("|"),
-            hasBeenWatched = run {
-              val watchedThreshold = browserPreferences.watchedThreshold.get()
-              val durationSeconds = duration.toFloat()
-              val currentPos = viewModel.pos ?: 0
-              
-              // Check if we are at the end (effectively watched)
-              // Using a small buffer (1s) to account for float inaccuracies or near-end stops
-              val isFinished = (durationSeconds > 0) && (currentPos >= durationSeconds - 1)
-
-              val progress = if (durationSeconds > 0) currentPos.toFloat() / durationSeconds else 0f
-              val isCurrentlyWatched = progress >= (watchedThreshold / 100f)
-              
-              // Also check lastPosition in case we are saving partway through (though lastPosition might be 0 if finished)
-              val oldProgress = if (durationSeconds > 0) lastPosition.toFloat() / durationSeconds else 0f
-              val wasWatchedThisSession = oldProgress >= (watchedThreshold / 100f)
-
-              isCurrentlyWatched || isFinished || wasWatchedThisSession || (oldState?.hasBeenWatched == true)
-            },
-          ),
-        )
-      }.onFailure { e ->
-        Log.e(TAG, "Error saving playback state", e)
-      }
+    
+    // Get old state for position calculation
+    lifecycleScope.launch(Dispatchers.IO) {
+      val oldState = runCatching { 
+        playbackStateRepository.getVideoDataByTitle(mediaIdentifier) 
+      }.getOrNull()
+      
+      // Use ProgressSaveManager for coordinated save
+      progressSaveManager.saveProgress(
+        mediaIdentifier = mediaIdentifier,
+        getPosition = { viewModel.pos ?: 0 },
+        getDuration = { viewModel.duration ?: 0 },
+        getPlaybackSpeed = { MPVLib.getPropertyDouble("speed") ?: DEFAULT_PLAYBACK_SPEED },
+        getVideoZoom = { MPVLib.getPropertyDouble("video-zoom")?.toFloat() ?: 0f },
+        getSid = { player.sid },
+        getSecondarySid = { player.secondarySid },
+        getSubDelay = { ((MPVLib.getPropertyDouble("sub-delay") ?: 0.0) * MILLISECONDS_TO_SECONDS).toInt() },
+        getSubSpeed = { MPVLib.getPropertyDouble("sub-speed") ?: DEFAULT_SUB_SPEED },
+        getAid = { player.aid },
+        getAudioDelay = { ((MPVLib.getPropertyDouble("audio-delay") ?: 0.0) * MILLISECONDS_TO_SECONDS).toInt() },
+        getExternalSubtitles = { viewModel.externalSubtitles.joinToString("|") },
+        savePositionOnQuit = playerPreferences.savePositionOnQuit.get(),
+        oldState = oldState
+      )
     }
+  }
+
+  /**
+   * Legacy method - kept for compatibility but should use saveVideoProgress() instead.
+   * @deprecated Use saveVideoProgress() instead
+   */
+  @Deprecated("Use saveVideoProgress() instead")
+  private fun saveVideoPlaybackState(mediaTitle: String) {
+    saveVideoProgress()
   }
 
   /**
