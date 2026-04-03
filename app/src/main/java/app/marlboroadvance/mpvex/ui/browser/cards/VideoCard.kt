@@ -1,5 +1,7 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -12,13 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,7 +37,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -88,26 +88,36 @@ fun VideoCard(
   val showSizeChip = overrideShowSizeChip ?: showSizeChipPref
   val showResolutionChip = overrideShowResolutionChip ?: showResolutionChipPref
 
-  Card(
+  val animatedProgress by animateFloatAsState(
+    targetValue = progressPercentage ?: 0f,
+    animationSpec = tween(durationMillis = 600),
+    label = "VideoProgress"
+  )
+
+  Surface(
     modifier = modifier
       .fillMaxWidth()
       .combinedClickable(
         onClick = onClick,
         onLongClick = onLongClick,
       ),
-    colors = CardDefaults.cardColors(
-      containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
-    ),
+    color = MaterialTheme.colorScheme.surface,
+    tonalElevation = 0.dp,
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(8.dp),
+        .padding(horizontal = 12.dp, vertical = 4.dp) // Outer gap for selection
+        .clip(RoundedCornerShape(16.dp))
+        .background(
+            if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent
+        )
+        .padding(horizontal = 12.dp, vertical = 12.dp), // Inner content padding
       verticalAlignment = Alignment.CenterVertically
     ) {
       val thumbnailRepository = koinInject<ThumbnailRepository>()
       // Rectangular thumbnail (16:9) with fixed width; height derives from aspect ratio
-      val thumbWidthDp = 128.dp
+      val thumbWidthDp = 160.dp // Increased from 128.dp
       val aspect = 16f / 9f
       val thumbWidthPx = with(LocalDensity.current) { thumbWidthDp.roundToPx() }
       val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
@@ -152,7 +162,7 @@ fun VideoCard(
           Modifier
             .width(thumbWidthDp)
             .aspectRatio(aspect)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .combinedClickable(
               onClick = onThumbClick,
@@ -172,7 +182,7 @@ fun VideoCard(
             Icon(
               Icons.Filled.PlayArrow,
               contentDescription = "Play",
-              modifier = Modifier.size(32.dp),
+              modifier = Modifier.size(40.dp), // Increased from 32.dp
               tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f),
             )
           }
@@ -180,8 +190,21 @@ fun VideoCard(
           Icon(
             Icons.Filled.PlayArrow,
             contentDescription = "Play",
-            modifier = Modifier.size(32.dp),
+            modifier = Modifier.size(40.dp), // Increased from 32.dp
             tint = MaterialTheme.colorScheme.secondary.copy(alpha = 0.6f),
+          )
+        }
+
+        // Show tick icon for watched videos
+        if (isWatched) {
+          Icon(
+            Icons.Rounded.CheckCircle,
+            contentDescription = null,
+            modifier = Modifier
+              .align(Alignment.TopStart)
+              .padding(8.dp)
+              .size(20.dp),
+            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
           )
         }
 
@@ -241,7 +264,7 @@ fun VideoCard(
               Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(4.dp),
+                .height(2.5.dp),
           ) {
             // Background (unwatched portion)
             Box(
@@ -255,27 +278,25 @@ fun VideoCard(
               modifier =
                 Modifier
                   .fillMaxHeight()
-                  .fillMaxWidth(progressPercentage)
+                  .fillMaxWidth(animatedProgress)
                   .background(MaterialTheme.colorScheme.primary),
             )
           }
         }
       }
-      Spacer(modifier = Modifier.width(16.dp))
+      Spacer(modifier = Modifier.width(12.dp))
       Column(
         modifier = Modifier.weight(1f),
       ) {
         Text(
           video.displayName,
           style = MaterialTheme.typography.titleMedium.copy(
-            fontWeight = FontWeight.SemiBold
-          ).let { baseStyle ->
-            if (isRecentlyPlayed) baseStyle.copy(fontStyle = FontStyle.Italic) else baseStyle
-          },
+            fontWeight = if (isRecentlyPlayed) FontWeight.Bold else FontWeight.SemiBold
+          ),
           color = if (isRecentlyPlayed) {
-            MaterialTheme.colorScheme.tertiary 
+            MaterialTheme.colorScheme.primary
           } else if (isWatched) {
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
           } else {
             MaterialTheme.colorScheme.onSurface
           },
@@ -283,95 +304,49 @@ fun VideoCard(
           overflow = TextOverflow.Ellipsis,
         )
         Spacer(modifier = Modifier.height(4.dp))
-        FlowRow(
-          horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
-          verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
-        ) {
-          if (showSubtitleIndicator) {
-            if (video.hasEmbeddedSubtitles && video.subtitleCodec.isNotBlank()) {
-              video.subtitleCodec.split(" ").forEach { codec ->
-                Text(
-                  text = codec,
-                  style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Medium
-                  ),
-                  modifier = Modifier
-                    .background(
-                      MaterialTheme.colorScheme.primaryContainer,
-                      RoundedCornerShape(4.dp),
-                    )
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                  color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-              }
+        
+        val metadataParts = remember(video, showSizeChip, showResolutionChip, showDateChip, showFramerateInResolution) {
+          buildList {
+            if (showSizeChip && video.sizeFormatted != "0 B" && video.sizeFormatted != "--") {
+              add(video.sizeFormatted)
+            }
+            if (showResolutionChip && video.resolution != "--") {
+              val res = if (showFramerateInResolution) video.resolution else video.resolution.substringBefore("@")
+              add(res)
+            } else if (showFramerateInResolution && video.resolution.substringAfter("@", "").isNotEmpty()) {
+              add("${video.resolution.substringAfter("@")} FPS")
+            }
+            if (showDateChip && video.dateModified > 0) {
+              add(formatDate(video.dateModified))
             }
           }
-          if (showSizeChip && video.sizeFormatted != "0 B" && video.sizeFormatted != "--") {
-            Text(
-              video.sizeFormatted,
-              style = MaterialTheme.typography.labelSmall,
-              modifier = Modifier
-                .background(
-                  MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                  RoundedCornerShape(4.dp),
-                )
-                .padding(horizontal = 6.dp, vertical = 2.dp),
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          }
-          // Resolution and Framerate logic (List view)
-            val fpsOnly = video.resolution.substringAfter("@", "")
-            val hasFps = fpsOnly.isNotEmpty()
+        }
 
-            if (showResolutionChip) {
-              if (video.resolution != "--") {
-                val displayResolution = if (showFramerateInResolution) {
-                  video.resolution
-                } else {
-                  video.resolution.substringBefore("@")
-                }
-
-                Text(
-                  displayResolution,
-                  style = MaterialTheme.typography.labelSmall,
-                  modifier =
-                    Modifier
-                      .background(
-                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        RoundedCornerShape(4.dp),
-                      )
+        if (metadataParts.isNotEmpty() || (showSubtitleIndicator && video.hasEmbeddedSubtitles)) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+          ) {
+            if (showSubtitleIndicator && video.hasEmbeddedSubtitles && video.subtitleCodec.isNotBlank()) {
+                video.subtitleCodec.split(" ").forEach { codec ->
+                  Text(
+                    text = codec,
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                    modifier = Modifier
+                      .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(4.dp))
                       .padding(horizontal = 6.dp, vertical = 2.dp),
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-              }
-            } else if (showFramerateInResolution && hasFps) {
-              // Resolution is hidden, but framerate is enabled -> show only framerate
-              Text(
-                "$fpsOnly FPS",
-                style = MaterialTheme.typography.labelSmall,
-                modifier =
-                  Modifier
-                    .background(
-                      MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                      RoundedCornerShape(4.dp),
-                    )
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-              )
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                  )
+                }
             }
             
-            if (showDateChip && video.dateModified > 0) {
+            if (metadataParts.isNotEmpty()) {
               Text(
-                formatDate(video.dateModified),
+                text = metadataParts.joinToString(" • "),
                 style = MaterialTheme.typography.labelSmall,
-                modifier =
-                  Modifier
-                    .background(
-                      MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                      RoundedCornerShape(4.dp),
-                    )
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
               )
             }
           }
@@ -379,6 +354,7 @@ fun VideoCard(
       }
     }
   }
+}
 
 private fun formatDate(timestampSeconds: Long): String {
   val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
