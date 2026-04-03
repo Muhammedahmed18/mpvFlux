@@ -24,21 +24,17 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ViewList
-import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Title
-import androidx.compose.material.icons.filled.ViewModule
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonMenu
@@ -70,6 +66,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -87,7 +84,6 @@ import app.marlboroadvance.mpvex.BuildConfig
 import app.marlboroadvance.mpvex.domain.browser.FileSystemItem
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
-import app.marlboroadvance.mpvex.preferences.MediaLayoutMode
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
@@ -100,7 +96,6 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.FileOperationProgressDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.FolderPickerDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.SortDialog
-import app.marlboroadvance.mpvex.ui.browser.dialogs.ViewModeSelector
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.PlayLinkSheet
@@ -112,8 +107,7 @@ import app.marlboroadvance.mpvex.utils.media.MediaUtils
 import app.marlboroadvance.mpvex.utils.permission.PermissionUtils
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import my.nanihadesuka.compose.LazyColumnScrollbar
@@ -407,7 +401,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
             parentDirectories.forEach { parentPath ->
               try {
                 Log.d("FileSystemBrowserScreen", "Searching in parent directory: $parentPath")
-                val parentResults = app.marlboroadvance.mpvex.ui.browser.filesystem.searchRecursively(context, parentPath, searchQuery)
+                val parentResults = searchRecursively(context, parentPath, searchQuery)
                 Log.d("FileSystemBrowserScreen", "Found ${parentResults.size} results in parent $parentPath")
                 allResults.addAll(parentResults)
               } catch (e: Exception) {
@@ -419,7 +413,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
             items.filterIsInstance<FileSystemItem.Folder>().forEach { storageVolume ->
               try {
                 Log.d("FileSystemBrowserScreen", "Searching in storage volume: ${storageVolume.path}")
-                val rootResults = app.marlboroadvance.mpvex.ui.browser.filesystem.searchRecursively(context, storageVolume.path, searchQuery)
+                val rootResults = searchRecursively(context, storageVolume.path, searchQuery)
                 Log.d("FileSystemBrowserScreen", "Found ${rootResults.size} results in ${storageVolume.path}")
                 allResults.addAll(rootResults)
               } catch (e: Exception) {
@@ -440,7 +434,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
           } else if (currentPath != null) {
             // In a specific directory - search from there
             Log.d("FileSystemBrowserScreen", "Searching in directory: $currentPath")
-            val results = app.marlboroadvance.mpvex.ui.browser.filesystem.searchRecursively(context, currentPath, searchQuery)
+            val results = searchRecursively(context, currentPath, searchQuery)
             Log.d("FileSystemBrowserScreen", "Found ${results.size} results in $currentPath")
             results
           } else {
@@ -573,11 +567,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
             } else {
               { deleteDialogOpen.value = true }
             },
-            onRenameClick = if (videoSelectionManager.isSingleSelection && !isMixedSelection) {
-              null
-            } else {
-              null
-            },
+            onRenameClick = null,
             isSingleSelection = videoSelectionManager.isSingleSelection && !isMixedSelection,
             onInfoClick = if (videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode) {
               {
@@ -926,7 +916,6 @@ fun FileSystemBrowserScreen(path: String? = null) {
     FileSystemSortDialog(
       isOpen = sortDialogOpen.value,
       onDismiss = { sortDialogOpen.value = false },
-      isAtRoot = isAtRoot,
     )
 
     DeleteConfirmationDialog(
@@ -1281,7 +1270,7 @@ private fun FileSystemBrowserContent(
             // Breadcrumb navigation (if not at root)
             if (!isAtRoot && breadcrumbs.isNotEmpty()) {
               item {
-                app.marlboroadvance.mpvex.ui.browser.filesystem.BreadcrumbNavigation(
+                BreadcrumbNavigation(
                   breadcrumbs = breadcrumbs,
                   onBreadcrumbClick = onBreadcrumbClick,
                 )
@@ -1314,7 +1303,6 @@ private fun FileSystemBrowserContent(
                 } else {
                   { onFolderClick(folder) }
                 },
-                isGridMode = false,
               )
             }
 
@@ -1335,7 +1323,6 @@ private fun FileSystemBrowserContent(
                 } else {
                   { onVideoClick(videoFile.video) }
                 },
-                isGridMode = false,
                 showSubtitleIndicator = showSubtitleIndicator,
                 overrideShowSizeChip = null,
                 overrideShowResolutionChip = null,
@@ -1382,34 +1369,34 @@ private fun FileSystemSearchContent(
   modifier: Modifier = Modifier,
 ) {
   val gesturePreferences = koinInject<GesturePreferences>()
-  val browserPreferences = koinInject<BrowserPreferences>()
   val tapThumbnailToSelect by gesturePreferences.tapThumbnailToSelect.collectAsState()
 
   // Track scroll for FAB visibility in search mode with proper scroll direction detection
   val previousIndex = remember { mutableIntStateOf(0) }
   val previousOffset = remember { mutableIntStateOf(0) }
   
-  LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) {
-    val currentIndex = listState.firstVisibleItemIndex
-    val currentOffset = listState.firstVisibleItemScrollOffset
-    
-    // Show FAB when at the top
-    if (currentIndex == 0 && currentOffset == 0) {
-      isFabVisible.value = true
-    } else {
-      // Calculate if scrolling down or up
-      val isScrollingDown = if (currentIndex != previousIndex.value) {
-        currentIndex > previousIndex.value
-      } else {
-        currentOffset > previousOffset.value
+  LaunchedEffect(listState) {
+    snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+      .distinctUntilChanged()
+      .collect { (currentIndex, currentOffset) ->
+        // Show FAB when at the top
+        if (currentIndex == 0 && currentOffset == 0) {
+          isFabVisible.value = true
+        } else {
+          // Calculate if scrolling down or up
+          val isScrollingDown = if (currentIndex != previousIndex.intValue) {
+            currentIndex > previousIndex.intValue
+          } else {
+            currentOffset > previousOffset.intValue
+          }
+          
+          // Hide when scrolling down, show when scrolling up
+          isFabVisible.value = !isScrollingDown
+        }
+        
+        previousIndex.intValue = currentIndex
+        previousOffset.intValue = currentOffset
       }
-      
-      // Hide when scrolling down, show when scrolling up
-      isFabVisible.value = !isScrollingDown
-    }
-    
-    previousIndex.value = currentIndex
-    previousOffset.value = currentOffset
   }
 
   Box(modifier = modifier.fillMaxSize()) {
@@ -1492,7 +1479,6 @@ private fun FileSystemSearchContent(
                 onClick = { onFolderClick(folder) },
                 onLongClick = { },
                 onThumbClick = { onFolderClick(folder) },
-                isGridMode = false,
               )
             }
             
@@ -1509,7 +1495,6 @@ private fun FileSystemSearchContent(
                 onClick = { onVideoClick(videoFile.video) },
                 onLongClick = { },
                 onThumbClick = { onVideoClick(videoFile.video) },
-                isGridMode = false,
                 showSubtitleIndicator = showSubtitleIndicator,
                 overrideShowSizeChip = null,
                 overrideShowResolutionChip = null,
@@ -1544,11 +1529,9 @@ private fun FileSystemSearchContent(
 fun FileSystemSortDialog(
   isOpen: Boolean,
   onDismiss: () -> Unit,
-  isAtRoot: Boolean = true,
 ) {
   val browserPreferences = koinInject<BrowserPreferences>()
   val appearancePreferences = koinInject<app.marlboroadvance.mpvex.preferences.AppearancePreferences>()
-  val folderViewMode by browserPreferences.folderViewMode.collectAsState()
   val folderSortType by browserPreferences.folderSortType.collectAsState()
   val folderSortOrder by browserPreferences.folderSortOrder.collectAsState()
   val showVideoThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
@@ -1597,37 +1580,6 @@ fun FileSystemSortDialog(
         else -> Pair("Asc", "Desc")
       }
     },
-    showSortOptions = true,
-    viewModeSelector = ViewModeSelector(
-      label = "View Mode",
-      firstOptionLabel = "Folder",
-      secondOptionLabel = "Tree",
-      firstOptionIcon = Icons.Filled.ViewModule,
-      secondOptionIcon = Icons.Filled.AccountTree,
-      isFirstOptionSelected = folderViewMode == app.marlboroadvance.mpvex.preferences.FolderViewMode.AlbumView,
-      onViewModeChange = { isFirstOption ->
-        browserPreferences.folderViewMode.set(
-          if (isFirstOption) {
-            app.marlboroadvance.mpvex.preferences.FolderViewMode.AlbumView
-          } else {
-            app.marlboroadvance.mpvex.preferences.FolderViewMode.FileManager
-          },
-        )
-      },
-    ),
-    layoutModeSelector = ViewModeSelector(
-      label = "Layout",
-      firstOptionLabel = "List",
-      secondOptionLabel = "Grid",
-      firstOptionIcon = Icons.AutoMirrored.Filled.ViewList,
-      secondOptionIcon = Icons.Filled.GridView,
-      isFirstOptionSelected = true, // Always list mode
-      onViewModeChange = { /* Disabled - do nothing */ },
-    ),
-    folderGridColumnSelector = null,
-    videoGridColumnSelector = null,
-    enableViewModeOptions = isAtRoot,
-    enableLayoutModeOptions = false, // Disabled/grayed out
     visibilityToggles = listOf(
       VisibilityToggle(
         label = "Video Thumbnails",

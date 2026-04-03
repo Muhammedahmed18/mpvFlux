@@ -82,6 +82,5 @@ fun PlaylistCard(
     customIcon = Icons.AutoMirrored.Filled.PlaylistPlay,
     modifier = modifier,
     customChipContent = customChipRenderer,
-    isGridMode = isGridMode
   )
 }

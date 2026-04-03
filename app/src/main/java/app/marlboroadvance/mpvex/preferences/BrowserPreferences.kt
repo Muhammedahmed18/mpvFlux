@@ -20,13 +20,6 @@ class BrowserPreferences(
 
   val folderViewMode = preferenceStore.getEnum("folder_view_mode", FolderViewMode.AlbumView)
 
-  private val isTablet = context.resources.configuration.smallestScreenWidthDp >= 600
-  val folderGridColumnsPortrait = preferenceStore.getInt("folder_grid_columns_portrait", if (isTablet) 4 else 3)
-  val folderGridColumnsLandscape = preferenceStore.getInt("folder_grid_columns_landscape", 5)
-
-  val videoGridColumnsPortrait = preferenceStore.getInt("video_grid_columns_portrait", if (isTablet) 4 else 2)
-  val videoGridColumnsLandscape = preferenceStore.getInt("video_grid_columns_landscape", 4)
-
   // Visibility preferences for video card chips
   val showVideoThumbnails = preferenceStore.getBoolean("show_video_thumbnails", true)
   val showSizeChip = preferenceStore.getBoolean("show_size_chip", true)
@@ -35,7 +28,7 @@ class BrowserPreferences(
   val showFramerateInResolution = preferenceStore.getBoolean("show_framerate_in_resolution", false)
   val showSubtitleIndicator = preferenceStore.getBoolean("show_subtitle_indicator", false)
   val showProgressBar = preferenceStore.getBoolean("show_progress_bar", true)
-  val mediaLayoutMode = preferenceStore.getEnum("media_layout_mode", MediaLayoutMode. LIST)
+  val mediaLayoutMode = preferenceStore.getEnum("media_layout_mode", MediaLayoutMode.LIST)
 
   // Visibility preferences for folder card chips
   val showTotalVideosChip = preferenceStore.getBoolean("show_total_videos_chip", true)
@@ -88,11 +81,7 @@ enum class FolderSortType {
  * Video sorting options
  */
 enum class VideoSortType {
-  Title,
-  Duration,
-  Date,
-  Size,
-  ;
+  Title, Duration, Date, Size;
 
   val displayName: String
     get() =
@@ -109,14 +98,12 @@ enum class VideoSortType {
  */
 enum class FolderViewMode {
   AlbumView,
-  FileManager,
   ;
 
   val displayName: String
     get() =
       when (this) {
         AlbumView -> "Folder View"
-        FileManager -> "Tree View"
       }
 }
 
@@ -125,9 +112,10 @@ enum class MediaLayoutMode {
   GRID,
   ;
 
-  val displayName:  String
-    get() = when (this) {
-      LIST -> "List"
-      GRID -> "Grid"
-    }
+  val displayName: String
+    get() =
+      when (this) {
+        LIST -> "List"
+        GRID -> "Grid"
+      }
 }

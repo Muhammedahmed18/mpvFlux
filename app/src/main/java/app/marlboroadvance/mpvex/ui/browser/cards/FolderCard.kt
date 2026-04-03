@@ -11,21 +11,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material3.Badge
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
@@ -33,11 +35,10 @@ import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.material3.ListItemDefaults.verticalAlignment
 import org.koin.compose.koinInject
 import kotlin.math.pow
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalWindowInfo
 
 @Composable
 fun FolderCard(
@@ -52,7 +53,6 @@ fun FolderCard(
   customIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
   newVideoCount: Int = 0,
   customChipContent: @Composable (() -> Unit)? = null,
-  isGridMode: Boolean = false,
 ) {
   val appearancePreferences = koinInject<AppearancePreferences>()
   val browserPreferences = koinInject<BrowserPreferences>()
@@ -62,181 +62,60 @@ fun FolderCard(
   val showTotalSizeChip by browserPreferences.showTotalSizeChip.collectAsState()
   val showDateChip by browserPreferences.showDateChip.collectAsState()
   val showFolderPath by browserPreferences.showFolderPath.collectAsState()
+  // Optimize expensive calculations with remember
   val maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2
+  val parentPath = remember(folder.path) { folder.path.substringBeforeLast("/", folder.path) }
 
-  // Remove the redundant folder name from the path
-  val parentPath = folder.path.substringBeforeLast("/", folder.path)
-
-  Card(
+  Surface(
     modifier = modifier
       .fillMaxWidth()
       .combinedClickable(
         onClick = onClick,
         onLongClick = onLongClick,
       ),
-    colors = CardDefaults. cardColors(containerColor = Color. Transparent),
+    color = MaterialTheme.colorScheme.surface,
+    tonalElevation = 0.dp,
   ) {
-    if (isGridMode) {
-      // GRID LAYOUT - Vertical arrangement
-      Column(
-        modifier = Modifier
-          . fillMaxWidth()
-          .background(
-            if (isSelected) MaterialTheme.colorScheme.tertiary. copy(alpha = 0.3f) else Color.Transparent,
-          )
-          .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-      ) {
-        val folderGridColumnsPortrait by browserPreferences.folderGridColumnsPortrait.collectAsState()
-        val folderGridColumnsLandscape by browserPreferences.folderGridColumnsLandscape.collectAsState()
-        val configuration = LocalConfiguration.current
-        val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val folderGridColumns = if (isLandscape) folderGridColumnsLandscape else folderGridColumnsPortrait
-        val screenWidthDp = LocalConfiguration.current.screenWidthDp.dp
-        val horizontalPadding = 32.dp
-        val spacing = 8.dp
-
-        val thumbWidthDp = if (folderGridColumns > 1) {
-          // (screen - padding - total spacing) / columns
-          val totalSpacing = spacing * (folderGridColumns - 1)
-          ((screenWidthDp - horizontalPadding - totalSpacing) / folderGridColumns).coerceAtLeast(120.dp)
-        } else {
-          // single column fallback
-          160.dp
-        }
-        val aspect = 16f / 9f
-        val thumbHeightDp = thumbWidthDp / aspect
-
-        val context = LocalContext.current
-        
-        Box(
-          modifier = Modifier
-            .width(thumbWidthDp)
-            .height(thumbHeightDp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .combinedClickable(
-              onClick = onThumbClick,
-              onLongClick = onLongClick,
-            ),
-          contentAlignment = Alignment.Center,
-        ) {
-          Icon(
-            customIcon ?: Icons.Filled.Folder,
-            contentDescription = "Folder",
-            modifier = Modifier.size(56.dp),
-            tint = MaterialTheme.colorScheme.secondary,
-          )
-
-          if (newVideoCount > 0) {
-            Box(
-              modifier =
-                Modifier
-                  .align(Alignment.TopEnd)
-                  .padding(6.dp)
-                  .clip(RoundedCornerShape(4.dp))
-                  .background(Color(0xFFD32F2F))
-                  .padding(horizontal = 6.dp, vertical = 2.dp),
-            ) {
-              Text(
-                text = newVideoCount.toString(),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                ),
-                color = Color.White,
-              )
-            }
-          }
-          
-          if (showTotalDurationChip && folder.totalDuration > 0) {
-            Box(
-              modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(6.dp)
-                .clip(RoundedCornerShape(4.dp))
-                .background(Color.Black.copy(alpha = 0.65f))
-                .padding(horizontal = 6.dp, vertical = 2.dp),
-            ) {
-              Text(
-                text = formatDuration(folder.totalDuration),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White,
-              )
-            }
-          }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Text(
-          folder.name,
-          style = MaterialTheme.typography.titleSmall,
-          color = if (isRecentlyPlayed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
-          maxLines = maxLines,
-          overflow = TextOverflow. Ellipsis,
-          textAlign = androidx.compose.ui. text.style.TextAlign.Center,
-        )
-
-        if (showTotalVideosChip && folder.videoCount > 0) {
-          Text(
-            if (folder.videoCount == 1) "1 Video" else "${folder.videoCount} Videos",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme. onSurfaceVariant,
-          )
-        }
-      }
-    } else {
+      // List layout with modern Android 16 styling
       Row(
-        modifier =
-          Modifier
-            .fillMaxWidth()
-            .background(
-              if (isSelected) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f) else Color.Transparent,
-            )
-            .padding(12.dp),
+        modifier = Modifier
+          .fillMaxWidth()
+          .background(
+            if (isSelected) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.12f) else Color.Transparent,
+          )
+          .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Box(
-          modifier =
-            Modifier
-              .size(64.dp)
-              .clip(RoundedCornerShape(12.dp))
-              .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-              .combinedClickable(
-                onClick = onThumbClick,
-                onLongClick = onLongClick,
-              ),
-          contentAlignment = Alignment.Center,
+          modifier = Modifier.size(48.dp)
         ) {
           Icon(
-            customIcon ?: Icons.Filled.Folder,
+            customIcon ?: Icons.Outlined.Folder,
             contentDescription = "Folder",
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier
+              .size(40.dp)
+              .align(Alignment.Center)
+              .semantics { contentDescription = "Folder icon" },
             tint = MaterialTheme.colorScheme.secondary,
           )
 
           // Show new video count badge if folder contains new videos
           if (newVideoCount > 0) {
-            Box(
-              modifier =
-                Modifier
-                  .align(Alignment.TopEnd)
-                  .padding(4.dp)
-                  .clip(RoundedCornerShape(4.dp))
-                  .background(Color(0xFFD32F2F)) // Warning red color
-                  .padding(horizontal = 6.dp, vertical = 2.dp),
+            Surface(
+              modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 4.dp, top = 4.dp),
+              shape = RoundedCornerShape(12.dp),
+              color = MaterialTheme.colorScheme.primary,
             ) {
               Text(
-              	text = newVideoCount.toString(),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.Bold,
-                ),
-                color = Color.White,
+                "NEW",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
               )
             }
           }
-
-
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(
@@ -248,6 +127,7 @@ fun FolderCard(
             color = if (isRecentlyPlayed) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface,
             maxLines = maxLines,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.semantics { contentDescription = "Folder: ${folder.name}" },
           )
           if (showFolderPath && parentPath.isNotEmpty()) {
             Text(
@@ -261,88 +141,99 @@ fun FolderCard(
           } else {
             Spacer(modifier = Modifier.height(4.dp))
           }
+          // Modern chips with simple Surface-based implementation
           FlowRow(
-            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
           ) {
-            // Render custom chip content first if provided
-            var hasChip = false
-          if (customChipContent != null) {
-            customChipContent()
-            hasChip = true
-          }
+            // Custom chip content
+            customChipContent?.invoke()
 
-          // Hide chips at storage root level (when videoCount is 0)
+            // Video count chip
             if (showTotalVideosChip && folder.videoCount > 0) {
-              Text(
-                if (folder.videoCount == 1) "1 Video" else "${folder.videoCount} Videos",
-                style = MaterialTheme.typography.labelSmall,
-                modifier =
-                  Modifier
-                    .background(
-                      MaterialTheme.colorScheme.surfaceContainerHigh,
-                      RoundedCornerShape(8.dp),
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                color = MaterialTheme.colorScheme.onSurface,
-              )
-              hasChip = true
+              Surface(
+                modifier = Modifier
+                  .combinedClickable(
+                    onClick = {},
+                    onLongClick = null,
+                  ),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+              ) {
+                Text(
+                  if (folder.videoCount == 1) "1 Video" else "${folder.videoCount} Videos",
+                  style = MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme.onSurface,
+                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+              }
             }
 
+            // File size chip
             if (showTotalSizeChip && folder.totalSize > 0) {
-              Text(
-                formatFileSize(folder.totalSize),
-                style = MaterialTheme.typography.labelSmall,
-                modifier =
-                  Modifier
-                    .background(
-                      MaterialTheme.colorScheme.surfaceContainerHigh,
-                      RoundedCornerShape(8.dp),
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                color = MaterialTheme.colorScheme.onSurface,
-              )
-              hasChip = true
+              Surface(
+                modifier = Modifier
+                  .combinedClickable(
+                    onClick = {},
+                    onLongClick = null,
+                  ),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+              ) {
+                Text(
+                  formatFileSize(folder.totalSize),
+                  style = MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme.onSurface,
+                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+              }
             }
 
+            // Duration chip
             if (showTotalDurationChip && folder.totalDuration > 0) {
-              Text(
-                formatDuration(folder.totalDuration),
-                style = MaterialTheme.typography.labelSmall,
-                modifier =
-                  Modifier
-                    .background(
-                      MaterialTheme.colorScheme.surfaceContainerHigh,
-                      RoundedCornerShape(8.dp),
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                color = MaterialTheme.colorScheme.onSurface,
-              )
-              hasChip = true
+              Surface(
+                modifier = Modifier
+                  .combinedClickable(
+                    onClick = {},
+                    onLongClick = null,
+                  ),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+              ) {
+                Text(
+                  formatDuration(folder.totalDuration),
+                  style = MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme.onSurface,
+                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+              }
             }
 
-
-
+            // Date chip
             if (showDateChip && folder.lastModified > 0) {
-              Text(
-                formatDate(folder.lastModified),
-                style = MaterialTheme.typography.labelSmall,
-                modifier =
-                  Modifier
-                    .background(
-                      MaterialTheme.colorScheme.surfaceContainerHigh,
-                      RoundedCornerShape(8.dp),
-                    )
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                color = MaterialTheme.colorScheme.onSurface,
-              )
+              Surface(
+                modifier = Modifier
+                  .combinedClickable(
+                    onClick = {},
+                    onLongClick = null,
+                  ),
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+              ) {
+                Text(
+                  formatDate(folder.lastModified),
+                  style = MaterialTheme.typography.labelSmall,
+                  color = MaterialTheme.colorScheme.onSurface,
+                  modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+              }
             }
           }
         }
       }
     }
   }
-}
+
 
 private fun formatDuration(durationMs: Long): String {
   val seconds = durationMs / 1000
