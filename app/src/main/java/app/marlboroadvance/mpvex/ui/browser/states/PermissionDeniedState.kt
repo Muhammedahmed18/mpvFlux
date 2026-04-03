@@ -87,9 +87,7 @@ fun PermissionDeniedState(
   )
 
   Box(
-    modifier = modifier
-      .fillMaxSize()
-      .padding(top = 40.dp, bottom = 100.dp) // Added top padding for icon, reduced bottom padding
+    modifier = modifier.fillMaxSize()
   ) {
     Surface(
       modifier = Modifier.fillMaxSize(),
@@ -99,7 +97,7 @@ fun PermissionDeniedState(
         modifier =
           Modifier
             .fillMaxSize()
-            .padding(32.dp) // Increased padding to prevent icon cutoff
+            .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -109,31 +107,27 @@ fun PermissionDeniedState(
         Surface(
           modifier =
             Modifier
-              .size(152.dp) // Increased size to compensate for padding (120dp + 32dp padding)
-              .padding(16.dp) // Added padding around the icon to prevent cutoff
+              .size(120.dp)
               .scale(scale),
-          shape = RoundedCornerShape(32.dp),
+          shape = RoundedCornerShape(28.dp),
           color = MaterialTheme.colorScheme.errorContainer,
-          tonalElevation = 3.dp,
+          tonalElevation = 2.dp,
         ) {
           Icon(
             imageVector = Icons.Outlined.Warning,
             contentDescription = null,
-            modifier =
-              Modifier
-                .padding(28.dp)
-                .fillMaxSize(),
+            modifier = Modifier.padding(24.dp).fillMaxSize(),
             tint = MaterialTheme.colorScheme.onErrorContainer,
           )
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Title
         Text(
           text = "Storage Access Required",
           style = MaterialTheme.typography.headlineMedium,
-          fontWeight = FontWeight.Bold,
+          fontWeight = FontWeight.Medium,
           textAlign = TextAlign.Center,
           color = MaterialTheme.colorScheme.onSurface,
         )
@@ -147,11 +141,12 @@ fun PermissionDeniedState(
             CardDefaults.cardColors(
               containerColor = MaterialTheme.colorScheme.surfaceContainer,
             ),
-          shape = RoundedCornerShape(20.dp),
+          elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+          shape = RoundedCornerShape(16.dp),
         ) {
           Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
           ) {
             Text(
               text = if (isPlayStoreBuild) {
@@ -170,7 +165,7 @@ fun PermissionDeniedState(
           }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
         // Allow Access Button
         FilledTonalButton(
@@ -199,36 +194,37 @@ fun PermissionDeniedState(
           modifier =
             Modifier
               .fillMaxWidth()
-              .height(56.dp),
-          shape = RoundedCornerShape(16.dp),
+              .height(48.dp),
+          shape = RoundedCornerShape(24.dp),
         ) {
           Text(
             text = "ALLOW ACCESS",
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-          )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Why do I see this? link
-        TextButton(
-          onClick = { showExplanationDialog = true },
-        ) {
-          Icon(
-            imageVector = Icons.Outlined.Info,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-          )
-          Spacer(modifier = Modifier.width(6.dp))
-          Text(
-            text = "Why do I see this?",
-            style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
           )
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Why do I see this? link
+        TextButton(
+          onClick = { showExplanationDialog = true },
+          modifier = Modifier.padding(vertical = 4.dp),
+        ) {
+          Icon(
+            imageVector = Icons.Outlined.Info,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+          )
+          Spacer(modifier = Modifier.width(8.dp))
+          Text(
+            text = "Why do I see this?",
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Normal,
+          )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
       }
     }
   }
@@ -244,6 +240,7 @@ fun PermissionDeniedState(
         Icon(
           imageVector = Icons.Outlined.Info,
           contentDescription = null,
+          modifier = Modifier.size(24.dp),
           tint = MaterialTheme.colorScheme.primary,
         )
       },
@@ -251,7 +248,7 @@ fun PermissionDeniedState(
         Text(
           text = "Why this permission is needed",
           style = MaterialTheme.typography.headlineSmall,
-          fontWeight = FontWeight.Bold,
+          fontWeight = FontWeight.Medium,
         )
       },
       text = {
@@ -260,7 +257,7 @@ fun PermissionDeniedState(
             Modifier
               .heightIn(max = 400.dp)
               .verticalScroll(rememberScrollState()),
-          verticalArrangement = Arrangement.spacedBy(12.dp),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
           if (isPlayStoreBuild) {
             // Play Store build explanation
@@ -367,11 +364,12 @@ fun PermissionDeniedState(
         FilledTonalButton(
           onClick = { showExplanationDialog = false },
           shape = RoundedCornerShape(12.dp),
+          modifier = Modifier.height(40.dp),
         ) {
           Text(stringResource(R.string.got_it))
         }
       },
-      shape = RoundedCornerShape(24.dp),
+      shape = RoundedCornerShape(16.dp),
     )
   }
 }
