@@ -85,7 +85,7 @@ import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefresh
 import app.marlboroadvance.mpvex.repository.MediaFileRepository
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
-import app.marlboroadvance.mpvex.ui.browser.MainScreen
+import app.marlboroadvance.mpvex.ui.browser.NavigationBarState
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
@@ -235,10 +235,10 @@ object FolderListScreen : Screen {
       onPermissionGranted = { viewModel.refresh() },
     )
 
-    // Update MainScreen about permission state
+    // Update NavigationBarState about permission state
     LaunchedEffect(permissionState.status) {
-      MainScreen.updatePermissionState(
-        isDenied = permissionState.status is com.google.accompanist.permissions.PermissionStatus.Denied
+      NavigationBarState.updatePermissionState(
+        denied = permissionState.status is com.google.accompanist.permissions.PermissionStatus.Denied
       )
     }
 
@@ -411,7 +411,7 @@ object FolderListScreen : Screen {
             ) {
               ToggleFloatingActionButton(
                 modifier = Modifier.animateFloatingActionButton(
-                  visible = !selectionManager.isInSelectionMode && isFabVisible.value && !MainScreen.getPermissionDeniedState(),
+                  visible = !selectionManager.isInSelectionMode && isFabVisible.value && !NavigationBarState.isPermissionDenied,
                   alignment = Alignment.BottomEnd,
                 ),
                 checked = isFabExpanded.value,

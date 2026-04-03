@@ -86,6 +86,8 @@ import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
+import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
+import app.marlboroadvance.mpvex.ui.browser.NavigationBarState
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserBottomBar
@@ -267,7 +269,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
     onPermissionGranted = { viewModel.refresh() },
   )
 
-  // Combined MainScreen updates for better performance and responsiveness
+  // Combined NavigationBarState updates for better performance and responsiveness
   LaunchedEffect(
     showBottomNavigation, 
     isInSelectionMode, 
@@ -277,21 +279,19 @@ fun FileSystemBrowserScreen(path: String? = null) {
   ) {
     if (isAtRoot) {
       try {
-        val mainScreenObj = app.marlboroadvance.mpvex.ui.browser.MainScreen
         val onlyVideosSelected = videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode
 
-        // Update all MainScreen states in one call to reduce overhead
-        mainScreenObj.updateBottomBarVisibility(showBottomNavigation)
-        mainScreenObj.updateSelectionState(
-          isInSelectionMode = isInSelectionMode,
-          isOnlyVideosSelected = onlyVideosSelected,
-          selectionManager = if (onlyVideosSelected) videoSelectionManager else null
+        // Update NavigationBarState for reactive navigation bar visibility
+        NavigationBarState.updateBottomBarVisibility(showBottomNavigation)
+        NavigationBarState.updateSelectionState(
+          inSelectionMode = isInSelectionMode,
+          onlyVideos = onlyVideosSelected
         )
-        mainScreenObj.updatePermissionState(
-          isDenied = permissionState.status is PermissionStatus.Denied
+        NavigationBarState.updatePermissionState(
+          denied = permissionState.status is PermissionStatus.Denied
         )
       } catch (e: Exception) {
-        Log.e("FileSystemBrowserScreen", "Failed to update MainScreen state", e)
+        Log.e("FileSystemBrowserScreen", "Failed to update NavigationBarState", e)
       }
     }
   }
@@ -301,9 +301,8 @@ fun FileSystemBrowserScreen(path: String? = null) {
     onDispose {
       if (isAtRoot) {
         try {
-          val mainScreenObj = app.marlboroadvance.mpvex.ui.browser.MainScreen
           // Restore bottom navigation when leaving the screen
-          mainScreenObj.updateBottomBarVisibility(true)
+          NavigationBarState.updateBottomBarVisibility(true)
         } catch (e: Exception) {
           Log.e("FileSystemBrowserScreen", "Failed to restore MainScreen bottom bar visibility", e)
         }
@@ -704,7 +703,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
                 ToggleFloatingActionButton(
                   modifier = Modifier
                     .animateFloatingActionButton(
-                      visible = !isInSelectionMode && isFabVisible.value && !app.marlboroadvance.mpvex.ui.browser.MainScreen.getPermissionDeniedState(),
+                      visible = !isInSelectionMode && isFabVisible.value && !NavigationBarState.isPermissionDenied,
                       alignment = Alignment.BottomEnd,
                     ),
                   checked = isFabExpanded.value,
