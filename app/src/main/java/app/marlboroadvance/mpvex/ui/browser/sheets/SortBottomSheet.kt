@@ -3,7 +3,6 @@ package app.marlboroadvance.mpvex.ui.browser.sheets
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,19 +81,19 @@ fun SortBottomSheet(
                 .navigationBarsPadding()
                 .padding(bottom = 32.dp)
                 .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.Start
         ) {
-            // Android 16 Style Header: Centered, Bold
+            // Android 16 Style Header: Start, Bold
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
-                    .padding(top = 8.dp, bottom = 24.dp)
+                    .padding(top = 8.dp, bottom = 16.dp)
                     .padding(horizontal = 24.dp)
                     .fillMaxWidth(),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Start
             )
 
             if (showSortOptions) {
@@ -118,7 +117,11 @@ fun SortBottomSheet(
 
             if (visibilityToggles.isNotEmpty()) {
                 if (showSortOptions) {
-                    Spacer(modifier = Modifier.height(24.dp))
+                    HorizontalDivider(
+                        modifier = Modifier.padding(24.dp),
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
+                    )
                 }
                 ViewOptionsSection(
                     toggles = visibilityToggles,
@@ -220,12 +223,9 @@ private fun ModernSortTypeItem(
     modifier: Modifier = Modifier
 ) {
     val containerColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceContainerHigh,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+        else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "containerColor"
     )
     val contentColor by animateColorAsState(
@@ -233,51 +233,59 @@ private fun ModernSortTypeItem(
         else MaterialTheme.colorScheme.onSurfaceVariant,
         label = "contentColor"
     )
-    val cornerSize by animateDpAsState(
-        if (isSelected) 28.dp else 20.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "cornerSize"
-    )
 
     Surface(
         onClick = onClick,
         modifier = modifier
-            .heightIn(min = 60.dp)
+            .height(64.dp)
             .animateContentSize(),
-        shape = RoundedCornerShape(cornerSize),
+        shape = RoundedCornerShape(24.dp),
         color = containerColor,
         contentColor = contentColor,
-        tonalElevation = if (isSelected) 2.dp else 0.dp
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
         ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+            // Icon Circle
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f)
+                        else MaterialTheme.colorScheme.surfaceContainerHighest
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp),
+                        tint = contentColor
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Bold,
-                maxLines = 1
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                modifier = Modifier.weight(1f)
             )
+
             if (isSelected) {
-                Spacer(modifier = Modifier.width(6.dp))
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(20.dp),
+                    tint = contentColor
                 )
+                Spacer(modifier = Modifier.width(4.dp))
             }
         }
     }
@@ -292,41 +300,39 @@ private fun OrderToggleItem(
     modifier: Modifier = Modifier
 ) {
     val containerColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primary
+        if (isSelected) MaterialTheme.colorScheme.primaryContainer
         else Color.Transparent,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "toggleColor"
     )
     val contentColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.onPrimary
+        if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
         else MaterialTheme.colorScheme.onSurfaceVariant,
         label = "toggleContentColor"
     )
 
-    Box(
-        modifier = modifier
-            .fillMaxHeight()
-            .clip(CircleShape)
-            .background(containerColor)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxHeight(),
+        shape = CircleShape,
+        color = containerColor,
+        contentColor = contentColor,
     ) {
         Row(
+            modifier = Modifier.padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp)
             )
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (isSelected) FontWeight.Black else FontWeight.ExtraBold
+                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold
             )
         }
     }
@@ -347,16 +353,18 @@ private fun ViewOptionsSection(
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            maxItemsInEachRow = 2
         ) {
             toggles.forEach { toggle ->
-                ModernViewOptionChip(
+                ModernViewOptionItem(
                     label = toggle.label,
                     checked = toggle.checked,
                     onCheckedChange = {
                         onToggle()
                         toggle.onCheckedChange(it)
-                    }
+                    },
+                    modifier = Modifier.weight(1f)
                 )
             }
         }
@@ -364,54 +372,41 @@ private fun ViewOptionsSection(
 }
 
 @Composable
-private fun ModernViewOptionChip(
+private fun ModernViewOptionItem(
     label: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val containerColor by animateColorAsState(
-        if (checked) MaterialTheme.colorScheme.primaryContainer
-        else MaterialTheme.colorScheme.surfaceContainerHigh,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
-        ),
-        label = "chipColor"
-    )
-    val contentColor by animateColorAsState(
-        if (checked) MaterialTheme.colorScheme.onPrimaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
-        label = "chipContentColor"
-    )
-
     Surface(
         onClick = { onCheckedChange(!checked) },
-        modifier = modifier
-            .height(44.dp)
-            .animateContentSize(),
-        shape = CircleShape,
-        color = containerColor,
-        contentColor = contentColor,
+        modifier = modifier.height(64.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            if (checked) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-            }
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                modifier = Modifier.weight(1f)
+            )
+            Switch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
+                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
             )
         }
     }
