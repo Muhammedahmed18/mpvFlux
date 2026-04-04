@@ -1,4 +1,4 @@
-﻿package app.marlboroadvance.mpvex.ui.player
+package app.marlboroadvance.mpvex.ui.player
 
 import android.content.BroadcastReceiver
 import android.content.ComponentName
@@ -357,6 +357,15 @@ class PlayerActivity :
     setupPipHelper()
     setupMediaSession()
     setupViewModelCallbacks()
+
+    // Observe showFileExtension preference
+    lifecycleScope.launch {
+      playerPreferences.showFileExtension.changes().collect {
+        // Refresh title and playlist items when preference changes
+        updateDisplayTitle()
+        viewModel.refreshPlaylistItems()
+      }
+    }
 
     playlistId = intent.getIntExtra("playlist_id", -1).takeIf { it != -1 }
     playlistIndex = intent.getIntExtra("playlist_index", 0)
@@ -1332,11 +1341,8 @@ class PlayerActivity :
    * @return The display name/title of the file
    */
   internal fun getPlaylistItemTitle(uri: Uri): String {
-    // Try content resolver first for content:// URIs
-    getDisplayNameFromUri(uri)?.let { return it }
-
-    // Extract filename from URL/URI
-    return extractFileNameFromUri(uri)
+    val rawTitle = getDisplayNameFromUri(uri) ?: extractFileNameFromUri(uri)
+    return formatTitle(rawTitle, isUriM3U(uri))
   }
 
   /**
@@ -1767,11 +1773,7 @@ class PlayerActivity :
 
     applySubtitlePreferences()
 
-    // Don't force media-title for m3u/m3u8 streams - let MPV provide it
-    if (!isCurrentStreamM3U()) {
-      MPVLib.setPropertyString("force-media-title", fileName)
-      viewModel.setMediaTitle(fileName)
-    }
+    updateDisplayTitle()
 
     viewModel.unpause()
 
@@ -1801,10 +1803,6 @@ class PlayerActivity :
       }
     }
 
-    updateMediaSessionMetadata(
-      title = fileName,
-      durationMs = (MPVLib.getPropertyDouble("duration")?.times(1000))?.toLong() ?: 0L,
-    )
     updateMediaSessionPlaybackState(isPlaying = true)
 
     // Asynchronously fetch better filename from HTTP headers for network streams
@@ -1862,24 +1860,9 @@ class PlayerActivity :
           // DO NOT update mediaIdentifier - keep the original identifier for playback state consistency
           // The URI hash in mediaIdentifier ensures position is saved/loaded correctly even if filename changes
 
-          // Update MPV title
+          // Update MPV title, ViewModel title, MediaSession, and background service
           withContext(Dispatchers.Main) {
-            MPVLib.setPropertyString("force-media-title", fileName)
-            viewModel.setMediaTitle(fileName)
-
-            // Update media session
-            val durationMs = (MPVLib.getPropertyDouble("duration")?.times(1000))?.toLong() ?: 0L
-            updateMediaSessionMetadata(
-              title = fileName,
-              durationMs = durationMs,
-            )
-
-            // Update background service if connected
-            if (serviceBound && mediaPlaybackService != null) {
-              val artist = runCatching { MPVLib.getPropertyString("metadata/artist") }.getOrNull() ?: ""
-              val thumbnail = runCatching { MPVLib.grabThumbnail(1080) }.getOrNull()
-              mediaPlaybackService?.setMediaInfo(title = fileName, artist = artist, thumbnail = thumbnail)
-            }
+            updateDisplayTitle()
           }
 
           // Update recently played with the parsed video title, duration, and file size
@@ -3047,19 +3030,14 @@ class PlayerActivity :
     }
 
     // Update media title (this will trigger UI update)
-    // Don't force media-title for m3u/m3u8 streams - let MPV provide it
-    val isM3U = uri.toString().lowercase().contains(".m3u8") || uri.toString().lowercase().contains(".m3u")
-    if (!isM3U) {
-      MPVLib.setPropertyString("force-media-title", fileName)
-      viewModel.setMediaTitle(fileName)
-    }
+    updateDisplayTitle()
 
     // Update media session metadata
     lifecycleScope.launch {
       kotlinx.coroutines.delay(100) // Wait for MPV to load the file
       val durationMs = (MPVLib.getPropertyDouble("duration")?.times(1000))?.toLong() ?: 0L
       updateMediaSessionMetadata(
-        title = fileName,
+        title = getTitleForControls(),
         durationMs = durationMs,
       )
       // Refresh playlist items to update the currently playing indicator
@@ -3068,11 +3046,27 @@ class PlayerActivity :
   }
 
   /**
+   * Formats a title based on the "show file extension" preference.
+   * If the preference is false, it removes the last dot and everything after it.
+   */
+  private fun formatTitle(title: String, isStream: Boolean = false): String {
+    if (playerPreferences.showFileExtension.get()) return title
+    if (isStream) return title
+
+    val lastDotIndex = title.lastIndexOf('.')
+    return if (lastDotIndex > 0) {
+      title.substring(0, lastDotIndex)
+    } else {
+      title
+    }
+  }
+
+  /**
    * Get file name from URI (used for playlist items)
    */
   private fun getFileNameFromUri(uri: Uri): String {
-    getDisplayNameFromUri(uri)?.let { return it }
-    return extractFileNameFromUri(uri)
+    val rawTitle = getDisplayNameFromUri(uri) ?: extractFileNameFromUri(uri)
+    return formatTitle(rawTitle, isUriM3U(uri))
   }
 
   /**
@@ -3088,7 +3082,33 @@ class PlayerActivity :
         return rawTitle
       }
     }
-    return fileName
+    return formatTitle(fileName)
+  }
+
+  /**
+   * Updates the displayed media title across all UI components (MPV, ViewModel, MediaSession, Service).
+   * Respects the "show file extension" preference.
+   */
+  private fun updateDisplayTitle() {
+    if (isCurrentStreamM3U()) return
+
+    val displayTitle = formatTitle(fileName)
+    MPVLib.setPropertyString("force-media-title", displayTitle)
+    viewModel.setMediaTitle(displayTitle)
+
+    // Update media session
+    val durationMs = (MPVLib.getPropertyDouble("duration")?.times(1000))?.toLong() ?: 0L
+    updateMediaSessionMetadata(
+      title = displayTitle,
+      durationMs = durationMs,
+    )
+
+    // Update background service if connected
+    if (serviceBound && mediaPlaybackService != null) {
+      val artist = runCatching { MPVLib.getPropertyString("metadata/artist") }.getOrNull() ?: ""
+      val thumbnail = runCatching { MPVLib.grabThumbnail(1080) }.getOrNull()
+      mediaPlaybackService?.setMediaInfo(title = displayTitle, artist = artist, thumbnail = thumbnail)
+    }
   }
 
   /**
