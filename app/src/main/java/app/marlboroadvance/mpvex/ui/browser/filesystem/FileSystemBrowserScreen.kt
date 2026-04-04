@@ -1035,7 +1035,6 @@ private fun FileSystemBrowserContent(
               FolderCard(
                 folder = folderModel,
                 isSelected = folderSelectionManager.isSelected(folder),
-                isRecentlyPlayed = false,
                 onClick = { onFolderClick(folder) },
                 onLongClick = { onFolderLongClick(folder) },
                 onThumbClick = if (tapThumbnailToSelect) {
@@ -1103,6 +1102,7 @@ fun FileSystemSortBottomSheet(
   val folderSortType by browserPreferences.folderSortType.collectAsState()
   val folderSortOrder by browserPreferences.folderSortOrder.collectAsState()
   val showVideoThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
+  val showVideoExtension by browserPreferences.showVideoExtension.collectAsState()
   val showTotalVideosChip by browserPreferences.showTotalVideosChip.collectAsState()
   val showTotalSizeChip by browserPreferences.showTotalSizeChip.collectAsState()
   val showFolderPath by browserPreferences.showFolderPath.collectAsState()
@@ -1155,6 +1155,11 @@ fun FileSystemSortBottomSheet(
         onCheckedChange = { browserPreferences.showVideoThumbnails.set(it) },
       ),
       VisibilityToggle(
+        label = "Extension",
+        checked = showVideoExtension,
+        onCheckedChange = { browserPreferences.showVideoExtension.set(it) },
+      ),
+      VisibilityToggle(
         label = "Full Name",
         checked = unlimitedNameLines,
         onCheckedChange = { appearancePreferences.unlimitedNameLines.set(it) },
@@ -1190,7 +1195,7 @@ fun FileSystemSortBottomSheet(
         onCheckedChange = { browserPreferences.showFramerateInResolution.set(it) },
       ),
       VisibilityToggle(
-        label = "Subtitle",
+        label = "Subtitles",
         checked = showSubtitleIndicator,
         onCheckedChange = { browserPreferences.showSubtitleIndicator.set(it) },
       ),

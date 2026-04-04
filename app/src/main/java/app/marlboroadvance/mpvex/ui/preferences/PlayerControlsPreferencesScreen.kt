@@ -249,6 +249,16 @@ object PlayerControlsPreferencesScreen : Screen {
               
               PreferenceDivider()
               
+              val showFileExtension by playerPrefs.showFileExtension.collectAsState()
+              SwitchPreference(
+                value = showFileExtension,
+                onValueChange = playerPrefs.showFileExtension::set,
+                title = { Text(stringResource(R.string.pref_player_show_file_extension_title)) },
+                summary = { Text(stringResource(R.string.pref_player_show_file_extension_summary)) },
+              )
+
+              PreferenceDivider()
+              
               ListPreference(
                 value = if (isCustomTimeValue) -1 else playerTimeToDisappear,
                 onValueChange = { newValue ->
