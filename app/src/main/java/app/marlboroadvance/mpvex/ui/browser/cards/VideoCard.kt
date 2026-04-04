@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
@@ -86,7 +84,6 @@ fun VideoCard(
   val unplayedOldVideoDays by appearancePreferences.unplayedOldVideoDays.collectAsState()
   val maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2
   
-  // Use override parameters if provided, otherwise use preferences
   val showSizeChip = overrideShowSizeChip ?: showSizeChipPref
   val showResolutionChip = overrideShowResolutionChip ?: showResolutionChipPref
 
@@ -94,7 +91,7 @@ fun VideoCard(
     modifier = modifier
       .fillMaxWidth()
       .padding(horizontal = 12.dp, vertical = 4.dp)
-      .clip(RoundedCornerShape(28.dp))
+      .clip(RoundedCornerShape(12.dp))
       .combinedClickable(
         onClick = onClick,
         onLongClick = onLongClick,
@@ -103,19 +100,19 @@ fun VideoCard(
         if (isSelected) Modifier.border(
           width = 1.5.dp,
           color = MaterialTheme.colorScheme.primary,
-          shape = RoundedCornerShape(28.dp)
+          shape = RoundedCornerShape(12.dp)
         ) else Modifier
       ),
     color = if (isSelected) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
             else MaterialTheme.colorScheme.surface,
-    shape = RoundedCornerShape(28.dp),
+    shape = RoundedCornerShape(12.dp),
     tonalElevation = if (isSelected) 2.dp else 0.dp,
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
         .padding(12.dp),
-      verticalAlignment = Alignment.CenterVertically
+      verticalAlignment = Alignment.Top
     ) {
       val thumbnailRepository = koinInject<ThumbnailRepository>()
       val thumbWidthDp = 160.dp
@@ -158,12 +155,12 @@ fun VideoCard(
           Modifier
             .width(thumbWidthDp)
             .aspectRatio(aspect)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
             .border(
               width = 0.5.dp,
               color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-              shape = RoundedCornerShape(24.dp)
+              shape = RoundedCornerShape(12.dp)
             )
             .combinedClickable(
               onClick = onThumbClick,
@@ -200,14 +197,14 @@ fun VideoCard(
           Surface(
             modifier = Modifier
               .align(Alignment.TopStart)
-              .padding(8.dp),
+              .padding(6.dp),
             color = MaterialTheme.colorScheme.primary,
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(4.dp)
           ) {
             Icon(
               Icons.Rounded.CheckCircle,
               contentDescription = null,
-              modifier = Modifier.padding(2.dp).size(14.dp),
+              modifier = Modifier.padding(2.dp).size(12.dp),
               tint = MaterialTheme.colorScheme.onPrimary
             )
           }
@@ -223,15 +220,15 @@ fun VideoCard(
               modifier =
                 Modifier
                   .align(Alignment.TopStart)
-                  .padding(8.dp),
+                  .padding(6.dp),
               color = MaterialTheme.colorScheme.primary,
-              shape = RoundedCornerShape(8.dp)
+              shape = RoundedCornerShape(4.dp)
             ) {
               Text(
                 text = stringResource(R.string.video_label_new),
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                 style = MaterialTheme.typography.labelSmall.copy(
-                  fontWeight = FontWeight.ExtraBold,
+                  fontWeight = FontWeight.Bold,
                   fontSize = 9.sp
                 ),
                 color = MaterialTheme.colorScheme.onPrimary,
@@ -243,13 +240,13 @@ fun VideoCard(
         Surface(
           modifier = Modifier
             .align(Alignment.BottomEnd)
-            .padding(8.dp),
-          color = Color.Black.copy(alpha = 0.65f),
-          shape = RoundedCornerShape(8.dp)
+            .padding(6.dp),
+          color = Color.Black.copy(alpha = 0.7f),
+          shape = RoundedCornerShape(4.dp)
         ) {
           Text(
             text = video.durationFormatted,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
             style = MaterialTheme.typography.labelSmall.copy(
               fontWeight = FontWeight.Bold,
               fontSize = 10.sp
@@ -264,17 +261,10 @@ fun VideoCard(
               Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp)
                 .height(3.dp)
-                .clip(RoundedCornerShape(100)),
+                .background(Color.Black.copy(alpha = 0.3f)),
             contentAlignment = Alignment.CenterStart
           ) {
-            Box(
-              modifier =
-                Modifier
-                  .matchParentSize()
-                  .background(Color.Black.copy(alpha = 0.4f)),
-            )
             Box(
               modifier =
                 Modifier
@@ -285,7 +275,7 @@ fun VideoCard(
           }
         }
       }
-      Spacer(modifier = Modifier.width(16.dp))
+      Spacer(modifier = Modifier.width(20.dp))
       Column(
         modifier = Modifier.weight(1f),
       ) {
@@ -293,7 +283,7 @@ fun VideoCard(
           video.displayName,
           style = MaterialTheme.typography.titleMedium.copy(
             fontWeight = FontWeight.Bold,
-            letterSpacing = 0.sp
+            letterSpacing = (-0.2).sp
           ),
           color = if (isRecentlyPlayed) {
             MaterialTheme.colorScheme.primary
@@ -305,7 +295,6 @@ fun VideoCard(
           maxLines = maxLines,
           overflow = TextOverflow.Ellipsis,
         )
-        Spacer(modifier = Modifier.height(6.dp))
         
         val metadataParts = remember(video, showSizeChip, showResolutionChip, showDateChip, showFramerateInResolution) {
           buildList {
@@ -313,62 +302,33 @@ fun VideoCard(
               add(video.sizeFormatted)
             }
             if (showResolutionChip && video.resolution != "--") {
-              val res = if (showFramerateInResolution) video.resolution else video.resolution.substringBefore("@")
-              add(res)
-            } else if (showFramerateInResolution && video.resolution.substringAfter("@", "").isNotEmpty()) {
-              add("${video.resolution.substringAfter("@")} FPS")
+                val res = if (showFramerateInResolution && video.fps > 0) {
+                    "${video.resolution} (${video.fps.roundToInt()}fps)"
+                } else video.resolution
+                add(res)
             }
             if (showDateChip && video.dateModified > 0) {
-              add(formatDate(video.dateModified))
+                val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+                add(sdf.format(java.util.Date(video.dateModified * 1000)))
             }
           }
         }
 
-        if (metadataParts.isNotEmpty() || (showSubtitleIndicator && video.hasEmbeddedSubtitles)) {
-          FlowRow(
-            verticalArrangement = Arrangement.Center,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-          ) {
-            if (showSubtitleIndicator && video.hasEmbeddedSubtitles && video.subtitleCodec.isNotBlank()) {
-              video.subtitleCodec.split(" ").forEach { codec ->
-                MetadataPill(text = codec, isPrimary = true)
-              }
-            }
-            metadataParts.forEach { part ->
-              MetadataPill(text = part)
-            }
-          }
+        if (metadataParts.isNotEmpty()) {
+          Spacer(modifier = Modifier.height(2.dp))
+          Text(
+            text = metadataParts.joinToString("  •  "),
+            style = MaterialTheme.typography.labelSmall.copy(
+              fontWeight = FontWeight.Medium,
+              fontSize = 11.sp,
+              letterSpacing = 0.sp
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+          )
         }
       }
     }
   }
-}
-
-@Composable
-private fun MetadataPill(
-  text: String,
-  isPrimary: Boolean = false
-) {
-  Surface(
-    shape = RoundedCornerShape(8.dp),
-    color = if (isPrimary) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-    modifier = Modifier.padding(vertical = 2.dp)
-  ) {
-    Text(
-      text = text,
-      modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-      style = MaterialTheme.typography.labelSmall.copy(
-        fontWeight = if (isPrimary) FontWeight.Bold else FontWeight.Medium,
-        fontSize = 10.sp
-      ),
-      color = if (isPrimary) MaterialTheme.colorScheme.primary
-              else MaterialTheme.colorScheme.onSurfaceVariant
-    )
-  }
-}
-
-private fun formatDate(timestampSeconds: Long): String {
-  val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
-  return sdf.format(java.util.Date(timestampSeconds * 1000))
 }
