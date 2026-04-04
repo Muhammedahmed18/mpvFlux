@@ -90,6 +90,31 @@ class VideoListViewModel(
   init {
     loadVideos()
 
+    // Observe metadata-impacting preferences to trigger re-enrichment when toggled
+    viewModelScope.launch {
+      kotlinx.coroutines.flow.combine(
+        browserPreferences.showResolutionChip.changes(),
+        browserPreferences.showFramerateInResolution.changes(),
+        browserPreferences.showSubtitleIndicator.changes(),
+        browserPreferences.showVideoThumbnails.changes()
+      ) { showResolution, showFps, showSub, showThumb ->
+        // Return a combined signal - only trigger if something that needs enrichment becomes true
+        showResolution || showFps || showSub || showThumb
+      }
+      .distinctUntilChanged()
+      .collectLatest { needsEnrichment ->
+        if (needsEnrichment && _videos.value.isNotEmpty()) {
+          val videosNeedEnrichment = _videos.value.any { video ->
+            video.fps == 0f || video.subtitleCodec.isEmpty()
+          }
+          if (videosNeedEnrichment) {
+            Log.d(tag, "Metadata preferences changed and videos need enrichment, reloading")
+            loadVideos()
+          }
+        }
+      }
+    }
+
     // Listen for global media library changes and refresh this list when they occur
     viewModelScope.launch(Dispatchers.IO) {
       MediaLibraryEvents.changes.collectLatest {
@@ -101,85 +126,76 @@ class VideoListViewModel(
   }
 
   override fun refresh() {
-    Log.d(tag, "Hard refreshing video list for bucket: $bucketId")
+    Log.d(tag, "Refreshing video list for bucket: $bucketId")
     
-    // Set loading state
-    _isLoading.value = true
+    // Only show full loading state if we have no videos yet
+    if (_videos.value.isEmpty()) {
+      _isLoading.value = true
+    }
     
     // Clear cache to force fresh data from filesystem
     MediaFileRepository.clearCache()
     FolderViewScanner.clearCache()
     
-    // Trigger media scan before loading to ensure MediaStore is up-to-date
+    // Trigger media scan in background
     triggerMediaScan()
     
-    // Wait a bit for MediaStore to update, then reload
-    viewModelScope.launch(Dispatchers.IO) {
-      delay(1500) // Give MediaStore time to index
-      loadVideos()
-    }
+    // Reload videos immediately without artificial delay
+    loadVideos()
   }
 
   private fun loadVideos() {
     viewModelScope.launch(Dispatchers.IO) {
       try {
-        // First attempt to load videos (basic info from MediaStore)
+        // Step 1: Immediate load from MediaStore (fast)
         var videoList = MediaFileRepository.getVideosInFolder(getApplication(), bucketId)
+        
+        // Show initial list immediately so thumbnails can start generating
+        _videos.value = videoList
+        loadPlaybackInfo(videoList)
+        _isLoading.value = false // Stop loading spinner as soon as we have the basic list
 
-        // Enrich with metadata only if chips are enabled
-        if (MetadataRetrieval.isVideoMetadataNeeded(browserPreferences)) {
-          Log.d(tag, "Metadata chips enabled, enriching ${videoList.size} videos")
-          videoList = MetadataRetrieval.enrichVideosIfNeeded(
+        // Step 2: Enrich with detailed metadata (framerate, resolution, codec) if needed
+        if (MetadataRetrieval.isVideoMetadataNeeded(browserPreferences) && videoList.isNotEmpty()) {
+          Log.d(tag, "Metadata chips enabled, enriching ${videoList.size} videos in background")
+          val enrichedList = MetadataRetrieval.enrichVideosIfNeeded(
             context = getApplication(),
             videos = videoList,
             browserPreferences = browserPreferences,
             metadataCache = metadataCache
           )
-        } else {
-          Log.d(tag, "Metadata chips disabled, skipping metadata extraction")
+          
+          // Update list with enriched metadata
+          _videos.value = enrichedList
+          loadPlaybackInfo(enrichedList)
         }
 
         // Check if folder became empty after having videos
         if (previousVideoCount > 0 && videoList.isEmpty()) {
           _videosWereDeletedOrMoved.value = true
-          Log.d(tag, "Folder became empty (had $previousVideoCount videos before)")
         } else if (videoList.isNotEmpty()) {
-          // Reset flag if folder now has videos
           _videosWereDeletedOrMoved.value = false
         }
-
-        // Update previous count
         previousVideoCount = videoList.size
 
         if (videoList.isEmpty()) {
           Log.d(tag, "No videos found for bucket $bucketId - attempting media rescan")
           triggerMediaScan()
           delay(1000)
-          var retryVideoList = MediaFileRepository.getVideosInFolder(getApplication(), bucketId)
+          val retryVideoList = MediaFileRepository.getVideosInFolder(getApplication(), bucketId)
+          _videos.value = retryVideoList
+          loadPlaybackInfo(retryVideoList)
 
-          // Enrich retry list if needed
-          if (MetadataRetrieval.isVideoMetadataNeeded(browserPreferences)) {
-            retryVideoList = MetadataRetrieval.enrichVideosIfNeeded(
+          if (MetadataRetrieval.isVideoMetadataNeeded(browserPreferences) && retryVideoList.isNotEmpty()) {
+            val enrichedRetryList = MetadataRetrieval.enrichVideosIfNeeded(
               context = getApplication(),
               videos = retryVideoList,
               browserPreferences = browserPreferences,
               metadataCache = metadataCache
             )
+            _videos.value = enrichedRetryList
+            loadPlaybackInfo(enrichedRetryList)
           }
-
-          // Update count after retry
-          if (previousVideoCount > 0 && retryVideoList.isEmpty()) {
-            _videosWereDeletedOrMoved.value = true
-          } else if (retryVideoList.isNotEmpty()) {
-            _videosWereDeletedOrMoved.value = false
-          }
-          previousVideoCount = retryVideoList.size
-
-          _videos.value = retryVideoList
-          loadPlaybackInfo(retryVideoList)
-        } else {
-          _videos.value = videoList
-          loadPlaybackInfo(videoList)
         }
       } catch (e: Exception) {
         Log.e(tag, "Error loading videos for bucket $bucketId", e)

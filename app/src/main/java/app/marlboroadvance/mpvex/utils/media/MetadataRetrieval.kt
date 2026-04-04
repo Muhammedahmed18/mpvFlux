@@ -45,7 +45,8 @@ object MetadataRetrieval {
     fun isVideoMetadataNeeded(browserPreferences: BrowserPreferences): Boolean {
         return browserPreferences.showResolutionChip.get() ||
                 browserPreferences.showFramerateInResolution.get() ||
-                browserPreferences.showSubtitleIndicator.get()
+                browserPreferences.showSubtitleIndicator.get() ||
+                browserPreferences.showVideoThumbnails.get()
     }
 
     /**
@@ -340,26 +341,22 @@ object MetadataRetrieval {
     }
 
     private fun formatResolutionWithFps(width: Int, height: Int, fps: Float): String {
-        val baseResolution = formatResolution(width, height)
-        if (baseResolution == "--" || fps <= 0f) return baseResolution
-
-        val fpsFormatted = fps.toInt().toString()
-        return "$baseResolution@$fpsFormatted"
+        return formatResolution(width, height)
     }
 
     private fun formatResolution(width: Int, height: Int): String {
         if (width <= 0 || height <= 0) return "--"
 
         return when {
-            width >= 7680 || height >= 4320 -> "4320p"
-            width >= 3840 || height >= 2160 -> "2160p"
-            width >= 2560 || height >= 1440 -> "1440p"
-            width >= 1920 || height >= 1080 -> "1080p"
-            width >= 1280 || height >= 720 -> "720p"
-            width >= 854 || height >= 480 -> "480p"
-            width >= 640 || height >= 360 -> "360p"
-            width >= 426 || height >= 240 -> "240p"
-            else -> "${height}p"
+            width >= 7680 || height >= 4320 -> "4320"
+            width >= 3840 || height >= 2160 -> "2160"
+            width >= 2560 || height >= 1440 -> "1440"
+            width >= 1920 || height >= 1080 -> "1080"
+            width >= 1280 || height >= 720 -> "720"
+            width >= 854 || height >= 480 -> "480"
+            width >= 640 || height >= 360 -> "360"
+            width >= 426 || height >= 240 -> "240"
+            else -> height.toString()
         }
     }
 }

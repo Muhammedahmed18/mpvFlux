@@ -1,6 +1,11 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
+import androidx.compose.material3.ripple
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,19 +19,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stream
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import androidx.compose.foundation.combinedClickable
@@ -50,42 +58,60 @@ fun M3UVideoCard(
   val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
   val maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2
 
-  val thumbSizeDp = 64.dp
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+  val scale by animateFloatAsState(
+    targetValue = if (isPressed) 0.96f else 1f,
+    label = "scale"
+  )
 
-  Card(
-    modifier =
-      modifier
-        .fillMaxWidth()
-        .combinedClickable(
-          onClick = onClick,
-          onLongClick = onLongClick,
-        ),
-    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+  Surface(
+    modifier = modifier
+      .fillMaxWidth()
+      .padding(horizontal = 12.dp, vertical = 6.dp)
+      .graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+      }
+      .clip(RoundedCornerShape(20.dp))
+      .combinedClickable(
+        onClick = onClick,
+        onLongClick = onLongClick,
+        interactionSource = interactionSource,
+        indication = ripple(
+          bounded = true,
+          color = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+        )
+      )
+      .then(
+        if (isSelected) Modifier.border(
+          width = 2.dp,
+          color = MaterialTheme.colorScheme.primary,
+          shape = RoundedCornerShape(20.dp)
+        ) else Modifier
+      ),
+    color = if (isSelected) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            else MaterialTheme.colorScheme.surfaceContainerLow,
+    shape = RoundedCornerShape(20.dp),
+    tonalElevation = if (isSelected) 4.dp else 0.dp,
   ) {
     Row(
-      modifier =
-        Modifier
-          .fillMaxWidth()
-          .background(
-            if (isSelected) {
-              MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
-            } else {
-              Color.Transparent
-            },
-          )
-          .padding(16.dp),
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(14.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       // Square placeholder with streaming icon
       Box(
         modifier =
           Modifier
-            .size(thumbSizeDp)
-            .clip(RoundedCornerShape(12.dp))
+            .size(64.dp)
+            .clip(RoundedCornerShape(16.dp))
             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .combinedClickable(
-              onClick = onClick,
-              onLongClick = onLongClick,
+            .border(
+              width = 1.dp,
+              color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+              shape = RoundedCornerShape(16.dp)
             ),
         contentAlignment = Alignment.Center,
       ) {
@@ -93,17 +119,22 @@ fun M3UVideoCard(
         Icon(
           Icons.Filled.PlayArrow,
           contentDescription = "Play",
-          modifier = Modifier.size(48.dp),
-          tint = MaterialTheme.colorScheme.secondary,
+          modifier = Modifier.size(36.dp),
+          tint = MaterialTheme.colorScheme.primary,
         )
       }
       Spacer(modifier = Modifier.width(16.dp))
       Column(
         modifier = Modifier.weight(1f),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
       ) {
         Text(
           title,
-          style = MaterialTheme.typography.titleSmall,
+          style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = (-0.4).sp,
+            lineHeight = 20.sp
+          ),
           color = if (isRecentlyPlayed) {
             MaterialTheme.colorScheme.primary
           } else {
@@ -116,9 +147,13 @@ fun M3UVideoCard(
         // Show URL like a file path
         Text(
           url,
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          maxLines = 2,
+          style = MaterialTheme.typography.labelSmall.copy(
+            fontWeight = FontWeight.Normal,
+            fontSize = 11.sp,
+            letterSpacing = 0.sp
+          ),
+          color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+          maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
       }

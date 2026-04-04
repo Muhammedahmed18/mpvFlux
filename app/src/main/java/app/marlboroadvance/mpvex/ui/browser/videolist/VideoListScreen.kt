@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
@@ -69,7 +68,6 @@ import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
-import app.marlboroadvance.mpvex.preferences.MediaLayoutMode
 import app.marlboroadvance.mpvex.preferences.SortOrder
 import app.marlboroadvance.mpvex.preferences.VideoSortType
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
@@ -272,43 +270,6 @@ data class VideoListScreen(
           onDeselectAll = { selectionManager.clear() },
         )
       },
-      floatingActionButton = {
-        val navBarHeight = app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight.current
-        if (sortedVideosWithInfo.isNotEmpty()) {
-          TooltipBox(
-            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-            tooltip = { PlainTooltip { Text("Play recently played or first video") } },
-            state = rememberTooltipState(),
-          ) {
-            FloatingActionButton(
-              modifier = Modifier
-                .windowInsetsPadding(WindowInsets.systemBars)
-                .padding(bottom = navBarHeight)
-                .animateFloatingActionButton(
-                  visible = !selectionManager.isInSelectionMode && isFabVisible.value,
-                  alignment = Alignment.BottomEnd,
-                ),
-              onClick = {
-                coroutineScope.launch {
-                  val folderPath = sortedVideosWithInfo.firstOrNull()?.video?.path?.let { File(it).parent } ?: ""
-                  val recentlyPlayedVideos = RecentlyPlayedOps.getRecentlyPlayed(limit = 100)
-                  val lastPlayedInFolder = recentlyPlayedVideos.firstOrNull {
-                    File(it.filePath).parent == folderPath
-                  }
-
-                  if (lastPlayedInFolder != null) {
-                    MediaUtils.playFile(lastPlayedInFolder.filePath, context, "recently_played_button")
-                  } else {
-                    MediaUtils.playFile(sortedVideosWithInfo.first().video, context, "first_video_button")
-                  }
-                }
-              },
-            ) {
-              Icon(Icons.Filled.PlayArrow, contentDescription = "Play recently played or first video")
-            }
-          }
-        }
-      }
     ) { padding ->
       val autoScrollToLastPlayed by browserPreferences.autoScrollToLastPlayed.collectAsState()
       
@@ -538,15 +499,13 @@ private fun VideoListContent(
   val thumbnailRepository = koinInject<ThumbnailRepository>()
   val gesturePreferences = koinInject<GesturePreferences>()
   val browserPreferences = koinInject<BrowserPreferences>()
-  val mediaLayoutMode by browserPreferences.mediaLayoutMode.collectAsState()
   val tapThumbnailToSelect by gesturePreferences.tapThumbnailToSelect.collectAsState()
   val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
   val showVideoThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
   val density = LocalDensity.current
   val navigationBarHeight = app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight.current
-  // Must match the thumbnail size logic inside `VideoCard` for this screen,
-  // otherwise the cache keys won't line up and the UI won't receive updates.
-  val thumbWidthDp = if (mediaLayoutMode == MediaLayoutMode.GRID) 160.dp else 128.dp
+  // Use list thumbnail size
+  val thumbWidthDp = 128.dp
   val aspect = 16f / 9f
   val thumbWidthPx = with(density) { thumbWidthDp.roundToPx() }
   val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
@@ -593,8 +552,6 @@ private fun VideoListContent(
     else -> {
       val rememberedListIndex = rememberSaveable { mutableIntStateOf(0) }
       val rememberedListOffset = rememberSaveable { mutableIntStateOf(0) }
-      val rememberedGridIndex = rememberSaveable { mutableIntStateOf(0) }
-      val rememberedGridOffset = rememberSaveable { mutableIntStateOf(0) }
       
       val initialListIndex = if (rememberedListIndex.intValue > 0) {
           rememberedListIndex.intValue
@@ -602,20 +559,9 @@ private fun VideoListContent(
           videosWithInfo.indexOfFirst { it.video.path == recentlyPlayedFilePath }.coerceAtLeast(0)
       } else 0
       
-      val initialGridIndex = if (rememberedGridIndex.intValue > 0) {
-          rememberedGridIndex.intValue
-      } else if (autoScrollToLastPlayed && recentlyPlayedFilePath != null && videosWithInfo.isNotEmpty()) {
-          videosWithInfo.indexOfFirst { it.video.path == recentlyPlayedFilePath }.coerceAtLeast(0)
-      } else 0
-      
       val listState = rememberLazyListState(
           initialFirstVisibleItemIndex = initialListIndex,
           initialFirstVisibleItemScrollOffset = rememberedListOffset.intValue
-      )
-      
-      val gridState = rememberLazyGridState(
-          initialFirstVisibleItemIndex = initialGridIndex,
-          initialFirstVisibleItemScrollOffset = rememberedGridOffset.intValue
       )
       
       LaunchedEffect(listState) {
@@ -626,17 +572,9 @@ private fun VideoListContent(
           }
       }
 
-      LaunchedEffect(gridState) {
-        snapshotFlow { Pair(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset) }
-          .collectLatest { (index, offset) ->
-            rememberedGridIndex.intValue = index
-            rememberedGridOffset.intValue = offset
-          }
-      }
-
       FabScrollHelper.trackScrollForFabVisibility(
         listState = listState,
-        gridState = if (mediaLayoutMode == MediaLayoutMode.GRID) gridState else null,
+        gridState = null,
         isFabVisible = isFabVisible,
         expanded = false,
         onExpandedChange = {},
@@ -644,11 +582,7 @@ private fun VideoListContent(
 
       val isAtTop by remember {
         derivedStateOf {
-          if (mediaLayoutMode == MediaLayoutMode.GRID) {
-            gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
-          } else {
-            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-          }
+          listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
         }
       }
 
@@ -732,6 +666,7 @@ private fun VideoSortBottomSheet(
   val browserPreferences = koinInject<BrowserPreferences>()
   val appearancePreferences = koinInject<AppearancePreferences>()
   val showThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
+  val showVideoExtension by browserPreferences.showVideoExtension.collectAsState()
   val showSizeChip by browserPreferences.showSizeChip.collectAsState()
   val showResolutionChip by browserPreferences.showResolutionChip.collectAsState()
   val showFramerateInResolution by browserPreferences.showFramerateInResolution.collectAsState()
@@ -782,7 +717,12 @@ private fun VideoSortBottomSheet(
           onCheckedChange = { browserPreferences.showVideoThumbnails.set(it) },
         ),
         VisibilityToggle(
-          label = "Subtitle Indicator",
+          label = "Extension",
+          checked = showVideoExtension,
+          onCheckedChange = { browserPreferences.showVideoExtension.set(it) },
+        ),
+        VisibilityToggle(
+          label = "Subtitles",
           checked = showSubtitleIndicator,
           onCheckedChange = { browserPreferences.showSubtitleIndicator.set(it) },
         ),

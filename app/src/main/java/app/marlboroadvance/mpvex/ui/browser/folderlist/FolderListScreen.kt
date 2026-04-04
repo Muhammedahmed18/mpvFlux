@@ -568,7 +568,6 @@ private fun ListContent(
         FolderCard(
           folder = folder,
           isSelected = selectionManager.isSelected(folder),
-          isRecentlyPlayed = isRecentlyPlayed,
           onClick = { onFolderClick(folder) },
           onLongClick = { onFolderLongClick(folder) },
           onThumbClick = if (tapThumbnailToSelect) {
@@ -576,7 +575,6 @@ private fun ListContent(
           } else {
             { onFolderClick(folder) }
           },
-          newVideoCount = newCount,
         )
       }
     }

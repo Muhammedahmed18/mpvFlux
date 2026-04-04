@@ -25,8 +25,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
@@ -59,25 +61,25 @@ fun NetworkVideoCard(
     modifier =
       modifier
         .fillMaxWidth()
+        .padding(horizontal = 8.dp, vertical = 6.dp)
         .combinedClickable(
           onClick = onClick,
           onLongClick = onLongClick,
         ),
+    shape = RoundedCornerShape(16.dp),
     colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+    border = if (isSelected) {
+      androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+    } else {
+      null
+    },
   ) {
     Row(
       modifier =
         Modifier
           .fillMaxWidth()
-          .background(
-            if (isSelected) {
-              MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
-            } else {
-              Color.Transparent
-            },
-          )
           .padding(16.dp),
-      verticalAlignment = Alignment.CenterVertically,
+      verticalAlignment = Alignment.Top,
     ) {
       // Square thumbnail matching folder icon size
       Box(
@@ -90,13 +92,15 @@ fun NetworkVideoCard(
               onClick = onClick,
               onLongClick = onLongClick,
             ),
-        contentAlignment = Alignment.Center,
+        contentAlignment = Alignment.TopCenter,
       ) {
         // Play icon overlay
         Icon(
           Icons.Filled.PlayArrow,
           contentDescription = "Play",
-          modifier = Modifier.size(48.dp),
+          modifier = Modifier
+            .padding(top = 8.dp)
+            .size(48.dp),
           tint = MaterialTheme.colorScheme.secondary,
         )
       }
@@ -106,42 +110,49 @@ fun NetworkVideoCard(
       ) {
         Text(
           file.name,
-          style = MaterialTheme.typography.titleSmall,
+          style = MaterialTheme.typography.titleMedium.copy(
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.1.sp
+          ),
           color = MaterialTheme.colorScheme.onSurface,
           maxLines = maxLines,
           overflow = TextOverflow.Ellipsis,
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         FlowRow(
-          horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
-          verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp)
+          horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
+          verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
         ) {
           if (showSizeChip && file.size > 0) {
             Text(
               formatFileSize(file.size),
-              style = MaterialTheme.typography.labelSmall,
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Medium,
+              ),
               modifier =
                 Modifier
                   .background(
-                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                    MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f),
                     RoundedCornerShape(8.dp),
                   )
-                  .padding(horizontal = 8.dp, vertical = 4.dp),
-              color = MaterialTheme.colorScheme.onSurface,
+                  .padding(horizontal = 10.dp, vertical = 5.dp),
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           }
           if (file.lastModified > 0) {
             Text(
               formatDate(file.lastModified),
-              style = MaterialTheme.typography.labelSmall,
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Medium,
+              ),
               modifier =
                 Modifier
                   .background(
-                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                    MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f),
                     RoundedCornerShape(8.dp),
                   )
-                  .padding(horizontal = 8.dp, vertical = 4.dp),
-              color = MaterialTheme.colorScheme.onSurface,
+                  .padding(horizontal = 10.dp, vertical = 5.dp),
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           }
         }

@@ -169,24 +169,23 @@ class FileSystemBrowserViewModel(
    * Equivalent to Fossify's refreshFragment() callback
    */
   override fun refresh() {
-    Log.d(TAG, "Hard refreshing current directory: ${_currentPath.value}")
+    Log.d(TAG, "Refreshing current directory: ${_currentPath.value}")
     
-    // Set loading state
-    _isLoading.value = true
+    // Only show full loading state if we have no items yet
+    if (_items.value.isEmpty()) {
+      _isLoading.value = true
+    }
     
     // Clear all caches to force fresh data from filesystem
     MediaFileRepository.clearCache()
     FolderViewScanner.clearCache()
     TreeViewScanner.clearCache()
     
-    // Trigger media scan to ensure MediaStore is up-to-date
+    // Trigger media scan in background
     triggerMediaScan()
     
-    // Wait for MediaStore to update, then reload
-    viewModelScope.launch(Dispatchers.IO) {
-      delay(1500) // Give MediaStore time to index
-      loadCurrentDirectory()
-    }
+    // Reload directory immediately without artificial delay
+    loadCurrentDirectory()
   }
   
   /**

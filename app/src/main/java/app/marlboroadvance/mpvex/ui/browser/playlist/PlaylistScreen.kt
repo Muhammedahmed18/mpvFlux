@@ -101,7 +101,6 @@ object PlaylistScreen : Screen {
 
     // Use the shared LazyListState from CompositionLocal instead of creating a new one
     val listState = LazyListState()
-    val gridState = LazyGridState()
     val isRefreshing = remember { mutableStateOf(false) }
     var showRenameDialog by rememberSaveable { mutableStateOf(false) }
     var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
@@ -117,10 +116,9 @@ object PlaylistScreen : Screen {
     }
 
     // Track scroll for FAB visibility
-    val mediaLayoutMode by browserPreferences.mediaLayoutMode.collectAsState()
     app.marlboroadvance.mpvex.ui.browser.fab.FabScrollHelper.trackScrollForFabVisibility(
       listState = listState,
-      gridState = if (mediaLayoutMode == MediaLayoutMode.GRID) gridState else null,
+      gridState = null,
       isFabVisible = isFabVisible,
       expanded = false,
       onExpandedChange = {},
@@ -182,7 +180,6 @@ object PlaylistScreen : Screen {
           PlaylistListContent(
             playlistsWithCount = playlistsWithCount,
             listState = listState,
-            gridState = gridState,
             isRefreshing = isRefreshing,
             onRefresh = { viewModel.refresh() },
             selectionManager = selectionManager,
@@ -275,7 +272,6 @@ object PlaylistScreen : Screen {
   private fun PlaylistListContent(
     playlistsWithCount: List<PlaylistWithCount>,
     listState: LazyListState,
-    gridState: androidx.compose.foundation.lazy.grid.LazyGridState,
     isRefreshing: androidx.compose.runtime.MutableState<Boolean>,
     onRefresh: suspend () -> Unit,
     selectionManager: app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager<PlaylistWithCount, Int>,
@@ -284,21 +280,9 @@ object PlaylistScreen : Screen {
     modifier: Modifier = Modifier,
     isInSelectionMode: Boolean = false,
   ) {
-    val browserPreferences = koinInject<app.marlboroadvance.mpvex.preferences.BrowserPreferences>()
-    val mediaLayoutMode by browserPreferences.mediaLayoutMode.collectAsState()
-  val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-  val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-
-    val isGridMode = mediaLayoutMode == MediaLayoutMode.GRID
-
-    // Check if at top of list to hide scrollbar during pull-to-refresh
     val isAtTop by remember {
       derivedStateOf {
-        if (isGridMode) {
-          gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
-        } else {
-          listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-        }
+        listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
       }
     }
 

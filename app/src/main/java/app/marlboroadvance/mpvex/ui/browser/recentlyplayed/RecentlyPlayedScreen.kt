@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Close
@@ -170,12 +169,10 @@ object RecentlyPlayedScreen : Screen {
 
     // Track scroll for FAB visibility - create states here to pass to content
     val listState = remember { LazyListState() }
-    val gridState = remember { LazyGridState() }
     val browserPreferences = koinInject<BrowserPreferences>()
-    val mediaLayoutMode by browserPreferences.mediaLayoutMode.collectAsState()
     FabScrollHelper.trackScrollForFabVisibility(
       listState = listState,
-      gridState = if (mediaLayoutMode == MediaLayoutMode.GRID) gridState else null,
+      gridState = null,
       isFabVisible = isFabVisible,
       expanded = isFabExpanded.value,
       onExpandedChange = { isFabExpanded.value = it },
@@ -538,7 +535,6 @@ private fun RecentItemsContent(
                 FolderCard(
                   folder = folderModel,
                   isSelected = selectionManager.isSelected(item),
-                  isRecentlyPlayed = false,
                   onClick = {
                     if (selectionManager.isInSelectionMode) {
                       selectionManager.toggle(item)
@@ -563,7 +559,6 @@ private fun RecentItemsContent(
                     }
                   },
                   customIcon = Icons.AutoMirrored.Filled.PlaylistPlay,
-                  showDateModified = true,
                 )
               }
             }
