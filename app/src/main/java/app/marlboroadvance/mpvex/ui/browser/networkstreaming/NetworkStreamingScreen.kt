@@ -124,8 +124,6 @@ object NetworkStreamingScreen : Screen {
             onBackClick = null, // No back button for network screen (root tab)
             onCancelSelection = { },
           onSortClick = null,
-          // Search functionality disabled for production
-          onSearchClick = null,
           onSettingsClick = {
             backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
           },

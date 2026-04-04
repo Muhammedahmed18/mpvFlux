@@ -236,6 +236,10 @@ class PlaylistDetailViewModel(
     playlistRepository.removeItemsFromPlaylist(itemsToRemove)
   }
 
+  suspend fun removePlaylistItems(items: List<PlaylistItemEntity>) {
+    playlistRepository.removeItemsFromPlaylist(items)
+  }
+
   suspend fun updatePlayHistory(filePath: String, position: Long = 0) {
     playlistRepository.updatePlayHistory(playlistId, filePath, position)
   }

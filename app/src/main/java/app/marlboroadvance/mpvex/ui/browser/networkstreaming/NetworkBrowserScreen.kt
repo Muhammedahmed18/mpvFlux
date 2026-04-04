@@ -96,7 +96,6 @@ data class NetworkBrowserScreen(
           onBackClick = { backstack.removeLastOrNull() },
           onCancelSelection = {},
           onSortClick = null,
-          onSearchClick = null,
           onSettingsClick = {
             backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
           },

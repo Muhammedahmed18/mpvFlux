@@ -56,8 +56,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -102,6 +104,7 @@ import my.nanihadesuka.compose.ScrollbarSettings
 import org.koin.compose.koinInject
 import java.io.File
 import kotlin.math.roundToInt
+import app.marlboroadvance.mpvex.R
 
 @Serializable
 data class VideoListScreen(
@@ -757,7 +760,7 @@ private fun VideoSortBottomSheet(
       ),
     icons =
       listOf(
-        Icons.Filled.Title,
+        ImageVector.vectorResource(id = R.drawable.sort_by_alpha_24px),
         Icons.Filled.AccessTime,
         Icons.Filled.CalendarToday,
         Icons.Filled.SwapVert,

@@ -19,7 +19,6 @@ import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.RemoveCircle
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.SortByAlpha
@@ -53,6 +52,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,7 +80,6 @@ fun BrowserTopBar(
   modifier: Modifier = Modifier,
   onBackClick: (() -> Unit)? = null,
   onSortClick: (() -> Unit)? = null,
-  onSearchClick: (() -> Unit)? = null,
   onSettingsClick: (() -> Unit)? = null,
   onDeleteClick: (() -> Unit)? = null,
   onRenameClick: (() -> Unit)? = null,
@@ -121,7 +120,6 @@ fun BrowserTopBar(
       title = title,
       onBackClick = onBackClick,
       onSortClick = onSortClick,
-      onSearchClick = onSearchClick,
       onSettingsClick = onSettingsClick,
       additionalActions = additionalActions,
       modifier = modifier,
@@ -139,7 +137,6 @@ private fun NormalTopBar(
   title: String,
   onBackClick: (() -> Unit)?,
   onSortClick: (() -> Unit)?,
-  onSearchClick: (() -> Unit)?,
   onSettingsClick: (() -> Unit)?,
   additionalActions: @Composable RowScope.() -> Unit,
   modifier: Modifier = Modifier,
@@ -250,26 +247,13 @@ private fun NormalTopBar(
     },
     actions = {
       additionalActions()
-      if (onSearchClick != null) {
-        IconButton(
-          onClick = onSearchClick,
-          modifier = Modifier.padding(horizontal = 2.dp),
-        ) {
-          Icon(
-            Icons.Rounded.Search,
-            contentDescription = "Search",
-            modifier = Modifier.size(24.dp),
-            tint = MaterialTheme.colorScheme.secondary,
-          )
-        }
-      }
       if (onSortClick != null) {
         IconButton(
           onClick = onSortClick,
           modifier = Modifier.padding(horizontal = 2.dp),
         ) {
           Icon(
-            Icons.Rounded.ViewComfy,
+            painter = painterResource(R.drawable.sort_by_alpha_24px),
             contentDescription = stringResource(R.string.sort),
             modifier = Modifier.size(24.dp),
             tint = MaterialTheme.colorScheme.secondary,

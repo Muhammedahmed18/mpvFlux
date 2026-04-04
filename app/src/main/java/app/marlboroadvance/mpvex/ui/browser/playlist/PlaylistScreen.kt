@@ -85,32 +85,9 @@ object PlaylistScreen : Screen {
     val isLoading by viewModel.isLoading.collectAsState()
     val hasCompletedInitialLoad by viewModel.hasCompletedInitialLoad.collectAsState()
 
-    // Search state
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-    var isSearching by rememberSaveable { mutableStateOf(false) }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val focusRequester = remember { FocusRequester() }
-
-    // Filter playlists based on search query
-    val filteredPlaylists = if (isSearching && searchQuery.isNotBlank()) {
-      playlistsWithCount.filter { playlistWithCount ->
-        playlistWithCount.playlist.name.contains(searchQuery, ignoreCase = true)
-      }
-    } else {
-      playlistsWithCount
-    }
-
-    // Request focus when search is activated
-    LaunchedEffect(isSearching) {
-      if (isSearching) {
-        focusRequester.requestFocus()
-        keyboardController?.show()
-      }
-    }
-
-    // Selection manager - use filtered list
+    // Selection manager
     val selectionManager = rememberSelectionManager(
-      items = filteredPlaylists,
+      items = playlistsWithCount,
       getId = { it.playlist.id },
       onDeleteItems = { itemsToDelete, _ ->
         // Delete all items sequentially (this is a suspend function, so it blocks until complete)
@@ -134,16 +111,9 @@ object PlaylistScreen : Screen {
     // FAB visibility for scroll-based hiding
     val isFabVisible = remember { mutableStateOf(true) }
 
-    // Predictive back: Intercept when in selection mode or searching
-    BackHandler(enabled = selectionManager.isInSelectionMode || isSearching) {
-      when {
-        isSearching -> {
-          isSearching = false
-          searchQuery = ""
-        }
-
-        selectionManager.isInSelectionMode -> selectionManager.clear()
-      }
+    // Predictive back: Intercept when in selection mode
+    BackHandler(enabled = selectionManager.isInSelectionMode) {
+      selectionManager.clear()
     }
 
     // Track scroll for FAB visibility
@@ -158,71 +128,25 @@ object PlaylistScreen : Screen {
 
     Scaffold(
         topBar = {
-          if (isSearching) {
-            // Search mode - show search bar
-            SearchBar(
-              inputField = {
-                SearchBarDefaults.InputField(
-                  query = searchQuery,
-                  onQueryChange = { searchQuery = it },
-                  onSearch = { },
-                  expanded = false,
-                  onExpandedChange = { },
-                  placeholder = { Text("Search playlists...") },
-                  leadingIcon = {
-                    Icon(
-                      imageVector = Icons.Filled.Search,
-                      contentDescription = "Search",
-                    )
-                  },
-                  trailingIcon = {
-                    IconButton(
-                      onClick = {
-                        isSearching = false
-                        searchQuery = ""
-                      },
-                    ) {
-                      Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "Cancel",
-                      )
-                    }
-                  },
-                  modifier = Modifier.focusRequester(focusRequester),
-                )
-              },
-              expanded = false,
-              onExpandedChange = { },
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-              shape = RoundedCornerShape(28.dp),
-              tonalElevation = 6.dp,
-            ) {
-              // Empty content for SearchBar
-            }
-          } else {
-            BrowserTopBar(
-              title = "Playlists",
-              isInSelectionMode = selectionManager.isInSelectionMode,
-              selectedCount = selectionManager.selectedCount,
-              totalCount = playlistsWithCount.size,
-              onBackClick = null,
-              onCancelSelection = { selectionManager.clear() },
-              isSingleSelection = selectionManager.isSingleSelection,
-              onSearchClick = { isSearching = true },
-              onSettingsClick = {
-                backStack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
-              },
-              onRenameClick = if (selectionManager.isSingleSelection) {
-                { showRenameDialog = true }
-              } else null,
-              onDeleteClick = { showDeleteDialog = true },
-              onSelectAll = { selectionManager.selectAll() },
-              onInvertSelection = { selectionManager.invertSelection() },
-              onDeselectAll = { selectionManager.clear() },
-            )
-          }
+          BrowserTopBar(
+            title = "Playlists",
+            isInSelectionMode = selectionManager.isInSelectionMode,
+            selectedCount = selectionManager.selectedCount,
+            totalCount = playlistsWithCount.size,
+            onBackClick = null,
+            onCancelSelection = { selectionManager.clear() },
+            isSingleSelection = selectionManager.isSingleSelection,
+            onSettingsClick = {
+              backStack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
+            },
+            onRenameClick = if (selectionManager.isSingleSelection) {
+              { showRenameDialog = true }
+            } else null,
+            onDeleteClick = { showDeleteDialog = true },
+            onSelectAll = { selectionManager.selectAll() },
+            onInvertSelection = { selectionManager.invertSelection() },
+            onDeselectAll = { selectionManager.clear() },
+          )
         },
         floatingActionButton = {
           val navigationBarHeight = app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight.current
@@ -236,21 +160,7 @@ object PlaylistScreen : Screen {
           }
         }
       ) { paddingValues ->
-        if (isSearching && filteredPlaylists.isEmpty() && searchQuery.isNotBlank()) {
-          // Show "no results" for search
-          Box(
-            modifier = Modifier
-              .fillMaxSize()
-              .padding(paddingValues),
-            contentAlignment = Alignment.Center,
-          ) {
-            EmptyState(
-              icon = Icons.Filled.Search,
-              title = "No playlists found",
-              message = "Try a different search term",
-            )
-          }
-        } else if (playlistsWithCount.isEmpty() && hasCompletedInitialLoad) {
+        if (playlistsWithCount.isEmpty() && hasCompletedInitialLoad) {
           Box(
             modifier = Modifier
               .fillMaxSize()
@@ -270,7 +180,7 @@ object PlaylistScreen : Screen {
           }
         } else {
           PlaylistListContent(
-            playlistsWithCount = filteredPlaylists,
+            playlistsWithCount = playlistsWithCount,
             listState = listState,
             gridState = gridState,
             isRefreshing = isRefreshing,

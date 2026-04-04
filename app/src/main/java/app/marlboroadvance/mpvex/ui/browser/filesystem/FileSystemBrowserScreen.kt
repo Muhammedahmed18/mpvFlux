@@ -13,7 +13,6 @@ import androidx.compose.animation.slideOutVertically
 import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,20 +31,15 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.filled.Title
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SearchBar
-import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
@@ -61,32 +55,27 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
-import app.marlboroadvance.mpvex.BuildConfig
 import app.marlboroadvance.mpvex.domain.browser.FileSystemItem
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
-import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.NavigationBarState
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
@@ -109,24 +98,12 @@ import app.marlboroadvance.mpvex.utils.media.MediaUtils
 import app.marlboroadvance.mpvex.utils.permission.PermissionUtils
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import org.koin.compose.koinInject
-
-/**
- * Root File System Browser screen - shows storage volumes
- */
-@Serializable
-object FileSystemBrowserRootScreen : app.marlboroadvance.mpvex.presentation.Screen {
-  @OptIn(ExperimentalPermissionsApi::class)
-  @Composable
-  override fun Content() {
-    FileSystemBrowserScreen(path = null)
-  }
-}
+import app.marlboroadvance.mpvex.R
 
 /**
  * File System Directory screen - shows contents of a specific directory
@@ -191,14 +168,6 @@ fun FileSystemBrowserScreen(path: String? = null) {
   // FAB visibility for scroll-based hiding
   val isFabVisible = remember { mutableStateOf(true) }
   val isFabExpanded = remember { mutableStateOf(false) }
-  
-  // Search state
-  var searchQuery by rememberSaveable { mutableStateOf("") }
-  var isSearching by rememberSaveable { mutableStateOf(false) }
-  var searchResults by remember { mutableStateOf<List<FileSystemItem>>(emptyList()) }
-  var isSearchLoading by remember { mutableStateOf(false) }
-  val keyboardController = LocalSoftwareKeyboardController.current
-  val focusRequester = remember { FocusRequester() }
   
   // Get navigation bar height from MainScreen
   val navigationBarHeight = app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight.current
@@ -369,101 +338,14 @@ fun FileSystemBrowserScreen(path: String? = null) {
     }
   }
 
-  // Search functionality - recursive search through all subfolders
-  LaunchedEffect(isSearching) {
-    if (isSearching) {
-      focusRequester.requestFocus()
-      keyboardController?.show()
-    }
-  }
-
-  LaunchedEffect(searchQuery, isSearching, isAtRoot, items) {
-    if (isSearching && searchQuery.isNotBlank()) {
-      isSearchLoading = true
-      coroutineScope.launch {
-        try {
-          val results = if (isAtRoot) {
-            // At storage roots - search across all storage volumes AND their parent directories
-            val allResults = mutableListOf<FileSystemItem>()
-            
-            // Get unique parent directories from storage volumes
-            val parentDirectories = items.filterIsInstance<FileSystemItem.Folder>()
-              .map { it.path }
-              .mapNotNull { path ->
-                // Extract parent directory (e.g., /storage/emulated/0 from /storage/emulated/0/DCIM)
-                val parentPath = java.io.File(path).parent
-                parentPath
-              }
-              .distinct()
-            
-            // Search in parent directories (like /storage/emulated/0) directly
-            parentDirectories.forEach { parentPath ->
-              try {
-                Log.d("FileSystemBrowserScreen", "Searching in parent directory: $parentPath")
-                val parentResults = searchRecursively(context, parentPath, searchQuery)
-                Log.d("FileSystemBrowserScreen", "Found ${parentResults.size} results in parent $parentPath")
-                allResults.addAll(parentResults)
-              } catch (e: Exception) {
-                Log.e("FileSystemBrowserScreen", "Error searching parent directory $parentPath", e)
-              }
-            }
-            
-            // Also search in the storage volume folders themselves (existing behavior)
-            items.filterIsInstance<FileSystemItem.Folder>().forEach { storageVolume ->
-              try {
-                Log.d("FileSystemBrowserScreen", "Searching in storage volume: ${storageVolume.path}")
-                val rootResults = searchRecursively(context, storageVolume.path, searchQuery)
-                Log.d("FileSystemBrowserScreen", "Found ${rootResults.size} results in ${storageVolume.path}")
-                allResults.addAll(rootResults)
-              } catch (e: Exception) {
-                Log.e("FileSystemBrowserScreen", "Error searching volume ${storageVolume.path}", e)
-              }
-            }
-            
-            // Remove duplicates based on file path
-            val uniqueResults = allResults.distinctBy { item ->
-              when (item) {
-                is FileSystemItem.VideoFile -> item.video.path
-                is FileSystemItem.Folder -> item.path
-              }
-            }
-            
-            Log.d("FileSystemBrowserScreen", "Total search results after deduplication: ${uniqueResults.size}")
-            uniqueResults
-          } else if (currentPath != null) {
-            // In a specific directory - search from there
-            Log.d("FileSystemBrowserScreen", "Searching in directory: $currentPath")
-            val results = searchRecursively(context, currentPath, searchQuery)
-            Log.d("FileSystemBrowserScreen", "Found ${results.size} results in $currentPath")
-            results
-          } else {
-            emptyList()
-          }
-          searchResults = results
-        } catch (e: Exception) {
-          Log.e("FileSystemBrowserScreen", "Error during search", e)
-          searchResults = emptyList()
-        } finally {
-          isSearchLoading = false
-        }
-      }
-    } else {
-      searchResults = emptyList()
-    }
-  }
-
   // Optimized predictive back handler for immediate response
-  val shouldHandleBack = isInSelectionMode || isSearching || isFabExpanded.value
+  val shouldHandleBack = isInSelectionMode || isFabExpanded.value
   BackHandler(enabled = shouldHandleBack) {
     when {
       isFabExpanded.value -> isFabExpanded.value = false
       isInSelectionMode -> {
         folderSelectionManager.clear()
         videoSelectionManager.clear()
-      }
-      isSearching -> {
-        isSearching = false
-        searchQuery = ""
       }
     }
   }
@@ -481,207 +363,146 @@ fun FileSystemBrowserScreen(path: String? = null) {
   Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
       topBar = {
-        if (isSearching) {
-          // Search mode - show search bar instead of top bar
-          SearchBar(
-            inputField = {
-              SearchBarDefaults.InputField(
-                query = searchQuery,
-                onQueryChange = { searchQuery = it },
-                onSearch = { },
-                expanded = false,
-                onExpandedChange = { },
-                placeholder = {
-                  Text(
-                    if (isAtRoot) {
-                      "Search in all storage volumes..."
-                    } else {
-                      "Search in ${breadcrumbs.lastOrNull()?.name ?: "folder"}..."
-                    }
-                  )
-                },
-                leadingIcon = {
-                  Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = "Search",
-                  )
-                },
-                trailingIcon = {
-                  IconButton(
-                    onClick = {
-                      isSearching = false
-                      searchQuery = ""
-                    },
-                  ) {
-                    Icon(
-                      imageVector = Icons.Filled.Close,
-                      contentDescription = "Cancel",
-                    )
+        BrowserTopBar(
+          title = if (isAtRoot) {
+            stringResource(R.string.app_name)
+          } else {
+            breadcrumbs.lastOrNull()?.name ?: "Tree View"
+          },
+          isInSelectionMode = isInSelectionMode,
+          selectedCount = selectedCount,
+          totalCount = totalCount,
+          onBackClick = if (isAtRoot) {
+            null
+          } else {
+            { backstack.removeLastOrNull() }
+          },
+          onCancelSelection = {
+            folderSelectionManager.clear()
+            videoSelectionManager.clear()
+          },
+          onSortClick = { sortDialogOpen.value = true },
+          onSettingsClick = {
+            backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
+          },
+          onDeleteClick = if (videoSelectionManager.isInSelectionMode && !isMixedSelection) {
+            null
+          } else {
+            { deleteDialogOpen.value = true }
+          },
+          onRenameClick = null,
+          isSingleSelection = videoSelectionManager.isSingleSelection && !isMixedSelection,
+          onInfoClick = if (videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode) {
+            {
+              val video = videoSelectionManager.getSelectedItems().firstOrNull()
+              if (video != null) {
+                val intent = Intent(context, app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity::class.java)
+                intent.action = Intent.ACTION_VIEW
+                intent.data = video.uri
+                context.startActivity(intent)
+                videoSelectionManager.clear()
+              }
+            }
+          } else {
+            null
+          },
+          onShareClick = {
+            when {
+              // Mixed selection: share videos from both selected videos and selected folders
+              isMixedSelection -> {
+                coroutineScope.launch {
+                  val selectedVideos = videoSelectionManager.getSelectedItems()
+                  val selectedFolders = folderSelectionManager.getSelectedItems()
+
+                  // Get all videos recursively from selected folders
+                  val videosFromFolders = selectedFolders.flatMap { folder ->
+                    collectVideosRecursively(context, folder.path)
                   }
-                },
-                modifier = Modifier.focusRequester(focusRequester),
-              )
-            },
-            expanded = false,
-            onExpandedChange = { },
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(horizontal = 16.dp),
-            shape = RoundedCornerShape(28.dp),
-            tonalElevation = 6.dp,
-          ) {
-            // Empty content for SearchBar
-          }
-        } else {
-          BrowserTopBar(
-            title = if (isAtRoot) {
-              stringResource(app.marlboroadvance.mpvex.R.string.app_name)
-            } else {
-              breadcrumbs.lastOrNull()?.name ?: "Tree View"
-            },
-            isInSelectionMode = isInSelectionMode,
-            selectedCount = selectedCount,
-            totalCount = totalCount,
-            onBackClick = if (isAtRoot) {
-              null
-            } else {
-              { backstack.removeLastOrNull() }
-            },
-            onCancelSelection = {
-              folderSelectionManager.clear()
-              videoSelectionManager.clear()
-            },
-            onSortClick = { sortDialogOpen.value = true },
-            onSearchClick = {
-              isSearching = !isSearching
-            },
-            onSettingsClick = {
-              backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
-            },
-            onDeleteClick = if (videoSelectionManager.isInSelectionMode && !isMixedSelection) {
-              null
-            } else if (!BuildConfig.ENABLE_UPDATE_FEATURE && folderSelectionManager.isInSelectionMode) {
-              // Hide delete button for folders in Play Store build
-              null
-            } else {
-              { deleteDialogOpen.value = true }
-            },
-            onRenameClick = null,
-            isSingleSelection = videoSelectionManager.isSingleSelection && !isMixedSelection,
-            onInfoClick = if (videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode) {
-              {
-                val video = videoSelectionManager.getSelectedItems().firstOrNull()
-                if (video != null) {
-                  val intent = Intent(context, app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity::class.java)
-                  intent.action = Intent.ACTION_VIEW
-                  intent.data = video.uri
-                  context.startActivity(intent)
+
+                  // Combine and share all videos
+                  val allVideos = (selectedVideos + videosFromFolders).distinctBy { it.id }
+                  if (allVideos.isNotEmpty()) {
+                    MediaUtils.shareVideos(context, allVideos)
+                  }
+                }
+              }
+              // Folders only: share all videos from selected folders
+              folderSelectionManager.isInSelectionMode -> {
+                coroutineScope.launch {
+                  val selectedFolders = folderSelectionManager.getSelectedItems()
+                  val videosFromFolders = selectedFolders.flatMap { folder ->
+                    collectVideosRecursively(context, folder.path)
+                  }
+                  if (videosFromFolders.isNotEmpty()) {
+                    MediaUtils.shareVideos(context, videosFromFolders)
+                  }
+                }
+              }
+              // Videos only: use existing functionality
+              videoSelectionManager.isInSelectionMode -> {
+                videoSelectionManager.shareSelected()
+              }
+            }
+          },
+          onPlayClick = {
+            when {
+              // Mixed selection: play videos from both selected videos and selected folders
+              isMixedSelection -> {
+                coroutineScope.launch {
+                  val selectedVideos = videoSelectionManager.getSelectedItems()
+                  val selectedFolders = folderSelectionManager.getSelectedItems()
+
+                  // Get all videos recursively from selected folders
+                  val videosFromFolders = selectedFolders.flatMap { folder ->
+                    collectVideosRecursively(context, folder.path)
+                  }
+
+                  // Combine and play all videos as playlist
+                  val allVideos = (selectedVideos + videosFromFolders).distinctBy { it.id }
+                  if (allVideos.isNotEmpty()) {
+                    playVideosAsPlaylist(context, allVideos)
+                  }
+
+                  // Clear selections
+                  folderSelectionManager.clear()
                   videoSelectionManager.clear()
                 }
               }
-            } else {
-              null
-            },
-            onShareClick = {
-              when {
-                // Mixed selection: share videos from both selected videos and selected folders
-                isMixedSelection -> {
-                  coroutineScope.launch {
-                    val selectedVideos = videoSelectionManager.getSelectedItems()
-                    val selectedFolders = folderSelectionManager.getSelectedItems()
-
-                    // Get all videos recursively from selected folders
-                    val videosFromFolders = selectedFolders.flatMap { folder ->
-                      collectVideosRecursively(context, folder.path)
-                    }
-
-                    // Combine and share all videos
-                    val allVideos = (selectedVideos + videosFromFolders).distinctBy { it.id }
-                    if (allVideos.isNotEmpty()) {
-                      MediaUtils.shareVideos(context, allVideos)
-                    }
+              // Folders only: play all videos from selected folders as playlist
+              folderSelectionManager.isInSelectionMode -> {
+                coroutineScope.launch {
+                  val selectedFolders = folderSelectionManager.getSelectedItems()
+                  val videosFromFolders = selectedFolders.flatMap { folder ->
+                    collectVideosRecursively(context, folder.path)
                   }
-                }
-                // Folders only: share all videos from selected folders
-                folderSelectionManager.isInSelectionMode -> {
-                  coroutineScope.launch {
-                    val selectedFolders = folderSelectionManager.getSelectedItems()
-                    val videosFromFolders = selectedFolders.flatMap { folder ->
-                      collectVideosRecursively(context, folder.path)
-                    }
-                    if (videosFromFolders.isNotEmpty()) {
-                      MediaUtils.shareVideos(context, videosFromFolders)
-                    }
+                  if (videosFromFolders.isNotEmpty()) {
+                    playVideosAsPlaylist(context, videosFromFolders)
                   }
-                }
-                // Videos only: use existing functionality
-                videoSelectionManager.isInSelectionMode -> {
-                  videoSelectionManager.shareSelected()
+
+                  // Clear selection
+                  folderSelectionManager.clear()
                 }
               }
-            },
-            onPlayClick = {
-              when {
-                // Mixed selection: play videos from both selected videos and selected folders
-                isMixedSelection -> {
-                  coroutineScope.launch {
-                    val selectedVideos = videoSelectionManager.getSelectedItems()
-                    val selectedFolders = folderSelectionManager.getSelectedItems()
-
-                    // Get all videos recursively from selected folders
-                    val videosFromFolders = selectedFolders.flatMap { folder ->
-                      collectVideosRecursively(context, folder.path)
-                    }
-
-                    // Combine and play all videos as playlist
-                    val allVideos = (selectedVideos + videosFromFolders).distinctBy { it.id }
-                    if (allVideos.isNotEmpty()) {
-                      playVideosAsPlaylist(context, allVideos)
-                    }
-
-                    // Clear selections
-                    folderSelectionManager.clear()
-                    videoSelectionManager.clear()
-                  }
-                }
-                // Folders only: play all videos from selected folders as playlist
-                folderSelectionManager.isInSelectionMode -> {
-                  coroutineScope.launch {
-                    val selectedFolders = folderSelectionManager.getSelectedItems()
-                    val videosFromFolders = selectedFolders.flatMap { folder ->
-                      collectVideosRecursively(context, folder.path)
-                    }
-                    if (videosFromFolders.isNotEmpty()) {
-                      playVideosAsPlaylist(context, videosFromFolders)
-                    }
-
-                    // Clear selection
-                    folderSelectionManager.clear()
-                  }
-                }
-                // Videos only: use existing functionality
-                videoSelectionManager.isInSelectionMode -> {
-                  videoSelectionManager.playSelected()
-                }
+              // Videos only: use existing functionality
+              videoSelectionManager.isInSelectionMode -> {
+                videoSelectionManager.playSelected()
               }
-            },
-            onSelectAll = {
-              folderSelectionManager.selectAll()
-              videoSelectionManager.selectAll()
-            },
-            onInvertSelection = {
-              folderSelectionManager.invertSelection()
-              videoSelectionManager.invertSelection()
-            },
-            onDeselectAll = {
-              folderSelectionManager.clear()
-              videoSelectionManager.clear()
-            },
-            onAddToPlaylistClick = if (!BuildConfig.ENABLE_UPDATE_FEATURE && videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode) {
-              { addToPlaylistDialogOpen.value = true }
-            } else null,
-          )
-        }
+            }
+          },
+          onSelectAll = {
+            folderSelectionManager.selectAll()
+            videoSelectionManager.selectAll()
+          },
+          onInvertSelection = {
+            folderSelectionManager.invertSelection()
+            videoSelectionManager.invertSelection()
+          },
+          onDeselectAll = {
+            folderSelectionManager.clear()
+            videoSelectionManager.clear()
+          },
+          onAddToPlaylistClick = null,
+        )
       },
       floatingActionButton = {
         if (isAtRoot) {
@@ -762,97 +583,70 @@ fun FileSystemBrowserScreen(path: String? = null) {
       Box(modifier = Modifier.padding(padding)) {
         when (permissionState.status) {
           PermissionStatus.Granted -> {
-            if (isSearching) {
-              // Show search results
-              FileSystemSearchContent(
-                listState = listState, // Use the main listState for FAB tracking
-                searchQuery = searchQuery,
-                searchResults = searchResults,
-                isLoading = isSearchLoading,
-                videoFilesWithPlayback = videoFilesWithPlayback,
-                showSubtitleIndicator = showSubtitleIndicator,
-                isAtRoot = isAtRoot,
-                navigationBarHeight = navigationBarHeight,
-                isFabVisible = isFabVisible, // Pass FAB visibility state
-                onVideoClick = { video ->
-                  MediaUtils.playFile(video, context, "search")
-                },
-                onFolderClick = { folder ->
-                  backstack.add(FileSystemDirectoryScreen(folder.path))
-                  isSearching = false
-                  searchQuery = ""
-                },
-                modifier = Modifier,
-              )
-            } else {
-              FileSystemBrowserContent(
-                listState = listState,
-                items = items,
-                videoFilesWithPlayback = videoFilesWithPlayback,
-                isLoading = isLoading && items.isEmpty(),
-                isRefreshing = isRefreshing,
-                error = error,
-                isAtRoot = isAtRoot,
-                breadcrumbs = breadcrumbs,
-                playlistMode = playlistMode,
-                itemsWereDeletedOrMoved = itemsWereDeletedOrMoved,
-                showSubtitleIndicator = showSubtitleIndicator,
-                navigationBarHeight = navigationBarHeight,
-                onRefresh = { viewModel.refresh() },
-                onFolderClick = { folder ->
-                  if (isInSelectionMode) {
-                    folderSelectionManager.toggle(folder)
-                  } else {
-                    backstack.add(FileSystemDirectoryScreen(folder.path))
-                  }
-                },
-                onFolderLongClick = { folder ->
+            FileSystemBrowserContent(
+              listState = listState,
+              items = items,
+              videoFilesWithPlayback = videoFilesWithPlayback,
+              isLoading = isLoading && items.isEmpty(),
+              isRefreshing = isRefreshing,
+              error = error,
+              isAtRoot = isAtRoot,
+              breadcrumbs = breadcrumbs,
+              itemsWereDeletedOrMoved = itemsWereDeletedOrMoved,
+              showSubtitleIndicator = showSubtitleIndicator,
+              navigationBarHeight = navigationBarHeight,
+              onRefresh = { viewModel.refresh() },
+              onFolderClick = { folder ->
+                if (isInSelectionMode) {
                   folderSelectionManager.toggle(folder)
-                },
-                onVideoClick = { video ->
-                  if (isInSelectionMode) {
-                    videoSelectionManager.toggle(video)
-                  } else {
-                    // If playlist mode is enabled, play all videos in current folder starting from clicked one
-                    if (playlistMode) {
-                      val allVideos = videos
-                      val startIndex = allVideos.indexOfFirst { it.id == video.id }
-                      if (startIndex >= 0) {
-                        if (allVideos.size == 1) {
-                          // Single video - play normally
-                          MediaUtils.playFile(video, context)
-                        } else {
-                          // Multiple videos - play as playlist starting from clicked video
-                          val intent = Intent(Intent.ACTION_VIEW, allVideos[startIndex].uri)
-                          intent.setClass(context, app.marlboroadvance.mpvex.ui.player.PlayerActivity::class.java)
-                          intent.putExtra("internal_launch", true)
-                          intent.putParcelableArrayListExtra("playlist", ArrayList(allVideos.map { it.uri }))
-                          intent.putExtra("playlist_index", startIndex)
-                          intent.putExtra("launch_source", "playlist")
-                          context.startActivity(intent)
-                        }
-                      } else {
+                } else {
+                  backstack.add(FileSystemDirectoryScreen(folder.path))
+                }
+              },
+              onFolderLongClick = { folder ->
+                folderSelectionManager.toggle(folder)
+              },
+              onVideoClick = { video ->
+                if (isInSelectionMode) {
+                  videoSelectionManager.toggle(video)
+                } else {
+                  // If playlist mode is enabled, play all videos in current folder starting from clicked one
+                  if (playlistMode) {
+                    val startIndex = videos.indexOfFirst { it.id == video.id }
+                    if (startIndex >= 0) {
+                      if (videos.size == 1) {
+                        // Single video - play normally
                         MediaUtils.playFile(video, context)
+                      } else {
+                        // Multiple videos - play as playlist starting from clicked video
+                        val intent = Intent(Intent.ACTION_VIEW, videos[startIndex].uri)
+                        intent.setClass(context, app.marlboroadvance.mpvex.ui.player.PlayerActivity::class.java)
+                        intent.putExtra("internal_launch", true)
+                        intent.putParcelableArrayListExtra("playlist", ArrayList(videos.map { it.uri }))
+                        intent.putExtra("playlist_index", startIndex)
+                        intent.putExtra("launch_source", "playlist")
+                        context.startActivity(intent)
                       }
                     } else {
                       MediaUtils.playFile(video, context)
                     }
+                  } else {
+                    MediaUtils.playFile(video, context)
                   }
-                },
-                onVideoLongClick = { video ->
-                  videoSelectionManager.toggle(video)
-                },
-                onBreadcrumbClick = { component ->
-                  // Navigate to the breadcrumb by popping until we reach it
-                  // or pushing if it's a new path
-                  backstack.add(FileSystemDirectoryScreen(component.fullPath))
-                },
-                folderSelectionManager = folderSelectionManager,
-                videoSelectionManager = videoSelectionManager,
-                modifier = Modifier,
-                isInSelectionMode = isInSelectionMode,
-              )
-            }
+                }
+              },
+              onVideoLongClick = { video ->
+                videoSelectionManager.toggle(video)
+              },
+              onBreadcrumbClick = { component ->
+                // Navigate to the breadcrumb by popping until we reach it
+                // or pushing if it's a new path
+                backstack.add(FileSystemDirectoryScreen(component.fullPath))
+              },
+              folderSelectionManager = folderSelectionManager,
+              videoSelectionManager = videoSelectionManager,
+              modifier = Modifier,
+            )
           }
 
           is PermissionStatus.Denied -> {
@@ -1019,57 +813,6 @@ fun FileSystemBrowserScreen(path: String? = null) {
   }
 }
 
-/**
- * Recursively searches for files matching the query in a directory and its subdirectories
- */
-suspend fun searchRecursively(
-  context: Context,
-  directoryPath: String,
-  query: String,
-): List<FileSystemItem> {
-  val results = mutableListOf<FileSystemItem>()
-  
-  try {
-    Log.d("FileSystemBrowserScreen", "Scanning directory: $directoryPath for query: $query")
-    // Scan the current directory
-    val items = app.marlboroadvance.mpvex.repository.MediaFileRepository
-      .scanDirectory(context, directoryPath, showAllFileTypes = false)
-      .getOrNull() ?: emptyList()
-
-    Log.d("FileSystemBrowserScreen", "Found ${items.size} items in $directoryPath")
-
-    // Filter items that match the search query (case-insensitive)
-    items.forEach { item ->
-      when (item) {
-        is FileSystemItem.VideoFile -> {
-          if (item.video.displayName.contains(query, ignoreCase = true)) {
-            Log.d("FileSystemBrowserScreen", "Found matching video: ${item.video.displayName}")
-            results.add(item)
-          }
-        }
-        is FileSystemItem.Folder -> {
-          if (item.name.contains(query, ignoreCase = true)) {
-            Log.d("FileSystemBrowserScreen", "Found matching folder: ${item.name}")
-            results.add(item)
-          }
-          // Recursively search in subdirectories
-          try {
-            val subResults = searchRecursively(context, item.path, query)
-            results.addAll(subResults)
-          } catch (e: Exception) {
-            Log.e("FileSystemBrowserScreen", "Error searching subdirectory ${item.path}", e)
-          }
-        }
-      }
-    }
-    
-    Log.d("FileSystemBrowserScreen", "Returning ${results.size} results from $directoryPath")
-  } catch (e: Exception) {
-    Log.e("FileSystemBrowserScreen", "Error searching directory $directoryPath", e)
-  }
-
-  return results
-}
 
 /**
  * Recursively collects all videos from a folder and its subfolders
@@ -1137,7 +880,6 @@ private fun FileSystemBrowserContent(
   error: String?,
   isAtRoot: Boolean,
   breadcrumbs: List<app.marlboroadvance.mpvex.domain.browser.PathComponent>,
-  playlistMode: Boolean,
   itemsWereDeletedOrMoved: Boolean,
   showSubtitleIndicator: Boolean,
   navigationBarHeight: Dp,
@@ -1150,7 +892,6 @@ private fun FileSystemBrowserContent(
   folderSelectionManager: app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager<FileSystemItem.Folder, String>,
   videoSelectionManager: app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager<app.marlboroadvance.mpvex.domain.media.model.Video, Long>,
   modifier: Modifier = Modifier,
-  isInSelectionMode: Boolean = false,
 ) {
   val gesturePreferences = koinInject<GesturePreferences>()
   val browserPreferences = koinInject<BrowserPreferences>()
@@ -1353,178 +1094,6 @@ private fun FileSystemBrowserContent(
 }
 
 @Composable
-private fun FileSystemSearchContent(
-  listState: LazyListState,
-  searchQuery: String,
-  searchResults: List<FileSystemItem>,
-  isLoading: Boolean,
-  videoFilesWithPlayback: Map<Long, Float>,
-  showSubtitleIndicator: Boolean,
-  isAtRoot: Boolean,
-  navigationBarHeight: Dp,
-  isFabVisible: androidx.compose.runtime.MutableState<Boolean>, // Add FAB visibility state
-  onVideoClick: (app.marlboroadvance.mpvex.domain.media.model.Video) -> Unit,
-  onFolderClick: (FileSystemItem.Folder) -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  val gesturePreferences = koinInject<GesturePreferences>()
-  val tapThumbnailToSelect by gesturePreferences.tapThumbnailToSelect.collectAsState()
-
-  // Track scroll for FAB visibility in search mode with proper scroll direction detection
-  val previousIndex = remember { mutableIntStateOf(0) }
-  val previousOffset = remember { mutableIntStateOf(0) }
-  
-  LaunchedEffect(listState) {
-    snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
-      .distinctUntilChanged()
-      .collect { (currentIndex, currentOffset) ->
-        // Show FAB when at the top
-        if (currentIndex == 0 && currentOffset == 0) {
-          isFabVisible.value = true
-        } else {
-          // Calculate if scrolling down or up
-          val isScrollingDown = if (currentIndex != previousIndex.intValue) {
-            currentIndex > previousIndex.intValue
-          } else {
-            currentOffset > previousOffset.intValue
-          }
-          
-          // Hide when scrolling down, show when scrolling up
-          isFabVisible.value = !isScrollingDown
-        }
-        
-        previousIndex.intValue = currentIndex
-        previousOffset.intValue = currentOffset
-      }
-  }
-
-  Box(modifier = modifier.fillMaxSize()) {
-    when {
-      isLoading -> {
-        Box(
-          modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = 80.dp), // Account for bottom navigation bar
-          contentAlignment = Alignment.Center,
-        ) {
-          Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-          ) {
-            CircularProgressIndicator(
-              modifier = Modifier.size(48.dp),
-              color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-              text = if (isAtRoot) "Searching all storage volumes..." else "Searching...",
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          }
-        }
-      }
-
-      searchResults.isEmpty() && searchQuery.isNotBlank() -> {
-        Box(
-          modifier = Modifier.fillMaxSize(),
-          contentAlignment = Alignment.Center,
-        ) {
-          EmptyState(
-            icon = Icons.Filled.Search,
-            title = "No results found",
-            message = "No files or folders match \"$searchQuery\"",
-          )
-        }
-      }
-
-      else -> {
-        Box(
-          modifier = Modifier.fillMaxSize()
-        ) {
-          // Content extends full height for transparency
-          LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-              start = 8.dp,
-              end = 8.dp,
-              top = 12.dp,
-              bottom = navigationBarHeight
-            ),
-          ) {
-            // Separate folders and videos for proper ordering and deduplicate
-            val folders = searchResults.filterIsInstance<FileSystemItem.Folder>().distinctBy { it.path }
-            val videos = searchResults.filterIsInstance<FileSystemItem.VideoFile>().distinctBy { it.video.id }
-            
-            // Folders first
-            items(
-              items = folders,
-              key = { "search_folder_${it.path}_${it.hashCode()}" },
-            ) { folder ->
-              val folderModel = app.marlboroadvance.mpvex.domain.media.model.VideoFolder(
-                bucketId = folder.path,
-                name = folder.name,
-                path = folder.path,
-                videoCount = folder.videoCount,
-                totalSize = folder.totalSize,
-                totalDuration = folder.totalDuration,
-                lastModified = folder.lastModified / 1000,
-              )
-
-              FolderCard(
-                folder = folderModel,
-                isSelected = false,
-                isRecentlyPlayed = false,
-                onClick = { onFolderClick(folder) },
-                onLongClick = { },
-                onThumbClick = { onFolderClick(folder) },
-              )
-            }
-            
-            // Videos second
-            items(
-              items = videos,
-              key = { "search_video_${it.video.id}_${it.video.path}_${it.hashCode()}" },
-            ) { videoFile ->
-              VideoCard(
-                video = videoFile.video,
-                progressPercentage = videoFilesWithPlayback[videoFile.video.id],
-                isRecentlyPlayed = false,
-                isSelected = false,
-                onClick = { onVideoClick(videoFile.video) },
-                onLongClick = { },
-                onThumbClick = { onVideoClick(videoFile.video) },
-                showSubtitleIndicator = showSubtitleIndicator,
-                overrideShowSizeChip = null,
-                overrideShowResolutionChip = null,
-                useFolderNameStyle = false,
-              )
-            }
-          }
-          
-          // Scrollbar with bottom padding to avoid overlap with navigation
-          Box(
-            modifier = Modifier
-              .fillMaxSize()
-              .padding(bottom = navigationBarHeight)
-          ) {
-            LazyColumnScrollbar(
-              state = listState,
-              settings = ScrollbarSettings(
-                thumbUnselectedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
-                thumbSelectedColor = MaterialTheme.colorScheme.primary,
-              ),
-            ) {
-              // Empty content - scrollbar only
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-@Composable
 fun FileSystemSortBottomSheet(
   isOpen: Boolean,
   onDismiss: () -> Unit,
@@ -1567,7 +1136,7 @@ fun FileSystemSortBottomSheet(
       app.marlboroadvance.mpvex.preferences.FolderSortType.Size.displayName,
     ),
     icons = listOf(
-      Icons.Filled.Title,
+      ImageVector.vectorResource(id = R.drawable.sort_by_alpha_24px),
       Icons.Filled.CalendarToday,
       Icons.Filled.SwapVert,
     ),
@@ -1632,4 +1201,47 @@ fun FileSystemSortBottomSheet(
       ),
     )
   )
+}
+
+/**
+ * Breadcrumb navigation item
+ */
+@Composable
+private fun BreadcrumbNavigation(
+  breadcrumbs: List<app.marlboroadvance.mpvex.domain.browser.PathComponent>,
+  onBreadcrumbClick: (app.marlboroadvance.mpvex.domain.browser.PathComponent) -> Unit,
+) {
+  androidx.compose.foundation.lazy.LazyRow(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(vertical = 8.dp),
+    horizontalArrangement = Arrangement.spacedBy(4.dp),
+    verticalAlignment = Alignment.CenterVertically
+  ) {
+    items(breadcrumbs) { component ->
+      androidx.compose.material3.TextButton(
+        onClick = { onBreadcrumbClick(component) },
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(8.dp),
+        colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
+          contentColor = MaterialTheme.colorScheme.primary
+        )
+      ) {
+        Text(
+          text = component.name,
+          style = MaterialTheme.typography.labelLarge,
+          fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+        )
+      }
+      
+      if (component != breadcrumbs.last()) {
+        Icon(
+          imageVector = Icons.Default.PlayArrow, // Using PlayArrow as a simple chevron
+          contentDescription = null,
+          modifier = Modifier.size(12.dp),
+          tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        )
+      }
+    }
+  }
 }
