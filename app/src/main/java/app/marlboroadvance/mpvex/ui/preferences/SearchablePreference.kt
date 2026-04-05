@@ -394,13 +394,6 @@ object SearchablePreferences {
                 category = "Decoder",
                 screen = DecoderPreferencesScreen,
             ))
-            add(SearchablePreference(
-                titleRes = R.string.pref_anime4k_title,
-                summaryRes = R.string.pref_anime4k_summary,
-                keywords = listOf("anime4k", "upscale", "shader", "anime", "upscale"),
-                category = "Decoder",
-                screen = DecoderPreferencesScreen,
-            ))
 
             // Subtitle preferences
             add(SearchablePreference(

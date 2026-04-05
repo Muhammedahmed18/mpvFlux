@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
+import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
@@ -37,9 +38,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.util.fastJoinToString
 import androidx.core.net.toUri
@@ -266,10 +268,9 @@ object AdvancedPreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.Rounded.FileUpload, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = {
@@ -288,10 +289,9 @@ object AdvancedPreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.Rounded.FileDownload, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = {
@@ -631,7 +631,7 @@ object AdvancedPreferencesScreen : Screen {
           item {
             PreferenceCard {
               val activity = LocalActivity.current!!
-              val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+              val clipboard = LocalClipboard.current
               val verboseLogging by preferences.verboseLogging.collectAsState()
               
               SwitchPreference(
@@ -660,8 +660,9 @@ object AdvancedPreferencesScreen : Screen {
                   scope.launch(Dispatchers.IO) {
                     val deviceInfo = CrashActivity.collectDeviceInfo()
                     val logcat = CrashActivity.collectLogcat()
+                    val logs = CrashActivity.concatLogs(deviceInfo, null, logcat)
     
-                    clipboard.setText(AnnotatedString(CrashActivity.concatLogs(deviceInfo, null, logcat)))
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Logs", logs)))
                     CrashActivity.shareLogs(deviceInfo, null, logcat, activity)
                   }
                 },

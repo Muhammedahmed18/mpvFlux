@@ -3,6 +3,8 @@ package app.marlboroadvance.mpvex.ui.player
 import android.util.Log
 import app.marlboroadvance.mpvex.database.entities.PlaybackStateEntity
 import app.marlboroadvance.mpvex.domain.playbackstate.repository.PlaybackStateRepository
+import app.marlboroadvance.mpvex.preferences.BrowserPreferences
+import app.marlboroadvance.mpvex.utils.media.MediaLibraryEvents
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,6 +19,7 @@ import org.koin.core.component.inject
  */
 class ProgressSaveManager : KoinComponent {
     private val playbackStateRepository: PlaybackStateRepository by inject()
+    private val browserPreferences: BrowserPreferences by inject()
     
     private var currentSaveJob: Job? = null
     private var lastSavedPosition: Int? = null
@@ -41,15 +44,18 @@ class ProgressSaveManager : KoinComponent {
         getAudioDelay: () -> Int?,
         getExternalSubtitles: () -> String,
         savePositionOnQuit: Boolean,
-        oldState: PlaybackStateEntity? = null
+        oldState: PlaybackStateEntity? = null,
+        isImmediate: Boolean = false
     ) {
         // Cancel any pending save operation
         currentSaveJob?.cancel()
         
         currentSaveJob = CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Debounce to prevent rapid saves
-                delay(SAVE_DEBOUNCE_MS)
+                // Debounce to prevent rapid saves unless immediate
+                if (!isImmediate) {
+                    delay(SAVE_DEBOUNCE_MS)
+                }
                 
                 if (!isActive) return@launch
                 
@@ -57,18 +63,28 @@ class ProgressSaveManager : KoinComponent {
                 val duration = getDuration() ?: 0
                 
                 // Skip save if position hasn't changed significantly (more than 1 second)
-                if (lastSavedMediaIdentifier == mediaIdentifier && 
+                // Unless it's an immediate save (like reaching end of video)
+                if (!isImmediate && 
+                    lastSavedMediaIdentifier == mediaIdentifier && 
                     lastSavedPosition != null && 
                     kotlin.math.abs(lastSavedPosition!! - currentPos) <= 1) {
                     Log.d(TAG, "Skipping save - position unchanged: $currentPos")
                     return@launch
                 }
         
-                Log.d(TAG, "Saving progress for: $mediaIdentifier at position: $currentPos")
+                Log.d(TAG, "Saving progress for: $mediaIdentifier at position: $currentPos (immediate: $isImmediate)")
                 
                 val positionToSave = calculateSavePosition(currentPos, duration, savePositionOnQuit, oldState)
                 val timeRemaining = if (duration > positionToSave) duration - positionToSave else 0
                 
+                // Get watched threshold from preferences (default 95%)
+                val thresholdPercent = browserPreferences.watchedThreshold.get()
+                val isWatched = if (duration > 0) {
+                    currentPos >= (duration * (thresholdPercent / 100f))
+                } else {
+                    false
+                }
+
                 playbackStateRepository.upsert(
                     PlaybackStateEntity(
                         mediaTitle = mediaIdentifier,
@@ -83,7 +99,7 @@ class ProgressSaveManager : KoinComponent {
                         audioDelay = getAudioDelay() ?: 0,
                         timeRemaining = timeRemaining,
                         externalSubtitles = getExternalSubtitles(),
-                        hasBeenWatched = currentPos >= (duration * 0.95) // Mark as watched if 95% complete
+                        hasBeenWatched = isWatched
                     ),
                 )
                 
@@ -91,6 +107,9 @@ class ProgressSaveManager : KoinComponent {
                 lastSavedMediaIdentifier = mediaIdentifier
                 
                 Log.d(TAG, "Progress saved successfully")
+
+                // Notify UI to refresh in real-time
+                MediaLibraryEvents.notifyChanged()
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error saving progress", e)
