@@ -15,7 +15,7 @@ fun DecodersSheet(
   GenericTracksSheet(
     Decoder.entries.minusElement(Decoder.Auto).toImmutableList(),
     track = {
-      AudioTrackRow(
+      TrackSelectableBar(
         title = stringResource(R.string.player_sheets_decoder_formatted, it.title, it.value),
         isSelected = selectedDecoder == it,
         onClick = { onSelect(it) },

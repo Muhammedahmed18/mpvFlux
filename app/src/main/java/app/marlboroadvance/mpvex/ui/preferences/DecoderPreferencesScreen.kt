@@ -133,9 +133,6 @@ object DecoderPreferencesScreen : Screen {
                         showGpuNextWarning = true
                     } else {
                         preferences.gpuNext.set(enabled)
-                        if (enabled && !useVulkan) { // Only disable Anime4K if Vulkan is disabled
-                            preferences.enableAnime4K.set(false)
-                        }
                     }
                 },
                 title = { Text(stringResource(R.string.pref_decoder_gpu_next_title)) },
@@ -155,30 +152,11 @@ object DecoderPreferencesScreen : Screen {
                           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                               Text(stringResource(R.string.pref_decoder_gpu_next_warning))
                               Text(stringResource(R.string.pref_decoder_gpu_next_purple_screen_fix))
-                              
-                              Surface(
-                                  color = MaterialTheme.colorScheme.errorContainer,
-                                  shape = MaterialTheme.shapes.small
-                              ) {
-                                  Column(modifier = Modifier.padding(8.dp)) {
-                                      Text(
-                                          text = stringResource(R.string.pref_anime4k_incompatibility),
-                                          style = MaterialTheme.typography.titleSmall,
-                                          color = MaterialTheme.colorScheme.onErrorContainer
-                                      )
-                                      Text(
-                                          text = stringResource(R.string.pref_anime4k_gpu_next_error),
-                                          style = MaterialTheme.typography.bodySmall,
-                                          color = MaterialTheme.colorScheme.onErrorContainer
-                                      )
-                                  }
-                              }
                           }
                       },
                       confirmButton = {
                           Button(onClick = {
                               preferences.gpuNext.set(true)
-                              preferences.enableAnime4K.set(false) // Ensure Anime4K is disabled on confirmation
                               showGpuNextWarning = false
                           }) {
                               Text(stringResource(R.string.pref_decoder_gpu_next_enable_anyway))
@@ -199,15 +177,6 @@ object DecoderPreferencesScreen : Screen {
                 value = useVulkan,
                 onValueChange = { enabled ->
                   preferences.useVulkan.set(enabled)
-                  // When Vulkan is disabled, ensure Anime4K and GPU Next are not both enabled
-                  if (!enabled) {
-                    val anime4kEnabled = preferences.enableAnime4K.get()
-                    val gpuNextEnabled = preferences.gpuNext.get()
-                    if (anime4kEnabled && gpuNextEnabled) {
-                      // Disable GPU Next to keep Anime4K
-                      preferences.gpuNext.set(false)
-                    }
-                  }
                 },
                 enabled = isVulkanSupported,
                 title = { Text(stringResource(R.string.pref_decoder_vulkan_title) + " (Experimental)") },
@@ -253,38 +222,6 @@ object DecoderPreferencesScreen : Screen {
                     stringResource(R.string.pref_decoder_yuv420p_summary),
                     color = MaterialTheme.colorScheme.outline,
                   )
-                },
-              )
-
-              PreferenceDivider()
-              
-              val enableAnime4K by preferences.enableAnime4K.collectAsState()
-              SwitchPreference(
-                value = enableAnime4K,
-                onValueChange = { enabled ->
-                    preferences.enableAnime4K.set(enabled)
-                    if (enabled && !useVulkan) { // Only disable GPU Next if Vulkan is disabled
-                        preferences.gpuNext.set(false)
-                    }
-                },
-                title = { Text(stringResource(R.string.pref_anime4k_title)) },
-                summary = {
-                  Column {
-                    Text(
-                      stringResource(R.string.pref_anime4k_summary),
-                      color = MaterialTheme.colorScheme.outline,
-                    )
-                    Text(
-                      text = "github.com/bloc97/Anime4K",
-                      color = MaterialTheme.colorScheme.primary,
-                      style = MaterialTheme.typography.bodySmall,
-                      textDecoration = TextDecoration.Underline,
-                      modifier = Modifier.clickable {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/bloc97/Anime4K"))
-                        context.startActivity(intent)
-                      }
-                    )
-                  }
                 },
               )
             }

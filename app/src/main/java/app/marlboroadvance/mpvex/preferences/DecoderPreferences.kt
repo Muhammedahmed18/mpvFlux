@@ -25,9 +25,4 @@ class DecoderPreferences(
   val contrastFilter = preferenceStore.getInt("filter_contrast")
   val hueFilter = preferenceStore.getInt("filter_hue")
   val sharpnessFilter = preferenceStore.getInt("filter_sharpness")
-
-  // Anime4K Preferences
-  val enableAnime4K = preferenceStore.getBoolean("enable_anime4k", false)
-  val anime4kMode = preferenceStore.getString("anime4k_mode", "OFF")
-  val anime4kQuality = preferenceStore.getString("anime4k_quality", "FAST")
 }

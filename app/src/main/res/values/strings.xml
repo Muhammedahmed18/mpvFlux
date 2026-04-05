@@ -1,7 +1,8 @@
 <resources>
-  <string name="app_name" translatable="false">mpvEx</string>
+  <string name="app_name" translatable="false">MpvFlux</string>
   <string name="generic_reset">Reset</string>
   <string name="generic_share">Share</string>
+  <string name="generic_external">External</string>
   <string name="generic_confirm">Confirm</string>
   <string name="generic_cancel">Cancel</string>
   <string name="generic_ok">OK</string>
@@ -240,28 +241,7 @@
   <string name="pref_advanced_cleared_fonts_cache">Cleared cached fonts</string>
   <string name="pref_advanced_enable_recently_played_title">Recently Played</string>
   <string name="pref_advanced_enable_recently_played_summary">Track and display recently played videos and playlists</string>
-  <string name="pref_advanced_features_tooltip">Enable experimental or advanced features such as stats page and Anime4K upscaling</string>
-  <string name="pref_anime4k_title">Anime4K upscaling (Experimental)</string>
-  <string name="pref_anime4k_summary">Enable Anime4K upscaling filter</string>
-  <string name="pref_anime4k_incompatibility">Anime4K Incompatibility</string>
-  <string name="pref_anime4k_gpu_next_error">gpu-next is incompatible with Anime4K shaders. When Anime4K is enabled, the app will automatically use the legacy \'gpu\' backend for shader compatibility.</string>
-  <string name="pref_anime4k_cannot_use_with_gpu_next">Cannot use Anime4K when gpu-next is enabled</string>
-  <string name="anime4k_mode_title">Anime4K Presets</string>
-  <string name="anime4k_mode_toast">Anime4K: Preset %1$s</string>
-  <string name="anime4k_quality_title">Anime4K Variants</string>
-  <string name="anime4k_quality_toast">Anime4K Variant: %1$s</string>
-  <!-- Anime4K Modes (Renamed to Presets in UI) -->
-  <string name="anime4k_mode_off">Off</string>
-  <string name="anime4k_mode_a">A</string>
-  <string name="anime4k_mode_b">B</string>
-  <string name="anime4k_mode_c">C</string>
-  <string name="anime4k_mode_a_plus">A+</string>
-  <string name="anime4k_mode_b_plus">B+</string>
-  <string name="anime4k_mode_c_plus">C+</string>
-  <!-- Anime4K Qualities (Renamed to Mode in UI) -->
-  <string name="anime4k_quality_fast">Fast</string>
-  <string name="anime4k_quality_balanced">Balanced</string>
-  <string name="anime4k_quality_high">High</string>
+  <string name="pref_advanced_features_tooltip">Enable experimental or advanced features such as stats page</string>
   <string name="pref_about_title">About</string>
   <string name="pref_about_summary">Acknowledgments, licenses</string>
   <string name="pref_about_oss_libraries">Libraries</string>
@@ -366,12 +346,13 @@
   <string name="timer_remaining">%s remaining</string>
   <string name="toast_sleep_timer_ended">Sleep timer ended</string>
   <string name="volume_slider_absolute_value" translatable="false">%d</string>
-  <string name="github_repo_url" translatable="false">https://github.com/marlboro-advance/mpvex</string>
+  <string name="github_repo_url" translatable="false">https://github.com/marlboro-advance/MpvFlux</string>
   <string name="swap_the_volume_and_brightness_slider">Swap volume and brightness slider</string>
   <string name="pref_player_display_reduce_player_animation">Reduce player animation</string>
   <string name="pref_player_display_hide_player_control_time">Hide player control time</string>
   <string name="show_splash_ovals_on_double_tap_to_seek">Show ripple when double tap seeking</string>
   <string name="show_time_on_double_tap_to_seek">Show seek time</string>
+  <string name="unlock_hold_to_unlock">Hold to unlock</string>
   <string name="player_sheets_frame_navigation_title">Frame Navigation</string>
   <string name="player_sheets_frame_navigation_snapshot_saved" translatable="false">Saved to Pictures/mpvSnaps</string>
   <string name="player_sheets_frame_navigation_include_subtitles">Include subtitles in snapshot</string>
