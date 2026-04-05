@@ -168,19 +168,10 @@ fun PlayerSheets(
         mediaSearchResults = mediaResults.toImmutableList(),
         isSearchingMedia = isSearchingMedia,
         onSearchMedia = { query ->
-          // Parse both the user's search query and the original filename
-          val queryInfo = MediaInfoParser.parse(query)
-          val fileInfo = MediaInfoParser.parse(viewModel.currentMediaTitle)
-          
           // Use clean title from query for TMDB search (strip S01E05 noise)
+          val queryInfo = MediaInfoParser.parse(query)
           val searchTitle = queryInfo.title.ifBlank { query }
           viewModel.searchMedia(searchTitle)
-          
-          // Priority: TMDB selection > query parsed > file parsed
-          val s = selectedSeason?.season_number ?: queryInfo.season ?: fileInfo.season
-          val e = selectedEpisode?.episode_number ?: queryInfo.episode ?: fileInfo.episode
-          val y = queryInfo.year ?: fileInfo.year
-          viewModel.searchSubtitles(searchTitle, s, e, y)
         },
         onSelectMedia = { viewModel.selectMedia(it) },
         selectedTvShow = selectedTvShow,
@@ -236,7 +227,6 @@ fun PlayerSheets(
         onStartTimer = onStartSleepTimer,
         onDismissRequest = onDismissRequest,
         onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
-        onAnime4KChanged = { },
       )
     }
 

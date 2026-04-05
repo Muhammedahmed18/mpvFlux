@@ -24,20 +24,10 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButtonMenu
-import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleFloatingActionButton
-import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
-import androidx.compose.material3.TooltipAnchorPosition
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.animateFloatingActionButton
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -49,7 +39,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -98,11 +87,9 @@ object RecentlyPlayedScreen : Screen {
     val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
     val deleteFilesCheckbox = rememberSaveable { mutableStateOf(false) }
     val advancedPreferences = koinInject<AdvancedPreferences>()
+    val appearancePreferences = koinInject<app.marlboroadvance.mpvex.preferences.AppearancePreferences>()
     val enableRecentlyPlayed by advancedPreferences.enableRecentlyPlayed.collectAsState()
 
-    // FAB visibility for scroll-based hiding
-    val isFabVisible = remember { mutableStateOf(true) }
-    val isFabExpanded = remember { mutableStateOf(false) }
     val showLinkDialog = remember { mutableStateOf(false) }
     
     val coroutineScope = rememberCoroutineScope()
@@ -144,12 +131,9 @@ object RecentlyPlayedScreen : Screen {
         onOperationComplete = { },
       )
 
-    // Handle back button during selection mode or FAB menu expanded
-    BackHandler(enabled = selectionManager.isInSelectionMode || isFabExpanded.value) {
-      when {
-        isFabExpanded.value -> isFabExpanded.value = false
-        selectionManager.isInSelectionMode -> selectionManager.clear()
-      }
+    // Handle back button during selection mode
+    BackHandler(enabled = selectionManager.isInSelectionMode) {
+      selectionManager.clear()
     }
     
     // File picker for opening external files
@@ -170,15 +154,59 @@ object RecentlyPlayedScreen : Screen {
     // Track scroll for FAB visibility - create states here to pass to content
     val listState = remember { LazyListState() }
     val browserPreferences = koinInject<BrowserPreferences>()
-    FabScrollHelper.trackScrollForFabVisibility(
-      listState = listState,
-      gridState = null,
-      isFabVisible = isFabVisible,
-      expanded = isFabExpanded.value,
-      onExpandedChange = { isFabExpanded.value = it },
-    )
+    val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
 
-    Scaffold(
+    // VideoCard settings
+    val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
+    val showThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
+    val showVideoExtension by browserPreferences.showVideoExtension.collectAsState()
+    val showSizeChip by browserPreferences.showSizeChip.collectAsState()
+    val showResolutionChip by browserPreferences.showResolutionChip.collectAsState()
+    val showFramerateInResolution by browserPreferences.showFramerateInResolution.collectAsState()
+    val showProgressBar by browserPreferences.showProgressBar.collectAsState()
+    val showDateChip by browserPreferences.showDateChip.collectAsState()
+    val showUnplayedOldVideoLabel by appearancePreferences.showUnplayedOldVideoLabel.collectAsState()
+    val unplayedOldVideoDays by appearancePreferences.unplayedOldVideoDays.collectAsState()
+
+    // FolderCard specific settings
+    val showTotalVideosChip by browserPreferences.showTotalVideosChip.collectAsState()
+    val showTotalDurationChip by browserPreferences.showTotalDurationChip.collectAsState()
+    val showTotalSizeChip by browserPreferences.showTotalSizeChip.collectAsState()
+    val showFolderPath by browserPreferences.showFolderPath.collectAsState()
+
+    val videoCardSettings = remember(
+      unlimitedNameLines, showThumbnails, showVideoExtension, showSizeChip,
+      showResolutionChip, showFramerateInResolution, showProgressBar,
+      showDateChip, showUnplayedOldVideoLabel, unplayedOldVideoDays
+    ) {
+      app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings(
+        unlimitedNameLines = unlimitedNameLines,
+        showThumbnails = showThumbnails,
+        showVideoExtension = showVideoExtension,
+        showSizeChip = showSizeChip,
+        showResolutionChip = showResolutionChip,
+        showFramerateInResolution = showFramerateInResolution,
+        showProgressBar = showProgressBar,
+        showDateChip = showDateChip,
+        showUnplayedOldVideoLabel = showUnplayedOldVideoLabel,
+        unplayedOldVideoDays = unplayedOldVideoDays
+      )
+    }
+    val folderCardSettings = remember(
+      unlimitedNameLines, showTotalVideosChip, showTotalDurationChip,
+      showTotalSizeChip, showDateChip, showFolderPath
+    ) {
+      app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings(
+        unlimitedNameLines = unlimitedNameLines,
+        showTotalVideosChip = showTotalVideosChip,
+        showTotalDurationChip = showTotalDurationChip,
+        showTotalSizeChip = showTotalSizeChip,
+        showDateChip = showDateChip,
+        showFolderPath = showFolderPath
+    )
+  }
+
+  Scaffold(
         topBar = {
           BrowserTopBar(
             title = "Recently Played",
@@ -201,95 +229,17 @@ object RecentlyPlayedScreen : Screen {
             onDeleteClick = { deleteDialogOpen.value = true },
           )
         },
-      floatingActionButton = {
-        FloatingActionButtonMenu(
-          modifier = Modifier
-            .padding( bottom = 88.dp),
-          expanded = isFabExpanded.value,
-          button = {
-            TooltipBox(
-              positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                if (isFabExpanded.value) {
-                  TooltipAnchorPosition.Start
-                } else {
-                  TooltipAnchorPosition.Above
-                }
-              ),
-              tooltip = { PlainTooltip { Text("Toggle menu") } },
-              state = rememberTooltipState(),
-            ) {
-              ToggleFloatingActionButton(
-                modifier = Modifier
-                  .animateFloatingActionButton(
-                    visible = !selectionManager.isInSelectionMode && isFabVisible.value,
-                    alignment = Alignment.BottomEnd,
-                  ),
-                checked = isFabExpanded.value,
-                onCheckedChange = { isFabExpanded.value = !isFabExpanded.value },
-              ) {
-                val imageVector by remember {
-                  derivedStateOf {
-                    if (checkedProgress > 0.5f) Icons.Filled.Close else Icons.Filled.PlayArrow
-                  }
-                }
-                Icon(
-                  painter = rememberVectorPainter(imageVector),
-                  contentDescription = null,
-                  modifier = Modifier.animateIcon({ checkedProgress }),
-                )
-              }
-            }
-          },
-        ) {
-          FloatingActionButtonMenuItem(
-            onClick = {
-              isFabExpanded.value = false
-              filePicker.launch(arrayOf("video/*"))
-            },
-            icon = { Icon(Icons.Filled.FileOpen, contentDescription = null) },
-            text = { Text(text = "Open File") },
-          )
-
-          FloatingActionButtonMenuItem(
-            onClick = {
-              isFabExpanded.value = false
-              coroutineScope.launch {
-                val recentlyPlayedVideos = app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps.getRecentlyPlayed(limit = 1)
-                val lastPlayed = recentlyPlayedVideos.firstOrNull()
-                if (lastPlayed != null) {
-                  MediaUtils.playFile(lastPlayed.filePath, context, "recently_played_button")
-                }
-              }
-            },
-            icon = { Icon(Icons.Filled.History, contentDescription = null) },
-            text = { Text(text = "Recently Played") },
-          )
-
-          FloatingActionButtonMenuItem(
-            onClick = {
-              isFabExpanded.value = false
-              showLinkDialog.value = true
-            },
-            icon = { Icon(Icons.Filled.Link, contentDescription = null) },
-            text = { Text(text = "Open Link") },
-          )
-        }
-      },
     ) { padding ->
       when {
         !enableRecentlyPlayed -> {
-          Box(
+          EmptyState(
+            icon = Icons.Filled.History,
+            title = "Recently Played is disabled",
+            message = "Enable it in Advanced Settings to track your playback history",
             modifier = Modifier
               .fillMaxSize()
               .padding(padding),
-            contentAlignment = Alignment.Center,
-          ) {
-            EmptyState(
-              icon = Icons.Filled.History,
-              title = "Recently Played is disabled",
-              message = "Enable it in Advanced Settings to track your playback history",
-            )
-          }
+          )
         }
 
         isLoading && recentItems.isEmpty() -> {
@@ -307,18 +257,14 @@ object RecentlyPlayedScreen : Screen {
         }
 
         recentItems.isEmpty() -> {
-          Box(
+          EmptyState(
+            icon = Icons.Filled.History,
+            title = "No recently played videos",
+            message = "Videos you play will appear here",
             modifier = Modifier
               .fillMaxSize()
               .padding(padding),
-            contentAlignment = Alignment.Center,
-          ) {
-            EmptyState(
-              icon = Icons.Filled.History,
-              title = "No recently played videos",
-              message = "Videos you play will appear here",
-            )
-          }
+          )
         }
 
         else -> {
@@ -334,6 +280,8 @@ object RecentlyPlayedScreen : Screen {
               // Navigate to playlist detail screen
               backStack.add(PlaylistDetailScreen(playlistItem.playlist.id))
             },
+            videoCardSettings = videoCardSettings,
+            folderCardSettings = folderCardSettings,
             modifier = Modifier.padding(padding),
             isInSelectionMode = selectionManager.isInSelectionMode,
             listState = listState,
@@ -413,6 +361,8 @@ private fun RecentItemsContent(
   selectionManager: SelectionManager<RecentlyPlayedItem, String>,
   onVideoClick: (Video) -> Unit,
   onPlaylistClick: suspend (RecentlyPlayedItem.PlaylistItem) -> Unit,
+  videoCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings,
+  folderCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings,
   modifier: Modifier = Modifier,
   isInSelectionMode: Boolean = false,
   listState: LazyListState,
@@ -497,7 +447,10 @@ private fun RecentItemsContent(
               is RecentlyPlayedItem.VideoItem -> {
                 VideoCard(
                   video = item.video,
-                  progressPercentage = null,
+                  settings = videoCardSettings,
+                  isRecentlyPlayed = true,
+                  progressPercentage = item.progressPercentage,
+                  isWatched = item.isWatched,
                   isSelected = selectionManager.isSelected(item),
                   onClick = {
                     if (selectionManager.isInSelectionMode) {
@@ -533,8 +486,9 @@ private fun RecentItemsContent(
                   lastModified = item.playlist.updatedAt / 1000,
                 )
                 FolderCard(
-                  folder = folderModel,
-                  isSelected = selectionManager.isSelected(item),
+                   folder = folderModel,
+                   settings = folderCardSettings,
+                   isSelected = selectionManager.isSelected(item),
                   onClick = {
                     if (selectionManager.isInSelectionMode) {
                       selectionManager.toggle(item)

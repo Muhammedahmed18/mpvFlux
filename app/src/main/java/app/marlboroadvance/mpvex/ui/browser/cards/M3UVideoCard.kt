@@ -48,15 +48,14 @@ import org.koin.compose.koinInject
 fun M3UVideoCard(
   title: String,
   url: String,
+  settings: VideoCardSettings,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   onLongClick: (() -> Unit)? = null,
   isSelected: Boolean = false,
   isRecentlyPlayed: Boolean = false,
 ) {
-  val appearancePreferences = koinInject<AppearancePreferences>()
-  val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
-  val maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2
+  val maxLines = if (settings.unlimitedNameLines) Int.MAX_VALUE else 2
 
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()

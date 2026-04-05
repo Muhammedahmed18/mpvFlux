@@ -73,6 +73,7 @@ object PlaylistScreen : Screen {
     val context = LocalContext.current
     val repository = koinInject<PlaylistRepository>()
     val browserPreferences = koinInject<BrowserPreferences>()
+    val appearancePreferences = koinInject<app.marlboroadvance.mpvex.preferences.AppearancePreferences>()
     val backStack = LocalBackStack.current
     val scope = rememberCoroutineScope()
 
@@ -84,6 +85,28 @@ object PlaylistScreen : Screen {
     val playlistsWithCount by viewModel.playlistsWithCount.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val hasCompletedInitialLoad by viewModel.hasCompletedInitialLoad.collectAsState()
+
+    // FolderCard settings
+    val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
+    val showTotalVideosChip by browserPreferences.showTotalVideosChip.collectAsState()
+    val showTotalDurationChip by browserPreferences.showTotalDurationChip.collectAsState()
+    val showTotalSizeChip by browserPreferences.showTotalSizeChip.collectAsState()
+    val showDateChip by browserPreferences.showDateChip.collectAsState()
+    val showFolderPath by browserPreferences.showFolderPath.collectAsState()
+
+    val folderCardSettings = remember(
+      unlimitedNameLines, showTotalVideosChip, showTotalDurationChip,
+      showTotalSizeChip, showDateChip, showFolderPath
+    ) {
+      app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings(
+        unlimitedNameLines = unlimitedNameLines,
+        showTotalVideosChip = showTotalVideosChip,
+        showTotalDurationChip = showTotalDurationChip,
+        showTotalSizeChip = showTotalSizeChip,
+        showDateChip = showDateChip,
+        showFolderPath = showFolderPath
+      )
+    }
 
     // Selection manager
     val selectionManager = rememberSelectionManager(
@@ -159,23 +182,14 @@ object PlaylistScreen : Screen {
         }
       ) { paddingValues ->
         if (playlistsWithCount.isEmpty() && hasCompletedInitialLoad) {
-          Box(
+          EmptyState(
+            icon = Icons.AutoMirrored.Outlined.PlaylistAdd,
+            title = "No playlists yet",
+            message = "Create a playlist or add one from an m3u URL",
             modifier = Modifier
               .fillMaxSize()
               .padding(paddingValues),
-            contentAlignment = Alignment.Center,
-          ) {
-            Column(
-              horizontalAlignment = Alignment.CenterHorizontally,
-              verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-              EmptyState(
-                icon = Icons.AutoMirrored.Outlined.PlaylistAdd,
-                title = "No playlists yet",
-                message = "Create a playlist or add one from an m3u URL",
-              )
-            }
-          }
+          )
         } else {
           PlaylistListContent(
             playlistsWithCount = playlistsWithCount,
@@ -183,6 +197,7 @@ object PlaylistScreen : Screen {
             isRefreshing = isRefreshing,
             onRefresh = { viewModel.refresh() },
             selectionManager = selectionManager,
+            folderCardSettings = folderCardSettings,
             onPlaylistClick = { playlistWithCount ->
               if (selectionManager.isInSelectionMode) {
                 selectionManager.toggle(playlistWithCount)
@@ -270,16 +285,17 @@ object PlaylistScreen : Screen {
 
   @Composable
   private fun PlaylistListContent(
-    playlistsWithCount: List<PlaylistWithCount>,
-    listState: LazyListState,
-    isRefreshing: androidx.compose.runtime.MutableState<Boolean>,
-    onRefresh: suspend () -> Unit,
-    selectionManager: app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager<PlaylistWithCount, Int>,
-    onPlaylistClick: (PlaylistWithCount) -> Unit,
-    onPlaylistLongClick: (PlaylistWithCount) -> Unit,
-    modifier: Modifier = Modifier,
-    isInSelectionMode: Boolean = false,
-  ) {
+  playlistsWithCount: List<PlaylistWithCount>,
+  listState: LazyListState,
+  isRefreshing: androidx.compose.runtime.MutableState<Boolean>,
+  onRefresh: suspend () -> Unit,
+  selectionManager: app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager<PlaylistWithCount, Int>,
+  folderCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings,
+  onPlaylistClick: (PlaylistWithCount) -> Unit,
+  onPlaylistLongClick: (PlaylistWithCount) -> Unit,
+  modifier: Modifier = Modifier,
+  isInSelectionMode: Boolean = false,
+) {
     val isAtTop by remember {
       derivedStateOf {
         listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
@@ -329,6 +345,7 @@ object PlaylistScreen : Screen {
                 PlaylistCard(
                   playlist = playlistWithCount.playlist,
                   itemCount = playlistWithCount.itemCount,
+                  settings = folderCardSettings,
                   isSelected = selectionManager.isSelected(playlistWithCount),
                   onClick = { onPlaylistClick(playlistWithCount) },
                   onLongClick = { onPlaylistLongClick(playlistWithCount) },

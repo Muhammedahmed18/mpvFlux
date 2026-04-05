@@ -116,6 +116,7 @@ data class VideoListScreen(
     val coroutineScope = rememberCoroutineScope()
     val backstack = LocalBackStack.current
     val browserPreferences = koinInject<BrowserPreferences>()
+    val appearancePreferences = koinInject<AppearancePreferences>()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
     // ViewModel
@@ -130,6 +131,38 @@ data class VideoListScreen(
     val recentlyPlayedFilePath by viewModel.recentlyPlayedFilePath.collectAsState()
     val lastPlayedInFolderPath by viewModel.lastPlayedInFolderPath.collectAsState()
     val videosWereDeletedOrMoved by viewModel.videosWereDeletedOrMoved.collectAsState()
+    val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
+
+    // VideoCard settings
+    val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
+    val showThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
+    val showVideoExtension by browserPreferences.showVideoExtension.collectAsState()
+    val showSizeChip by browserPreferences.showSizeChip.collectAsState()
+    val showResolutionChip by browserPreferences.showResolutionChip.collectAsState()
+    val showFramerateInResolution by browserPreferences.showFramerateInResolution.collectAsState()
+    val showProgressBar by browserPreferences.showProgressBar.collectAsState()
+    val showDateChip by browserPreferences.showDateChip.collectAsState()
+    val showUnplayedOldVideoLabel by appearancePreferences.showUnplayedOldVideoLabel.collectAsState()
+    val unplayedOldVideoDays by appearancePreferences.unplayedOldVideoDays.collectAsState()
+
+    val videoCardSettings = remember(
+      unlimitedNameLines, showThumbnails, showVideoExtension, showSizeChip,
+      showResolutionChip, showFramerateInResolution, showProgressBar,
+      showDateChip, showUnplayedOldVideoLabel, unplayedOldVideoDays
+    ) {
+      app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings(
+        unlimitedNameLines = unlimitedNameLines,
+        showThumbnails = showThumbnails,
+        showVideoExtension = showVideoExtension,
+        showSizeChip = showSizeChip,
+        showResolutionChip = showResolutionChip,
+        showFramerateInResolution = showFramerateInResolution,
+        showProgressBar = showProgressBar,
+        showDateChip = showDateChip,
+        showUnplayedOldVideoLabel = showUnplayedOldVideoLabel,
+        unplayedOldVideoDays = unplayedOldVideoDays
+      )
+    }
 
     // Sorting
     val videoSortType by browserPreferences.videoSortType.collectAsState()
@@ -277,6 +310,7 @@ data class VideoListScreen(
         VideoListContent(
           folderId = bucketId,
           videosWithInfo = sortedVideosWithInfo,
+          videoCardSettings = videoCardSettings,
           isLoading = isLoading && videos.isEmpty(),
           isRefreshing = isRefreshing,
           recentlyPlayedFilePath = lastPlayedInFolderPath ?: recentlyPlayedFilePath,
@@ -483,6 +517,7 @@ data class VideoListScreen(
 private fun VideoListContent(
   folderId: String,
   videosWithInfo: List<VideoWithPlaybackInfo>,
+  videoCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings,
   isLoading: Boolean,
   isRefreshing: androidx.compose.runtime.MutableState<Boolean>,
   recentlyPlayedFilePath: String?,
@@ -504,8 +539,8 @@ private fun VideoListContent(
   val showVideoThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
   val density = LocalDensity.current
   val navigationBarHeight = app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight.current
-  // Use list thumbnail size
-  val thumbWidthDp = 128.dp
+  // Standardized thumbnail size (must match VideoCard.kt thumbWidthDp)
+  val thumbWidthDp = 160.dp
   val aspect = 16f / 9f
   val thumbWidthPx = with(density) { thumbWidthDp.roundToPx() }
   val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
@@ -525,8 +560,7 @@ private fun VideoListContent(
     isLoading && videosWithInfo.isEmpty() -> {
       Box(
         modifier = modifier
-          .fillMaxSize()
-          .padding(bottom = 80.dp), // Account for bottom navigation bar
+          .fillMaxSize(),
         contentAlignment = Alignment.Center,
       ) {
         CircularProgressIndicator(
@@ -537,16 +571,12 @@ private fun VideoListContent(
     }
 
     videosWithInfo.isEmpty() && videosWereDeletedOrMoved -> {
-      Box(
+      EmptyState(
+        icon = Icons.Filled.VideoLibrary,
+        title = "No videos in this folder",
+        message = "Videos you add to this folder will appear here",
         modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-      ) {
-        EmptyState(
-          icon = Icons.Filled.VideoLibrary,
-          title = "No videos in this folder",
-          message = "Videos you add to this folder will appear here",
-        )
-      }
+      )
     }
 
     else -> {
@@ -630,6 +660,7 @@ private fun VideoListContent(
 
                 VideoCard(
                   video = videoWithInfo.video,
+                  settings = videoCardSettings,
                   progressPercentage = videoWithInfo.progressPercentage,
                   isRecentlyPlayed = isRecentlyPlayed,
                   isSelected = selectionManager.isSelected(videoWithInfo.video),
@@ -643,7 +674,7 @@ private fun VideoListContent(
                     { onVideoClick(videoWithInfo.video) }
                   },
                   showSubtitleIndicator = showSubtitleIndicator,
-                  allowThumbnailGeneration = false,
+                  allowThumbnailGeneration = true,
                 )
               }
             }

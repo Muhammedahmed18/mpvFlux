@@ -1,31 +1,27 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreTime
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AudioChannels
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
@@ -52,53 +48,77 @@ fun AudioTracksSheet(
     tracks,
     onDismissRequest = onDismissRequest,
     header = {
-      AddTrackRow(
-        stringResource(R.string.player_sheets_add_ext_audio),
-        onAddAudioTrack,
-        actions = {
-          IconButton(onClick = onOpenDelayPanel) {
-            Icon(Icons.Default.MoreTime, null)
-          }
-        },
-      )
+      val audioActions = remember {
+        listOf(
+          TrackAction(
+            label = "Add",
+            icon = Icons.Default.Add,
+            onClick = onAddAudioTrack
+          ),
+          TrackAction(
+            label = "Delay",
+            icon = Icons.Default.MoreTime,
+            onClick = onOpenDelayPanel
+          )
+        )
+      }
+      TrackActionsRow(actions = audioActions)
     },
     track = {
-      AudioTrackRow(
+      val externalLabel = stringResource(R.string.generic_external)
+      val metadata = remember(it) {
+        mutableListOf<String>().apply {
+          if (!it.codec.isNullOrBlank()) add(it.codec)
+          if (it.audioChannels != null) {
+            add(it.demuxChannels ?: "${it.audioChannels}ch")
+          }
+          if (it.external == true) add(externalLabel)
+        }
+      }
+
+      TrackSelectableBar(
         title = getTrackTitle(it),
         isSelected = it.isSelected,
         onClick = { onSelect(it) },
+        metadata = metadata
       )
     },
     footer = {
       Column(
         modifier = Modifier
           .fillMaxWidth()
-          .padding(MaterialTheme.spacing.medium)
+          .padding(vertical = MaterialTheme.spacing.small)
       ) {
-        Spacer(modifier = Modifier.height(MaterialTheme.spacing.medium))
         Text(
           text = stringResource(id = R.string.pref_audio_channels),
-          style = MaterialTheme.typography.titleMedium,
-          color = MaterialTheme.colorScheme.primary
+          style = MaterialTheme.typography.titleSmall,
+          color = MaterialTheme.colorScheme.primary,
+          fontWeight = FontWeight.Bold,
         )
-        Spacer(modifier = Modifier.height(MaterialTheme.spacing.smaller))
-        LazyRow(
-          horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
+        Spacer(modifier = Modifier.height(MaterialTheme.spacing.small))
+        
+        SingleChoiceSegmentedButtonRow(
+          modifier = Modifier.fillMaxWidth()
         ) {
-          items(AudioChannels.entries) {
-            FilterChip(
-              selected = audioChannels == it,
+          AudioChannels.entries.forEachIndexed { index, channel ->
+            this@SingleChoiceSegmentedButtonRow.SegmentedButton(
+              selected = audioChannels == channel,
               onClick = {
-                audioPreferences.audioChannels.set(it)
-                if (it == AudioChannels.ReverseStereo) {
+                audioPreferences.audioChannels.set(channel)
+                if (channel == AudioChannels.ReverseStereo) {
                   MPVLib.setPropertyString(AudioChannels.AutoSafe.property, AudioChannels.AutoSafe.value)
                 } else {
                   MPVLib.setPropertyString(AudioChannels.ReverseStereo.property, "")
                 }
-                MPVLib.setPropertyString(it.property, it.value)
+                MPVLib.setPropertyString(channel.property, channel.value)
               },
-              label = { Text(text = stringResource(id = it.title)) },
-              leadingIcon = null,
+              shape = SegmentedButtonDefaults.itemShape(index = index, count = AudioChannels.entries.size),
+              label = { 
+                Text(
+                  text = stringResource(id = channel.title),
+                  style = MaterialTheme.typography.labelMedium
+                ) 
+              }
             )
           }
         }
@@ -106,32 +126,4 @@ fun AudioTracksSheet(
     },
     modifier = modifier,
   )
-}
-
-@Composable
-fun AudioTrackRow(
-  title: String,
-  isSelected: Boolean,
-  onClick: () -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  Row(
-    modifier =
-      modifier
-        .fillMaxWidth()
-        .clickable(onClick = onClick)
-        .padding(horizontal = MaterialTheme.spacing.medium, vertical = MaterialTheme.spacing.extraSmall),
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
-  ) {
-    RadioButton(
-      isSelected,
-      onClick,
-    )
-    Text(
-      title,
-      fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.Normal,
-      fontStyle = if (isSelected) FontStyle.Italic else FontStyle.Normal,
-    )
-  }
 }

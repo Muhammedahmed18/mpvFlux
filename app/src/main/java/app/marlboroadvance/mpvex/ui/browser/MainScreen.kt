@@ -15,6 +15,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +29,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
@@ -49,9 +52,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.browser.folderlist.FolderListScreen
@@ -119,8 +123,8 @@ object MainScreen : Screen {
       }
     ) { _ ->
       Box(modifier = Modifier.fillMaxSize()) {
-        // Always use 80dp bottom padding regardless of navigation bar visibility
-        val fabBottomPadding = 80.dp
+        // Padding to account for the floating island navigation bar
+        val fabBottomPadding = 88.dp
 
         AnimatedContent(
           targetState = selectedTab,
@@ -231,16 +235,17 @@ private fun FloatingIslandNavigationBar(
 
   Surface(
     modifier = Modifier
-      .height(64.dp)
+      .padding(horizontal = 16.dp, vertical = 12.dp)
+      .height(72.dp)
       .fillMaxWidth(),
-    shape = RoundedCornerShape(32.dp),
-    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.95f),
-    tonalElevation = 8.dp,
-    shadowElevation = 4.dp
+    shape = RoundedCornerShape(36.dp),
+    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+    tonalElevation = 12.dp,
+    shadowElevation = 8.dp
   ) {
     // Navigation items row
     Row(
-      modifier = Modifier.fillMaxWidth(),
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
       horizontalArrangement = Arrangement.SpaceEvenly,
       verticalAlignment = Alignment.CenterVertically
     ) {
@@ -249,25 +254,32 @@ private fun FloatingIslandNavigationBar(
 
         // Scale animation for icon
         val iconScale by animateFloatAsState(
-          targetValue = if (isSelected) 1.2f else 1f,
+          targetValue = if (isSelected) 1.1f else 1f,
           animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            stiffness = Spring.StiffnessLow
           ),
           label = "icon_scale_$index"
         )
 
-        // Alpha for label visibility
-        val labelAlpha by animateFloatAsState(
-          targetValue = if (isSelected) 1f else 0.7f,
+        // Pill background alpha animation
+        val pillAlpha by animateFloatAsState(
+          targetValue = if (isSelected) 1f else 0f,
+          animationSpec = tween(durationMillis = 300),
+          label = "pill_alpha_$index"
+        )
+
+        // Dot indicator alpha animation
+        val dotAlpha by animateFloatAsState(
+          targetValue = if (isSelected) 1f else 0f,
           animationSpec = tween(durationMillis = 200),
-          label = "label_alpha_$index"
+          label = "dot_alpha_$index"
         )
 
         Box(
           modifier = Modifier
             .weight(1f)
-            .height(64.dp)
+            .height(72.dp)
             .clickable(
               interactionSource = remember { MutableInteractionSource() },
               indication = null,
@@ -279,28 +291,61 @@ private fun FloatingIslandNavigationBar(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
           ) {
-            Icon(
-              imageVector = item.icon,
-              contentDescription = item.contentDescription,
+            Box(
+              contentAlignment = Alignment.Center,
               modifier = Modifier
-                .size(24.dp)
-                .scale(iconScale),
-              tint = if (isSelected) {
-                MaterialTheme.colorScheme.primary
-              } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-              }
-            )
+                .height(32.dp)
+                .width(64.dp)
+            ) {
+              // Pill background - only this animates alpha
+              Box(
+                modifier = Modifier
+                  .fillMaxSize()
+                  .graphicsLayer { alpha = pillAlpha }
+                  .background(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(16.dp)
+                  )
+              )
+
+              Icon(
+                imageVector = item.icon,
+                contentDescription = item.contentDescription,
+                modifier = Modifier
+                  .size(24.dp)
+                  .scale(iconScale),
+                tint = if (isSelected) {
+                  MaterialTheme.colorScheme.primary
+                } else {
+                  MaterialTheme.colorScheme.onSurfaceVariant
+                }
+              )
+            }
+            
             Spacer(modifier = Modifier.height(2.dp))
+            
+            // Dot Indicator
+            Box(
+              modifier = Modifier
+                .size(4.dp)
+                .graphicsLayer { alpha = dotAlpha }
+                .background(
+                  color = MaterialTheme.colorScheme.primary,
+                  shape = CircleShape
+                )
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+            
             Text(
               text = item.label,
               style = MaterialTheme.typography.labelSmall,
+              fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
               color = if (isSelected) {
                 MaterialTheme.colorScheme.primary
               } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
-              },
-              modifier = Modifier.alpha(labelAlpha)
+              }
             )
           }
         }

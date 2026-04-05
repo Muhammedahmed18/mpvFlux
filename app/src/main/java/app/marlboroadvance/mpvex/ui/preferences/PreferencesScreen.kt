@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -42,6 +43,7 @@ import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.Preference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
+import me.zhanghai.compose.preference.preferenceTheme
 
 @Serializable
 object PreferencesScreen : Screen {
@@ -49,6 +51,10 @@ object PreferencesScreen : Screen {
   @Composable
   override fun Content() {
     val backstack = LocalBackStack.current
+    val customPreferenceTheme = preferenceTheme(
+      padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+      iconContainerMinWidth = 72.dp,
+    )
     Scaffold(
       topBar = {
         TopAppBar(
@@ -72,40 +78,41 @@ object PreferencesScreen : Screen {
         )
       },
     ) { padding ->
-      ProvidePreferenceLocals {
+      ProvidePreferenceLocals(theme = customPreferenceTheme) {
         LazyColumn(
           modifier =
             Modifier
               .fillMaxSize()
               .padding(padding),
+          verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
           // Search bar - full width, prominent placement
           item {
             Surface(
               modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp)
                 .clickable { backstack.add(SettingsSearchScreen) },
               shape = RoundedCornerShape(28.dp),
-              color = MaterialTheme.colorScheme.surfaceContainerHigh,
-              tonalElevation = 2.dp,
+              color = MaterialTheme.colorScheme.surfaceContainerLowest,
+              tonalElevation = 0.dp,
             ) {
               Row(
                 modifier = Modifier
                   .fillMaxWidth()
-                  .padding(horizontal = 16.dp, vertical = 14.dp),
+                  .padding(horizontal = 20.dp, vertical = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
               ) {
                 Icon(
                   imageVector = Icons.Rounded.Search,
                   contentDescription = null,
-                  tint = MaterialTheme.colorScheme.outline,
+                  tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(16.dp))
                 Text(
                   text = stringResource(R.string.settings_search_hint),
                   style = MaterialTheme.typography.bodyLarge,
-                  color = MaterialTheme.colorScheme.outline,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
               }
             }
@@ -113,7 +120,7 @@ object PreferencesScreen : Screen {
           
           // UI & Appearance Section
           item {
-            PreferenceSectionHeader(title = "UI & Appearance")
+            PreferenceSectionHeader(title = "UI & Appearance", modifier = Modifier.padding(top = 12.dp))
           }
           
           item {
@@ -127,10 +134,9 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.Rounded.Palette, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = { backstack.add(AppearancePreferencesScreen) },
@@ -148,10 +154,9 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.AutoMirrored.Rounded.ViewQuilt, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = { backstack.add(PlayerControlsPreferencesScreen) },
@@ -176,10 +181,9 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.Rounded.PlayCircle, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = { backstack.add(PlayerPreferencesScreen) },
@@ -197,10 +201,9 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.Rounded.Gesture, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = { backstack.add(GesturePreferencesScreen) },
@@ -225,10 +228,9 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.Rounded.Folder, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = { backstack.add(FoldersPreferencesScreen) },
@@ -253,10 +255,9 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.Rounded.Memory, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = { backstack.add(DecoderPreferencesScreen) },
@@ -274,10 +275,9 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.Rounded.Subtitles, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = { backstack.add(SubtitlesPreferencesScreen) },
@@ -295,10 +295,9 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.Rounded.Audiotrack, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = { backstack.add(AudioPreferencesScreen) },
@@ -323,10 +322,9 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
+                  PreferenceIcon(
                     Icons.Rounded.Code, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = { backstack.add(AdvancedPreferencesScreen) },
@@ -344,10 +342,9 @@ object PreferencesScreen : Screen {
                   ) 
                 },
                 icon = { 
-                  Icon(
-                    Icons.Rounded.Info,
+                  PreferenceIcon(
+                    Icons.Rounded.Info, 
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
                   ) 
                 },
                 onClick = { backstack.add(AboutScreen) },

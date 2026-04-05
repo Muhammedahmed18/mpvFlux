@@ -74,7 +74,7 @@ enum class FolderSortType {
         Title -> "Title"
         Date -> "Date"
         Size -> "Size"
-        VideoCount -> "Count"
+        VideoCount -> "Total Videos"
       }
 }
 

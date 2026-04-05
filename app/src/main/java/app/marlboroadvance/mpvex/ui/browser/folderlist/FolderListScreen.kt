@@ -20,22 +20,13 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SwapVert
+import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButtonMenu
-import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleFloatingActionButton
-import androidx.compose.material3.ToggleFloatingActionButtonDefaults.animateIcon
-import androidx.compose.material3.TooltipAnchorPosition
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.animateFloatingActionButton
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -49,7 +40,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
@@ -88,6 +78,7 @@ import app.marlboroadvance.mpvex.ui.browser.states.PermissionDeniedState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
 import app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen
+import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
 import app.marlboroadvance.mpvex.ui.browser.videolist.VideoListScreen
 import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
@@ -126,6 +117,7 @@ object FolderListScreen : Screen {
       factory = FolderListViewModel.factory(context.applicationContext as android.app.Application)
     )
     val browserPreferences = koinInject<BrowserPreferences>()
+    val appearancePreferences = koinInject<AppearancePreferences>()
     val gesturePreferences = koinInject<GesturePreferences>()
     val foldersPreferences = koinInject<FoldersPreferences>()
 
@@ -149,14 +141,10 @@ object FolderListScreen : Screen {
     val isRefreshing = remember { mutableStateOf(false) }
     val sortDialogOpen = rememberSaveable { mutableStateOf(false) }
     val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
+    val renameDialogOpen = rememberSaveable { mutableStateOf(false) }
     val showLinkDialog = remember { mutableStateOf(false) }
 
     // Pre-fetch strings for use in lambdas
-    val blacklistedToastMessage = stringResource(R.string.pref_folders_blacklisted)
-
-    // FAB state
-    val isFabVisible = remember { mutableStateOf(true) }
-    val isFabExpanded = remember { mutableStateOf(false) }
 
     // File picker
     val filePicker = rememberLauncherForActivityResult(
@@ -178,6 +166,28 @@ object FolderListScreen : Screen {
       SortUtils.sortFolders(videoFolders, folderSortType, folderSortOrder)
     }
 
+    // FolderCard settings
+    val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
+    val showTotalVideosChip by browserPreferences.showTotalVideosChip.collectAsState()
+    val showTotalDurationChip by browserPreferences.showTotalDurationChip.collectAsState()
+    val showTotalSizeChip by browserPreferences.showTotalSizeChip.collectAsState()
+    val showDateChip by browserPreferences.showDateChip.collectAsState()
+    val showFolderPath by browserPreferences.showFolderPath.collectAsState()
+
+    val folderCardSettings = remember(
+      unlimitedNameLines, showTotalVideosChip, showTotalDurationChip,
+      showTotalSizeChip, showDateChip, showFolderPath
+    ) {
+      app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings(
+        unlimitedNameLines = unlimitedNameLines,
+        showTotalVideosChip = showTotalVideosChip,
+        showTotalDurationChip = showTotalDurationChip,
+        showTotalSizeChip = showTotalSizeChip,
+        showDateChip = showDateChip,
+        showFolderPath = showFolderPath
+      )
+    }
+
     // Selection manager
     val selectionManager = rememberSelectionManager(
       items = sortedFolders,
@@ -187,6 +197,9 @@ object FolderListScreen : Screen {
         val videos = MediaFileRepository.getVideosForBuckets(context, ids)
         viewModel.deleteVideos(videos)
         Pair(videos.size, 0)
+      },
+      onRenameItem = { folder, newName ->
+        viewModel.renameFolder(folder, newName)
       },
       onOperationComplete = { viewModel.refresh() },
     )
@@ -215,22 +228,12 @@ object FolderListScreen : Screen {
     }
 
     // Optimized back handler for immediate response
-    val shouldHandleBack = selectionManager.isInSelectionMode || isFabExpanded.value
+    val shouldHandleBack = selectionManager.isInSelectionMode
     androidx.activity.compose.BackHandler(enabled = shouldHandleBack) {
-      when {
-        isFabExpanded.value -> isFabExpanded.value = false
-        selectionManager.isInSelectionMode -> selectionManager.clear()
-      }
+      selectionManager.clear()
     }
 
-    // FAB scroll tracking
-    FabScrollHelper.trackScrollForFabVisibility(
-      listState = listState,
-      gridState = null,
-      isFabVisible = isFabVisible,
-      expanded = isFabExpanded.value,
-      onExpandedChange = { isFabExpanded.value = it },
-    )
+
 
     Scaffold(
       topBar = {
@@ -248,136 +251,19 @@ object FolderListScreen : Screen {
               backstack.add(PreferencesScreen)
             },
             onDeleteClick = { deleteDialogOpen.value = true },
-            onRenameClick = null,
+            onRenameClick = { renameDialogOpen.value = true },
             isSingleSelection = selectionManager.isSingleSelection,
             onInfoClick = null,
-            onShareClick = {
-              coroutineScope.launch {
-                val selectedIds = selectionManager.getSelectedItems().map { it.bucketId }.toSet()
-                val allVideos = MediaFileRepository
-                  .getVideosForBuckets(context, selectedIds)
-                if (allVideos.isNotEmpty()) {
-                  MediaUtils.shareVideos(context, allVideos)
-                }
-              }
-            },
-            onPlayClick = {
-              coroutineScope.launch {
-                val selectedIds = selectionManager.getSelectedItems().map { it.bucketId }.toSet()
-                val allVideos = MediaFileRepository
-                  .getVideosForBuckets(context, selectedIds)
-                if (allVideos.isNotEmpty()) {
-                  if (allVideos.size == 1) {
-                    MediaUtils.playFile(allVideos.first(), context)
-                  } else {
-                    val intent = Intent(Intent.ACTION_VIEW, allVideos.first().uri)
-                    intent.setClass(context, PlayerActivity::class.java)
-                    intent.putExtra("internal_launch", true)
-                    intent.putParcelableArrayListExtra("playlist", ArrayList(allVideos.map { it.uri }))
-                    intent.putExtra("playlist_index", 0)
-                    intent.putExtra("launch_source", "playlist")
-                    context.startActivity(intent)
-                  }
-                  selectionManager.clear()
-                }
-              }
-            },
-            onBlacklistClick = {
-              coroutineScope.launch {
-                val selectedFolders = selectionManager.getSelectedItems()
-                val blacklistedFolders = foldersPreferences.blacklistedFolders.get().toMutableSet()
-                selectedFolders.forEach { folder ->
-                  blacklistedFolders.add(folder.path)
-                }
-                foldersPreferences.blacklistedFolders.set(blacklistedFolders)
-                selectionManager.clear()
-                viewModel.refresh()
-                android.widget.Toast.makeText(
-                  context,
-                  blacklistedToastMessage,
-                  android.widget.Toast.LENGTH_SHORT,
-                ).show()
-              }
-            },
+            onShareClick = null,
+            onPlayClick = null,
+            onBlacklistClick = null,
             onSelectAll = { selectionManager.selectAll() },
             onInvertSelection = { selectionManager.invertSelection() },
-            onDeselectAll = { selectionManager.clear() },
-          )
-        }
-      },
-      floatingActionButton = {
-        FloatingActionButtonMenu(
-          modifier = Modifier.padding(bottom = 88.dp),
-          expanded = isFabExpanded.value,
-          button = {
-            TooltipBox(
-              positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                if (isFabExpanded.value) {
-                  TooltipAnchorPosition.Start
-                } else {
-                  TooltipAnchorPosition.Above
-                }
-              ),
-              tooltip = { PlainTooltip { Text("Toggle menu") } },
-              state = rememberTooltipState(),
-            ) {
-              ToggleFloatingActionButton(
-                modifier = Modifier.animateFloatingActionButton(
-                  visible = !selectionManager.isInSelectionMode && isFabVisible.value && !NavigationBarState.isPermissionDenied,
-                  alignment = Alignment.BottomEnd,
-                ),
-                checked = isFabExpanded.value,
-                onCheckedChange = { isFabExpanded.value = !isFabExpanded.value },
-              ) {
-                val imageVector by remember {
-                  derivedStateOf {
-                    if (checkedProgress > 0.5f) Icons.Rounded.Close else Icons.Rounded.PlayArrow
-                  }
-                }
-                Icon(
-                  painter = rememberVectorPainter(imageVector),
-                  contentDescription = null,
-                  modifier = Modifier.animateIcon({ checkedProgress }),
-                )
-              }
-            }
-          },
-        ) {
-          FloatingActionButtonMenuItem(
-            onClick = {
-              isFabExpanded.value = false
-              filePicker.launch(arrayOf("video/*"))
-            },
-            icon = { Icon(Icons.Rounded.FileOpen, contentDescription = null) },
-            text = { Text(text = "Open File") },
-          )
-
-          FloatingActionButtonMenuItem(
-            onClick = {
-              isFabExpanded.value = false
-              coroutineScope.launch {
-                val recentlyPlayedVideos = RecentlyPlayedOps.getRecentlyPlayed(limit = 1)
-                val lastPlayed = recentlyPlayedVideos.firstOrNull()
-                if (lastPlayed != null) {
-                  MediaUtils.playFile(lastPlayed.filePath, context, "recently_played_button")
-                }
-              }
-            },
-            icon = { Icon(Icons.Rounded.History, contentDescription = null) },
-            text = { Text(text = "Recently Played") },
-          )
-
-          FloatingActionButtonMenuItem(
-            onClick = {
-              isFabExpanded.value = false
-              showLinkDialog.value = true
-            },
-            icon = { Icon(Icons.Rounded.Link, contentDescription = null) },
-            text = { Text(text = "Open Link") },
-          )
-        }
-      },
-    ) { padding ->
+          onDeselectAll = { selectionManager.clear() },
+        )
+      }
+    },
+  ) { padding ->
       Box(modifier = Modifier.padding(padding)) {
         when (permissionState.status) {
           com.google.accompanist.permissions.PermissionStatus.Granted -> {
@@ -394,6 +280,7 @@ object FolderListScreen : Screen {
               listState = listState,
               isRefreshing = isRefreshing,
               selectionManager = selectionManager,
+              folderCardSettings = folderCardSettings,
               onRefresh = { viewModel.refresh() },
               onFolderClick = { folder ->
                 if (selectionManager.isInSelectionMode) {
@@ -440,6 +327,16 @@ object FolderListScreen : Screen {
         itemCount = selectionManager.selectedCount,
         itemNames = selectionManager.getSelectedItems().map { it.name },
       )
+
+      RenameDialog(
+        isOpen = renameDialogOpen.value,
+        onDismiss = { renameDialogOpen.value = false },
+        currentName = selectionManager.getSelectedItems().firstOrNull()?.name ?: "",
+        onConfirm = { newName ->
+          selectionManager.renameSelected(newName)
+        },
+        itemType = "folder",
+      )
     }
   }
 }
@@ -458,6 +355,7 @@ private fun FolderListContent(
   listState: LazyListState,
   isRefreshing: androidx.compose.runtime.MutableState<Boolean>,
   selectionManager: app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager<VideoFolder, String>,
+  folderCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings,
   onRefresh: suspend () -> Unit,
   onFolderClick: (VideoFolder) -> Unit,
   onFolderLongClick: (VideoFolder) -> Unit,
@@ -486,23 +384,20 @@ private fun FolderListContent(
     modifier = Modifier.fillMaxSize(),
   ) {
     if (showLoading || showEmpty) {
-      Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-      ) {
-        if (showLoading) {
-          LoadingState(
-            icon = Icons.Rounded.Folder,
-            title = "Scanning for videos...",
-            message = scanStatus ?: "Please wait while we search your device",
-          )
-        } else {
-          EmptyState(
-            icon = Icons.Rounded.Folder,
-            title = "No video folders found",
-            message = "Add some video files to your device to see them here",
-          )
-        }
+      if (showLoading) {
+        LoadingState(
+          icon = Icons.Rounded.Folder,
+          title = "Scanning for videos...",
+          message = scanStatus ?: "Please wait while we search your device",
+          modifier = Modifier.fillMaxSize(),
+        )
+      } else {
+        EmptyState(
+          icon = Icons.Rounded.Folder,
+          title = "No video folders found",
+          message = "Add some video files to your device to see them here",
+          modifier = Modifier.fillMaxSize(),
+        )
       }
     } else {
       ListContent(
@@ -514,6 +409,7 @@ private fun FolderListContent(
         listState = listState,
         scrollbarAlpha = scrollbarAlpha,
         selectionManager = selectionManager,
+        folderCardSettings = folderCardSettings,
         onFolderClick = onFolderClick,
         onFolderLongClick = onFolderLongClick,
       )
@@ -542,6 +438,7 @@ private fun ListContent(
   listState: LazyListState,
   scrollbarAlpha: Float,
   selectionManager: app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager<VideoFolder, String>,
+  folderCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings,
   onFolderClick: (VideoFolder) -> Unit,
   onFolderLongClick: (VideoFolder) -> Unit,
 ) {
@@ -566,8 +463,9 @@ private fun ListContent(
           ?.newVideoCount ?: 0
 
         FolderCard(
-          folder = folder,
-          isSelected = selectionManager.isSelected(folder),
+        folder = folder,
+        settings = folderCardSettings,
+        isSelected = selectionManager.isSelected(folder),
           onClick = { onFolderClick(folder) },
           onLongClick = { onFolderLongClick(folder) },
           onThumbClick = if (tapThumbnailToSelect) {
@@ -637,17 +535,20 @@ private fun FolderSortDialog(
       FolderSortType.Title.displayName,
       FolderSortType.Date.displayName,
       FolderSortType.Size.displayName,
+      FolderSortType.VideoCount.displayName,
     ),
     icons = listOf(
       ImageVector.vectorResource(id = R.drawable.sort_by_alpha_24px),
       Icons.Rounded.CalendarToday,
       Icons.Rounded.SwapVert,
+      Icons.Rounded.VideoLibrary,
     ),
     getLabelForType = { type, _ ->
       when (type) {
         FolderSortType.Title.displayName -> Pair("A-Z", "Z-A")
         FolderSortType.Date.displayName -> Pair("Oldest", "Newest")
         FolderSortType.Size.displayName -> Pair("Smallest", "Largest")
+        FolderSortType.VideoCount.displayName -> Pair("Fewest", "Most")
         else -> Pair("Asc", "Desc")
       }
     },

@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import app.marlboroadvance.mpvex.R
-import app.marlboroadvance.mpvex.domain.anime4k.Anime4KManager
 import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
 import app.marlboroadvance.mpvex.preferences.DecoderPreferences
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
@@ -64,20 +63,12 @@ fun MoreSheet(
   onStartTimer: (Int) -> Unit,
   onDismissRequest: () -> Unit,
   onEnterFiltersPanel: () -> Unit,
-  onAnime4KChanged: () -> Unit = {},
   modifier: Modifier = Modifier,
 ) {
   val advancedPreferences = koinInject<AdvancedPreferences>()
   val decoderPreferences = koinInject<DecoderPreferences>()
-  val anime4kManager = koinInject<Anime4KManager>()
   koinInject<PlayerPreferences>()
   val statisticsPage by advancedPreferences.enabledStatisticsPage.collectAsState()
-  
-  val enableAnime4K by decoderPreferences.enableAnime4K.collectAsState()
-  val anime4kMode by decoderPreferences.anime4kMode.collectAsState()
-  val anime4kQuality by decoderPreferences.anime4kQuality.collectAsState()
-  val gpuNext by decoderPreferences.gpuNext.collectAsState()
-  val useVulkan by decoderPreferences.useVulkan.collectAsState()
   
   val context = LocalContext.current
 val scope = rememberCoroutineScope()
@@ -176,113 +167,6 @@ val scope = rememberCoroutineScope()
             selected = statisticsPage == page,
             leadingIcon = null,
           )
-        }
-      }
-      
-      // Shaders Controls
-      if (enableAnime4K && (!gpuNext || useVulkan)) {
-        // Auto-detect resolution to disable for 4K+
-        val width = MPVLib.getPropertyInt("video-params/w") ?: 0
-        val height = MPVLib.getPropertyInt("video-params/h") ?: 0
-        val isHighRes = width >= 3840 || height >= 2160
-
-        // Presets (Mode) - Now on Top
-        Text(
-            text = stringResource(R.string.anime4k_mode_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        
-        if (isHighRes) {
-            Text(
-                text = "Not available for 4K/8K video",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-        }
-
-        LazyRow(
-          horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
-        ) {
-          items(Anime4KManager.Mode.entries) { mode ->
-            FilterChip(
-              label = { Text(stringResource(mode.titleRes)) },
-              selected = anime4kMode == mode.name,
-              enabled = !isHighRes,
-              leadingIcon = null,
-              onClick = {
-                decoderPreferences.anime4kMode.set(mode.name)
-                
-                // Apply shaders immediately (runtime change)
-                scope.launch(Dispatchers.IO) {
-                  runCatching {
-                    val qualityStr = decoderPreferences.anime4kQuality.get()
-                    val quality = try {
-                      Anime4KManager.Quality.valueOf(qualityStr)
-                    } catch (e: IllegalArgumentException) {
-                      Anime4KManager.Quality.BALANCED
-                    }
-                    val currentMode = try {
-                        Anime4KManager.Mode.valueOf(mode.name)
-                    } catch (e: IllegalArgumentException) {
-                        Anime4KManager.Mode.OFF
-                    }
-
-                    val shaderChain = anime4kManager.getShaderChain(currentMode, quality)
-
-                    // Use setPropertyString for runtime changes
-                    MPVLib.setPropertyString("glsl-shaders", if (shaderChain.isNotEmpty()) shaderChain else "")
-                    onAnime4KChanged()
-                  }
-                }
-              }
-            )
-          }
-        }
-
-        Text(
-            text = stringResource(R.string.anime4k_quality_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary
-        )
-        LazyRow(
-          horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
-        ) {
-          items(Anime4KManager.Quality.entries) { quality ->
-             FilterChip(
-              label = { Text(stringResource(quality.titleRes)) },
-              selected = anime4kQuality == quality.name,
-              enabled = anime4kMode != "OFF" && !isHighRes,
-              leadingIcon = null,
-              onClick = {
-                decoderPreferences.anime4kQuality.set(quality.name)
-
-                // Apply shaders immediately (runtime change)
-                scope.launch(Dispatchers.IO) {
-                  runCatching {
-                    val modeStr = decoderPreferences.anime4kMode.get()
-                    val modeEnum = try {
-                      Anime4KManager.Mode.valueOf(modeStr)
-                    } catch (e: IllegalArgumentException) {
-                      Anime4KManager.Mode.OFF
-                    }
-                    val currentQuality = try {
-                        Anime4KManager.Quality.valueOf(quality.name)
-                    } catch (e: IllegalArgumentException) {
-                        Anime4KManager.Quality.BALANCED
-                    }
-
-                    val shaderChain = anime4kManager.getShaderChain(modeEnum, currentQuality)
-
-                    // Use setPropertyString for runtime changes
-                    MPVLib.setPropertyString("glsl-shaders", if (shaderChain.isNotEmpty()) shaderChain else "")
-                    onAnime4KChanged()
-                  }
-                }
-              }
-            )
-          }
         }
       }
     }

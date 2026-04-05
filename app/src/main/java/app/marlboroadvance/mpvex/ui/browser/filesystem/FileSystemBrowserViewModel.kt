@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
@@ -300,6 +301,39 @@ class FileSystemBrowserViewModel(
     }
 
     return result
+  }
+
+  /**
+   * Rename a folder on the filesystem
+   */
+  suspend fun renameFolder(folder: FileSystemItem.Folder, newName: String): Result<Unit> = withContext(Dispatchers.IO) {
+    try {
+      val oldFile = File(folder.path)
+      val newFile = File(oldFile.parent, newName)
+
+      if (newFile.exists()) {
+        return@withContext Result.failure(Exception("A folder with this name already exists"))
+      }
+
+      val success = oldFile.renameTo(newFile)
+      if (success) {
+        Log.d(TAG, "Successfully renamed folder from ${oldFile.path} to ${newFile.path}")
+
+        // Notify MediaStore about both paths to trigger indexing updates
+        android.media.MediaScannerConnection.scanFile(
+          getApplication(),
+          arrayOf(oldFile.absolutePath, newFile.absolutePath),
+          null
+        ) { _, _ -> }
+
+        Result.success(Unit)
+      } else {
+        Result.failure(Exception("Could not rename folder. Check permissions."))
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "Error renaming folder", e)
+      Result.failure(e)
+    }
   }
 
   /**

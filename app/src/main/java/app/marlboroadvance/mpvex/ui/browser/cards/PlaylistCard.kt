@@ -25,6 +25,7 @@ import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
 fun PlaylistCard(
   playlist: PlaylistEntity,
   itemCount: Int,
+  settings: FolderCardSettings,
   onClick: () -> Unit,
   onLongClick: () -> Unit,
   onThumbClick: () -> Unit,
@@ -71,6 +72,7 @@ fun PlaylistCard(
   // Use the FolderCard component with playlist-specific customizations
   FolderCard(
     folder = folderModel,
+    settings = settings,
     isSelected = isSelected,
     onClick = onClick,
     onLongClick = onLongClick,

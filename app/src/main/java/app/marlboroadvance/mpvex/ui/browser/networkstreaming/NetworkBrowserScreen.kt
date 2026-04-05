@@ -58,6 +58,8 @@ data class NetworkBrowserScreen(
   override fun Content() {
     val backstack = LocalBackStack.current
     val context = LocalContext.current
+    val browserPreferences = org.koin.compose.koinInject<app.marlboroadvance.mpvex.preferences.BrowserPreferences>()
+    val appearancePreferences = org.koin.compose.koinInject<app.marlboroadvance.mpvex.preferences.AppearancePreferences>()
 
     val viewModel: NetworkBrowserViewModel =
       viewModel(
@@ -73,6 +75,56 @@ data class NetworkBrowserScreen(
     val files by viewModel.files.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+
+    // VideoCard settings
+    val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
+    val showThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
+    val showVideoExtension by browserPreferences.showVideoExtension.collectAsState()
+    val showSizeChip by browserPreferences.showSizeChip.collectAsState()
+    val showResolutionChip by browserPreferences.showResolutionChip.collectAsState()
+    val showFramerateInResolution by browserPreferences.showFramerateInResolution.collectAsState()
+    val showProgressBar by browserPreferences.showProgressBar.collectAsState()
+    val showDateChip by browserPreferences.showDateChip.collectAsState()
+    val showUnplayedOldVideoLabel by appearancePreferences.showUnplayedOldVideoLabel.collectAsState()
+    val unplayedOldVideoDays by appearancePreferences.unplayedOldVideoDays.collectAsState()
+
+    val videoCardSettings = remember(
+      unlimitedNameLines, showThumbnails, showVideoExtension, showSizeChip,
+      showResolutionChip, showFramerateInResolution, showProgressBar,
+      showDateChip, showUnplayedOldVideoLabel, unplayedOldVideoDays
+    ) {
+      app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings(
+        unlimitedNameLines = unlimitedNameLines,
+        showThumbnails = showThumbnails,
+        showVideoExtension = showVideoExtension,
+        showSizeChip = showSizeChip,
+        showResolutionChip = showResolutionChip,
+        showFramerateInResolution = showFramerateInResolution,
+        showProgressBar = showProgressBar,
+        showDateChip = showDateChip,
+        showUnplayedOldVideoLabel = showUnplayedOldVideoLabel,
+        unplayedOldVideoDays = unplayedOldVideoDays
+      )
+    }
+
+    val showTotalVideosChip by browserPreferences.showTotalVideosChip.collectAsState()
+    val showTotalDurationChip by browserPreferences.showTotalDurationChip.collectAsState()
+    val showTotalSizeChip by browserPreferences.showTotalSizeChip.collectAsState()
+    val showFolderPath by browserPreferences.showFolderPath.collectAsState()
+
+    val folderCardSettings = remember(
+      unlimitedNameLines, showTotalVideosChip, showTotalDurationChip,
+      showTotalSizeChip, showDateChip, showFolderPath
+    ) {
+      app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings(
+        unlimitedNameLines = unlimitedNameLines,
+        showTotalVideosChip = showTotalVideosChip,
+        showTotalDurationChip = showTotalDurationChip,
+        showTotalSizeChip = showTotalSizeChip,
+        showDateChip = showDateChip,
+        showFolderPath = showFolderPath
+      )
+    }
 
     // UI State
     val isRefreshing = remember { mutableStateOf(false) }
@@ -117,6 +169,8 @@ data class NetworkBrowserScreen(
         connectionName = connectionName,
         isLoading = isLoading && files.isEmpty(),
         isRefreshing = isRefreshing,
+        videoCardSettings = videoCardSettings,
+        folderCardSettings = folderCardSettings,
         error = error,
         onRefresh = { viewModel.loadFiles() },
         onFolderClick = { folder ->
@@ -144,6 +198,8 @@ private fun NetworkBrowserContent(
   connectionName: String,
   isLoading: Boolean,
   isRefreshing: MutableState<Boolean>,
+  videoCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings,
+  folderCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings,
   error: String?,
   onRefresh: suspend () -> Unit,
   onFolderClick: (NetworkFile) -> Unit,
@@ -174,29 +230,21 @@ private fun NetworkBrowserContent(
     }
 
     error != null -> {
-      Box(
+      EmptyState(
+        icon = Icons.Filled.Folder,
+        title = "Error loading files",
+        message = error,
         modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-      ) {
-        EmptyState(
-          icon = Icons.Filled.Folder,
-          title = "Error loading files",
-          message = error,
-        )
-      }
+      )
     }
 
     files.isEmpty() -> {
-      Box(
+      EmptyState(
+        icon = Icons.Filled.Folder,
+        title = "Empty folder",
+        message = "This folder contains no files or directories",
         modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-      ) {
-        EmptyState(
-          icon = Icons.Filled.Folder,
-          title = "Empty folder",
-          message = "This folder contains no files or directories",
-        )
-      }
+      )
     }
 
     else -> {
@@ -266,6 +314,7 @@ private fun NetworkBrowserContent(
               ) { folder ->
                 NetworkFolderCard(
                   file = folder,
+                  settings = folderCardSettings,
                   onClick = { onFolderClick(folder) },
                   modifier = Modifier,
                 )
@@ -291,6 +340,7 @@ private fun NetworkBrowserContent(
                   NetworkVideoCard(
                     file = video,
                     connection = conn,
+                    settings = videoCardSettings,
                     onClick = { onVideoClick(video) },
                     modifier = Modifier,
                   )

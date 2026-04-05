@@ -6,6 +6,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -25,10 +27,14 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -64,6 +70,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -95,6 +102,8 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.SpeedControlSlide
 import app.marlboroadvance.mpvex.ui.player.controls.components.TextPlayerUpdate
 import app.marlboroadvance.mpvex.ui.player.controls.components.VolumeSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
+import app.marlboroadvance.mpvex.ui.player.controls.components.ControlsButton
+import app.marlboroadvance.mpvex.ui.player.controls.components.ControlsButtonType
 import app.marlboroadvance.mpvex.ui.theme.controlColor
 import app.marlboroadvance.mpvex.ui.theme.playerRippleConfiguration
 import app.marlboroadvance.mpvex.ui.theme.spacing
@@ -173,7 +182,7 @@ fun PlayerControls(
   val abLoopB by viewModel.abLoopB.collectAsState()
 
   val onOpenSheet: (Sheets) -> Unit = {
-    viewModel.sheetShown.update { _ -> it }
+    viewModel.setSheetShown(it)
     if (it == Sheets.None) {
       viewModel.showControls()
     } else {
@@ -362,9 +371,7 @@ fun PlayerControls(
             },
           exit =
             if (!reduceMotion) {
-              slideOutHorizontally(playerControlsExitAnimationSpec()) {
-                if (swapVolumeAndBrightness) it else -it
-              } + fadeOut(playerControlsExitAnimationSpec())
+              slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec())
             } else {
               fadeOut(playerControlsExitAnimationSpec())
             },
@@ -584,12 +591,12 @@ fun PlayerControls(
                 }
               )
               .constrainAs(unlockControlsButton) {
-                bottom.linkTo(parent.bottom, spacing.larger)
+                bottom.linkTo(parent.bottom, spacing.large)
                 end.linkTo(parent.end, spacing.large)
               },
         ) {
           ThumbZoneUnlock(
-            onUnlock = { viewModel.unlockControls() },
+            onUnlock = { viewModel.unlockControls() }
           )
         }
 
@@ -612,6 +619,16 @@ fun PlayerControls(
           val showLoadingCircle by playerPreferences.showLoadingCircle.collectAsState()
           val icon = AnimatedImageVector.animatedVectorResource(R.drawable.anim_play_to_pause)
           val interaction = remember { MutableInteractionSource() }
+          val isPressed by interaction.collectIsPressedAsState()
+          
+          val scale by animateFloatAsState(
+            targetValue = if (isPressed) 0.92f else 1f,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessLow
+            ),
+            label = "play_button_scale"
+          )
 
           when {
             pausedForCache == true && showLoadingCircle -> {
@@ -621,212 +638,78 @@ fun PlayerControls(
             }
 
             else -> {
-              val buttonShadow =
-                Brush.radialGradient(
-                  0.0f to Color.Black.copy(alpha = 0.3f),
-                  0.7f to Color.Transparent,
-                  1.0f to Color.Transparent,
-                )
+              val buttonShadow = Brush.radialGradient(
+                  0.0f to Color.Black.copy(alpha = 0.45f),
+                  0.75f to Color.Transparent,
+              )
 
-              if (playlistMode && viewModel.hasPlaylistSupport()) {
-                androidx.compose.foundation.layout.Row(
-                  horizontalArrangement = Arrangement.spacedBy(24.dp),
-                  verticalAlignment = Alignment.CenterVertically,
-                ) {
-                  Surface(
-                    modifier =
-                      Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .clickable(
-                          enabled = viewModel.hasPrevious(),
-                          onClick = {
-                            resetControlsTimestamp = System.currentTimeMillis()
-                            if (viewModel.hasPrevious()) viewModel.playPrevious()
-                          },
-                        )
-                        .then(
-                          if (hideBackground) {
-                            Modifier.background(brush = buttonShadow, shape = CircleShape)
-                          } else {
-                            Modifier
-                          },
-                        ),
+              Row(
+                modifier = Modifier,
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                verticalAlignment = Alignment.CenterVertically,
+              ) {
+                if (playlistMode && viewModel.hasPlaylistSupport()) {
+                  // Previous Button
+                  val prevEnabled = viewModel.hasPrevious()
+                  ControlsButton(
+                    icon = Icons.Default.SkipPrevious,
+                    onClick = { viewModel.playPrevious() },
+                    enabled = prevEnabled,
+                    modifier = Modifier
+                      .size(56.dp)
+                      .then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier),
                     shape = CircleShape,
-                    color =
-                      if (!hideBackground) {
-                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f)
-                      } else {
-                        Color.Transparent
-                      },
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp,
-                    border =
-                      if (!hideBackground) {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                      } else {
-                        null
-                      },
-                  ) {
-                    Icon(
-                      imageVector = Icons.Default.SkipPrevious,
-                      contentDescription = "Previous",
-                      tint =
-                        if (viewModel.hasPrevious()) {
-                          if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface
-                        } else {
-                          if (hideBackground) {
-                            controlColor.copy(alpha = 0.38f)
-                          } else {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                          }
-                        },
-                      modifier = Modifier
-                        .fillMaxSize()
-                        .padding(MaterialTheme.spacing.small),
-                    )
-                  }
-
-                  Surface(
-                    modifier =
-                      Modifier
-                        .size(64.dp)
-                        .clip(CircleShape)
-                        .clickable(interaction, ripple(), onClick = {
-                          resetControlsTimestamp = System.currentTimeMillis()
-                          viewModel.pauseUnpause()
-                        })
-                        .then(
-                          if (hideBackground) {
-                            Modifier.background(brush = buttonShadow, shape = CircleShape)
-                          } else {
-                            Modifier
-                          },
-                        ),
-                    shape = CircleShape,
-                    color =
-                      if (!hideBackground) {
-                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f)
-                      } else {
-                        Color.Transparent
-                      },
-                    contentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp,
-                    border =
-                      if (!hideBackground) {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                      } else {
-                        null
-                      },
-                  ) {
-                    Image(
-                      painter = rememberAnimatedVectorPainter(icon, paused == false),
-                      modifier = Modifier
-                        .fillMaxSize()
-                        .padding(MaterialTheme.spacing.medium),
-                      contentDescription = null,
-                      colorFilter = ColorFilter.tint(LocalContentColor.current),
-                    )
-                  }
-
-                  Surface(
-                    modifier =
-                      Modifier
-                        .size(56.dp)
-                        .clip(CircleShape)
-                        .clickable(
-                          enabled = viewModel.hasNext(),
-                          onClick = {
-                            resetControlsTimestamp = System.currentTimeMillis()
-                            if (viewModel.hasNext()) viewModel.playNext()
-                          },
-                        )
-                        .then(
-                          if (hideBackground) {
-                            Modifier.background(brush = buttonShadow, shape = CircleShape)
-                          } else {
-                            Modifier
-                          },
-                        ),
-                    shape = CircleShape,
-                    color =
-                      if (!hideBackground) {
-                        MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f)
-                      } else {
-                        Color.Transparent
-                      },
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp,
-                    border =
-                      if (!hideBackground) {
-                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                      } else {
-                        null
-                      },
-                  ) {
-                    Icon(
-                      imageVector = Icons.Default.SkipNext,
-                      contentDescription = "Next",
-                      tint =
-                        if (viewModel.hasNext()) {
-                          if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface
-                        } else {
-                          if (hideBackground) {
-                            controlColor.copy(alpha = 0.38f)
-                          } else {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                          }
-                        },
-                      modifier = Modifier
-                        .fillMaxSize()
-                        .padding(MaterialTheme.spacing.small),
-                    )
-                  }
+                    iconSize = 28.dp,
+                    type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal,
+                    color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface
+                  )
                 }
-              } else {
+
+                // Main Play/Pause Button
+                val playButtonColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer
+                val playContentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onPrimaryContainer
+                
                 Surface(
-                  modifier =
-                    Modifier
-                      .size(64.dp)
-                      .clip(CircleShape)
-                      .clickable(interaction, ripple(), onClick = {
-                        resetControlsTimestamp = System.currentTimeMillis()
-                        viewModel.pauseUnpause()
-                      })
-                      .then(
-                        if (hideBackground) {
-                          Modifier.background(brush = buttonShadow, shape = CircleShape)
-                        } else {
-                          Modifier
-                        },
-                      ),
-                  shape = CircleShape,
-                  color =
-                    if (!hideBackground) {
-                      MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f)
-                    } else {
-                      Color.Transparent
+                  modifier = Modifier
+                    .size(84.dp)
+                    .graphicsLayer {
+                      scaleX = scale
+                      scaleY = scale
+                    }
+                    .then(if (hideBackground) Modifier.background(buttonShadow, MaterialTheme.shapes.extraLarge) else Modifier)
+                    .clip(MaterialTheme.shapes.extraLarge)
+                    .clickable(interaction, ripple()) {
+                      resetControlsTimestamp = System.currentTimeMillis()
+                      viewModel.pauseUnpause()
                     },
-                  contentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
-                  tonalElevation = 0.dp,
-                  shadowElevation = 0.dp,
-                  border =
-                    if (!hideBackground) {
-                      BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                    } else {
-                      null
-                    },
+                  shape = MaterialTheme.shapes.extraLarge,
+                  color = playButtonColor,
+                  contentColor = playContentColor,
                 ) {
                   Image(
                     painter = rememberAnimatedVectorPainter(icon, paused == false),
                     modifier = Modifier
                       .fillMaxSize()
-                      .padding(MaterialTheme.spacing.medium),
+                      .padding(24.dp),
                     contentDescription = null,
-                    colorFilter = ColorFilter.tint(LocalContentColor.current),
+                    colorFilter = ColorFilter.tint(playContentColor),
+                  )
+                }
+
+                if (playlistMode && viewModel.hasPlaylistSupport()) {
+                  // Next Button
+                  val nextEnabled = viewModel.hasNext()
+                  ControlsButton(
+                    icon = Icons.Default.SkipNext,
+                    onClick = { viewModel.playNext() },
+                    enabled = nextEnabled,
+                    modifier = Modifier
+                      .size(56.dp)
+                      .then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier),
+                    shape = CircleShape,
+                    iconSize = 28.dp,
+                    type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal,
+                    color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface
                   )
                 }
               }
@@ -1191,14 +1074,22 @@ fun PlayerControls(
       sheetShown = sheetShown,
       subtitles = subtitles.toImmutableList(),
       onAddSubtitle = viewModel::addSubtitle,
-      onToggleSubtitle = viewModel::toggleSubtitle,
+      onToggleSubtitle = { id ->
+        if (viewModel.isSubtitleSelected(id)) {
+          MPVLib.setPropertyString("sid", "no")
+          MPVLib.setPropertyString("secondary-sid", "no")
+        } else {
+          MPVLib.setPropertyInt("sid", id)
+          MPVLib.setPropertyString("secondary-sid", "no")
+        }
+      },
       isSubtitleSelected = viewModel::isSubtitleSelected,
       onRemoveSubtitle = viewModel::removeSubtitle,
       audioTracks = audioTracks.toImmutableList(),
       onAddAudio = viewModel::addAudio,
       onSelectAudio = {
         if (MPVLib.getPropertyInt("aid") == it.id) {
-          MPVLib.setPropertyBoolean("aid", false)
+          MPVLib.setPropertyString("aid", "no")
         } else {
           MPVLib.setPropertyInt("aid", it.id)
         }

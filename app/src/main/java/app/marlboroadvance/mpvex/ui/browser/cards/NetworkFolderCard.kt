@@ -36,14 +36,13 @@ import org.koin.compose.koinInject
 @Composable
 fun NetworkFolderCard(
   file: NetworkFile,
+  settings: FolderCardSettings,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   onLongClick: (() -> Unit)? = null,
   isSelected: Boolean = false,
 ) {
-  val appearancePreferences = koinInject<AppearancePreferences>()
-  val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
-  val maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2
+  val maxLines = if (settings.unlimitedNameLines) Int.MAX_VALUE else 2
 
   Card(
     modifier =

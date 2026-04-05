@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,16 +45,13 @@ import java.util.Locale
 fun NetworkVideoCard(
   file: NetworkFile,
   connection: NetworkConnection,
+  settings: VideoCardSettings,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   onLongClick: (() -> Unit)? = null,
   isSelected: Boolean = false,
 ) {
-  val appearancePreferences = koinInject<AppearancePreferences>()
-  val browserPreferences = koinInject<BrowserPreferences>()
-  val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
-  val showSizeChip by browserPreferences.showSizeChip.collectAsState()
-  val maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2
+  val maxLines = if (settings.unlimitedNameLines) Int.MAX_VALUE else 2
 
   val thumbSizeDp = 64.dp
 
@@ -123,9 +121,10 @@ fun NetworkVideoCard(
           horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp),
           verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)
         ) {
-          if (showSizeChip && file.size > 0) {
+          if (settings.showSizeChip && file.size > 0) {
+            val sizeText = remember(file.size) { formatFileSize(file.size) }
             Text(
-              formatFileSize(file.size),
+              sizeText,
               style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.Medium,
               ),
@@ -140,8 +139,9 @@ fun NetworkVideoCard(
             )
           }
           if (file.lastModified > 0) {
+            val dateText = remember(file.lastModified) { formatDate(file.lastModified) }
             Text(
-              formatDate(file.lastModified),
+              dateText,
               style = MaterialTheme.typography.labelSmall.copy(
                 fontWeight = FontWeight.Medium,
               ),

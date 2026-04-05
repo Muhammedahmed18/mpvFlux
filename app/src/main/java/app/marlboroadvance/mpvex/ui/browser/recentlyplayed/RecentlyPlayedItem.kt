@@ -9,6 +9,8 @@ sealed class RecentlyPlayedItem {
   data class VideoItem(
     val video: Video,
     override val timestamp: Long,
+    val progressPercentage: Float? = null,
+    val isWatched: Boolean = false,
   ) : RecentlyPlayedItem()
 
   data class PlaylistItem(

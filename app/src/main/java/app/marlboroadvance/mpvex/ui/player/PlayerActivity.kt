@@ -95,7 +95,7 @@ class PlayerActivity :
   // Initialize ViewModel callback for progress saving on pause
   private fun setupViewModelCallbacks() {
     viewModel.onPauseCallback = {
-      saveVideoProgress()
+      saveVideoProgress(isImmediate = true)
     }
   }
 
@@ -478,7 +478,7 @@ class PlayerActivity :
   private fun handleBackPress() {
     // Dismiss overlays first
     if (viewModel.sheetShown.value != Sheets.None) {
-      viewModel.sheetShown.update { Sheets.None }
+      viewModel.setSheetShown(Sheets.None)
       viewModel.showControls()
       return
     }
@@ -495,8 +495,8 @@ class PlayerActivity :
       return
     }
 
-    // Save progress when user navigates back from player (condition 2)
-    saveVideoProgress()
+    // Save progress immediately when user navigates back from player (condition 2)
+    saveVideoProgress(isImmediate = true)
     
     isUserFinishing = true
     finish()
@@ -509,8 +509,8 @@ class PlayerActivity :
         PlayerControls(
           viewModel = viewModel,
           onBackPress = {
-            // Save progress when user closes player via controls (condition 2)
-            saveVideoProgress()
+            // Save progress immediately when user closes player via controls (condition 2)
+            saveVideoProgress(isImmediate = true)
             isUserFinishing = true
             finish()
           },
@@ -713,8 +713,8 @@ class PlayerActivity :
   @RequiresApi(Build.VERSION_CODES.P)
   override fun finish() {
     runCatching {
-      // Save progress when app is closed/finished (condition 3)
-      saveVideoProgress()
+      // Save progress immediately when app is closed/finished (condition 3)
+      saveVideoProgress(isImmediate = true)
       
       // Don't restore UI during normal finish to prevent flickering
       // System will handle UI restoration automatically
@@ -736,8 +736,8 @@ class PlayerActivity :
   // finishAndRemoveTask() was added in API 21, but since our minSdk is 26, it's always available
   override fun finishAndRemoveTask() {
     runCatching {
-      // Save progress when app is closed/finished (condition 3)
-      saveVideoProgress()
+      // Save progress immediately when app is closed/finished (condition 3)
+      saveVideoProgress(isImmediate = true)
       
       // Don't restore UI during normal finish to prevent flickering
       // System will handle UI restoration automatically
@@ -1461,9 +1461,6 @@ class PlayerActivity :
         if (playerPreferences.orientation.get() == PlayerOrientation.Video && aspect != null) {
           setOrientation()
         }
-
-        // Re-apply Anime4K shaders (check for resolution limit)
-        player.applyAnime4KShaders()
       }
     }
   }
@@ -1498,8 +1495,8 @@ class PlayerActivity :
    */
   private fun handlePauseStateChange(isPaused: Boolean) {
     if (isPaused) {
-      // Save progress when video is paused (every pause as requested)
-      saveVideoProgress()
+      // Save progress immediately when video is paused (every pause as requested)
+      saveVideoProgress(isImmediate = true)
       
       // Only clear keep-screen-on if the preference is NOT enabled
       if (!playerPreferences.keepScreenOnWhenPaused.get()) {
@@ -1523,8 +1520,8 @@ class PlayerActivity :
    */
   private fun handleEndOfFile(isEof: Boolean) {
     if (isEof) {
-      // Save progress when video reaches end (condition 4)
-      saveVideoProgress()
+      // Save progress immediately when video reaches end (condition 4)
+      saveVideoProgress(isImmediate = true)
       
       // Check if we should repeat current file
       if (viewModel.shouldRepeatCurrentFile()) {
@@ -1978,7 +1975,7 @@ class PlayerActivity :
    * Saves current video progress using the centralized ProgressSaveManager.
    * This method should be called for all 4 save conditions.
    */
-  private fun saveVideoProgress() {
+  private fun saveVideoProgress(isImmediate: Boolean = false) {
     if (mediaIdentifier.isBlank()) return
     
     // Get old state for position calculation
@@ -2002,7 +1999,8 @@ class PlayerActivity :
         getAudioDelay = { ((MPVLib.getPropertyDouble("audio-delay") ?: 0.0) * MILLISECONDS_TO_SECONDS).toInt() },
         getExternalSubtitles = { viewModel.externalSubtitles.joinToString("|") },
         savePositionOnQuit = playerPreferences.savePositionOnQuit.get(),
-        oldState = oldState
+        oldState = oldState,
+        isImmediate = isImmediate
       )
     }
   }
@@ -2972,9 +2970,9 @@ class PlayerActivity :
       return
     }
 
-    // Save current video's playback state before switching
+    // Save current video's playback state immediately before switching
     if (fileName.isNotBlank()) {
-      saveVideoPlaybackState(fileName)
+      saveVideoProgress(isImmediate = true)
     }
 
     val uri = playlist[index]

@@ -52,18 +52,11 @@ fun LoadingState(
     label = "icon_alpha",
   )
 
-  Box(
-    modifier = modifier.fillMaxSize(),
-    contentAlignment = Alignment.Center
+  Column(
+    modifier = modifier.fillMaxSize().padding(horizontal = 48.dp),
+    verticalArrangement = Arrangement.Center,
+    horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = 48.dp)
-        .padding(bottom = 80.dp), // Account for bottom navigation bar
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.Center,
-    ) {
       // Icon with Surface (same style as EmptyState)
       Surface(
         modifier =
@@ -103,6 +96,5 @@ fun LoadingState(
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
       )
-    }
   }
 }

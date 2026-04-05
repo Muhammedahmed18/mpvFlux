@@ -143,17 +143,14 @@ object FoldersPreferencesScreen : Screen {
         }
 
         if (blacklistedFolders.isEmpty()) {
-          Box(
+          EmptyState(
+            icon = Icons.Rounded.FolderOff,
+            title = stringResource(R.string.pref_folders_empty_title),
+            message = stringResource(R.string.pref_folders_empty_message),
             modifier = Modifier
               .fillMaxWidth()
               .weight(1f),
-          ) {
-            EmptyState(
-              icon = Icons.Rounded.FolderOff,
-              title = stringResource(R.string.pref_folders_empty_title),
-              message = stringResource(R.string.pref_folders_empty_message),
-            )
-          }
+          )
         } else {
           LazyColumn(
             modifier = Modifier.weight(1f),

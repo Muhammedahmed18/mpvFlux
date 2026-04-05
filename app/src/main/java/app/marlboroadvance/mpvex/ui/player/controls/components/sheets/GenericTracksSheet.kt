@@ -1,28 +1,50 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
+import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import android.net.Uri
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.presentation.components.PlayerSheet
@@ -42,18 +64,209 @@ fun <T> GenericTracksSheet(
   footer: @Composable () -> Unit = {},
 ) {
   val listState = lazyListState ?: rememberLazyListState()
+  val configuration = LocalConfiguration.current
   
-  PlayerSheet(onDismissRequest, customMaxWidth = customMaxWidth) {
-    Column(modifier) {
+  // Ensure the sheet is full-width in portrait to avoid the "centered pillar" look
+  val calculatedMaxWidth = customMaxWidth ?: if (configuration.orientation == ORIENTATION_PORTRAIT) {
+    2000.dp 
+  } else {
+    640.dp
+  }
+
+  PlayerSheet(onDismissRequest, customMaxWidth = calculatedMaxWidth) {
+    Column(
+      modifier = modifier
+        .fillMaxWidth()
+        .padding(bottom = MaterialTheme.spacing.medium)
+    ) {
       header()
-      LazyColumn(state = listState) {
+      LazyColumn(
+        state = listState,
+        modifier = Modifier.weight(1f, fill = false),
+        contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.medium),
+        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small)
+      ) {
         items(tracks) {
           track(it)
         }
-        item {
-          footer()
+      }
+      Spacer(modifier = Modifier.height(MaterialTheme.spacing.small))
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = MaterialTheme.spacing.medium)
+      ) {
+        footer()
+      }
+    }
+  }
+}
+
+@Composable
+fun TrackMetadataBadge(
+  text: String,
+  isSelected: Boolean,
+  modifier: Modifier = Modifier,
+) {
+  val containerColor = if (isSelected) {
+    MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+  } else {
+    MaterialTheme.colorScheme.surfaceContainerHighest
+  }
+  
+  val contentColor = if (isSelected) {
+    MaterialTheme.colorScheme.primary
+  } else {
+    MaterialTheme.colorScheme.onSurfaceVariant
+  }
+
+  Surface(
+    color = containerColor,
+    shape = RoundedCornerShape(4.dp),
+    modifier = modifier
+  ) {
+    Text(
+      text = text.uppercase(),
+      style = MaterialTheme.typography.labelSmall,
+      fontWeight = FontWeight.Bold,
+      color = contentColor,
+      modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+    )
+  }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun TrackSelectableBar(
+  title: String,
+  isSelected: Boolean,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+  metadata: List<String> = emptyList(),
+  trailingContent: @Composable (RowScope.() -> Unit)? = null,
+) {
+  val containerColor = if (isSelected) {
+    MaterialTheme.colorScheme.primaryContainer
+  } else {
+    MaterialTheme.colorScheme.surfaceContainerLow
+  }
+
+  val contentColor = if (isSelected) {
+    MaterialTheme.colorScheme.onPrimaryContainer
+  } else {
+    MaterialTheme.colorScheme.onSurface
+  }
+
+  Surface(
+    onClick = onClick,
+    modifier = modifier.fillMaxWidth(),
+    shape = RoundedCornerShape(12.dp),
+    color = containerColor,
+    contentColor = contentColor,
+  ) {
+    Row(
+      modifier = Modifier
+        .padding(vertical = MaterialTheme.spacing.small),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      // Selection Indicator Bar
+      Box(
+        modifier = Modifier
+          .width(4.dp)
+          .height(32.dp)
+          .clip(RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp))
+          .background(
+            if (isSelected) MaterialTheme.colorScheme.primary 
+            else Color.Transparent
+          )
+      )
+
+      Spacer(modifier = Modifier.width(MaterialTheme.spacing.medium))
+
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = title,
+          style = MaterialTheme.typography.bodyLarge,
+          fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+        )
+        if (metadata.isNotEmpty()) {
+          Spacer(modifier = Modifier.height(4.dp))
+          FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+          ) {
+            metadata.forEach { 
+               TrackMetadataBadge(text = it, isSelected = isSelected)
+            }
+          }
         }
       }
+
+      if (trailingContent != null || isSelected) {
+        Row(
+          modifier = Modifier.padding(horizontal = MaterialTheme.spacing.medium),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
+        ) {
+          if (trailingContent != null) {
+            trailingContent()
+          }
+          if (isSelected) {
+            Icon(
+              Icons.Default.Check,
+              contentDescription = null,
+              modifier = Modifier.size(20.dp),
+              tint = MaterialTheme.colorScheme.primary,
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+data class TrackAction(
+  val label: String,
+  val icon: ImageVector,
+  val onClick: () -> Unit,
+)
+
+@Composable
+fun TrackActionsRow(
+  actions: List<TrackAction>,
+  modifier: Modifier = Modifier,
+) {
+  LazyRow(
+    modifier = modifier
+      .fillMaxWidth()
+      .padding(MaterialTheme.spacing.medium),
+    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    items(actions) { action ->
+      AssistChip(
+        onClick = action.onClick,
+        label = {
+          Text(
+            text = action.label,
+            style = MaterialTheme.typography.labelLarge,
+          )
+        },
+        leadingIcon = {
+          Icon(
+            action.icon,
+            contentDescription = null,
+            modifier = Modifier.size(AssistChipDefaults.IconSize),
+          )
+        },
+        shape = CircleShape,
+        colors = AssistChipDefaults.assistChipColors(
+          containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+          labelColor = MaterialTheme.colorScheme.onSurface,
+          leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
+        ),
+        border = null,
+      )
     }
   }
 }
@@ -69,24 +282,30 @@ fun AddTrackRow(
     modifier =
       modifier
         .fillMaxWidth()
-        .clickable(onClick = onClick)
-        .height(56.dp)
-        .padding(horizontal = MaterialTheme.spacing.medium),
+        .padding(MaterialTheme.spacing.medium),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
+    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
   ) {
-    Icon(
-      Icons.Default.Add,
-      contentDescription = null,
-      modifier = Modifier.size(24.dp),
-    )
-    Text(
-      text = title,
-      style = MaterialTheme.typography.bodyLarge,
+    FilledTonalButton(
+      onClick = onClick,
       modifier = Modifier.weight(1f),
-    )
+      shape = RoundedCornerShape(12.dp),
+      contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.medium, vertical = 8.dp)
+    ) {
+      Icon(
+        Icons.Default.Add,
+        contentDescription = null,
+        modifier = Modifier.size(20.dp),
+      )
+      Spacer(modifier = Modifier.size(MaterialTheme.spacing.small))
+      Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+      )
+    }
+
     Row(
-      horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
+      horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       actions()
@@ -128,5 +347,3 @@ fun getTrackTitle(
     else -> ""
   }
 }
-
-

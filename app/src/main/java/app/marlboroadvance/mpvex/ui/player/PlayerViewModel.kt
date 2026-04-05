@@ -232,6 +232,15 @@ class PlayerViewModel(
     )
 
   val sheetShown = MutableStateFlow(Sheets.None)
+  
+  fun setSheetShown(sheet: Sheets) {
+      sheetShown.value = sheet
+      if (sheet == Sheets.OnlineSubtitleSearch) {
+          clearMediaSelection()
+          _wyzieSearchResults.value = emptyList()
+      }
+  }
+
   val panelShown = MutableStateFlow(Panels.None)
 
   // Seek state
@@ -643,6 +652,7 @@ class PlayerViewModel(
     mediaSearchJob = viewModelScope.launch {
       delay(300) // Debounce
       _isSearchingMedia.value = true
+      _wyzieSearchResults.value = emptyList() // Clear old subtitle results when searching for new media
       wyzieRepository.searchMedia(query)
         .onSuccess { results ->
           _mediaSearchResults.value = results

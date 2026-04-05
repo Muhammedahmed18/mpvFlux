@@ -13,7 +13,9 @@ import app.marlboroadvance.mpvex.database.entities.RecentlyPlayedEntity
 import app.marlboroadvance.mpvex.database.repository.PlaylistRepository
 import app.marlboroadvance.mpvex.database.repository.VideoMetadataCacheRepository
 import app.marlboroadvance.mpvex.domain.media.model.Video
+import app.marlboroadvance.mpvex.domain.playbackstate.repository.PlaybackStateRepository
 import app.marlboroadvance.mpvex.domain.recentlyplayed.repository.RecentlyPlayedRepository
+import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.utils.permission.PermissionUtils
 
 
@@ -29,6 +31,8 @@ class RecentlyPlayedViewModel(application: Application) : AndroidViewModel(appli
   private val recentlyPlayedRepository by inject<RecentlyPlayedRepository>(RecentlyPlayedRepository::class.java)
   private val playlistRepository by inject<PlaylistRepository>(PlaylistRepository::class.java)
   private val metadataCache by inject<VideoMetadataCacheRepository>(VideoMetadataCacheRepository::class.java)
+  private val playbackStateRepository by inject<PlaybackStateRepository>(PlaybackStateRepository::class.java)
+  private val browserPreferences by inject<BrowserPreferences>(BrowserPreferences::class.java)
 
   private val _recentItems = MutableStateFlow<List<RecentlyPlayedItem>>(emptyList())
   val recentItems: StateFlow<List<RecentlyPlayedItem>> = _recentItems.asStateFlow()
@@ -143,7 +147,34 @@ class RecentlyPlayedViewModel(application: Application) : AndroidViewModel(appli
         }
 
         if (video != null) {
-          items.add(RecentlyPlayedItem.VideoItem(video, timestamp))
+          // Fetch playback info for this video
+          val playbackState = playbackStateRepository.getVideoDataByTitle(video.displayName)
+          val watchedThreshold = browserPreferences.watchedThreshold.get()
+
+          var progress: Float? = null
+          var isWatched = false
+
+          if (playbackState != null && video.duration > 0) {
+            val durationSeconds = video.duration / 1000
+            val timeRemaining = playbackState.timeRemaining.toLong()
+            val watchedSeconds = durationSeconds - timeRemaining
+            val progressValue = (watchedSeconds.toFloat() / durationSeconds.toFloat()).coerceIn(0f, 1f)
+
+            // Only show progress for videos that are 1-99% complete
+            if (progressValue in 0.01f..0.99f) {
+                progress = progressValue
+            }
+
+            val calculatedWatched = progressValue >= (watchedThreshold / 100f)
+            isWatched = playbackState.hasBeenWatched || calculatedWatched
+          }
+
+          items.add(RecentlyPlayedItem.VideoItem(
+            video = video,
+            timestamp = timestamp,
+            progressPercentage = progress,
+            isWatched = isWatched
+          ))
         }
       }
 

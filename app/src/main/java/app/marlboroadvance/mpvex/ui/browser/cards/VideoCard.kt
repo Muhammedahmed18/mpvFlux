@@ -1,9 +1,16 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,17 +20,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -31,7 +38,9 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +48,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -49,22 +61,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.BorderStroke
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
-import app.marlboroadvance.mpvex.preferences.BrowserPreferences
-import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
+@Immutable
+data class VideoCardSettings(
+    val unlimitedNameLines: Boolean = false,
+    val showThumbnails: Boolean = true,
+    val showVideoExtension: Boolean = true,
+    val showSizeChip: Boolean = true,
+    val showResolutionChip: Boolean = true,
+    val showFramerateInResolution: Boolean = true,
+    val showProgressBar: Boolean = true,
+    val showDateChip: Boolean = true,
+    val showUnplayedOldVideoLabel: Boolean = true,
+    val unplayedOldVideoDays: Int = 7,
+)
+
 @Composable
 fun VideoCard(
     video: Video,
+    settings: VideoCardSettings,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isRecentlyPlayed: Boolean = false,
@@ -80,31 +103,36 @@ fun VideoCard(
     useFolderNameStyle: Boolean = false,
     allowThumbnailGeneration: Boolean = true,
 ) {
-    val appearancePreferences = koinInject<AppearancePreferences>()
-    val browserPreferences = koinInject<BrowserPreferences>()
-    val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
-    val showThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
-    val showVideoExtension by browserPreferences.showVideoExtension.collectAsState()
-    val showSizeChipPref by browserPreferences.showSizeChip.collectAsState()
-    val showResolutionChipPref by browserPreferences.showResolutionChip.collectAsState()
-    val showFramerateInResolution by browserPreferences.showFramerateInResolution.collectAsState()
-    val showProgressBar by browserPreferences.showProgressBar.collectAsState()
-    val showDateChip by browserPreferences.showDateChip.collectAsState()
-    val showUnplayedOldVideoLabel by appearancePreferences.showUnplayedOldVideoLabel.collectAsState()
-    val unplayedOldVideoDays by appearancePreferences.unplayedOldVideoDays.collectAsState()
-    val maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2
+    val maxLines = if (settings.unlimitedNameLines) Int.MAX_VALUE else 2
 
-    // Use override parameters if provided, otherwise use preferences
-    val showSizeChip = overrideShowSizeChip ?: showSizeChipPref
-    val showResolutionChip = overrideShowResolutionChip ?: showResolutionChipPref
+    val showSizeChip = overrideShowSizeChip ?: settings.showSizeChip
+    val showResolutionChip = overrideShowResolutionChip ?: settings.showResolutionChip
 
-    val isCompleted = (progressPercentage ?: 0f) >= 0.95f
+    val isCompleted by remember(progressPercentage, isWatched) {
+        derivedStateOf { isWatched || (progressPercentage ?: 0f) >= 0.95f }
+    }
+    
     val animatedProgress by animateFloatAsState(
         targetValue = progressPercentage ?: 0f,
         label = "VideoProgressAnimation"
     )
+    val animatedContainerColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent,
+        label = "ContainerColor"
+    )
+    val animatedContentColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
+        label = "ContentColor"
+    )
+    val animatedBorderWidth by animateDpAsState(
+        targetValue = if (isSelected) 2.dp else 0.dp,
+        label = "BorderWidth"
+    )
+    val animatedThumbnailPadding by animateDpAsState(
+        targetValue = if (isSelected) 6.dp else 0.dp,
+        label = "ThumbnailPadding"
+    )
 
-    // 1. Card Architecture: Tonal Card (surfaceContainerLow) with MaterialTheme.shapes.large (16dp)
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -115,12 +143,9 @@ fun VideoCard(
             ),
         shape = MaterialTheme.shapes.large,
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
-            } else {
-                Color.Transparent
-            }
+            containerColor = animatedContainerColor,
         ),
+        border = if (isSelected) BorderStroke(animatedBorderWidth, MaterialTheme.colorScheme.primary) else null
     ) {
         Row(
             modifier = Modifier
@@ -129,8 +154,7 @@ fun VideoCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val thumbnailRepository = koinInject<ThumbnailRepository>()
-            // Adjusted size for better M3 balance
-            val thumbWidthDp = 140.dp
+            val thumbWidthDp = 160.dp
             val aspect = 16f / 9f
             val thumbWidthPx = with(LocalDensity.current) { thumbWidthDp.roundToPx() }
             val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
@@ -152,25 +176,36 @@ fun VideoCard(
                     }
             }
 
-            LaunchedEffect(thumbnailKey, allowThumbnailGeneration, showThumbnails) {
-                if (thumbnail == null && showThumbnails) {
-                    thumbnail =
-                        withContext(Dispatchers.IO) {
-                            if (allowThumbnailGeneration) {
-                                thumbnailRepository.getThumbnail(video, thumbWidthPx, thumbHeightPx)
-                            } else {
-                                thumbnailRepository.getCachedThumbnail(video, thumbWidthPx, thumbHeightPx)
-                            }
-                        }
+            LaunchedEffect(thumbnailKey, settings.showThumbnails, allowThumbnailGeneration) {
+                if (!settings.showThumbnails) {
+                    thumbnail = null
+                    return@LaunchedEffect
+                }
+                
+                val memoryThumbnail = thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx)
+                if (memoryThumbnail != null) {
+                    thumbnail = memoryThumbnail
+                    return@LaunchedEffect
+                }
+                
+                val loadedThumbnail = withContext(Dispatchers.IO) {
+                    if (allowThumbnailGeneration) {
+                        thumbnailRepository.getThumbnail(video, thumbWidthPx, thumbHeightPx)
+                    } else {
+                        thumbnailRepository.getCachedThumbnail(video, thumbWidthPx, thumbHeightPx)
+                    }
+                }
+                if (loadedThumbnail != null) {
+                    thumbnail = loadedThumbnail
                 }
             }
 
-            // 2. Thumbnail & Overlays
             Box(
                 modifier = Modifier
                     .width(thumbWidthDp)
                     .aspectRatio(aspect)
-                    .clip(RoundedCornerShape(12.dp)) // Refinement: Nested 12dp corners
+                    .padding(animatedThumbnailPadding)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .combinedClickable(
                         onClick = onThumbClick,
@@ -178,23 +213,14 @@ fun VideoCard(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                if (showThumbnails) {
-                    thumbnail?.let {
-                        Image(
-                            bitmap = it.asImageBitmap(),
-                            contentDescription = "Thumbnail",
-                            modifier = Modifier.matchParentSize(),
-                            contentScale = ContentScale.Crop,
-                        )
-                    } ?: run {
-                        Icon(
-                            Icons.Filled.PlayArrow,
-                            contentDescription = "Play",
-                            modifier = Modifier.size(40.dp),
-                            tint = MaterialTheme.colorScheme.secondary,
-                        )
-                    }
-                } else {
+                thumbnail?.let { bmp ->
+                    Image(
+                        bitmap = bmp.asImageBitmap(),
+                        contentDescription = "Thumbnail",
+                        modifier = Modifier.matchParentSize(),
+                        contentScale = ContentScale.Crop,
+                    )
+                } ?: run {
                     Icon(
                         Icons.Filled.PlayArrow,
                         contentDescription = "Play",
@@ -203,200 +229,205 @@ fun VideoCard(
                     )
                 }
 
-                // Status Badges using M3 system
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
+                // Selection Overlay
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isSelected,
+                    enter = fadeIn() + scaleIn(),
+                    exit = fadeOut() + scaleOut()
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (isCompleted) {
-                            // "Completed" would be a Tertiary tonal icon badge
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(MaterialTheme.colorScheme.tertiaryContainer),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Filled.Check,
-                                    contentDescription = "Completed",
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.onTertiaryContainer
-                                )
-                            }
-                        }
-
-                        if (showUnplayedOldVideoLabel && isOldAndUnplayed && !isCompleted) {
-                            val currentTime = System.currentTimeMillis()
-                            val videoAge = currentTime - (video.dateModified * 1000)
-                            val thresholdMillis = unplayedOldVideoDays * 24 * 60 * 60 * 1000L
-
-                            if (videoAge <= thresholdMillis) {
-                                // "New" indicator would be a subtle Primary pill
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(4.dp))
-                                        .background(MaterialTheme.colorScheme.primary)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = stringResource(R.string.video_label_new),
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold
-                                        ),
-                                        color = MaterialTheme.colorScheme.onPrimary
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // 1. Selection State: Integrated checkmark badge on thumbnail
-                if (isSelected) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(32.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.primary),
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            Icons.Filled.Check,
-                            contentDescription = "Selected",
-                            modifier = Modifier.size(20.dp),
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = "Selected",
+                                modifier = Modifier.size(24.dp),
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
                     }
                 }
 
-                // Duration Badge (M3 style pill with surfaceContainer background)
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(8.dp)
+                        .padding(4.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.8f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
                     Text(
                         text = video.durationFormatted,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = Color.White,
+                        fontSize = 10.sp
                     )
                 }
 
-                // Integrated Progress: Linear Progress Indicator perfectly flush with the bottom edge
-                if (progressPercentage != null && showProgressBar && !isCompleted) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .padding(6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    if (settings.showUnplayedOldVideoLabel && isOldAndUnplayed && !isCompleted) {
+                        val isNew = remember(video.dateModified, settings.unplayedOldVideoDays) {
+                            val currentTime = System.currentTimeMillis()
+                            val videoAge = currentTime - (video.dateModified * 1000)
+                            val thresholdMillis = settings.unplayedOldVideoDays * 24 * 60 * 60 * 1000L
+                            videoAge <= thresholdMillis
+                        }
+                        if (isNew) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(50))
+                                    .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.9f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.video_label_new),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 9.sp
+                                    )
+                                )
+                            }
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.width(1.dp))
+                    }
+
+                    if (isCompleted && !isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.primary)
+                                .padding(3.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = "Completed",
+                                modifier = Modifier.fillMaxSize(),
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                }
+
+                if (settings.showProgressBar && progressPercentage != null && progressPercentage > 0.01f && !isCompleted) {
+                    val primaryColor = MaterialTheme.colorScheme.primary
                     LinearProgressIndicator(
                         progress = { animatedProgress },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
-                            .height(4.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        strokeCap = StrokeCap.Butt
+                            .padding(bottom = 2.dp, start = 4.dp, end = 4.dp)
+                            .height(4.dp)
+                            .drawBehind {
+                                // Subtle glow effect for the active progress
+                                if (animatedProgress > 0f) {
+                                    drawRoundRect(
+                                        color = primaryColor.copy(alpha = 0.3f),
+                                        size = size.copy(width = size.width * animatedProgress, height = size.height * 2f),
+                                        topLeft = Offset(0f, -size.height * 0.5f),
+                                        cornerRadius = CornerRadius(size.height, size.height)
+                                    )
+                                }
+                            },
+                        color = primaryColor,
+                        trackColor = Color.Black.copy(alpha = 0.4f),
+                        strokeCap = StrokeCap.Round,
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(16.dp)) // 4. Spacing: Standard M3 "Large" spacing
+            Spacer(modifier = Modifier.width(16.dp))
 
             Column(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
                 verticalArrangement = Arrangement.Center
             ) {
-                // 3. Typography: Title using titleMedium, color logic for played/unplayed
                 Text(
-                    if (showVideoExtension) video.displayName else video.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = if (isRecentlyPlayed || isWatched || isCompleted) {
-                        MaterialTheme.colorScheme.onSurfaceVariant // played videos
-                    } else {
-                        MaterialTheme.colorScheme.onSurface // unplayed videos
-                    },
-                    maxLines = 2,
+                    text = if (settings.showVideoExtension) video.displayName else video.displayName.substringBeforeLast("."),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = if (isRecentlyPlayed) FontWeight.Bold else FontWeight.Medium,
+                        letterSpacing = 0.sp
+                    ),
+                    maxLines = maxLines,
                     overflow = TextOverflow.Ellipsis,
+                    color = if (isRecentlyPlayed && !isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        animatedContentColor
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // 3. Metadata Row: Using bodySmall and pipe separators with wrapping support
                 FlowRow(
-                    verticalArrangement = Arrangement.Center,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    val metadataStyle = MaterialTheme.typography.bodySmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    val separatorStyle = metadataStyle.copy(
-                        color = metadataStyle.color.copy(alpha = 0.5f)
-                    )
-
-                    val items = buildList {
-                        if (showSizeChip && video.sizeFormatted != "0 B" && video.sizeFormatted != "--") {
-                            add(video.sizeFormatted)
-                        }
-
-                        if (showResolutionChip && video.resolution != "--") {
-                            val baseResolution = if (video.resolution.all { it.isDigit() }) {
-                                "${video.resolution}p"
-                            } else {
-                                video.resolution
-                            }
-
-                            val displayResolution = if (showFramerateInResolution && video.fps > 0f) {
-                                "$baseResolution@${video.fps.toInt()}"
-                            } else {
-                                baseResolution
-                            }
-                            add(displayResolution)
-                        }
-
-                        if (showDateChip && video.dateModified > 0) {
-                            add(formatDate(video.dateModified))
-                        }
+                    val chipContainerColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    }
+                    val chipContentColor = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        animatedContentColor.copy(alpha = 0.8f)
                     }
 
-                    items.forEachIndexed { index, text ->
-                        Text(text, style = metadataStyle)
-                        if (index < items.size - 1) {
-                            Text("|", style = separatorStyle)
-                        }
+                    if (showSizeChip) {
+                        MetadataChip(text = video.sizeFormatted, containerColor = chipContainerColor, contentColor = chipContentColor)
                     }
-                }
 
-                // 3. Subtitle Labels: M3 Assist Chips
-                if (showSubtitleIndicator && video.hasEmbeddedSubtitles && video.subtitleCodec.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        video.subtitleCodec.split(" ").take(2).forEach { codec ->
-                            AssistChip(
-                                onClick = { },
-                                label = {
-                                    Text(
-                                        codec.uppercase(),
-                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp)
-                                    )
-                                },
-                                modifier = Modifier.height(24.dp),
-                                colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                                    labelColor = MaterialTheme.colorScheme.primary
-                                ),
-                                border = BorderStroke(
-                                    width = 0.5.dp,
-                                    color = MaterialTheme.colorScheme.outlineVariant
-                                )
-                            )
+                    if (showResolutionChip) {
+                        val resText = if (settings.showFramerateInResolution && video.fps > 0) {
+                            "${video.resolution} • ${video.fps.roundToInt()}fps"
+                        } else {
+                            video.resolution
                         }
+                        MetadataChip(text = resText, containerColor = chipContainerColor, contentColor = chipContentColor)
+                    }
+
+                    if (settings.showDateChip) {
+                        val formattedDate = remember(video.dateModified) {
+                            val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
+                            sdf.format(java.util.Date(video.dateModified * 1000))
+                        }
+                        MetadataChip(text = formattedDate, containerColor = chipContainerColor, contentColor = chipContentColor)
+                    }
+
+                    if (showSubtitleIndicator && (video.hasEmbeddedSubtitles || video.subtitleCodec.isNotEmpty())) {
+                        val subText = if (video.subtitleCodec.isNotEmpty()) {
+                            video.subtitleCodec.uppercase().substringBefore("/")
+                        } else "SUB"
+
+                        MetadataChip(
+                            text = subText,
+                            containerColor = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.primary,
+                            isBold = true
+                        )
                     }
                 }
             }
@@ -404,7 +435,26 @@ fun VideoCard(
     }
 }
 
-private fun formatDate(timestampSeconds: Long): String {
-    val sdf = java.text.SimpleDateFormat("MMM dd, yyyy", java.util.Locale.getDefault())
-    return sdf.format(java.util.Date(timestampSeconds * 1000))
+@Composable
+private fun MetadataChip(
+    text: String,
+    containerColor: Color,
+    contentColor: Color,
+    isBold: Boolean = false
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(containerColor)
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = if (isBold) FontWeight.ExtraBold else FontWeight.SemiBold,
+                fontSize = 10.sp
+            ),
+            color = contentColor
+        )
+    }
 }

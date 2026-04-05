@@ -116,9 +116,43 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
       )
 
     val playlist by viewModel.playlist.collectAsState()
+    val browserPreferences = koinInject<BrowserPreferences>()
+    val appearancePreferences = koinInject<app.marlboroadvance.mpvex.preferences.AppearancePreferences>()
     val videoItems by viewModel.videoItems.collectAsState()
     val videos = videoItems.map { it.video }
     val isLoading by viewModel.isLoading.collectAsState()
+    val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
+
+    // VideoCard settings
+    val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
+    val showThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
+    val showVideoExtension by browserPreferences.showVideoExtension.collectAsState()
+    val showSizeChip by browserPreferences.showSizeChip.collectAsState()
+    val showResolutionChip by browserPreferences.showResolutionChip.collectAsState()
+    val showFramerateInResolution by browserPreferences.showFramerateInResolution.collectAsState()
+    val showProgressBar by browserPreferences.showProgressBar.collectAsState()
+    val showDateChip by browserPreferences.showDateChip.collectAsState()
+    val showUnplayedOldVideoLabel by appearancePreferences.showUnplayedOldVideoLabel.collectAsState()
+    val unplayedOldVideoDays by appearancePreferences.unplayedOldVideoDays.collectAsState()
+
+    val videoCardSettings = remember(
+      unlimitedNameLines, showThumbnails, showVideoExtension, showSizeChip,
+      showResolutionChip, showFramerateInResolution, showProgressBar,
+      showDateChip, showUnplayedOldVideoLabel, unplayedOldVideoDays
+    ) {
+      app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings(
+        unlimitedNameLines = unlimitedNameLines,
+        showThumbnails = showThumbnails,
+        showVideoExtension = showVideoExtension,
+        showSizeChip = showSizeChip,
+        showResolutionChip = showResolutionChip,
+        showFramerateInResolution = showFramerateInResolution,
+        showProgressBar = showProgressBar,
+        showDateChip = showDateChip,
+        showUnplayedOldVideoLabel = showUnplayedOldVideoLabel,
+        unplayedOldVideoDays = unplayedOldVideoDays
+      )
+    }
     val isRefreshing = remember { mutableStateOf(false) }
 
     // Selection manager
@@ -323,6 +357,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
           videoItems = videoItems,
           isLoading = isLoading && videoItems.isEmpty(),
           selectionManager = selectionManager,
+          videoCardSettings = videoCardSettings,
           isM3uPlaylist = playlist?.isM3uPlaylist == true,
           isReorderMode = isReorderMode,
           onReorder = { fromIndex, toIndex ->
@@ -395,6 +430,7 @@ private fun PlaylistVideoListContent(
   videoItems: List<PlaylistVideoItem>,
   isLoading: Boolean,
   selectionManager: SelectionManager<PlaylistVideoItem, Int>,
+  videoCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings,
   isReorderMode: Boolean,
   onReorder: (Int, Int) -> Unit,
   onVideoItemClick: (PlaylistVideoItem) -> Unit,
@@ -509,6 +545,7 @@ private fun PlaylistVideoListContent(
                     url = item.video.path,
                     onClick = { onVideoItemClick(item) },
                     onLongClick = { onVideoItemLongClick(item) },
+                    settings = videoCardSettings,
                     isSelected = selectionManager.isSelected(item),
                     isRecentlyPlayed = item.playlistItem.id == mostRecentlyPlayedItem?.playlistItem?.id,
                     modifier = Modifier.weight(1f),
@@ -516,6 +553,7 @@ private fun PlaylistVideoListContent(
                 } else {
                   VideoCard(
                     video = item.video,
+                    settings = videoCardSettings,
                     progressPercentage = progressPercentage,
                     isRecentlyPlayed = item.playlistItem.id == mostRecentlyPlayedItem?.playlistItem?.id,
                     isSelected = selectionManager.isSelected(item),

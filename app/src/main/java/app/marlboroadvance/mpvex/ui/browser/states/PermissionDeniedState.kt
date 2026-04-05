@@ -13,6 +13,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,15 +26,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,7 +49,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -58,6 +62,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.BuildConfig
 import app.marlboroadvance.mpvex.R
 
@@ -73,159 +78,160 @@ fun PermissionDeniedState(
   // Determine if we're using MANAGE_EXTERNAL_STORAGE or scoped storage permissions
   val isPlayStoreBuild = remember { BuildConfig.SCOPED_STORAGE_ONLY }
 
+  // Colors based on the provided image
+  val backgroundColor = Color(0xFF0D1117)
+  val outerCircleColor = Color(0xFF161B22)
+  val innerCircleColor = Color(0xFF21262D)
+  val iconColor = Color(0xFF388BFD)
+  val buttonColor = Color(0xFFADC6FF)
+  val buttonTextColor = Color(0xFF002D6F)
+
   // Animated scale for the icon
   val infiniteTransition = rememberInfiniteTransition(label = "permission_icon")
   val scale by infiniteTransition.animateFloat(
     initialValue = 1f,
-    targetValue = 1.1f,
+    targetValue = 1.05f,
     animationSpec =
       infiniteRepeatable(
-        animation = tween(2000, easing = FastOutSlowInEasing),
+        animation = tween(2500, easing = FastOutSlowInEasing),
         repeatMode = RepeatMode.Reverse,
       ),
     label = "icon_scale",
   )
 
   Box(
-    modifier = modifier.fillMaxSize()
+    modifier = modifier.fillMaxSize().background(backgroundColor)
   ) {
-    Surface(
-      modifier = Modifier.fillMaxSize(),
-      color = MaterialTheme.colorScheme.background,
+    Column(
+      modifier =
+        Modifier
+          .fillMaxSize()
+          .padding(horizontal = 32.dp)
+          .verticalScroll(rememberScrollState()),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center,
     ) {
-      Column(
+      // Custom Multi-layered Icon
+      Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.scale(scale)
+      ) {
+        // Outer Circle
+        Box(
+          modifier = Modifier
+            .size(180.dp)
+            .clip(CircleShape)
+            .background(outerCircleColor.copy(alpha = 0.5f))
+        )
+        // Inner Circle
+        Box(
+          modifier = Modifier
+            .size(130.dp)
+            .clip(CircleShape)
+            .background(innerCircleColor)
+        )
+        // Icon
+        Icon(
+          imageVector = Icons.Filled.FolderSpecial,
+          contentDescription = null,
+          modifier = Modifier.size(64.dp),
+          tint = Color.White,
+        )
+      }
+
+      Spacer(modifier = Modifier.height(48.dp))
+
+      // Title
+      Text(
+        text = "Storage Access\nRequired",
+        style = MaterialTheme.typography.headlineLarge,
+        fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center,
+        color = Color.White,
+        lineHeight = 40.sp
+      )
+
+      Spacer(modifier = Modifier.height(24.dp))
+
+      // Description
+      Text(
+        text = if (isPlayStoreBuild) {
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            "MpvFlux needs \"Photos and videos\" permission to access and play your video files stored on your device."
+          } else {
+            "MpvFlux needs \"Storage\" permission to access and play your media files stored on your device."
+          }
+        } else {
+          "MpvFlux needs \"All file access\" to discover media and subtitles across your device."
+        },
+        style = MaterialTheme.typography.bodyLarge,
+        color = Color.White.copy(alpha = 0.7f),
+        textAlign = TextAlign.Center,
+        lineHeight = 24.sp
+      )
+
+      Spacer(modifier = Modifier.height(64.dp))
+
+      // Grant Access Button
+      Button(
+        onClick = {
+          if (isPlayStoreBuild) {
+            onRequestPermission()
+          } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+              try {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                intent.data = Uri.parse("package:${context.packageName}")
+                context.startActivity(intent)
+              } catch (_: Exception) {
+                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+                context.startActivity(intent)
+              }
+            } else {
+              onRequestPermission()
+            }
+          }
+        },
         modifier =
           Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-      ) {
-
-        // Animated Icon with Surface
-        Surface(
-          modifier =
-            Modifier
-              .size(120.dp)
-              .scale(scale),
-          shape = RoundedCornerShape(28.dp),
-          color = MaterialTheme.colorScheme.errorContainer,
-          tonalElevation = 2.dp,
-        ) {
-          Icon(
-            imageVector = Icons.Outlined.Warning,
-            contentDescription = null,
-            modifier = Modifier.padding(24.dp).fillMaxSize(),
-            tint = MaterialTheme.colorScheme.onErrorContainer,
-          )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Title
-        Text(
-          text = "Storage Access Required",
-          style = MaterialTheme.typography.headlineMedium,
-          fontWeight = FontWeight.Medium,
-          textAlign = TextAlign.Center,
-          color = MaterialTheme.colorScheme.onSurface,
+            .fillMaxWidth()
+            .height(56.dp),
+        shape = RoundedCornerShape(28.dp),
+        colors = ButtonDefaults.buttonColors(
+          containerColor = buttonColor,
+          contentColor = buttonTextColor
         )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Description Card
-        Card(
-          modifier = Modifier.fillMaxWidth(),
-          colors =
-            CardDefaults.cardColors(
-              containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            ),
-          elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-          shape = RoundedCornerShape(16.dp),
-        ) {
-          Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
-            Text(
-              text = if (isPlayStoreBuild) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                  "mpvEx requires \"Photos and videos\" permission to access and play your video files stored on your device."
-                } else {
-                  "mpvEx requires \"Storage\" permission to access and play your media files stored on your device."
-                }
-              } else {
-                "mpvEx requires \"All file access\" permission to discover media and subtitles on your device due to a change in security policy in Android 11 and later versions."
-              },
-              style = MaterialTheme.typography.bodyLarge,
-              color = MaterialTheme.colorScheme.onSurface,
-              textAlign = TextAlign.Center,
-            )
-          }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Allow Access Button
-        FilledTonalButton(
-          onClick = {
-            if (isPlayStoreBuild) {
-              // Play Store build: Use regular permission request
-              onRequestPermission()
-            } else {
-              // Standard build: Open All Files Access settings for Android 11+
-              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                try {
-                  val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                  intent.data = Uri.parse("package:${context.packageName}")
-                  context.startActivity(intent)
-                } catch (_: Exception) {
-                  // Fallback to general All Files Access settings
-                  val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                  context.startActivity(intent)
-                }
-              } else {
-                // For older Android versions, use the regular permission request
-                onRequestPermission()
-              }
-            }
-          },
-          modifier =
-            Modifier
-              .fillMaxWidth()
-              .height(48.dp),
-          shape = RoundedCornerShape(24.dp),
-        ) {
-          Text(
-            text = "ALLOW ACCESS",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Medium,
-          )
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Why do I see this? link
-        TextButton(
-          onClick = { showExplanationDialog = true },
-          modifier = Modifier.padding(vertical = 4.dp),
-        ) {
-          Icon(
-            imageVector = Icons.Outlined.Info,
-            contentDescription = null,
-            modifier = Modifier.size(20.dp),
-          )
-          Spacer(modifier = Modifier.width(8.dp))
-          Text(
-            text = "Why do I see this?",
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Normal,
-          )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
+      ) {
+        Text(
+          text = "Grant Access",
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.SemiBold,
+        )
       }
+
+      Spacer(modifier = Modifier.height(16.dp))
+
+      // Why is this needed?
+      TextButton(
+        onClick = { showExplanationDialog = true },
+        modifier = Modifier.padding(vertical = 8.dp),
+      ) {
+        Icon(
+          imageVector = Icons.Outlined.Info,
+          contentDescription = null,
+          modifier = Modifier.size(18.dp),
+          tint = Color.White.copy(alpha = 0.5f)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+          text = "Why is this needed?",
+          style = MaterialTheme.typography.bodyMedium,
+          color = Color.White.copy(alpha = 0.5f),
+          fontWeight = FontWeight.Normal,
+        )
+      }
+
+      Spacer(modifier = Modifier.height(32.dp))
     }
   }
 
