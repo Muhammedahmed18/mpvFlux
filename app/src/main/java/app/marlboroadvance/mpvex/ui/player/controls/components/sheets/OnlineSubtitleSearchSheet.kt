@@ -92,12 +92,8 @@ fun OnlineSubtitleSearchSheet(
         }
       }
 
-      // Auto-trigger search on open
-      LaunchedEffect(mediaInfo) {
-        if (mediaInfo.title.isNotBlank()) {
-          onSearchMedia(mediaInfo.title)
-        }
-      }
+      // We removed the LaunchedEffect that automatically triggered search here.
+      // Search is now manual via the search icon or keyboard.
       
       Column(
         modifier = Modifier.padding(top = MaterialTheme.spacing.medium)
@@ -127,19 +123,18 @@ fun OnlineSubtitleSearchSheet(
             )
           }
         }
-        OutlinedTextField(
+        TextField(
           value = searchQuery,
           onValueChange = { 
             searchQuery = it
           },
           modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = MaterialTheme.spacing.medium, vertical = MaterialTheme.spacing.extraSmall),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
           placeholder = { Text(stringResource(R.string.pref_subtitles_search_online)) },
           leadingIcon = {
             IconButton(onClick = { 
               searchQuery = mediaInfo.title
-              onSearchMedia(mediaInfo.title)
             }) {
               Icon(Icons.Default.AutoFixHigh, null, tint = MaterialTheme.colorScheme.primary)
             }
@@ -159,9 +154,9 @@ fun OnlineSubtitleSearchSheet(
                 Spacer(Modifier.width(8.dp))
               }
               IconButton(onClick = {
-                val q = if (searchQuery.isNotBlank()) searchQuery else mediaInfo.title
-                searchQuery = q
-                onSearchMedia(q)
+                if (searchQuery.isNotBlank()) {
+                  onSearchMedia(searchQuery)
+                }
                 keyboardController?.hide()
               }) {
                 Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary)
@@ -171,17 +166,18 @@ fun OnlineSubtitleSearchSheet(
           singleLine = true,
           keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
           keyboardActions = KeyboardActions(onSearch = {
-            val q = if (searchQuery.isNotBlank()) searchQuery else mediaInfo.title
-            searchQuery = q
-            onSearchMedia(q)
+            if (searchQuery.isNotBlank()) {
+              onSearchMedia(searchQuery)
+            }
             keyboardController?.hide()
           }),
           shape = RoundedCornerShape(12.dp),
           colors = TextFieldDefaults.colors(
             focusedContainerColor = Color.Transparent,
             unfocusedContainerColor = Color.Transparent,
-            focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-            unfocusedIndicatorColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+            disabledIndicatorColor = Color.Transparent,
           )
         )
 

@@ -104,15 +104,10 @@ class ThumbnailRepository(
             // Check if this video should use MediaStore
             val videoKey = videoBaseKey(video)
             val thumbnail = if (useMediaStoreForVideo.containsKey(videoKey)) {
-              // Use MediaStore for this video
-              android.util.Log.d("ThumbnailRepository", "Using MediaStore for ${video.displayName}")
               generateWithMediaStore(video, diskCacheDimension)
             } else {
-              // Try FastThumbnails first
               val fastResult = generateWithFastThumbnails(video, diskCacheDimension)
               if (fastResult == null) {
-                // FastThumbnails failed, mark for MediaStore and try it
-                android.util.Log.w("ThumbnailRepository", "FastThumbnails failed for ${video.displayName}, falling back to MediaStore")
                 useMediaStoreForVideo[videoKey] = true
                 generateWithMediaStore(video, diskCacheDimension)
               } else {
@@ -250,7 +245,14 @@ class ThumbnailRepository(
       return "$base|network"
     }
     
-    return "${video.size}|${video.dateModified}|${video.duration}"
+    // For local files, prefer path as it's the most reliable identifier
+    // Fall back to metadata only if path is blank
+    return if (video.path.isNotBlank()) {
+      "${video.path}|local"
+    } else {
+      // Fallback to metadata for content:// URIs without file path
+      "${video.size}|${video.dateModified}|${video.duration}|${video.id}"
+    }
   }
 
   private fun keyToFileName(key: String): String {
