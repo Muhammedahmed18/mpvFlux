@@ -60,10 +60,12 @@ object MediaUtils {
           intent.putExtra("internal_launch", true) // Enables subtitle autoload
           launchSource?.let { intent.putExtra("launch_source", it) }
           
-          // For playlist items, pass the title so it shows correctly in the player
-          if (launchSource != null && (launchSource.contains("playlist") || launchSource == "m3u_playlist")) {
-            intent.putExtra("title", source.displayName)
-          }
+          // ALWAYS pass pre-resolved metadata to avoid ContentResolver queries in PlayerActivity
+          intent.putExtra("title", source.displayName)
+          intent.putExtra("absolute_path", source.path)
+          intent.putExtra("video_id", source.id)
+          intent.putExtra("date_modified", source.dateModified)
+          intent.putExtra("size", source.size)
           
           context.startActivity(intent)
           return

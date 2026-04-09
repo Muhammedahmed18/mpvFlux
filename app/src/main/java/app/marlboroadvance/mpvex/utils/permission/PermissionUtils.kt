@@ -16,6 +16,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -200,9 +201,16 @@ object PermissionUtils {
         }
       }
 
+    // Optimization: Track if we've already notified about the current grant to avoid redundant calls
+    var wasPreviouslyGranted by remember { mutableStateOf(false) }
+
     LaunchedEffect(effectivePermissionState.status) {
-      if (effectivePermissionState.status == PermissionStatus.Granted) {
+      val isCurrentlyGranted = effectivePermissionState.status == PermissionStatus.Granted
+      if (isCurrentlyGranted && !wasPreviouslyGranted) {
         onPermissionGranted()
+        wasPreviouslyGranted = true
+      } else if (!isCurrentlyGranted) {
+        wasPreviouslyGranted = false
       }
     }
 
