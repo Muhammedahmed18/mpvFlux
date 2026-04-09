@@ -190,7 +190,7 @@ private fun NormalTopBar(
             onTap = { localOffset ->
               // Don't allow theme change if animation is in progress
               if (themeTransition?.isAnimating == true) return@detectTapGestures
-              
+
               // Calculate window position for circular reveal
               val windowOffset = Offset(
                 titleBounds.value.left + localOffset.x,

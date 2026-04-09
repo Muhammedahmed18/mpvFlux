@@ -1,59 +1,37 @@
 package app.marlboroadvance.mpvex.ui.mediainfo
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
@@ -70,7 +48,6 @@ import java.io.File
 
 class MediaInfoActivity : ComponentActivity() {
   private val appearancePreferences by inject<AppearancePreferences>()
-  private val TAG = "MediaInfoActivity"
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -88,11 +65,8 @@ class MediaInfoActivity : ComponentActivity() {
       )
 
       MpvexTheme {
-        Surface {
-          MediaInfoScreen(
-            onBack = { finish() },
-            isDarkMode = isDarkMode,
-          )
+        Surface(color = MaterialTheme.colorScheme.surface) {
+          MediaInfoScreen(onBack = { finish() })
         }
       }
     }
@@ -100,44 +74,29 @@ class MediaInfoActivity : ComponentActivity() {
 
   @OptIn(ExperimentalMaterial3Api::class)
   @Composable
-  private fun MediaInfoScreen(
-    onBack: () -> Unit,
-    isDarkMode: Boolean,
-  ) {
+  private fun MediaInfoScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var textContent by remember { mutableStateOf<String?>(null) }
-    var fullMediaInfoText by remember { mutableStateOf<String?>(null) }
     var fileName by remember { mutableStateOf("Media File") }
-    var fileUri by remember { mutableStateOf<Uri?>(null) }
     var mediaInfo by remember { mutableStateOf<MediaInfoOps.MediaInfoData?>(null) }
 
-    // Get Material Theme colors
-    val backgroundColor = MaterialTheme.colorScheme.background
-    val surfaceColor = MaterialTheme.colorScheme.surface
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
-    val surfaceContainerColor = MaterialTheme.colorScheme.surfaceContainer
-    val outlineVariantColor = MaterialTheme.colorScheme.outlineVariant
+    // LargeTopAppBar with exitUntilCollapsed for the collapsing title effect
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     LaunchedEffect(Unit) {
       val uri = when (intent?.action) {
         Intent.ACTION_SEND -> {
-          if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
           } else {
             @Suppress("DEPRECATION")
-            intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+            intent.getParcelableExtra(Intent.EXTRA_STREAM)
           }
         }
-
-        Intent.ACTION_VIEW -> {
-          intent.data
-        }
-
+        Intent.ACTION_VIEW -> intent.data
         else -> null
       }
 
@@ -147,40 +106,27 @@ class MediaInfoActivity : ComponentActivity() {
         return@LaunchedEffect
       }
 
-      fileUri = uri
-
-      // Get the file name
       fileName = try {
         context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
           val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
           if (nameIndex >= 0 && cursor.moveToFirst()) {
             cursor.getString(nameIndex) ?: uri.lastPathSegment ?: "Unknown"
-          } else {
-            uri.lastPathSegment ?: "Unknown"
-          }
+          } else uri.lastPathSegment ?: "Unknown"
         } ?: uri.lastPathSegment ?: "Unknown"
-      } catch (e: Exception) {
-        Log.e(TAG, "Error getting file name", e)
+      } catch (_: Exception) {
         uri.lastPathSegment ?: "Unknown"
       }
 
-      // Load media info
       scope.launch {
         try {
-          val result = MediaInfoOps.getMediaInfo(context, uri, fileName)
-          result.onSuccess { mediaInfoResult ->
-            mediaInfo = mediaInfoResult
-
-            // Also generate text content for sharing/copying
-            val textResult = MediaInfoOps.generateTextOutput(context, uri, fileName)
-            textResult.onSuccess { text ->
+          MediaInfoOps.getMediaInfo(context, uri, fileName).onSuccess { info ->
+            mediaInfo = info
+            MediaInfoOps.generateTextOutput(context, uri, fileName).onSuccess { text ->
               textContent = text
-              fullMediaInfoText = text
             }
-
             isLoading = false
           }.onFailure { e ->
-            error = e.message ?: "Failed to load media information"
+            error = e.message ?: "Failed to load media info"
             isLoading = false
           }
         } catch (e: Exception) {
@@ -191,23 +137,17 @@ class MediaInfoActivity : ComponentActivity() {
     }
 
     Scaffold(
+      modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+      containerColor = MaterialTheme.colorScheme.surface,
       topBar = {
-        TopAppBar(
+        LargeTopAppBar(
+          // Strip the extension from the top bar title
           title = {
-            Column {
-              Text(
-                text = "Media Info",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-              )
-              Text(
-                text = fileName,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-              )
-            }
+            Text(
+              text = fileName.substringBeforeLast('.'),
+              maxLines = 2,
+              overflow = TextOverflow.Ellipsis,
+            )
           },
           navigationIcon = {
             IconButton(onClick = onBack) {
@@ -216,61 +156,27 @@ class MediaInfoActivity : ComponentActivity() {
           },
           actions = {
             if (!isLoading && error == null && textContent != null) {
-              Row(modifier = Modifier.padding(end = 12.dp)) {
-                FilledTonalIconButton(
-                  onClick = {
-                    scope.launch {
-                      copyToClipboard(textContent!!, fileName)
-                    }
-                  },
-                  colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                  ),
-                ) {
-                  Icon(
-                    imageVector = Icons.Filled.ContentCopy,
-                    contentDescription = "Copy",
-                  )
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-
-                FilledTonalIconButton(
-                  onClick = {
-                    scope.launch {
-                      shareMediaInfo(textContent!!, fileName, fileUri)
-                    }
-                  },
-                  colors = IconButtonDefaults.filledTonalIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                  ),
-                ) {
-                  Icon(
-                    imageVector = Icons.Filled.Share,
-                    contentDescription = "Share",
-                  )
-                }
+              FilledTonalIconButton(onClick = { scope.launch { copyToClipboard(textContent!!, fileName) } }) {
+                Icon(Icons.Filled.ContentCopy, contentDescription = "Copy")
+              }
+              IconButton(onClick = { scope.launch { shareMediaInfo(textContent!!, fileName) } }) {
+                Icon(Icons.Filled.Share, contentDescription = "Share")
               }
             }
           },
+          scrollBehavior = scrollBehavior,
           colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surface,
-            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
           ),
         )
       },
     ) { padding ->
-      Box(
-        modifier = Modifier
-          .fillMaxSize()
-          .padding(padding),
-      ) {
+      Box(modifier = Modifier.fillMaxSize().padding(padding)) {
         when {
           isLoading -> LoadingContent()
           error != null -> ErrorContent(error!!)
-          mediaInfo != null -> MediaInfoContent(mediaInfo!!, fileName, fullMediaInfoText)
+          mediaInfo != null -> MediaInfoContent(mediaInfo!!, textContent)
         }
       }
     }
@@ -278,254 +184,426 @@ class MediaInfoActivity : ComponentActivity() {
 
   @Composable
   private fun LoadingContent() {
-    Box(
-      modifier = Modifier.fillMaxSize(),
-      contentAlignment = Alignment.Center,
-    ) {
-      Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(20.dp),
-      ) {
-        CircularProgressIndicator(
-          color = MaterialTheme.colorScheme.primary,
-          strokeWidth = 4.dp,
-          modifier = Modifier.size(48.dp),
-        )
-        Text(
-          text = "Analyzing media file...",
-          style = MaterialTheme.typography.bodyLarge,
-          fontWeight = FontWeight.Medium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+      CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(42.dp))
     }
   }
 
   @Composable
   private fun ErrorContent(errorMessage: String) {
-    Box(
-      modifier = Modifier
-        .fillMaxSize()
-        .padding(24.dp),
-      contentAlignment = Alignment.Center,
+    Column(
+      modifier = Modifier.fillMaxSize().padding(32.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.Center,
     ) {
-      Card(
-        colors = CardDefaults.cardColors(
-          containerColor = MaterialTheme.colorScheme.errorContainer,
-        ),
+      Surface(
         shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.size(72.dp),
       ) {
-        Text(
-          text = "Error: $errorMessage",
-          style = MaterialTheme.typography.bodyLarge,
-          fontWeight = FontWeight.Medium,
-          color = MaterialTheme.colorScheme.onErrorContainer,
-          modifier = Modifier.padding(24.dp),
+        Box(contentAlignment = Alignment.Center) {
+          Icon(
+            Icons.Default.ErrorOutline,
+            contentDescription = null,
+            modifier = Modifier.size(36.dp),
+            tint = MaterialTheme.colorScheme.onErrorContainer,
+          )
+        }
+      }
+      Spacer(modifier = Modifier.height(20.dp))
+      Text(
+        errorMessage,
+        style = MaterialTheme.typography.bodyMedium,
+        textAlign = TextAlign.Center,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+  }
+
+  @Composable
+  private fun MediaInfoContent(
+    mediaInfo: MediaInfoOps.MediaInfoData,
+    fullMediaInfoText: String?,
+  ) {
+    val sections = remember(fullMediaInfoText) {
+      fullMediaInfoText?.let { parseMediaInfoText(it) } ?: emptyList()
+    }
+
+    // Build hero chips: resolution badge, video codec, audio codec(s), file size
+    val video = mediaInfo.videoStreams.firstOrNull()
+    val heroChips = remember(mediaInfo) {
+      buildList {
+        video?.let { v ->
+          val h = v.height.filter { it.isDigit() }.toIntOrNull() ?: 0
+          val resLabel = when {
+            h >= 2160 -> "4K UHD"
+            h >= 1080 -> "1080p"
+            h >= 720  -> "720p"
+            h > 0     -> "${h}p"
+            else      -> null
+          }
+          resLabel?.let { add(it) }
+          if (v.format.isNotBlank() && v.format != "---") add(v.format)
+        }
+        mediaInfo.audioStreams.firstOrNull()?.let { a ->
+          if (a.format.isNotBlank() && a.format != "---") add(a.format)
+        }
+        if (mediaInfo.general.fileSize.isNotBlank() && mediaInfo.general.fileSize != "---") {
+          add(mediaInfo.general.fileSize)
+        }
+      }
+    }
+
+    LazyColumn(
+      modifier = Modifier.fillMaxSize(),
+      contentPadding = PaddingValues(bottom = 32.dp),
+    ) {
+      // Hero chip row
+      if (heroChips.isNotEmpty()) {
+        item {
+          HeroChipRow(heroChips)
+        }
+      }
+
+      // ── Architecture section ──────────────────────────────────
+      item { SectionDividerHeader("Architecture") }
+
+      // Video stream cards
+      mediaInfo.videoStreams.forEachIndexed { i, v ->
+        item {
+          StreamCard(
+            title = if (mediaInfo.videoStreams.size > 1) "Video #${i + 1}" else "Video",
+            badge = v.format.takeIf { it.isNotBlank() && it != "---" },
+            icon = Icons.Default.Movie,
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            onContainerColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            properties = listOfNotNull(
+              "Resolution" to "${v.width.filter { it.isDigit() }}×${v.height.filter { it.isDigit() }}",
+              "Frame rate" to v.frameRate,
+              "Bitrate"    to v.bitRate,
+              "Profile"    to v.formatProfile,
+            ).filter { (_, v2) -> v2.isNotBlank() && v2 != "---" },
+          )
+        }
+      }
+
+      // Audio stream cards
+      mediaInfo.audioStreams.forEachIndexed { i, a ->
+        item {
+          StreamCard(
+            title = "Audio #${i + 1}",
+            badge = a.format.takeIf { it.isNotBlank() && it != "---" },
+            icon = Icons.Default.MusicNote,
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            onContainerColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            properties = listOfNotNull(
+              "Channels" to a.channels,
+              "Language" to a.language,
+              "Bitrate"  to a.bitRate,
+            ).filter { (_, v2) -> v2.isNotBlank() && v2 != "---" },
+          )
+        }
+      }
+
+      // Container card
+      item {
+        StreamCard(
+          title = "Container",
+          badge = mediaInfo.general.format.takeIf { it.isNotBlank() && it != "---" },
+          icon = Icons.Default.Inventory2,
+          containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+          onContainerColor = MaterialTheme.colorScheme.onSurface,
+          properties = listOfNotNull(
+            "Duration"    to mediaInfo.general.duration,
+            "File size"   to mediaInfo.general.fileSize,
+            "Writing app" to mediaInfo.general.writingApplication,
+          ).filter { (_, v2) -> v2.isNotBlank() && v2 != "---" },
+        )
+      }
+
+      // ── Technical log section ─────────────────────────────────
+      if (sections.isNotEmpty()) {
+        item { SectionDividerHeader("Technical Log") }
+        sections.forEach { section ->
+          item {
+            Text(
+              text = section.name,
+              modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+              style = MaterialTheme.typography.titleSmall,
+              fontWeight = FontWeight.Bold,
+              color = MaterialTheme.colorScheme.primary,
+            )
+          }
+          items(section.properties) { (k, v) -> TechnicalPropertyRow(k, v) }
+          item {
+            HorizontalDivider(
+              modifier = Modifier.padding(horizontal = 16.dp),
+              thickness = 0.5.dp,
+              color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+            )
+          }
+        }
+      }
+
+      item { Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)) }
+    }
+  }
+
+  // ── Hero chip row ─────────────────────────────────────────────────────────
+
+  @Composable
+  private fun HeroChipRow(chips: List<String>) {
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp, vertical = 12.dp),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      chips.forEach { label ->
+        SuggestionChip(
+          onClick = {},
+          label = { Text(label, style = MaterialTheme.typography.labelMedium) },
         )
       }
     }
   }
 
+  // ── Section divider header ────────────────────────────────────────────────
+
   @Composable
-  private fun MediaInfoContent(mediaInfo: MediaInfoOps.MediaInfoData, fileName: String, fullMediaInfoText: String?) {
-    if (fullMediaInfoText == null) {
-      Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-      ) {
-        Text("Loading detailed information...")
-      }
-      return
-    }
-
-    // Parse the text output into sections
-    val sections = parseMediaInfoText(fullMediaInfoText)
-
-    Column(
+  private fun SectionDividerHeader(title: String) {
+    Row(
       modifier = Modifier
-        .fillMaxSize()
-        .verticalScroll(rememberScrollState())
-        .padding(16.dp),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-      sections.forEach { section ->
-        MediaInfoSection(section)
-      }
-
-      Spacer(modifier = Modifier.height(8.dp))
-
-      // Footer
-      Text(
-        text = "Generated by mpvEx using MediaInfoLib",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(vertical = 12.dp),
-        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+      HorizontalDivider(
+        modifier = Modifier.width(12.dp),
+        thickness = 0.5.dp,
+        color = MaterialTheme.colorScheme.outlineVariant,
       )
-
-      Spacer(modifier = Modifier.height(8.dp))
+      Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing,
+        color = MaterialTheme.colorScheme.primary,
+      )
+      HorizontalDivider(
+        modifier = Modifier.weight(1f),
+        thickness = 0.5.dp,
+        color = MaterialTheme.colorScheme.outlineVariant,
+      )
     }
   }
+
+  // ── Per-stream elevated card ──────────────────────────────────────────────
+
+  @Composable
+  private fun StreamCard(
+    title: String,
+    badge: String?,
+    icon: ImageVector,
+    containerColor: Color,
+    onContainerColor: Color,
+    properties: List<Pair<String, String>>,
+  ) {
+    if (properties.isEmpty()) return
+    ElevatedCard(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp, vertical = 6.dp),
+      colors = CardDefaults.elevatedCardColors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+      ),
+    ) {
+      // Card header — tonal background strip
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .background(containerColor)
+          .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+      ) {
+        Surface(
+          shape = MaterialTheme.shapes.small,
+          color = onContainerColor.copy(alpha = 0.15f),
+          modifier = Modifier.size(32.dp),
+        ) {
+          Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp), tint = onContainerColor)
+          }
+        }
+        Text(
+          text = title,
+          style = MaterialTheme.typography.titleSmall,
+          fontWeight = FontWeight.SemiBold,
+          color = onContainerColor,
+          modifier = Modifier.weight(1f),
+        )
+        if (badge != null) {
+          Surface(
+            shape = MaterialTheme.shapes.extraSmall,
+            color = onContainerColor.copy(alpha = 0.15f),
+          ) {
+            Text(
+              text = badge,
+              modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+              style = MaterialTheme.typography.labelSmall,
+              fontWeight = FontWeight.Bold,
+              color = onContainerColor,
+            )
+          }
+        }
+      }
+
+      // 2-column stat tile grid
+      val chunked = properties.chunked(2)
+      chunked.forEach { pair ->
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          pair.forEach { (label, value) ->
+            StatTile(
+              label = label,
+              value = value,
+              modifier = Modifier.weight(1f),
+            )
+          }
+          // Fill empty slot if odd number of properties
+          if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+        }
+      }
+      Spacer(modifier = Modifier.height(6.dp))
+    }
+  }
+
+  // ── Stat tile (inside stream card) ───────────────────────────────────────
+
+  @Composable
+  private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    Surface(
+      modifier = modifier
+        .clickable {
+          val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+          cm.setPrimaryClip(ClipData.newPlainText(label, value))
+          Toast.makeText(context, "Copied $label", Toast.LENGTH_SHORT).show()
+        },
+      shape = MaterialTheme.shapes.small,
+      tonalElevation = 2.dp,
+      color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+      Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+        Text(
+          text = label,
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+          text = value,
+          style = MaterialTheme.typography.bodyMedium,
+          fontWeight = FontWeight.SemiBold,
+          color = MaterialTheme.colorScheme.onSurface,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+    }
+  }
+
+  // ── Technical log property row ────────────────────────────────────────────
+
+  @Composable
+  private fun TechnicalPropertyRow(label: String, value: String) {
+    if (value.isEmpty() || value == "---") return
+    val context = LocalContext.current
+    ListItem(
+      headlineContent = {
+        Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+      },
+      overlineContent = {
+        Text(
+          label.uppercase(),
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+          fontWeight = FontWeight.Bold,
+        )
+      },
+      modifier = Modifier.clickable {
+        val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        cm.setPrimaryClip(ClipData.newPlainText(label, value))
+        Toast.makeText(context, "Copied $label", Toast.LENGTH_SHORT).show()
+      },
+      colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
 
   private fun parseMediaInfoText(text: String): List<InfoSection> {
     val sections = mutableListOf<InfoSection>()
-    val lines = text.lines()
-
-    var currentSectionName: String? = null
-    val currentProperties = mutableListOf<Pair<String, String>>()
-
-    for (line in lines) {
+    var currentName: String? = null
+    val currentProps = mutableListOf<Pair<String, String>>()
+    text.lines().forEach { line ->
+      val trimmed = line.trim()
       when {
-        // Skip separator lines and empty lines
-        line.trim().startsWith("=") || line.trim().isEmpty() -> continue
-
-        // Skip header/footer
-        line.contains("MEDIA INFO -") || line.contains("Generated by mpvex") -> continue
-
-        // New section (no colon, not indented, has content)
-        !line.startsWith(" ") && !line.contains(":") && line.trim().isNotEmpty() -> {
-          // Save previous section
-          if (currentSectionName != null && currentProperties.isNotEmpty()) {
-            sections.add(InfoSection(currentSectionName, currentProperties.toList()))
-            currentProperties.clear()
+        trimmed.isEmpty() || trimmed.startsWith("=") || line.contains("MEDIA INFO") -> {}
+        !line.startsWith(" ") && !line.contains(":") -> {
+          if (currentName != null && currentProps.isNotEmpty()) {
+            sections.add(InfoSection(currentName, currentProps.toList()))
           }
-          currentSectionName = line.trim()
+          currentName = trimmed
+          currentProps.clear()
         }
-
-        // Property line (contains colon)
         line.contains(":") -> {
           val parts = line.split(":", limit = 2)
-          if (parts.size == 2) {
-            val key = parts[0].trim()
-            val value = parts[1].trim()
-            if (key.isNotEmpty() && value.isNotEmpty()) {
-              currentProperties.add(key to value)
-            }
+          if (parts.size == 2 && parts[0].trim().isNotEmpty() && parts[1].trim().isNotEmpty()) {
+            currentProps.add(parts[0].trim() to parts[1].trim())
           }
         }
       }
     }
-
-    // Add last section
-    if (currentSectionName != null && currentProperties.isNotEmpty()) {
-      sections.add(InfoSection(currentSectionName, currentProperties.toList()))
+    if (currentName != null && currentProps.isNotEmpty()) {
+      sections.add(InfoSection(currentName, currentProps.toList()))
     }
-
     return sections
   }
 
-  @Composable
-  private fun MediaInfoSection(section: InfoSection) {
-    Card(
-      modifier = Modifier.fillMaxWidth(),
-      colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-      ),
-      shape = MaterialTheme.shapes.large,
-      elevation = CardDefaults.cardElevation(
-        defaultElevation = 2.dp,
-        pressedElevation = 4.dp,
-        hoveredElevation = 4.dp,
-      ),
-    ) {
-      Column(
-        modifier = Modifier.padding(16.dp),
-      ) {
-        // Section title
-        Text(
-          text = section.name,
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.Bold,
-          color = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.padding(bottom = 12.dp),
-        )
-
-        // Properties
-        androidx.compose.foundation.text.selection.SelectionContainer {
-          Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
-            section.properties.forEach { (key, value) ->
-              PropertyRow(key, value)
-            }
-          }
-        }
-      }
-    }
-  }
-
-  @Composable
-  private fun PropertyRow(label: String, value: String) {
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-      Text(
-        text = label,
-        style = MaterialTheme.typography.bodyMedium,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-          .weight(1f)
-          .padding(end = 16.dp),
-      )
-
-      Text(
-        text = value,
-        style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.weight(1.5f),
-      )
-    }
-  }
-
-  private data class InfoSection(
-    val name: String,
-    val properties: List<Pair<String, String>>,
-  )
+  private data class InfoSection(val name: String, val properties: List<Pair<String, String>>)
 
   private suspend fun copyToClipboard(content: String, fileName: String) {
     withContext(Dispatchers.Main) {
-      val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-      val clip = android.content.ClipData.newPlainText("Media Info - $fileName", content)
-      clipboard.setPrimaryClip(clip)
-      Toast.makeText(this@MediaInfoActivity, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+      val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+      cm.setPrimaryClip(ClipData.newPlainText("Media Info - $fileName", content))
+      Toast.makeText(this@MediaInfoActivity, "Copied full report", Toast.LENGTH_SHORT).show()
     }
   }
 
-  private suspend fun shareMediaInfo(content: String, fileName: String, mediaUri: Uri?) {
+  private suspend fun shareMediaInfo(content: String, fileName: String) {
     withContext(Dispatchers.IO) {
       try {
-        val textFileName = "mediainfo_${fileName.substringBeforeLast('.')}.txt"
-        val file = File(cacheDir, textFileName)
+        val file = File(cacheDir, "mediainfo_${fileName.substringBeforeLast('.')}.txt")
         file.writeText(content)
-
         withContext(Dispatchers.Main) {
-          val fileUri = FileProvider.getUriForFile(
-            this@MediaInfoActivity,
-            "${packageName}.provider",
-            file,
-          )
-
-          val shareIntent = Intent(Intent.ACTION_SEND).apply {
+          val uri = FileProvider.getUriForFile(this@MediaInfoActivity, "${packageName}.provider", file)
+          val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
-            putExtra(Intent.EXTRA_STREAM, fileUri)
-            putExtra(Intent.EXTRA_SUBJECT, "Media Info - $fileName")
-            putExtra(Intent.EXTRA_TEXT, "Media information for: $fileName")
+            putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
           }
-
-          startActivity(Intent.createChooser(shareIntent, "Share Media Info"))
+          startActivity(Intent.createChooser(intent, "Share Media Info"))
         }
       } catch (e: Exception) {
         withContext(Dispatchers.Main) {
-          Toast.makeText(
-            this@MediaInfoActivity,
-            "Failed to share: ${e.message}",
-            Toast.LENGTH_LONG,
-          ).show()
+          Toast.makeText(this@MediaInfoActivity, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
       }
     }

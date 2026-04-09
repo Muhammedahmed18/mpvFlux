@@ -8,6 +8,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.ui.player.controls.LocalPlayerButtonsClickEvent
+import app.marlboroadvance.mpvex.ui.theme.controlColor
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import org.koin.compose.koinInject
 
@@ -56,8 +58,8 @@ fun ControlsButton(
     title: String? = null,
     color: Color? = null,
     type: ControlsButtonType = ControlsButtonType.Tonal,
-    shape: Shape = MaterialTheme.shapes.medium,
-    iconSize: Dp = 20.dp,
+    shape: Shape = CircleShape,
+    iconSize: Dp = 24.dp,
     enabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -77,33 +79,28 @@ fun ControlsButton(
 
     val clickEvent = LocalPlayerButtonsClickEvent.current
 
+    // Glassmorphism update: Use dark translucent colors for high contrast visibility on video
     val containerColor = when {
         hideBackground || !enabled -> Color.Transparent
-        type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.primary
-        type == ControlsButtonType.Tonal -> MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f)
-        type == ControlsButtonType.Outlined -> Color.Transparent
+        type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+        type == ControlsButtonType.Tonal -> Color.Black.copy(alpha = 0.5f)
         else -> Color.Transparent
     }
 
     val baseContentColor = color ?: when {
-        hideBackground -> app.marlboroadvance.mpvex.ui.theme.controlColor
-        type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.onPrimary
-        else -> MaterialTheme.colorScheme.onSurface
+        type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.primary
+        else -> controlColor // controlColor is white (0xFFFFFFFF)
     }
     
     val contentColor = if (enabled) baseContentColor else baseContentColor.copy(alpha = 0.38f)
 
+    // Ultra-thin "glass edge" border using white transparency
     val border = when {
         hideBackground || !enabled -> null
-        type == ControlsButtonType.Outlined -> BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        else -> BorderStroke(
+            0.5.dp,
+            Color.White.copy(alpha = 0.12f)
         )
-        type == ControlsButtonType.Tonal -> BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
-        )
-        else -> null
     }
 
     Surface(
@@ -121,7 +118,7 @@ fun ControlsButton(
                 },
                 onLongClick = onLongClick,
                 interactionSource = interactionSource,
-                indication = ripple(),
+                indication = ripple(color = Color.White),
             ),
         shape = shape,
         color = containerColor,
@@ -130,14 +127,17 @@ fun ControlsButton(
         shadowElevation = 0.dp,
         border = border,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = contentColor,
-            modifier = Modifier
-                .padding(MaterialTheme.spacing.small)
-                .size(iconSize),
-        )
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.padding(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = contentColor,
+                modifier = Modifier.size(iconSize),
+            )
+        }
     }
 }
 

@@ -24,7 +24,7 @@ class ProgressSaveManager : KoinComponent {
     private var currentSaveJob: Job? = null
     private var lastSavedPosition: Int? = null
     private var lastSavedMediaIdentifier: String? = null
-    
+
     companion object {
         private const val TAG = "ProgressSaveManager"
         private const val SAVE_DEBOUNCE_MS = 500L
@@ -73,7 +73,7 @@ class ProgressSaveManager : KoinComponent {
                 }
         
                 Log.d(TAG, "Saving progress for: $mediaIdentifier at position: $currentPos (immediate: $isImmediate)")
-                
+
                 val positionToSave = calculateSavePosition(currentPos, duration, savePositionOnQuit, oldState)
                 val timeRemaining = if (duration > positionToSave) duration - positionToSave else 0
                 

@@ -6,12 +6,16 @@ import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 import android.provider.MediaStore.Video.Thumbnails
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,10 +32,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.ViewList
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,7 +46,6 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +61,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.material3.ripple
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -177,7 +188,7 @@ private suspend fun loadMediaStoreThumbnail(context: Context, uri: Uri): Bitmap?
             if (cursor.moveToFirst()) {
               val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
               val videoId = cursor.getLong(idColumn)
-              
+
               // Use modern API on Android Q+
               if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                 val contentUri = android.content.ContentUris.withAppendedId(
@@ -246,7 +257,7 @@ private fun extractVideoId(uri: Uri, context: Context): Long? {
     } else {
       path.substringAfterLast('/')
     }
-    
+
     val videoId = idString.toLongOrNull() ?: return null
 
     // Verify this ID exists in MediaStore
@@ -281,6 +292,7 @@ fun PlaylistSheet(
   totalCount: Int = playlist.size,
   isM3UPlaylist: Boolean = false,
   playerPreferences: app.marlboroadvance.mpvex.preferences.PlayerPreferences,
+  loadingItemIndex: Int = -1,
   modifier: Modifier = Modifier,
 ) {
   val context = LocalContext.current
@@ -413,7 +425,7 @@ fun PlaylistSheet(
               onClick = { isListMode = !isListMode }
             ) {
               Icon(
-                imageVector = if (isListMode) Icons.Default.GridView else Icons.Default.ViewList,
+                imageVector = if (isListMode) Icons.Default.GridView else Icons.AutoMirrored.Default.ViewList,
                 contentDescription = if (isListMode) "Switch to Grid View" else "Switch to List View",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
               )
@@ -434,7 +446,8 @@ fun PlaylistSheet(
                 thumbnailRepository = thumbnailRepository,
                 onClick = { onItemClick(item) },
                 skipThumbnail = isM3UPlaylist,
-                accentColor = accentColor
+                accentColor = accentColor,
+                isLoading = item.index == loadingItemIndex
               )
             }
           }
@@ -454,6 +467,7 @@ fun PlaylistSheet(
                 thumbnailRepository = thumbnailRepository,
                 onClick = { onItemClick(item) },
                 skipThumbnail = isM3UPlaylist,
+                isLoading = item.index == loadingItemIndex
               )
             }
           }
@@ -470,10 +484,23 @@ fun PlaylistTrackListItem(
   onClick: () -> Unit,
   skipThumbnail: Boolean = false,
   accentColor: Color,
+  isLoading: Boolean = false,
   modifier: Modifier = Modifier,
 ) {
   // Use theme colors dynamically
   val accentSecondary = MaterialTheme.colorScheme.tertiary
+
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+
+  val scale by animateFloatAsState(
+    targetValue = if (isPressed) 0.97f else 1f,
+    animationSpec = spring(
+      dampingRatio = Spring.DampingRatioMediumBouncy,
+      stiffness = Spring.StiffnessMedium
+    ),
+    label = "list_item_scale"
+  )
 
   // Convert PlaylistItem to Video for ThumbnailRepository
   // Strip file:// prefix and URL decode the path (ThumbnailRepository expects plain decoded path)
@@ -584,9 +611,14 @@ fun PlaylistTrackListItem(
         horizontal = MaterialTheme.spacing.medium,
         vertical = MaterialTheme.spacing.extraSmall,
       )
+      .graphicsLayer { scaleX = scale; scaleY = scale }
       .clip(RoundedCornerShape(12.dp))
       .then(borderModifier)
-      .clickable(onClick = onClick),
+      .clickable(
+        interactionSource = interactionSource,
+        indication = ripple(bounded = true),
+        onClick = onClick
+      ),
     color = if (item.isPlaying) {
       MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
     } else {
@@ -715,9 +747,19 @@ fun PlaylistTrackListItem(
         }
       }
 
-      // Status badges
-      when {
-        item.isPlaying -> {
+      // Status badges with smooth animation
+      AnimatedVisibility(
+        visible = isLoading,
+        enter = fadeIn() + slideInHorizontally { it / 2 },
+        exit = fadeOut() + slideOutHorizontally { it / 2 }
+      ) {
+        LinearProgressIndicator(
+          modifier = Modifier.width(40.dp),
+          color = accentColor,
+          trackColor = accentColor.copy(alpha = 0.2f)
+        )
+      }
+      if (!isLoading && item.isPlaying) {
           Surface(
             color = accentColor.copy(alpha = 0.15f),
             shape = RoundedCornerShape(16.dp),
@@ -736,7 +778,6 @@ fun PlaylistTrackListItem(
       }
     }
   }
-}
 
 @Composable
 fun PlaylistTrackGridItem(
@@ -744,11 +785,24 @@ fun PlaylistTrackGridItem(
   thumbnailRepository: ThumbnailRepository,
   onClick: () -> Unit,
   skipThumbnail: Boolean = false,
+  isLoading: Boolean = false,
   modifier: Modifier = Modifier,
 ) {
   // Use theme colors dynamically
   val accentColor = MaterialTheme.colorScheme.primary
   val accentSecondary = MaterialTheme.colorScheme.tertiary
+
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+
+  val scale by animateFloatAsState(
+    targetValue = if (isPressed) 0.95f else 1f,
+    animationSpec = spring(
+      dampingRatio = Spring.DampingRatioMediumBouncy,
+      stiffness = Spring.StiffnessMedium
+    ),
+    label = "grid_item_scale"
+  )
 
   // Convert PlaylistItem to Video for ThumbnailRepository
   // Strip file:// prefix and URL decode the path (ThumbnailRepository expects plain decoded path)
@@ -845,9 +899,14 @@ fun PlaylistTrackGridItem(
   Surface(
     modifier = modifier
       .width(200.dp)
+      .graphicsLayer { scaleX = scale; scaleY = scale }
       .clip(RoundedCornerShape(12.dp))
       .then(borderModifier)
-      .clickable(onClick = onClick),
+      .clickable(
+        interactionSource = interactionSource,
+        indication = ripple(bounded = true),
+        onClick = onClick
+      ),
     color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
     shape = RoundedCornerShape(12.dp),
   ) {
@@ -949,6 +1008,28 @@ fun PlaylistTrackGridItem(
                 )
               )
           )
+        }
+
+        // Loading indicator overlay - horizontal line at bottom of thumbnail with smooth animation
+        androidx.compose.animation.AnimatedVisibility(
+          visible = isLoading,
+          modifier = Modifier
+            .fillMaxWidth()
+            .align(Alignment.BottomCenter),
+          enter = fadeIn(),
+          exit = fadeOut()
+        ) {
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(bottom = 4.dp)
+          ) {
+            LinearProgressIndicator(
+              modifier = Modifier.fillMaxWidth(),
+              color = accentColor,
+              trackColor = Color.Black.copy(alpha = 0.3f)
+            )
+          }
         }
       }
 

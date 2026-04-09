@@ -1014,6 +1014,21 @@ fun FileSystemSortBottomSheet(
         else app.marlboroadvance.mpvex.preferences.SortOrder.Descending,
       )
     },
+    onReset = {
+      browserPreferences.folderSortType.set(app.marlboroadvance.mpvex.preferences.FolderSortType.Title)
+      browserPreferences.folderSortOrder.set(app.marlboroadvance.mpvex.preferences.SortOrder.Ascending)
+      browserPreferences.showVideoThumbnails.set(true)
+      browserPreferences.showVideoExtension.set(false)
+      appearancePreferences.unlimitedNameLines.set(false)
+      browserPreferences.showFolderPath.set(false)
+      browserPreferences.showTotalVideosChip.set(true)
+      browserPreferences.showTotalSizeChip.set(false)
+      browserPreferences.showSizeChip.set(true)
+      browserPreferences.showResolutionChip.set(true)
+      browserPreferences.showFramerateInResolution.set(false)
+      browserPreferences.showSubtitleIndicator.set(true)
+      browserPreferences.showProgressBar.set(true)
+    },
     types = listOf(
       app.marlboroadvance.mpvex.preferences.FolderSortType.Title.displayName,
       app.marlboroadvance.mpvex.preferences.FolderSortType.Date.displayName,
