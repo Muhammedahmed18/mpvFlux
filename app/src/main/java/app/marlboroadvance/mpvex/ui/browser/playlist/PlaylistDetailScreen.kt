@@ -292,12 +292,19 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
                       } else {
                         // Regular playlists: Start playlist navigation
                         if (videos.isNotEmpty()) {
-                          val intent = Intent(Intent.ACTION_VIEW, videos.first().uri)
+                          val firstVideo = videos.first()
+                          val intent = Intent(Intent.ACTION_VIEW, firstVideo.uri)
                           intent.setClass(context, PlayerActivity::class.java)
                           intent.putExtra("internal_launch", true)
                           intent.putParcelableArrayListExtra("playlist", ArrayList(videos.map { it.uri }))
                           intent.putExtra("playlist_index", 0)
                           intent.putExtra("launch_source", "playlist")
+                          // Pass pre-resolved metadata to avoid ContentResolver queries
+                          intent.putExtra("title", firstVideo.displayName)
+                          intent.putExtra("absolute_path", firstVideo.path)
+                          intent.putExtra("video_id", firstVideo.id)
+                          intent.putExtra("date_modified", firstVideo.dateModified)
+                          intent.putExtra("size", firstVideo.size)
                           context.startActivity(intent)
                         }
                       }
@@ -378,13 +385,19 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
                 if (videos.size == 1) {
                   MediaUtils.playFile(item.video, context, "playlist_detail")
                 } else {
-                  val intent = Intent(Intent.ACTION_VIEW, videos[startIndex].uri)
+                  val targetVideo = videos[startIndex]
+                  val intent = Intent(Intent.ACTION_VIEW, targetVideo.uri)
                   intent.setClass(context, PlayerActivity::class.java)
                   intent.putExtra("internal_launch", true)
                   intent.putExtra("playlist_index", startIndex)
                   intent.putExtra("launch_source", "playlist")
                   intent.putExtra("playlist_id", playlistId)
-                  intent.putExtra("title", videos[startIndex].displayName)
+                  // Pass pre-resolved metadata to avoid ContentResolver queries
+                  intent.putExtra("title", targetVideo.displayName)
+                  intent.putExtra("absolute_path", targetVideo.path)
+                  intent.putExtra("video_id", targetVideo.id)
+                  intent.putExtra("date_modified", targetVideo.dateModified)
+                  intent.putExtra("size", targetVideo.size)
                   context.startActivity(intent)
                 }
               } else {
