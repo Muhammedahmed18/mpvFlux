@@ -1,32 +1,28 @@
 package app.marlboroadvance.mpvex.ui.browser.states
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -39,62 +35,71 @@ fun LoadingState(
   message: String = "Please wait while we search your device",
   modifier: Modifier = Modifier,
 ) {
-  // Animated alpha for subtle pulsing effect (same as EmptyState)
-  val infiniteTransition = rememberInfiniteTransition(label = "loading_state")
-  val alpha by infiniteTransition.animateFloat(
-    initialValue = 0.6f,
-    targetValue = 1f,
-    animationSpec =
-      infiniteRepeatable(
-        animation = tween(2500, easing = FastOutSlowInEasing),
-        repeatMode = RepeatMode.Reverse,
-      ),
-    label = "icon_alpha",
-  )
-
   Column(
-    modifier = modifier.fillMaxSize().padding(horizontal = 48.dp),
+    modifier = modifier
+      .fillMaxSize()
+      .padding(horizontal = 48.dp),
     verticalArrangement = Arrangement.Center,
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-      // Icon with Surface (same style as EmptyState)
+    Box(
+      contentAlignment = Alignment.Center,
+      modifier = Modifier.size(120.dp)
+    ) {
+      // Modern Container with soft elevation
       Surface(
-        modifier =
-          Modifier
-            .size(96.dp)
-            .alpha(alpha),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        tonalElevation = 0.dp,
-      ) {
-        Icon(
-          imageVector = icon,
-          contentDescription = null,
-          modifier = Modifier.padding(24.dp),
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(32.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+      ) {}
+
+      // Smooth Circular Progress
+      CircularProgressIndicator(
+        modifier = Modifier.size(84.dp),
+        strokeWidth = 6.dp,
+        color = MaterialTheme.colorScheme.primary,
+        trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+        strokeCap = StrokeCap.Round
+      )
+
+      // Centered Icon
+      Icon(
+        imageVector = icon,
+        contentDescription = null,
+        modifier = Modifier.size(32.dp),
+        tint = MaterialTheme.colorScheme.primary,
+      )
+    }
+
+    Spacer(modifier = Modifier.height(32.dp))
+
+    // Animated Text Container for fluid transitions
+    Column(
+      horizontalAlignment = Alignment.CenterHorizontally,
+      modifier = Modifier.animateContentSize(
+        animationSpec = spring(
+          dampingRatio = Spring.DampingRatioLowBouncy,
+          stiffness = Spring.StiffnessLow
         )
-      }
-
-      Spacer(modifier = Modifier.height(24.dp))
-
-      // Title
+      )
+    ) {
       Text(
         text = title,
-        style = MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.headlineSmall,
+        fontWeight = FontWeight.Bold,
         textAlign = TextAlign.Center,
         color = MaterialTheme.colorScheme.onSurface,
       )
 
-      Spacer(modifier = Modifier.height(8.dp))
+      Spacer(modifier = Modifier.height(12.dp))
 
-      // Message
       Text(
         text = message,
-        style = MaterialTheme.typography.bodyMedium,
+        style = MaterialTheme.typography.bodyLarge,
         textAlign = TextAlign.Center,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
+        lineHeight = MaterialTheme.typography.bodyLarge.lineHeight,
       )
+    }
   }
 }

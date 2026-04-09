@@ -1,15 +1,10 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
 import android.content.res.Configuration.ORIENTATION_PORTRAIT
-import android.net.Uri
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -18,22 +13,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,6 +48,37 @@ import app.marlboroadvance.mpvex.ui.theme.spacing
 import kotlinx.collections.immutable.ImmutableList
 
 @Composable
+fun getTrackTitle(track: TrackNode): String {
+  val title = if (track.external == true) {
+    track.title?.substringBeforeLast(".")
+  } else {
+    track.title
+  }
+  val lang = track.lang?.uppercase()
+  val id = track.id
+
+  return when {
+    !title.isNullOrBlank() && !lang.isNullOrBlank() -> {
+      stringResource(R.string.player_sheets_track_title_w_lang, id, title, lang)
+    }
+    !title.isNullOrBlank() -> {
+      stringResource(R.string.player_sheets_track_title_wo_lang, id, title)
+    }
+    !lang.isNullOrBlank() -> {
+      stringResource(R.string.player_sheets_track_lang_wo_title, id, lang)
+    }
+    else -> {
+      val fallbackRes = if (track.type == "audio") {
+        R.string.player_sheets_chapter_title_substitute_audio
+      } else {
+        R.string.player_sheets_chapter_title_substitute_subtitle
+      }
+      stringResource(fallbackRes, id)
+    }
+  }
+}
+
+@Composable
 fun <T> GenericTracksSheet(
   tracks: ImmutableList<T>,
   onDismissRequest: () -> Unit,
@@ -66,7 +92,6 @@ fun <T> GenericTracksSheet(
   val listState = lazyListState ?: rememberLazyListState()
   val configuration = LocalConfiguration.current
   
-  // Ensure the sheet is full-width in portrait to avoid the "centered pillar" look
   val calculatedMaxWidth = customMaxWidth ?: if (configuration.orientation == ORIENTATION_PORTRAIT) {
     2000.dp 
   } else {
@@ -84,7 +109,7 @@ fun <T> GenericTracksSheet(
         state = listState,
         modifier = Modifier.weight(1f, fill = false),
         contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.medium),
-        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
       ) {
         items(tracks) {
           track(it)
@@ -109,9 +134,9 @@ fun TrackMetadataBadge(
   modifier: Modifier = Modifier,
 ) {
   val containerColor = if (isSelected) {
-    MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
   } else {
-    MaterialTheme.colorScheme.surfaceContainerHighest
+    MaterialTheme.colorScheme.surfaceVariant
   }
   
   val contentColor = if (isSelected) {
@@ -135,7 +160,6 @@ fun TrackMetadataBadge(
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TrackSelectableBar(
   title: String,
@@ -148,80 +172,56 @@ fun TrackSelectableBar(
   val containerColor = if (isSelected) {
     MaterialTheme.colorScheme.primaryContainer
   } else {
-    MaterialTheme.colorScheme.surfaceContainerLow
-  }
-
-  val contentColor = if (isSelected) {
-    MaterialTheme.colorScheme.onPrimaryContainer
-  } else {
-    MaterialTheme.colorScheme.onSurface
+    Color.Transparent
   }
 
   Surface(
     onClick = onClick,
-    modifier = modifier.fillMaxWidth(),
+    modifier = modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(12.dp)),
     shape = RoundedCornerShape(12.dp),
     color = containerColor,
-    contentColor = contentColor,
   ) {
-    Row(
-      modifier = Modifier
-        .padding(vertical = MaterialTheme.spacing.small),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      // Selection Indicator Bar
-      Box(
-        modifier = Modifier
-          .width(4.dp)
-          .height(32.dp)
-          .clip(RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp))
-          .background(
-            if (isSelected) MaterialTheme.colorScheme.primary 
-            else Color.Transparent
-          )
-      )
-
-      Spacer(modifier = Modifier.width(MaterialTheme.spacing.medium))
-
-      Column(modifier = Modifier.weight(1f)) {
+    ListItem(
+      colors = ListItemDefaults.colors(
+        containerColor = Color.Transparent,
+      ),
+      headlineContent = {
         Text(
           text = title,
           style = MaterialTheme.typography.bodyLarge,
-          fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+          fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
         )
-        if (metadata.isNotEmpty()) {
-          Spacer(modifier = Modifier.height(4.dp))
-          FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-          ) {
-            metadata.forEach { 
-               TrackMetadataBadge(text = it, isSelected = isSelected)
+      },
+      supportingContent = if (metadata.isNotEmpty()) {
+        {
+          Text(
+            text = metadata.joinToString(" • "),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isSelected) {
+              MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+            } else {
+              MaterialTheme.colorScheme.onSurfaceVariant
             }
-          }
+          )
         }
-      }
-
-      if (trailingContent != null || isSelected) {
+      } else null,
+      trailingContent = {
         Row(
-          modifier = Modifier.padding(horizontal = MaterialTheme.spacing.medium),
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
           if (trailingContent != null) {
             trailingContent()
           }
-          if (isSelected) {
-            Icon(
-              Icons.Default.Check,
-              contentDescription = null,
-              modifier = Modifier.size(20.dp),
-              tint = MaterialTheme.colorScheme.primary,
-            )
-          }
+          RadioButton(
+            selected = isSelected,
+            onClick = null // Handled by the surface click
+          )
         }
       }
-    }
+    )
   }
 }
 
@@ -239,8 +239,9 @@ fun TrackActionsRow(
   LazyRow(
     modifier = modifier
       .fillMaxWidth()
-      .padding(MaterialTheme.spacing.medium),
-    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+      .padding(bottom = MaterialTheme.spacing.small),
+    contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.medium),
+    horizontalArrangement = Arrangement.spacedBy(8.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     items(actions) { action ->
@@ -250,20 +251,21 @@ fun TrackActionsRow(
           Text(
             text = action.label,
             style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium
           )
         },
         leadingIcon = {
           Icon(
             action.icon,
             contentDescription = null,
-            modifier = Modifier.size(AssistChipDefaults.IconSize),
+            modifier = Modifier.size(20.dp),
           )
         },
-        shape = CircleShape,
+        shape = RoundedCornerShape(16.dp),
         colors = AssistChipDefaults.assistChipColors(
           containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
           labelColor = MaterialTheme.colorScheme.onSurface,
-          leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
+          leadingIconContentColor = MaterialTheme.colorScheme.primary,
         ),
         border = null,
       )
@@ -310,40 +312,5 @@ fun AddTrackRow(
     ) {
       actions()
     }
-  }
-}
-
-/**
- * Get a displayable title for a track node.
- * Uses title, language, or a default substitute.
- */
-@Composable
-fun getTrackTitle(
-  track: TrackNode,
-): String {
-  // Handle external subtitles
-  if (track.isSubtitle && track.external == true && track.externalFilename != null) {
-    val decoded = Uri.decode(track.externalFilename)
-    val fileName = decoded.substringAfterLast("/")
-    return stringResource(R.string.player_sheets_track_title_wo_lang, track.id, fileName)
-  }
-
-  // Build title from available metadata
-  val hasTitle = !track.title.isNullOrBlank()
-  val hasLang = !track.lang.isNullOrBlank()
-
-  return when {
-    hasTitle && hasLang ->
-      stringResource(
-        R.string.player_sheets_track_title_w_lang,
-        track.id,
-        track.title,
-        track.lang,
-      )
-    hasTitle -> stringResource(R.string.player_sheets_track_title_wo_lang, track.id, track.title)
-    hasLang -> stringResource(R.string.player_sheets_track_lang_wo_title, track.id, track.lang)
-    track.isSubtitle -> stringResource(R.string.player_sheets_chapter_title_substitute_subtitle, track.id)
-    track.isAudio -> stringResource(R.string.player_sheets_chapter_title_substitute_audio, track.id)
-    else -> ""
   }
 }

@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import android.widget.Toast
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,7 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
@@ -40,8 +42,10 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
+import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
+import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -70,6 +74,7 @@ data class ConfigEditorScreen(
     val context      = LocalContext.current
     val backStack    = LocalBackStack.current
     val preferences  = koinInject<AdvancedPreferences>()
+    val appPreferences = koinInject<AppearancePreferences>()
     val scope        = rememberCoroutineScope()
 
     val (fileName, initialValue) = when (configType) {
@@ -84,6 +89,16 @@ data class ConfigEditorScreen(
     var configText       by remember { mutableStateOf(initialValue) }
     var hasUnsavedChanges by remember { mutableStateOf(false) }
     val mpvConfStorageLocation by preferences.mpvConfStorageUri.collectAsState()
+
+    // OLED Optimization: Pure black background in dark mode
+    val darkMode by appPreferences.darkMode.collectAsState()
+    val systemDarkTheme = isSystemInDarkTheme()
+    val isDark = when (darkMode) {
+      DarkMode.Dark -> true
+      DarkMode.Light -> false
+      DarkMode.System -> systemDarkTheme
+    }
+    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
 
     // Load from external storage if a folder is configured
     LaunchedEffect(mpvConfStorageLocation) {
@@ -147,78 +162,83 @@ data class ConfigEditorScreen(
       }
     }
 
-    Column(
-      modifier = Modifier.fillMaxSize()
+    Surface(
+      modifier = Modifier.fillMaxSize(),
+      color = backgroundColor
     ) {
-      // Fixed TopAppBar
-      TopAppBar(
-        title = {
-          Column {
-            Text(
-              text  = screenTitle,
-              style = MaterialTheme.typography.headlineSmall,
-              fontWeight = FontWeight.ExtraBold,
-              color = MaterialTheme.colorScheme.primary,
-            )
-            if (hasUnsavedChanges) {
+      Column(
+        modifier = Modifier.fillMaxSize()
+      ) {
+        // Fixed TopAppBar
+        TopAppBar(
+          title = {
+            Column {
               Text(
-                text  = "Unsaved changes",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary,
+                text  = screenTitle,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
+              )
+              if (hasUnsavedChanges) {
+                Text(
+                  text  = "Unsaved changes",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.secondary,
+                )
+              }
+            }
+          },
+          navigationIcon = {
+            IconButton(onClick = backStack::removeLastOrNull) {
+              Icon(
+                Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.secondary,
               )
             }
-          }
-        },
-        navigationIcon = {
-          IconButton(onClick = backStack::removeLastOrNull) {
-            Icon(
-              Icons.AutoMirrored.Rounded.ArrowBack,
-              contentDescription = "Back",
-              tint = MaterialTheme.colorScheme.secondary,
-            )
-          }
-        },
-        actions = {
-          IconButton(
-            onClick  = { saveConfig() },
-            enabled  = hasUnsavedChanges,
-            modifier = Modifier.padding(horizontal = 12.dp).size(40.dp),
-            colors   = IconButtonDefaults.iconButtonColors(
-              containerColor        = if (hasUnsavedChanges) MaterialTheme.colorScheme.primaryContainer
-                                      else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-              contentColor          = if (hasUnsavedChanges) MaterialTheme.colorScheme.onPrimaryContainer
-                                      else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-              disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-              disabledContentColor   = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            ),
-            shape = RoundedCornerShape(8.dp),
-          ) {
-            Icon(Icons.Rounded.Check, contentDescription = "Save")
-          }
-        },
-      )
-      
-      // Editor content with IME padding
-      val scrollState = rememberScrollState()
-      Box(
-        modifier = Modifier
-          .fillMaxSize()
-          .weight(1f)
-          .imePadding()
-      ) {
-        BasicTextField(
-          value = configText,
-          onValueChange = { configText = it; hasUnsavedChanges = true },
+          },
+          actions = {
+            IconButton(
+              onClick  = { saveConfig() },
+              enabled  = hasUnsavedChanges,
+              modifier = Modifier.padding(horizontal = 12.dp).size(40.dp),
+              colors   = IconButtonDefaults.iconButtonColors(
+                containerColor        = if (hasUnsavedChanges) MaterialTheme.colorScheme.primaryContainer
+                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+                contentColor          = if (hasUnsavedChanges) MaterialTheme.colorScheme.onPrimaryContainer
+                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
+                disabledContentColor   = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+              ),
+              shape = RoundedCornerShape(8.dp),
+            ) {
+              Icon(Icons.Rounded.Check, contentDescription = "Save")
+            }
+          },
+        )
+        
+        // Editor content with IME padding
+        val scrollState = rememberScrollState()
+        Box(
           modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-          textStyle = TextStyle(
-            fontSize = 14.sp,
-            color = MaterialTheme.colorScheme.onSurface,
-          ),
-          cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-        )
+            .weight(1f)
+            .imePadding()
+        ) {
+          BasicTextField(
+            value = configText,
+            onValueChange = { configText = it; hasUnsavedChanges = true },
+            modifier = Modifier
+              .fillMaxSize()
+              .verticalScroll(scrollState)
+              .padding(horizontal = 16.dp, vertical = 12.dp),
+            textStyle = TextStyle(
+              fontSize = 14.sp,
+              color = MaterialTheme.colorScheme.onSurface,
+            ),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+          )
+        }
       }
     }
   }

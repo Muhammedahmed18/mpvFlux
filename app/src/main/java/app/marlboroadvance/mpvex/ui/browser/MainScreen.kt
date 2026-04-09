@@ -1,20 +1,14 @@
 package app.marlboroadvance.mpvex.ui.browser
 
 import android.annotation.SuppressLint
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,6 +24,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,14 +43,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.presentation.Screen
@@ -62,6 +56,7 @@ import app.marlboroadvance.mpvex.ui.browser.folderlist.FolderListScreen
 import app.marlboroadvance.mpvex.ui.browser.networkstreaming.NetworkStreamingScreen
 import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistScreen
 import app.marlboroadvance.mpvex.ui.browser.recentlyplayed.RecentlyPlayedScreen
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -72,20 +67,20 @@ object MainScreen : Screen {
   @Composable
   @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
   override fun Content() {
-    var selectedTab by remember {
-      mutableIntStateOf(persistentSelectedTab)
-    }
-
-    val density = LocalDensity.current
+    val pagerState = rememberPagerState(
+      initialPage = persistentSelectedTab,
+      pageCount = { 4 }
+    )
+    val scope = rememberCoroutineScope()
 
     // Use NavigationBarState for reactive updates (no polling needed)
     val hideNavigationBarState = NavigationBarState.shouldHideNavigationBar
     val isPermissionDeniedState = NavigationBarState.isPermissionDenied
     
     // Update persistent state whenever tab changes
-    LaunchedEffect(selectedTab) {
-      android.util.Log.d("MainScreen", "selectedTab changed to: $selectedTab (was ${persistentSelectedTab})")
-      persistentSelectedTab = selectedTab
+    LaunchedEffect(pagerState.currentPage) {
+      android.util.Log.d("MainScreen", "selectedTab changed to: ${pagerState.currentPage} (was ${persistentSelectedTab})")
+      persistentSelectedTab = pagerState.currentPage
     }
 
     // Scaffold with floating island bottom navigation
@@ -114,8 +109,12 @@ object MainScreen : Screen {
               contentAlignment = Alignment.Center
             ) {
               FloatingIslandNavigationBar(
-                selectedTab = selectedTab,
-                onTabSelected = { selectedTab = it }
+                selectedTab = pagerState.currentPage,
+                onTabSelected = { index ->
+                  scope.launch {
+                    pagerState.animateScrollToPage(index)
+                  }
+                }
               )
             }
           }
@@ -126,66 +125,10 @@ object MainScreen : Screen {
         // Padding to account for the floating island navigation bar
         val fabBottomPadding = 88.dp
 
-        AnimatedContent(
-          targetState = selectedTab,
-          transitionSpec = {
-            // Material 3 Expressive slide-in-fade animation (like Google Phone app)
-            val slideDistance = with(density) { 48.dp.roundToPx() }
-            val animationDuration = 250
-            
-            if (targetState > initialState) {
-              // Moving forward: slide in from right with fade
-              (slideInHorizontally(
-                animationSpec = tween(
-                  durationMillis = animationDuration,
-                  easing = FastOutSlowInEasing
-                ),
-                initialOffsetX = { slideDistance }
-              ) + fadeIn(
-                animationSpec = tween(
-                  durationMillis = animationDuration,
-                  easing = FastOutSlowInEasing
-                )
-              )) togetherWith (slideOutHorizontally(
-                animationSpec = tween(
-                  durationMillis = animationDuration,
-                  easing = FastOutSlowInEasing
-                ),
-                targetOffsetX = { -slideDistance }
-              ) + fadeOut(
-                animationSpec = tween(
-                  durationMillis = animationDuration / 2,
-                  easing = FastOutSlowInEasing
-                )
-              ))
-            } else {
-              // Moving backward: slide in from left with fade
-              (slideInHorizontally(
-                animationSpec = tween(
-                  durationMillis = animationDuration,
-                  easing = FastOutSlowInEasing
-                ),
-                initialOffsetX = { -slideDistance }
-              ) + fadeIn(
-                animationSpec = tween(
-                  durationMillis = animationDuration,
-                  easing = FastOutSlowInEasing
-                )
-              )) togetherWith (slideOutHorizontally(
-                animationSpec = tween(
-                  durationMillis = animationDuration,
-                  easing = FastOutSlowInEasing
-                ),
-                targetOffsetX = { slideDistance }
-              ) + fadeOut(
-                animationSpec = tween(
-                  durationMillis = animationDuration / 2,
-                  easing = FastOutSlowInEasing
-                )
-              ))
-            }
-          },
-          label = "tab_animation"
+        HorizontalPager(
+          state = pagerState,
+          modifier = Modifier.fillMaxSize(),
+          beyondViewportPageCount = 1
         ) { targetTab ->
           CompositionLocalProvider(
             LocalNavigationBarHeight provides fabBottomPadding

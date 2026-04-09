@@ -8,11 +8,12 @@ import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
-import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -27,9 +28,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,11 +41,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastJoinToString
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
@@ -50,13 +55,16 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.database.MpvExDatabase
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
+import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.SettingsManager
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.ConfirmDialog
 import app.marlboroadvance.mpvex.presentation.crash.CrashActivity
+import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
+import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -79,6 +87,7 @@ object AdvancedPreferencesScreen : Screen {
     val context = LocalContext.current
     val backStack = LocalBackStack.current
     val preferences = koinInject<AdvancedPreferences>()
+    val appPreferences = koinInject<AppearancePreferences>()
     val settingsManager = koinInject<SettingsManager>()
     val scope = rememberCoroutineScope()
     var showImportDialog by remember { mutableStateOf(false) }
@@ -88,6 +97,16 @@ object AdvancedPreferencesScreen : Screen {
     
     val clearedHistoryMsg = stringResource(R.string.pref_advanced_cleared_playback_history)
     val clearedFontsMsg = stringResource(R.string.pref_advanced_cleared_fonts_cache)
+
+    // OLED Optimization: Pure black background in dark mode
+    val darkMode by appPreferences.darkMode.collectAsState()
+    val systemDarkTheme = isSystemInDarkTheme()
+    val isDark = when (darkMode) {
+      DarkMode.Dark -> true
+      DarkMode.Light -> false
+      DarkMode.System -> systemDarkTheme
+    }
+    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
 
     // Export settings launcher
     val exportLauncher =
@@ -182,491 +201,525 @@ object AdvancedPreferencesScreen : Screen {
       )
     }
 
-    Scaffold(
-      topBar = {
-        TopAppBar(
-          title = { 
-            Text(
-              text = stringResource(R.string.pref_advanced),
-              style = MaterialTheme.typography.headlineSmall,
-              fontWeight = FontWeight.ExtraBold,
-              color = MaterialTheme.colorScheme.primary,
-            )
-          },
-          navigationIcon = {
-            IconButton(onClick = backStack::removeLastOrNull) {
-              Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack, 
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
+    Surface(
+      modifier = Modifier.fillMaxSize(),
+      color = backgroundColor
+    ) {
+      Scaffold(
+        containerColor = Color.Transparent,
+        topBar = {
+          TopAppBar(
+            modifier = Modifier.statusBarsPadding(),
+            colors = TopAppBarDefaults.topAppBarColors(
+              containerColor = Color.Transparent,
+              scrolledContainerColor = Color.Transparent
+            ),
+            title = { 
+              Text(
+                text = stringResource(R.string.pref_advanced),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
               )
-            }
-          },
-        )
-      },
-    ) { padding ->
-      ProvidePreferenceLocals {
-        val locationPicker =
-          rememberLauncherForActivityResult(
-            OpenDocumentTreeContract(),
-          ) { uri ->
-            if (uri == null) return@rememberLauncherForActivityResult
+            },
+            navigationIcon = {
+              IconButton(onClick = backStack::removeLastOrNull) {
+                Icon(
+                  Icons.AutoMirrored.Rounded.ArrowBack, 
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.secondary,
+                )
+              }
+            },
+          )
+        },
+      ) { padding ->
+        ProvidePreferenceLocals {
+          val locationPicker =
+            rememberLauncherForActivityResult(
+              OpenDocumentTreeContract(),
+            ) { uri ->
+              if (uri == null) return@rememberLauncherForActivityResult
 
-            val flags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION
-            context.contentResolver.takePersistableUriPermission(uri, flags)
-            preferences.mpvConfStorageUri.set(uri.toString())
+              val flags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION
+              context.contentResolver.takePersistableUriPermission(uri, flags)
+              preferences.mpvConfStorageUri.set(uri.toString())
 
-            // Auto-create standard MPV folder structure
-            scope.launch(Dispatchers.IO) {
-              runCatching {
-                val tree = DocumentFile.fromTreeUri(context, uri)
-                if (tree != null && tree.exists() && tree.canWrite()) {
-                  val subdirs = listOf("fonts", "script-opts", "scripts", "shaders")
-                  for (name in subdirs) {
-                    val existing = tree.listFiles().firstOrNull {
-                      it.isDirectory && it.name?.equals(name, ignoreCase = true) == true
-                    }
-                    if (existing == null) {
-                      tree.createDirectory(name)
-                    }
-                  }
-                  // Create default mpv.conf if missing
-                  val hasConf = tree.listFiles().any {
-                    it.isFile && it.name?.equals("mpv.conf", ignoreCase = true) == true
-                  }
-                  if (!hasConf) {
-                    tree.createFile("application/octet-stream", "mpv.conf")
-                  }
-                  withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "MPV directory ready ✓", Toast.LENGTH_SHORT).show()
-                  }
-                }
-              }.onFailure { e ->
-                android.util.Log.e("AdvancedPrefs", "Error creating MPV directory structure", e)
-              }
-            }
-          }
-        val mpvConfStorageLocation by preferences.mpvConfStorageUri.collectAsState()
-        LazyColumn(
-          modifier = Modifier
-            .fillMaxSize()
-            .padding(padding),
-        ) {
-          // Backup & Restore Section
-          item {
-            PreferenceSectionHeader(title = "Backup & Restore")
-          }
-          
-          item {
-            PreferenceCard {
-              Preference(
-                title = { Text(text = "Export Settings") },
-                summary = { 
-                  Text(
-                    text = "Export settings to an XML file",
-                    color = MaterialTheme.colorScheme.outline,
-                  ) 
-                },
-                icon = { 
-                  PreferenceIcon(
-                    Icons.Rounded.FileUpload, 
-                    contentDescription = null,
-                  ) 
-                },
-                onClick = {
-                  exportLauncher.launch(settingsManager.getDefaultExportFilename())
-                },
-              )
-              
-              PreferenceDivider()
-              
-              Preference(
-                title = { Text(text = "Import Settings") },
-                summary = { 
-                  Text(
-                    text = "Import settings from an XML file",
-                    color = MaterialTheme.colorScheme.outline,
-                  ) 
-                },
-                icon = { 
-                  PreferenceIcon(
-                    Icons.Rounded.FileDownload, 
-                    contentDescription = null,
-                  ) 
-                },
-                onClick = {
-                  importLauncher.launch(arrayOf("text/xml", "application/xml", "*/*"))
-                },
-              )
-            }
-          }
-          
-          // MPV Configuration Section
-          item {
-            PreferenceSectionHeader(title = "MPV Configuration")
-          }
-          
-          item {
-            PreferenceCard {
-              var mpvConf by remember { mutableStateOf(preferences.mpvConf.get()) }
-              var inputConf by remember { mutableStateOf(preferences.inputConf.get()) }
-              
-              // Load config files when storage location changes
-              LaunchedEffect(mpvConfStorageLocation) {
-                if (mpvConfStorageLocation.isBlank()) return@LaunchedEffect
-                withContext(Dispatchers.IO) {
-                  val tempFile = kotlin.io.path.createTempFile()
-                  runCatching {
-                    val tree =
-                      DocumentFile.fromTreeUri(
-                        context,
-                        mpvConfStorageLocation.toUri(),
-                      )
-                    val mpvConfFile = tree?.findFile("mpv.conf")
-                    if (mpvConfFile != null && mpvConfFile.exists()) {
-                      context.contentResolver
-                        .openInputStream(
-                          mpvConfFile.uri,
-                        )?.copyTo(tempFile.outputStream())
-                      val content = tempFile.readLines().fastJoinToString("\n")
-                      preferences.mpvConf.set(content)
-                      File(context.filesDir, "mpv.conf").writeText(content)
-                      withContext(Dispatchers.Main) {
-                        mpvConf = content
+              scope.launch(Dispatchers.IO) {
+                runCatching {
+                  val tree = DocumentFile.fromTreeUri(context, uri)
+                  if (tree != null && tree.exists() && tree.canWrite()) {
+                    val subdirs = listOf("fonts", "script-opts", "scripts", "shaders")
+                    for (name in subdirs) {
+                      val existing = tree.listFiles().firstOrNull {
+                        it.isDirectory && it.name?.equals(name, ignoreCase = true) == true
+                      }
+                      if (existing == null) {
+                        tree.createDirectory(name)
                       }
                     }
-                  }
-                  tempFile.deleteIfExists()
-                }
-              }
-              
-              // Load input.conf when storage location changes
-              LaunchedEffect(mpvConfStorageLocation) {
-                if (mpvConfStorageLocation.isBlank()) return@LaunchedEffect
-                withContext(Dispatchers.IO) {
-                  val tempFile = kotlin.io.path.createTempFile()
-                  runCatching {
-                    val tree =
-                      DocumentFile.fromTreeUri(
-                        context,
-                        mpvConfStorageLocation.toUri(),
-                      )
-                    val inputConfFile = tree?.findFile("input.conf")
-                    if (inputConfFile != null && inputConfFile.exists()) {
-                      context.contentResolver
-                        .openInputStream(
-                          inputConfFile.uri,
-                        )?.copyTo(tempFile.outputStream())
-                      val content = tempFile.readLines().fastJoinToString("\n")
-                      preferences.inputConf.set(content)
-                      File(context.filesDir, "input.conf").writeText(content)
-                      withContext(Dispatchers.Main) {
-                        inputConf = content
-                      }
+                    val hasConf = tree.listFiles().any {
+                      it.isFile && it.name?.equals("mpv.conf", ignoreCase = true) == true
+                    }
+                    if (!hasConf) {
+                      tree.createFile("application/octet-stream", "mpv.conf")
+                    }
+                    withContext(Dispatchers.Main) {
+                      Toast.makeText(context, "MPV directory ready ✓", Toast.LENGTH_SHORT).show()
                     }
                   }
-                  tempFile.deleteIfExists()
+                }.onFailure { e ->
+                  android.util.Log.e("AdvancedPrefs", "Error creating MPV directory structure", e)
                 }
               }
-              
-              TwoTargetIconButtonPreference(
-                title = { Text(stringResource(R.string.pref_advanced_mpv_conf_storage_location)) },
-                summary = {
-                  if (mpvConfStorageLocation.isNotBlank()) {
-                    Text(
-                      getSimplifiedPathFromUri(mpvConfStorageLocation),
-                      color = MaterialTheme.colorScheme.outline,
-                    )
-                  }
-                },
-                onClick = { locationPicker.launch(null) },
-                iconButtonIcon = { 
-                  Icon(
-                    Icons.Rounded.Clear,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                  ) 
-                },
-                onIconButtonClick = { preferences.mpvConfStorageUri.delete() },
-                iconButtonEnabled = mpvConfStorageLocation.isNotBlank(),
-              )
-              
-              PreferenceDivider()
-              
-              Preference(
-                title = { Text(stringResource(R.string.pref_advanced_mpv_conf)) },
-                summary = {
-                  val firstLine = mpvConf.lines().firstOrNull()
-                  if (firstLine != null && firstLine.isNotBlank()) {
-                    Text(
-                      firstLine,
-                      color = MaterialTheme.colorScheme.outline,
-                    )
-                  } else {
-                    Text(
-                      "Tap to edit configuration",
-                      color = MaterialTheme.colorScheme.outline,
-                    )
-                  }
-                },
-                onClick = {
-                  backStack.add(ConfigEditorScreen(ConfigEditorScreen.ConfigType.MPV_CONF))
-                },
-              )
-              
-              PreferenceDivider()
-              
-              Preference(
-                title = { Text(stringResource(R.string.pref_advanced_input_conf)) },
-                summary = {
-                  val firstLine = inputConf.lines().firstOrNull()
-                  if (firstLine != null && firstLine.isNotBlank()) {
-                    Text(
-                      firstLine,
-                      color = MaterialTheme.colorScheme.outline,
-                    )
-                  } else {
-                    Text(
-                      "Tap to edit configuration",
-                      color = MaterialTheme.colorScheme.outline,
-                    )
-                  }
-                },
-                onClick = {
-                  backStack.add(ConfigEditorScreen(ConfigEditorScreen.ConfigType.INPUT_CONF))
-                },
-              )
             }
-          }
-          
-          // Scripts Section
-          // History Section
-          item {
-            PreferenceSectionHeader(title = "History")
-          }
-          
-          item {
-            PreferenceCard {
-              var isConfirmDialogShown by remember { mutableStateOf(false) }
-              val mpvexDatabase = koinInject<MpvExDatabase>()
-              val enableRecentlyPlayed by preferences.enableRecentlyPlayed.collectAsState()
-              
-              SwitchPreference(
-                value = enableRecentlyPlayed,
-                onValueChange = preferences.enableRecentlyPlayed::set,
-                title = { Text(stringResource(R.string.pref_advanced_enable_recently_played_title)) },
-                summary = { 
-                  Text(
-                    stringResource(R.string.pref_advanced_enable_recently_played_summary),
-                    color = MaterialTheme.colorScheme.outline,
-                  ) 
-                },
-              )
-              
-              PreferenceDivider()
-              
-              Preference(
-                title = { Text(stringResource(R.string.pref_advanced_clear_playback_history)) },
-                onClick = { isConfirmDialogShown = true },
-              )
-              
-              if (isConfirmDialogShown) {
-                ConfirmDialog(
-                  stringResource(R.string.pref_advanced_clear_playback_history_confirm_title),
-                  stringResource(R.string.pref_advanced_clear_playback_history_confirm_subtitle),
-                  onConfirm = {
-                    scope.launch(Dispatchers.IO) {
-                      runCatching {
-                        mpvexDatabase.videoDataDao().clearAllPlaybackStates()
-                        RecentlyPlayedOps.clearAll()
-                      }.onSuccess {
-                        withContext(Dispatchers.Main) {
-                          isConfirmDialogShown = false
-                          Toast
-                            .makeText(
-                              context,
-                              clearedHistoryMsg,
-                              Toast.LENGTH_SHORT,
-                            ).show()
-                        }
-                      }.onFailure { error ->
-                        withContext(Dispatchers.Main) {
-                          isConfirmDialogShown = false
-                          Toast
-                            .makeText(
-                              context,
-                              "Failed to clear: ${error.message}",
-                              Toast.LENGTH_LONG,
-                            ).show()
-                        }
-                      }
-                    }
+          val mpvConfStorageLocation by preferences.mpvConfStorageUri.collectAsState()
+          LazyColumn(
+            modifier = Modifier
+              .fillMaxSize()
+              .padding(padding),
+          ) {
+            item {
+              PreferenceSectionHeader(title = "Backup & Restore")
+            }
+            
+            item {
+              PreferenceCard {
+                Preference(
+                  title = { 
+                    Text(
+                      text = "Export Settings",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
                   },
-                  onCancel = { isConfirmDialogShown = false },
+                  summary = { 
+                    Text(
+                      text = "Export settings to an XML file",
+                      style = MaterialTheme.typography.bodySmall,
+                      fontWeight = FontWeight.Light,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    ) 
+                  },
+                  icon = { 
+                    PreferenceIcon(Icons.Rounded.FileUpload) 
+                  },
+                  onClick = {
+                    exportLauncher.launch(settingsManager.getDefaultExportFilename())
+                  },
+                )
+                
+                PreferenceDivider()
+                
+                Preference(
+                  title = { 
+                    Text(
+                      text = "Import Settings",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  summary = { 
+                    Text(
+                      text = "Import settings from an XML file",
+                      style = MaterialTheme.typography.bodySmall,
+                      fontWeight = FontWeight.Light,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    ) 
+                  },
+                  icon = { 
+                    PreferenceIcon(Icons.Rounded.FileDownload) 
+                  },
+                  onClick = {
+                    importLauncher.launch(arrayOf("text/xml", "application/xml", "*/*"))
+                  },
                 )
               }
             }
-          }
-          
-          // Cache Section
-          item {
-            PreferenceSectionHeader(title = "Cache")
-          }
-          
-          item {
-            PreferenceCard {
-              var mpvConf by remember { mutableStateOf(preferences.mpvConf.get()) }
-              var isClearThumbsConfirmShown by remember { mutableStateOf(false) }
-              val thumbnailRepository = koinInject<ThumbnailRepository>()
-              
-              Preference(
-                title = { Text(text = "Clear config cache") },
-                summary = { 
-                  Text(
-                    text = "Clear the cached mpv.conf settings",
-                    color = MaterialTheme.colorScheme.outline,
-                  ) 
-                },
-                onClick = {
-                  scope.launch(Dispatchers.IO) {
-                    val mpvConfFile = File(context.filesDir, "mpv.conf")
-                    mpvConfFile.delete()
-                    // Clear preferences too
-                    preferences.mpvConf.delete()
-                    withContext(Dispatchers.Main) {
-                      mpvConf = ""
-                      Toast
-                        .makeText(
-                          context,
-                          "Config cache cleared",
-                          Toast.LENGTH_SHORT,
-                        ).show()
+            
+            item {
+              PreferenceSectionHeader(title = "MPV Configuration")
+            }
+            
+            item {
+              PreferenceCard {
+                var mpvConf by remember { mutableStateOf(preferences.mpvConf.get()) }
+                var inputConf by remember { mutableStateOf(preferences.inputConf.get()) }
+                
+                LaunchedEffect(mpvConfStorageLocation) {
+                  if (mpvConfStorageLocation.isBlank()) return@LaunchedEffect
+                  withContext(Dispatchers.IO) {
+                    val tempFile = kotlin.io.path.createTempFile()
+                    runCatching {
+                      val tree = DocumentFile.fromTreeUri(context, mpvConfStorageLocation.toUri())
+                      val mpvConfFile = tree?.findFile("mpv.conf")
+                      if (mpvConfFile != null && mpvConfFile.exists()) {
+                        context.contentResolver.openInputStream(mpvConfFile.uri)?.copyTo(tempFile.outputStream())
+                        val content = tempFile.readLines().fastJoinToString("\n")
+                        preferences.mpvConf.set(content)
+                        File(context.filesDir, "mpv.conf").writeText(content)
+                        withContext(Dispatchers.Main) {
+                          mpvConf = content
+                        }
+                      }
                     }
+                    tempFile.deleteIfExists()
                   }
-                },
-              )
-              
-              PreferenceDivider()
-
-              Preference(
-                title = { Text(text = "Clear thumbnail cache") },
-                summary = {
-                  Text(
-                    text = "Delete all cached video thumbnails (will regenerate as you browse folders)",
-                    color = MaterialTheme.colorScheme.outline,
+                }
+                
+                LaunchedEffect(mpvConfStorageLocation) {
+                  if (mpvConfStorageLocation.isBlank()) return@LaunchedEffect
+                  withContext(Dispatchers.IO) {
+                    val tempFile = kotlin.io.path.createTempFile()
+                    runCatching {
+                      val tree = DocumentFile.fromTreeUri(context, mpvConfStorageLocation.toUri())
+                      val inputConfFile = tree?.findFile("input.conf")
+                      if (inputConfFile != null && inputConfFile.exists()) {
+                        context.contentResolver.openInputStream(inputConfFile.uri)?.copyTo(tempFile.outputStream())
+                        val content = tempFile.readLines().fastJoinToString("\n")
+                        preferences.inputConf.set(content)
+                        File(context.filesDir, "input.conf").writeText(content)
+                        withContext(Dispatchers.Main) {
+                          inputConf = content
+                        }
+                      }
+                    }
+                    tempFile.deleteIfExists()
+                  }
+                }
+                
+                TwoTargetIconButtonPreference(
+                  title = { 
+                    Text(
+                      text = stringResource(R.string.pref_advanced_mpv_conf_storage_location),
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  summary = {
+                    if (mpvConfStorageLocation.isNotBlank()) {
+                      Text(
+                        text = getSimplifiedPathFromUri(mpvConfStorageLocation),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Light,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      )
+                    }
+                  },
+                  onClick = { locationPicker.launch(null) },
+                  iconButtonIcon = { 
+                    Icon(
+                      Icons.Rounded.Clear,
+                      contentDescription = null,
+                      tint = MaterialTheme.colorScheme.error,
+                    ) 
+                  },
+                  onIconButtonClick = { preferences.mpvConfStorageUri.delete() },
+                  iconButtonEnabled = mpvConfStorageLocation.isNotBlank(),
+                )
+                
+                PreferenceDivider()
+                
+                Preference(
+                  title = { 
+                    Text(
+                      text = stringResource(R.string.pref_advanced_mpv_conf),
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  summary = {
+                    val firstLine = mpvConf.lines().firstOrNull()
+                    val summaryText = if (firstLine != null && firstLine.isNotBlank()) firstLine else "Tap to edit configuration"
+                    Text(
+                      text = summaryText,
+                      style = MaterialTheme.typography.bodySmall,
+                      fontWeight = FontWeight.Light,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                  },
+                  onClick = {
+                    backStack.add(ConfigEditorScreen(ConfigEditorScreen.ConfigType.MPV_CONF))
+                  },
+                )
+                
+                PreferenceDivider()
+                
+                Preference(
+                  title = { 
+                    Text(
+                      text = stringResource(R.string.pref_advanced_input_conf),
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  summary = {
+                    val firstLine = inputConf.lines().firstOrNull()
+                    val summaryText = if (firstLine != null && firstLine.isNotBlank()) firstLine else "Tap to edit configuration"
+                    Text(
+                      text = summaryText,
+                      style = MaterialTheme.typography.bodySmall,
+                      fontWeight = FontWeight.Light,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                  },
+                  onClick = {
+                    backStack.add(ConfigEditorScreen(ConfigEditorScreen.ConfigType.INPUT_CONF))
+                  },
+                )
+              }
+            }
+            
+            item {
+              PreferenceSectionHeader(title = "History")
+            }
+            
+            item {
+              PreferenceCard {
+                var isConfirmDialogShown by remember { mutableStateOf(false) }
+                val mpvexDatabase = koinInject<MpvExDatabase>()
+                val enableRecentlyPlayed by preferences.enableRecentlyPlayed.collectAsState()
+                
+                SwitchPreference(
+                  value = enableRecentlyPlayed,
+                  onValueChange = preferences.enableRecentlyPlayed::set,
+                  title = { 
+                    Text(
+                      text = stringResource(R.string.pref_advanced_enable_recently_played_title),
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  summary = { 
+                    Text(
+                      text = stringResource(R.string.pref_advanced_enable_recently_played_summary),
+                      style = MaterialTheme.typography.bodySmall,
+                      fontWeight = FontWeight.Light,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    ) 
+                  },
+                )
+                
+                PreferenceDivider()
+                
+                Preference(
+                  title = { 
+                    Text(
+                      text = stringResource(R.string.pref_advanced_clear_playback_history),
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  onClick = { isConfirmDialogShown = true },
+                )
+                
+                if (isConfirmDialogShown) {
+                  ConfirmDialog(
+                    stringResource(R.string.pref_advanced_clear_playback_history_confirm_title),
+                    stringResource(R.string.pref_advanced_clear_playback_history_confirm_subtitle),
+                    onConfirm = {
+                      scope.launch(Dispatchers.IO) {
+                        runCatching {
+                          mpvexDatabase.videoDataDao().clearAllPlaybackStates()
+                          RecentlyPlayedOps.clearAll()
+                        }.onSuccess {
+                          withContext(Dispatchers.Main) {
+                            isConfirmDialogShown = false
+                            Toast.makeText(context, clearedHistoryMsg, Toast.LENGTH_SHORT).show()
+                          }
+                        }.onFailure { error ->
+                          withContext(Dispatchers.Main) {
+                            isConfirmDialogShown = false
+                            Toast.makeText(context, "Failed to clear: ${error.message}", Toast.LENGTH_LONG).show()
+                          }
+                        }
+                      }
+                    },
+                    onCancel = { isConfirmDialogShown = false },
                   )
-                },
-                onClick = { isClearThumbsConfirmShown = true },
-              )
-
-              if (isClearThumbsConfirmShown) {
-                ConfirmDialog(
-                  title = "Clear thumbnail cache?",
-                  subtitle = "This will delete cached thumbnails from storage and memory.",
-                  onConfirm = {
+                }
+              }
+            }
+            
+            item {
+              PreferenceSectionHeader(title = "Cache")
+            }
+            
+            item {
+              PreferenceCard {
+                var isClearThumbsConfirmShown by remember { mutableStateOf(false) }
+                val thumbnailRepository = koinInject<ThumbnailRepository>()
+                
+                Preference(
+                  title = { 
+                    Text(
+                      text = "Clear config cache",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  summary = { 
+                    Text(
+                      text = "Clear the cached mpv.conf settings",
+                      style = MaterialTheme.typography.bodySmall,
+                      fontWeight = FontWeight.Light,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    ) 
+                  },
+                  onClick = {
                     scope.launch(Dispatchers.IO) {
-                      runCatching {
-                        thumbnailRepository.clearThumbnailCache()
-                      }.onSuccess {
-                        withContext(Dispatchers.Main) {
-                          isClearThumbsConfirmShown = false
-                          Toast.makeText(context, "Thumbnail cache cleared", Toast.LENGTH_SHORT).show()
-                        }
-                      }.onFailure { error ->
-                        withContext(Dispatchers.Main) {
-                          isClearThumbsConfirmShown = false
-                          Toast.makeText(context, "Failed to clear: ${error.message}", Toast.LENGTH_LONG).show()
-                        }
+                      val mpvConfFile = File(context.filesDir, "mpv.conf")
+                      mpvConfFile.delete()
+                      preferences.mpvConf.delete()
+                      withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Config cache cleared", Toast.LENGTH_SHORT).show()
                       }
                     }
                   },
-                  onCancel = { isClearThumbsConfirmShown = false },
                 )
-              }
-              
-              PreferenceDivider()
-              
-              Preference(
-                title = { Text(text = stringResource(id = R.string.pref_advanced_clear_fonts_cache)) },
-                summary = { 
-                  Text(
-                    text = "Remove all cached subtitle fonts",
-                    color = MaterialTheme.colorScheme.outline,
-                  ) 
-                },
-                onClick = {
-                  scope.launch(Dispatchers.IO) {
-                    val fontsDir = File(context.filesDir.path + "/fonts")
-                    if (fontsDir.exists()) {
-                      fontsDir.listFiles()?.forEach { file ->
-                        // Delete all font files
-                        if (file.isFile &&
-                          file.name
-                            .lowercase()
-                            .matches(".*\\.[ot]tf$".toRegex())
-                        ) {
-                          file.delete()
+                
+                PreferenceDivider()
+
+                Preference(
+                  title = { 
+                    Text(
+                      text = "Clear thumbnail cache",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  summary = {
+                    Text(
+                      text = "Delete all cached video thumbnails (will regenerate as you browse folders)",
+                      style = MaterialTheme.typography.bodySmall,
+                      fontWeight = FontWeight.Light,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                  },
+                  onClick = { isClearThumbsConfirmShown = true },
+                )
+
+                if (isClearThumbsConfirmShown) {
+                  ConfirmDialog(
+                    title = "Clear thumbnail cache?",
+                    subtitle = "This will delete cached thumbnails from storage and memory.",
+                    onConfirm = {
+                      scope.launch(Dispatchers.IO) {
+                        runCatching {
+                          thumbnailRepository.clearThumbnailCache()
+                        }.onSuccess {
+                          withContext(Dispatchers.Main) {
+                            isClearThumbsConfirmShown = false
+                            Toast.makeText(context, "Thumbnail cache cleared", Toast.LENGTH_SHORT).show()
+                          }
+                        }.onFailure { error ->
+                          withContext(Dispatchers.Main) {
+                            isClearThumbsConfirmShown = false
+                            Toast.makeText(context, "Failed to clear: ${error.message}", Toast.LENGTH_LONG).show()
+                          }
                         }
                       }
+                    },
+                    onCancel = { isClearThumbsConfirmShown = false },
+                  )
+                }
+                
+                PreferenceDivider()
+                
+                Preference(
+                  title = { 
+                    Text(
+                      text = stringResource(id = R.string.pref_advanced_clear_fonts_cache),
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  summary = { 
+                    Text(
+                      text = "Remove all cached subtitle fonts",
+                      style = MaterialTheme.typography.bodySmall,
+                      fontWeight = FontWeight.Light,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    ) 
+                  },
+                  onClick = {
+                    scope.launch(Dispatchers.IO) {
+                      val fontsDir = File(context.filesDir.path + "/fonts")
+                      if (fontsDir.exists()) {
+                        fontsDir.listFiles()?.forEach { file ->
+                          if (file.isFile && file.name.lowercase().matches(".*\\.[ot]tf$".toRegex())) {
+                            file.delete()
+                          }
+                        }
+                      }
+                      withContext(Dispatchers.Main) {
+                        Toast.makeText(context, clearedFontsMsg, Toast.LENGTH_SHORT).show()
+                      }
                     }
-                    withContext(Dispatchers.Main) {
-                      Toast
-                        .makeText(
-                          context,
-                          clearedFontsMsg,
-                          Toast.LENGTH_SHORT,
-                        ).show()
-                    }
-                  }
-                },
-              )
+                  },
+                )
+              }
             }
-          }
-          
-          // Logging Section
-          item {
-            PreferenceSectionHeader(title = "Logging")
-          }
-          
-          item {
-            PreferenceCard {
-              val activity = LocalActivity.current!!
-              val clipboard = LocalClipboard.current
-              val verboseLogging by preferences.verboseLogging.collectAsState()
-              
-              SwitchPreference(
-                value = verboseLogging,
-                onValueChange = preferences.verboseLogging::set,
-                title = { Text(stringResource(R.string.pref_advanced_verbose_logging_title)) },
-                summary = { 
-                  Text(
-                    stringResource(R.string.pref_advanced_verbose_logging_summary),
-                    color = MaterialTheme.colorScheme.outline,
-                  ) 
-                },
-              )
-              
-              PreferenceDivider()
-              
-              Preference(
-                title = { Text(stringResource(R.string.pref_advanced_dump_logs_title)) },
-                summary = { 
-                  Text(
-                    stringResource(R.string.pref_advanced_dump_logs_summary),
-                    color = MaterialTheme.colorScheme.outline,
-                  ) 
-                },
-                onClick = {
-                  scope.launch(Dispatchers.IO) {
-                    val deviceInfo = CrashActivity.collectDeviceInfo()
-                    val logcat = CrashActivity.collectLogcat()
-                    val logs = CrashActivity.concatLogs(deviceInfo, null, logcat)
-    
-                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Logs", logs)))
-                    CrashActivity.shareLogs(deviceInfo, null, logcat, activity)
-                  }
-                },
-              )
+            
+            item {
+              PreferenceSectionHeader(title = "Logging")
+            }
+            
+            item {
+              PreferenceCard {
+                val activity = LocalActivity.current!!
+                val clipboard = LocalClipboard.current
+                val verboseLogging by preferences.verboseLogging.collectAsState()
+                
+                SwitchPreference(
+                  value = verboseLogging,
+                  onValueChange = preferences.verboseLogging::set,
+                  title = { 
+                    Text(
+                      text = stringResource(R.string.pref_advanced_verbose_logging_title),
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  summary = { 
+                    Text(
+                      text = stringResource(R.string.pref_advanced_verbose_logging_summary),
+                      style = MaterialTheme.typography.bodySmall,
+                      fontWeight = FontWeight.Light,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    ) 
+                  },
+                )
+                
+                PreferenceDivider()
+                
+                Preference(
+                  title = { 
+                    Text(
+                      text = stringResource(R.string.pref_advanced_dump_logs_title),
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    ) 
+                  },
+                  summary = { 
+                    Text(
+                      text = stringResource(R.string.pref_advanced_dump_logs_summary),
+                      style = MaterialTheme.typography.bodySmall,
+                      fontWeight = FontWeight.Light,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    ) 
+                  },
+                  onClick = {
+                    scope.launch(Dispatchers.IO) {
+                      val deviceInfo = CrashActivity.collectDeviceInfo()
+                      val logcat = CrashActivity.collectLogcat()
+                      val logs = CrashActivity.concatLogs(deviceInfo, null, logcat)
+                      clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Logs", logs)))
+                      CrashActivity.shareLogs(deviceInfo, null, logcat, activity)
+                    }
+                  },
+                )
+              }
             }
           }
         }
