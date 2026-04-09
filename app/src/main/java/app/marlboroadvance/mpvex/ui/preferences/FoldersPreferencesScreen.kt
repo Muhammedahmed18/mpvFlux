@@ -12,12 +12,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.FolderOff
 import androidx.compose.material.icons.rounded.RemoveCircle
@@ -32,9 +36,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -75,7 +84,9 @@ object FoldersPreferencesScreen : Screen {
 
     val blacklistedFolders by preferences.blacklistedFolders.collectAsState()
     var availableFolders by remember { mutableStateOf<List<VideoFolder>>(emptyList()) }
-    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddSheet by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState()
+    
     var isLoading by remember { mutableStateOf(false) }
     var selectionState by remember { mutableStateOf(SelectionState<String>()) }
     var showClearAllDialog by remember { mutableStateOf(false) }
@@ -84,46 +95,73 @@ object FoldersPreferencesScreen : Screen {
 
     Scaffold(
       topBar = {
-        BrowserTopBar(
-          title = stringResource(R.string.pref_folders_title),
-          isInSelectionMode = selectionState.isInSelectionMode,
-          selectedCount = selectionState.selectedCount,
-          totalCount = blacklistedFoldersList.size,
-          onCancelSelection = { selectionState = selectionState.clear() },
-          onBackClick = backstack::removeLastOrNull,
-          onDeleteClick = {
-            val updated = blacklistedFolders.toMutableSet().apply {
-              removeAll(selectionState.selectedIds)
-            }
-            preferences.blacklistedFolders.set(updated)
-            selectionState = selectionState.clear()
-          },
-          onSelectAll = {
-            selectionState = selectionState.selectAll(blacklistedFoldersList)
-          },
-          onInvertSelection = {
-            selectionState = selectionState.invertSelection(blacklistedFoldersList)
-          },
-          onDeselectAll = {
-            selectionState = selectionState.clear()
-          },
-          additionalActions = {
-            if (!selectionState.isInSelectionMode && blacklistedFolders.isNotEmpty()) {
-              IconButton(
-                onClick = { showClearAllDialog = true },
-                modifier = Modifier.padding(horizontal = 2.dp),
-              ) {
+        if (selectionState.isInSelectionMode) {
+          BrowserTopBar(
+            title = stringResource(R.string.pref_folders_title),
+            isInSelectionMode = true,
+            selectedCount = selectionState.selectedCount,
+            totalCount = blacklistedFoldersList.size,
+            onCancelSelection = { selectionState = selectionState.clear() },
+            onBackClick = backstack::removeLastOrNull,
+            onDeleteClick = {
+              val updated = blacklistedFolders.toMutableSet().apply {
+                removeAll(selectionState.selectedIds)
+              }
+              preferences.blacklistedFolders.set(updated)
+              selectionState = selectionState.clear()
+            },
+            onSelectAll = {
+              selectionState = selectionState.selectAll(blacklistedFoldersList)
+            },
+            onInvertSelection = {
+              selectionState = selectionState.invertSelection(blacklistedFoldersList)
+            },
+            onDeselectAll = {
+              selectionState = selectionState.clear()
+            },
+            useRemoveIcon = true,
+          )
+        } else {
+          TopAppBar(
+            modifier = Modifier.statusBarsPadding(),
+            colors = TopAppBarDefaults.topAppBarColors(
+              containerColor = Color.Transparent,
+              scrolledContainerColor = Color.Transparent
+            ),
+            title = {
+              Text(
+                text = stringResource(R.string.pref_folders_title),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.ExtraBold,
+                color = MaterialTheme.colorScheme.primary,
+              )
+            },
+            navigationIcon = {
+              IconButton(onClick = backstack::removeLastOrNull) {
                 Icon(
-                  Icons.Rounded.Restore,
-                  contentDescription = stringResource(R.string.pref_folders_clear_all),
-                  modifier = Modifier.size(28.dp),
-                  tint = MaterialTheme.colorScheme.error,
+                  Icons.AutoMirrored.Rounded.ArrowBack,
+                  contentDescription = null,
+                  tint = MaterialTheme.colorScheme.secondary,
                 )
               }
-            }
-          },
-          useRemoveIcon = true,
-        )
+            },
+            actions = {
+              if (blacklistedFolders.isNotEmpty()) {
+                IconButton(
+                  onClick = { showClearAllDialog = true },
+                  modifier = Modifier.padding(horizontal = 2.dp),
+                ) {
+                  Icon(
+                    Icons.Rounded.Restore,
+                    contentDescription = stringResource(R.string.pref_folders_clear_all),
+                    modifier = Modifier.size(28.dp),
+                    tint = MaterialTheme.colorScheme.error,
+                  )
+                }
+              }
+            },
+          )
+        }
       },
     ) { padding ->
       Column(
@@ -185,7 +223,7 @@ object FoldersPreferencesScreen : Screen {
             modifier = Modifier
               .fillMaxWidth()
               .clickable {
-                showAddDialog = true
+                showAddSheet = true
                 isLoading = true
                 coroutineScope.launch(Dispatchers.IO) {
                   try {
@@ -223,16 +261,21 @@ object FoldersPreferencesScreen : Screen {
       }
     }
 
-    if (showAddDialog) {
-      AddFolderDialog(
+    if (showAddSheet) {
+      AddFolderBottomSheet(
         folders = availableFolders,
         blacklistedFolders = blacklistedFolders,
         isLoading = isLoading,
-        onDismiss = { showAddDialog = false },
+        onDismiss = {
+          coroutineScope.launch { sheetState.hide() }.invokeOnCompletion {
+            if (!sheetState.isVisible) showAddSheet = false
+          }
+        },
         onAddFolders = { folderPaths ->
           val updated = blacklistedFolders.toMutableSet().apply { addAll(folderPaths) }
           preferences.blacklistedFolders.set(updated)
         },
+        sheetState = sheetState,
       )
     }
 
@@ -329,13 +372,15 @@ private fun BlacklistedFolderItem(
   }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddFolderDialog(
+private fun AddFolderBottomSheet(
   folders: List<VideoFolder>,
   blacklistedFolders: Set<String>,
   isLoading: Boolean,
   onDismiss: () -> Unit,
   onAddFolders: (Set<String>) -> Unit,
+  sheetState: androidx.compose.material3.SheetState,
 ) {
   var selectionState by remember { mutableStateOf(SelectionState<String>()) }
   var showDropdown by remember { mutableStateOf(false) }
@@ -350,72 +395,117 @@ private fun AddFolderDialog(
     availableFolders.map { it.path }
   }
 
-  AlertDialog(
+  ModalBottomSheet(
     onDismissRequest = onDismiss,
-    title = {
+    sheetState = sheetState,
+    dragHandle = null, // We'll use our own header
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(16.dp)
+        .navigationBarsPadding(),
+    ) {
+      // Header with title and tick icon
       Row(
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.clickable(enabled = !isLoading && availableFolders.isNotEmpty()) {
-          showDropdown = true
-        },
+        horizontalArrangement = Arrangement.SpaceBetween,
       ) {
-        Text(
-          text = if (selectionState.isInSelectionMode) {
-            stringResource(R.string.selected_items, selectionState.selectedCount, availableFolders.size)
-          } else {
-            stringResource(R.string.pref_folders_select_folders)
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          modifier = Modifier.clickable(enabled = !isLoading && availableFolders.isNotEmpty()) {
+            showDropdown = true
           },
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-        )
-        if (!isLoading && availableFolders.isNotEmpty()) {
-          Icon(
-            Icons.Rounded.ArrowDropDown,
-            contentDescription = stringResource(R.string.selection_options),
-            modifier = Modifier.size(24.dp),
+        ) {
+          Text(
+            text = if (selectionState.isInSelectionMode) {
+              stringResource(R.string.selected_items, selectionState.selectedCount, availableFolders.size)
+            } else {
+              stringResource(R.string.pref_folders_select_folders)
+            },
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
           )
+          if (!isLoading && availableFolders.isNotEmpty()) {
+            Icon(
+              Icons.Rounded.ArrowDropDown,
+              contentDescription = stringResource(R.string.selection_options),
+              modifier = Modifier.size(24.dp),
+            )
+          }
+
+          DropdownMenu(
+            expanded = showDropdown,
+            onDismissRequest = { showDropdown = false },
+          ) {
+            DropdownMenuItem(
+              text = { Text(stringResource(R.string.select_all)) },
+              onClick = {
+                selectionState = selectionState.selectAll(availableFolderPaths)
+                showDropdown = false
+              },
+            )
+            DropdownMenuItem(
+              text = { Text(stringResource(R.string.invert_selection)) },
+              onClick = {
+                selectionState = selectionState.invertSelection(availableFolderPaths)
+                showDropdown = false
+              },
+            )
+            DropdownMenuItem(
+              text = { Text(stringResource(R.string.deselect_all)) },
+              onClick = {
+                selectionState = selectionState.clear()
+                showDropdown = false
+              },
+            )
+          }
         }
 
-        DropdownMenu(
-          expanded = showDropdown,
-          onDismissRequest = { showDropdown = false },
+        IconButton(
+          onClick = {
+            onAddFolders(selectionState.selectedIds)
+            onDismiss()
+          },
+          enabled = selectionState.isInSelectionMode && !isLoading,
         ) {
-          DropdownMenuItem(
-            text = { Text(stringResource(R.string.select_all)) },
-            onClick = {
-              selectionState = selectionState.selectAll(availableFolderPaths)
-              showDropdown = false
+          Icon(
+            imageVector = Icons.Rounded.Check,
+            contentDescription = stringResource(R.string.generic_confirm),
+            tint = if (selectionState.isInSelectionMode && !isLoading) {
+              MaterialTheme.colorScheme.primary
+            } else {
+              MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
             },
-          )
-          DropdownMenuItem(
-            text = { Text(stringResource(R.string.invert_selection)) },
-            onClick = {
-              selectionState = selectionState.invertSelection(availableFolderPaths)
-              showDropdown = false
-            },
-          )
-          DropdownMenuItem(
-            text = { Text(stringResource(R.string.deselect_all)) },
-            onClick = {
-              selectionState = selectionState.clear()
-              showDropdown = false
-            },
+            modifier = Modifier.size(28.dp)
           )
         }
       }
-    },
-    text = {
+
+      Spacer(modifier = Modifier.height(16.dp))
+
       if (isLoading) {
         Box(
           modifier = Modifier
             .fillMaxWidth()
-            .padding(32.dp),
+            .height(200.dp),
           contentAlignment = Alignment.Center,
         ) {
           Text(stringResource(R.string.pref_folders_loading))
         }
       } else if (availableFolders.isEmpty()) {
-        Text(stringResource(R.string.pref_folders_no_folders))
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(200.dp),
+          contentAlignment = Alignment.Center,
+        ) {
+          Text(stringResource(R.string.pref_folders_no_folders))
+        }
       } else {
         LazyColumn(
           modifier = Modifier
@@ -453,24 +543,8 @@ private fun AddFolderDialog(
           }
         }
       }
-    },
-    confirmButton = {
-      TextButton(
-        onClick = {
-          onAddFolders(selectionState.selectedIds)
-          onDismiss()
-        },
-        enabled = selectionState.isInSelectionMode && !isLoading,
-      ) {
-        Text(stringResource(R.string.generic_ok))
-      }
-    },
-    dismissButton = {
-      TextButton(onClick = onDismiss) {
-        Text(stringResource(R.string.generic_cancel))
-      }
-    },
-  )
+    }
+  }
 }
 
 /**

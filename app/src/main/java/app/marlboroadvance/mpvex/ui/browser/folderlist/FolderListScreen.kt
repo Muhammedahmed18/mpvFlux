@@ -206,7 +206,10 @@ object FolderListScreen : Screen {
 
     // Permissions
     val permissionState = PermissionUtils.handleStoragePermission(
-      onPermissionGranted = { viewModel.refresh() },
+      onPermissionGranted = { 
+        // When permission is granted, call onPermissionGranted to reset state and clear caches
+        viewModel.onPermissionGranted()
+      },
     )
 
     // Update NavigationBarState about permission state
@@ -360,8 +363,12 @@ private fun FolderListContent(
   onFolderClick: (VideoFolder) -> Unit,
   onFolderLongClick: (VideoFolder) -> Unit,
 ) {
-  val showLoading = isLoading && !hasCompletedInitialLoad
-  val showEmpty = folders.isEmpty() && hasCompletedInitialLoad && !foldersWereDeleted
+  // Enhanced logic: show loading state if currently loading and list is empty, 
+  // or if we haven't completed the very first initial load yet.
+  val showLoading = (isLoading && folders.isEmpty()) || !hasCompletedInitialLoad
+  
+  // Show empty state only when loading is fully finished and there are no folders.
+  val showEmpty = folders.isEmpty() && !isLoading && hasCompletedInitialLoad && !foldersWereDeleted
 
   // Scrollbar alpha animation
   val isAtTop by remember {
@@ -415,7 +422,7 @@ private fun FolderListContent(
       )
 
       // Show background enrichment progress
-      if (scanStatus != null) {
+      if (scanStatus != null && !showLoading) {
         androidx.compose.material3.LinearProgressIndicator(
           modifier = Modifier
             .fillMaxWidth()
@@ -530,6 +537,16 @@ private fun FolderSortDialog(
     sortOrderAsc = sortOrder.isAscending,
     onSortOrderChange = { isAsc ->
       onSortOrderChange(if (isAsc) SortOrder.Ascending else SortOrder.Descending)
+    },
+    onReset = {
+      onSortTypeChange(FolderSortType.Title)
+      onSortOrderChange(SortOrder.Ascending)
+      appearancePreferences.unlimitedNameLines.set(false)
+      browserPreferences.showFolderPath.set(false)
+      browserPreferences.showTotalVideosChip.set(true)
+      browserPreferences.showTotalDurationChip.set(false)
+      browserPreferences.showTotalSizeChip.set(false)
+      browserPreferences.showDateChip.set(false)
     },
     types = listOf(
       FolderSortType.Title.displayName,
