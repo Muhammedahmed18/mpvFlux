@@ -62,7 +62,14 @@ fun OnlineSubtitleSearchSheet(
     
     // Online Search Results section
     if (searchResults.isNotEmpty() || isSearching) {
-        list.add(OnlineSubtitleItem.Header("Online Results (${searchResults.size})"))
+        val hashMatches = searchResults.count { it.isHashMatch }
+        val headerText = if (hashMatches > 0) {
+            "Verified Matches ($hashMatches) + Others"
+        } else {
+            "Online Results (${searchResults.size})"
+        }
+        list.add(OnlineSubtitleItem.Header(headerText))
+        
         if (isOnlineSectionExpanded) {
             list.addAll(searchResults.map { OnlineSubtitleItem.OnlineTrack(it) })
         }
@@ -242,7 +249,7 @@ fun OnlineSubtitleSearchSheet(
             )
         }
         is OnlineSubtitleItem.Header -> {
-            val isOnlineHeader = item.title.startsWith("Online Results")
+            val isOnlineHeader = item.title.startsWith("Online Results") || item.title.startsWith("Verified Matches")
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -288,7 +295,10 @@ fun WyzieSubtitleRow(
     Surface(
         modifier = modifier.fillMaxWidth().clickable { onDownload() },
         shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+        color = if (subtitle.isHashMatch) 
+            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f) 
+        else 
+            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -296,16 +306,37 @@ fun WyzieSubtitleRow(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = subtitle.displayName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (subtitle.isHashMatch) {
+                        Icon(
+                            imageVector = Icons.Default.Verified,
+                            contentDescription = "Verified Sync",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Text(
+                        text = subtitle.displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        modifier = Modifier.basicMarquee()
+                    )
+                }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(text = subtitle.displayLanguage, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     subtitle.source?.let { Text(text = " • $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline) }
                     subtitle.format?.let { Text(text = " • ${it.uppercase()}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline) }
+                    if (subtitle.isHashMatch) {
+                        Text(
+                            text = " • PERFECT SYNC",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
             }
             IconButton(onClick = onDownload) {

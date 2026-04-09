@@ -17,8 +17,8 @@ android {
     applicationId = "app.marlboroadvance.mpvex"
     minSdk = 26
     targetSdk = 36
-    versionCode = 129
-    versionName = "1.2.9"
+    versionCode = 110
+    versionName = "1.1.0"
 
     vectorDrawables {
       useSupportLibrary = true
@@ -51,7 +51,7 @@ android {
       buildConfigField("boolean", "SCOPED_STORAGE_ONLY", "false")
 
       ndk {
-        abiFilters += "arm64-v8a"
+        abiFilters += listOf("arm64-v8a", "x86_64")
       }
     }
   }
@@ -175,15 +175,15 @@ dependencies {
   implementation(libs.androidx.ui)
   implementation(libs.androidx.ui.graphics)
   implementation(libs.androidx.material3.android)
-  implementation("com.google.android.material:material:1.13.0")
+  implementation(libs.material)
   implementation(libs.androidx.compose.material)
   implementation(libs.androidx.ui.tooling.preview)
   debugImplementation(libs.androidx.ui.tooling)
   implementation(libs.bundles.compose.navigation3)
   implementation(libs.androidx.appcompat)
   implementation(libs.androidx.compose.constraintlayout)
-  implementation("androidx.preference:preference-ktx:1.2.1")
-  implementation("androidx.constraintlayout:constraintlayout:2.2.0")
+  implementation(libs.androidx.preference.ktx)
+  implementation(libs.androidx.constraintlayout)
   implementation(libs.androidx.material3.icons.extended)
   implementation(libs.androidx.compose.animation.graphics)
   implementation(libs.mediasession)
@@ -244,6 +244,6 @@ fun runCommand(command: String): String? =
 
     process.waitFor()
     output.ifEmpty { null }
-  } catch (e: Exception) {
+  } catch (_: Exception) {
     null
   }

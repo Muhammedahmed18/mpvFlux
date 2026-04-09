@@ -38,7 +38,8 @@ data class WyzieSubtitle(
     val fileName: String? = null,
     val matchedRelease: String? = null,
     val matchedFilter: String? = null,
-    val downloadCount: Int? = null
+    val downloadCount: Int? = null,
+    val isHashMatch: Boolean = false // Added to track perfect sync matches
 ) {
     val displayName: String get() = fileName ?: release ?: media ?: "Unknown Subtitle"
     val displayLanguage: String get() = display ?: language ?: "Unknown"
@@ -218,7 +219,8 @@ class WyzieSearchRepository(
         query: String,
         season: Int? = null,
         episode: Int? = null,
-        year: String? = null
+        year: String? = null,
+        movieHash: String? = null // New parameter for perfect sync matching
     ): Result<List<WyzieSubtitle>> = withContext(Dispatchers.IO) {
         try {
             var searchId = query
@@ -263,7 +265,8 @@ class WyzieSearchRepository(
                 format = formatParam,
                 encoding = encodingParam,
                 source = sourceParam,
-                hi = if (hearingImpaired) true else null
+                hi = if (hearingImpaired) true else null,
+                movieHash = movieHash
             )
             
             // The Wyzie API often returns all languages regardless of query parameters.
@@ -282,7 +285,8 @@ class WyzieSearchRepository(
                 results
             }
             
-            val sortedResults = filteredResults.sortedWith(compareByDescending<WyzieSubtitle> { sub ->
+            val sortedResults = filteredResults.sortedWith(compareByDescending<WyzieSubtitle> { it.isHashMatch }
+                .thenByDescending { sub ->
                 val name = sub.displayName.lowercase()
                 val q = query.lowercase()
                 var score = 0
@@ -308,7 +312,8 @@ class WyzieSearchRepository(
         format: String? = null,
         encoding: String? = null,
         source: String = "all",
-        hi: Boolean? = null
+        hi: Boolean? = null,
+        movieHash: String? = null
     ): List<WyzieSubtitle> {
         fun encode(s: String) = URLEncoder.encode(s, "UTF-8")
         
@@ -334,6 +339,8 @@ class WyzieSearchRepository(
 
                 append("&unzip=true")
                 hi?.let { append("&hi=$it") }
+                // Use moviehash for the API if supported, or for later filtering
+                movieHash?.let { append("&moviehash=$it") }
             }.toString()
 
         val request = Request.Builder().url(url).addAuth().build()
@@ -353,7 +360,13 @@ class WyzieSearchRepository(
                 throw IOException(errorMsg)
             }
             return try {
-                json.decodeFromString<List<WyzieSubtitle>>(responseBodyString)
+                val results = json.decodeFromString<List<WyzieSubtitle>>(responseBodyString)
+                if (movieHash != null) {
+                    // Mark results that match the hash from the API side
+                    results.map { it.copy(isHashMatch = it.isHashMatch || it.matchedFilter == "moviehash") }
+                } else {
+                    results
+                }
             } catch (e: Exception) {
                 Log.e("WyzieSearchRepository", "Failed to parse response: $responseBodyString", e)
                 emptyList()

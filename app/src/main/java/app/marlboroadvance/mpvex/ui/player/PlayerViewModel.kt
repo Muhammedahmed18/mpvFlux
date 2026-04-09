@@ -25,6 +25,7 @@ import app.marlboroadvance.mpvex.repository.wyzie.WyzieSearchRepository
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieSubtitle
 import app.marlboroadvance.mpvex.utils.media.ChecksumUtils
 import app.marlboroadvance.mpvex.utils.media.MediaInfoParser
+import app.marlboroadvance.mpvex.utils.media.SubtitleHashUtils
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -295,6 +296,17 @@ class PlayerViewModel(
   var currentMediaTitle: String = ""
   private var lastAutoSelectedMediaTitle: String? = null
 
+  // Video hash for unique identification and perfect sync matching
+  private val _videoHash = MutableStateFlow<String?>(null)
+  val videoHash: StateFlow<String?> = _videoHash.asStateFlow()
+
+  fun calculateVideoHash(uri: Uri) {
+    viewModelScope.launch(Dispatchers.IO) {
+      _videoHash.value = SubtitleHashUtils.computeHash(host.context, uri)
+      Log.d(TAG, "Computed video hash: ${_videoHash.value}")
+    }
+  }
+
   // External subtitle tracking
   private val _externalSubtitles = mutableListOf<String>()
   val externalSubtitles: List<String> get() = _externalSubtitles.toList()
@@ -552,6 +564,8 @@ class PlayerViewModel(
       lastAutoSelectedMediaTitle = null
       // Clear external subtitles when media changes
       _externalSubtitles.clear()
+      // Reset hash when media changes
+      _videoHash.value = null
       // Scan for previously downloaded/added subtitles
       scanLocalSubtitles(mediaTitle)
 
@@ -739,7 +753,7 @@ class PlayerViewModel(
   fun searchSubtitles(query: String, season: Int? = null, episode: Int? = null, year: String? = null) {
      viewModelScope.launch {
          _isSearchingSub.value = true
-         wyzieRepository.search(query, season, episode, year)
+         wyzieRepository.search(query, season, episode, year, movieHash = _videoHash.value)
              .onSuccess { results ->
                  _wyzieSearchResults.value = results
              }
@@ -755,6 +769,11 @@ class PlayerViewModel(
           _isDownloadingSub.value = true
           wyzieRepository.download(subtitle, currentMediaTitle)
               .onSuccess { uri ->
+                  // If this is a perfect hash match, reset delay to 0
+                  if (subtitle.isHashMatch) {
+                      MPVLib.setPropertyDouble("sub-delay", 0.0)
+                      Log.d(TAG, "Perfect sync match applied: Resetting sub-delay to 0.0")
+                  }
                   addSubtitle(uri)
               }
               .onFailure {

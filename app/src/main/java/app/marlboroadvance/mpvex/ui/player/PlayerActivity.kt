@@ -1694,6 +1694,14 @@ class PlayerActivity :
     // Start media notification service (like YouTube - always show notification)
     startBackgroundPlayback()
 
+    // Calculate video hash for perfect sync matching
+    val currentUri = if (playlist.isNotEmpty() && playlistIndex in playlist.indices) {
+      playlist[playlistIndex]
+    } else {
+      extractUriFromIntent(intent)
+    }
+    currentUri?.let { viewModel.calculateVideoHash(it) }
+
     // Reset AB loop values when video changes
     viewModel.clearABLoop()
     
