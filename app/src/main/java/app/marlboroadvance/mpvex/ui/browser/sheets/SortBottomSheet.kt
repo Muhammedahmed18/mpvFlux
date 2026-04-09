@@ -1,14 +1,9 @@
 package app.marlboroadvance.mpvex.ui.browser.sheets
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -17,10 +12,10 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -31,13 +26,14 @@ import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 
 /**
- * A modern, One UI 7 / Android 16 inspired Sort Bottom Sheet.
+ * A modern, Material 3 "Contextual" Sort Bottom Sheet.
  * Features:
- * - Extreme roundness (48dp corners)
- * - Large, centered, black-weight typography
- * - Spring-animated selection states
- * - High-contrast "pill" toggles
- * - Integrated haptic feedback for a premium feel
+ * - Centered M3 Typography
+ * - Reset functionality
+ * - Grid-based selection for sort types (2x2)
+ * - Segmented Buttons for order
+ * - Grid-based View Options (2-columns)
+ * - Integrated haptic feedback
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +51,7 @@ fun SortBottomSheet(
     modifier: Modifier = Modifier,
     visibilityToggles: List<VisibilityToggle> = emptyList(),
     showSortOptions: Boolean = true,
+    onReset: (() -> Unit)? = null,
 ) {
     if (!isOpen) return
 
@@ -65,13 +62,13 @@ fun SortBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 48.dp, topEnd = 48.dp),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         dragHandle = {
             BottomSheetDefaults.DragHandle(
-                width = 64.dp,
-                height = 3.dp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+                width = 32.dp,
+                height = 4.dp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             )
         },
     ) {
@@ -79,22 +76,39 @@ fun SortBottomSheet(
             modifier = modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(bottom = 32.dp)
+                .padding(bottom = 24.dp)
                 .verticalScroll(rememberScrollState()),
-            horizontalAlignment = Alignment.Start
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Android 16 Style Header: Start, Bold
-            Text(
-                text = title,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Black,
-                color = MaterialTheme.colorScheme.onSurface,
+            // Step 1: M3 Centered Header with Reset Button
+            Box(
                 modifier = Modifier
-                    .padding(top = 8.dp, bottom = 16.dp)
-                    .padding(horizontal = 24.dp)
-                    .fillMaxWidth(),
-                textAlign = TextAlign.Start
-            )
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center
+                )
+
+                if (onReset != null) {
+                    TextButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onReset()
+                        },
+                        modifier = Modifier.align(Alignment.CenterEnd)
+                    ) {
+                        Text("Reset")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             if (showSortOptions) {
                 SortOptionsSection(
@@ -118,9 +132,9 @@ fun SortBottomSheet(
             if (visibilityToggles.isNotEmpty()) {
                 if (showSortOptions) {
                     HorizontalDivider(
-                        modifier = Modifier.padding(24.dp),
+                        modifier = Modifier.padding(vertical = 24.dp, horizontal = 24.dp),
                         thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
+                        color = MaterialTheme.colorScheme.outlineVariant
                     )
                 }
                 ViewOptionsSection(
@@ -132,7 +146,7 @@ fun SortBottomSheet(
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun SortOptionsSection(
     sortType: String,
@@ -148,56 +162,95 @@ private fun SortOptionsSection(
         modifier = Modifier.padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
-        // Sort Type Selection Grid
+        // Step 2: Sort Type Selection using a Grid-like 2x2 FlowRow
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(text = "Sort by")
 
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 maxItemsInEachRow = 2
             ) {
                 types.forEachIndexed { index, type ->
                     val isSelected = sortType == type
-                    ModernSortTypeItem(
-                        label = type,
-                        icon = icons.getOrNull(index),
-                        isSelected = isSelected,
-                        onClick = { onSortTypeChange(type) },
-                        modifier = Modifier.weight(1f)
-                    )
+                    // Use a Box with weight to force 2-column grid behavior
+                    Box(modifier = Modifier.weight(1f)) {
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onSortTypeChange(type) },
+                            label = {
+                                Text(
+                                    text = type,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center
+                                )
+                            },
+                            leadingIcon = if (icons.getOrNull(index) != null) {
+                                {
+                                    Icon(
+                                        imageVector = icons[index],
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            } else null,
+                            trailingIcon = if (isSelected) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            } else null,
+                            shape = RoundedCornerShape(16.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            border = null,
+                            modifier = Modifier.fillMaxWidth().height(48.dp)
+                        )
+                    }
                 }
             }
         }
 
-        // Sort Order - Modern Pill Toggle
+        // Step 3: Sort Order - Standard M3 Segmented Button
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SectionHeader(text = "Order")
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(5.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            SingleChoiceSegmentedButtonRow(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                OrderToggleItem(
-                    label = ascLabel,
-                    icon = Icons.Default.KeyboardArrowUp,
-                    isSelected = sortOrderAsc,
+                SegmentedButton(
+                    selected = sortOrderAsc,
                     onClick = { onSortOrderChange(true) },
-                    modifier = Modifier.weight(1f)
-                )
-                OrderToggleItem(
-                    label = descLabel,
-                    icon = Icons.Default.KeyboardArrowDown,
-                    isSelected = !sortOrderAsc,
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    icon = { SegmentedButtonDefaults.Icon(active = sortOrderAsc) {
+                        Icon(Icons.Default.KeyboardArrowUp, null, Modifier.size(18.dp))
+                    }}
+                ) {
+                    Text(ascLabel, style = MaterialTheme.typography.bodyMedium)
+                }
+                SegmentedButton(
+                    selected = !sortOrderAsc,
                     onClick = { onSortOrderChange(false) },
-                    modifier = Modifier.weight(1f)
-                )
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    icon = { SegmentedButtonDefaults.Icon(active = !sortOrderAsc) {
+                        Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(18.dp))
+                    }}
+                ) {
+                    Text(descLabel, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
     }
@@ -209,133 +262,9 @@ private fun SectionHeader(text: String) {
         text = text,
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.ExtraBold,
+        fontWeight = FontWeight.SemiBold,
         modifier = Modifier.padding(start = 8.dp)
     )
-}
-
-@Composable
-private fun ModernSortTypeItem(
-    label: String,
-    icon: ImageVector?,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val containerColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
-        else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "containerColor"
-    )
-    val contentColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
-        label = "contentColor"
-    )
-
-    Surface(
-        onClick = onClick,
-        modifier = modifier
-            .height(64.dp)
-            .animateContentSize(),
-        shape = RoundedCornerShape(24.dp),
-        color = containerColor,
-        contentColor = contentColor,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // Icon Circle
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f)
-                        else MaterialTheme.colorScheme.surfaceContainerHighest
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                if (icon != null) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = contentColor
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                modifier = Modifier.weight(1f)
-            )
-
-            if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = contentColor
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun OrderToggleItem(
-    label: String,
-    icon: ImageVector,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val containerColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.primaryContainer
-        else Color.Transparent,
-        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "toggleColor"
-    )
-    val contentColor by animateColorAsState(
-        if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer
-        else MaterialTheme.colorScheme.onSurfaceVariant,
-        label = "toggleContentColor"
-    )
-
-    Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxHeight(),
-        shape = CircleShape,
-        color = containerColor,
-        contentColor = contentColor,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Bold
-            )
-        }
-    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -350,64 +279,56 @@ private fun ViewOptionsSection(
     ) {
         SectionHeader(text = "View options")
 
+        // Step 4: 2-Column Grid for View Options
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
             maxItemsInEachRow = 2
         ) {
             toggles.forEach { toggle ->
-                ModernViewOptionItem(
-                    label = toggle.label,
-                    checked = toggle.checked,
-                    onCheckedChange = {
+                Surface(
+                    onClick = {
                         onToggle()
-                        toggle.onCheckedChange(it)
+                        toggle.onCheckedChange(!toggle.checked)
                     },
-                    modifier = Modifier.weight(1f)
-                )
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(64.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = toggle.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Switch(
+                            checked = toggle.checked,
+                            onCheckedChange = {
+                                onToggle()
+                                toggle.onCheckedChange(it)
+                            },
+                            modifier = Modifier.scale(0.7f) // Even smaller to fit better in grid
+                        )
+                    }
+                }
             }
-        }
-    }
-}
-
-@Composable
-private fun ModernViewOptionItem(
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = { onCheckedChange(!checked) },
-        modifier = modifier.height(64.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
-        contentColor = MaterialTheme.colorScheme.onSurface
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f)
-            )
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange,
-                colors = SwitchDefaults.colors(
-                    checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
-                    checkedTrackColor = MaterialTheme.colorScheme.primary,
-                    uncheckedThumbColor = MaterialTheme.colorScheme.outline,
-                    uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
-                )
-            )
+            
+            // Spacer for odd numbers of items to maintain grid alignment
+            if (toggles.size % 2 != 0) {
+                Spacer(modifier = Modifier.weight(1f))
+            }
         }
     }
 }
