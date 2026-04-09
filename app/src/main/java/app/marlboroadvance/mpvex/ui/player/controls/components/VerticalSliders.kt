@@ -13,15 +13,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.VolumeDown
+import androidx.compose.material.icons.automirrored.rounded.VolumeMute
+import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.automirrored.rounded.VolumeUp
 import androidx.compose.material.icons.rounded.BrightnessHigh
 import androidx.compose.material.icons.rounded.BrightnessLow
 import androidx.compose.material.icons.rounded.BrightnessMedium
-import androidx.compose.material.icons.rounded.VolumeDown
-import androidx.compose.material.icons.rounded.VolumeMute
-import androidx.compose.material.icons.rounded.VolumeOff
-import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -38,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.ui.theme.controlColor
 import kotlin.math.roundToInt
 
 fun percentage(
@@ -71,7 +71,7 @@ fun VerticalSlider(
         .width(48.dp) // Slightly narrower for a more elegant look
         .height(200.dp) // Taller for better precision
         .clip(sliderShape)
-        .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.45f)),
+        .background(Color.White.copy(alpha = 0.08f)), // Use glass effect regardless of theme
     contentAlignment = Alignment.BottomCenter,
   ) {
     // Active Fill
@@ -138,7 +138,7 @@ fun VerticalSlider(
           color = if (currentPercentage > 0.85f) {
             MaterialTheme.colorScheme.onPrimary
           } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            controlColor // Always use white/light color for visibility
           },
           textAlign = TextAlign.Center,
         )
@@ -154,7 +154,7 @@ fun VerticalSlider(
           tint = if (currentPercentage > 0.15f) {
             MaterialTheme.colorScheme.onPrimary
           } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
+            controlColor // Always use white/light color for visibility
           },
           modifier = Modifier.size(24.dp)
         )
@@ -229,10 +229,10 @@ fun VolumeSlider(
     modifier = modifier,
     label = label,
     icon = when {
-      mpvVolume == 0 -> Icons.Rounded.VolumeOff
-      mpvVolume in 1..30 -> Icons.Rounded.VolumeMute
-      mpvVolume in 31..60 -> Icons.Rounded.VolumeDown
-      else -> Icons.Rounded.VolumeUp
+      mpvVolume == 0 -> Icons.AutoMirrored.Rounded.VolumeOff
+      mpvVolume in 1..30 -> Icons.AutoMirrored.Rounded.VolumeMute
+      mpvVolume in 31..60 -> Icons.AutoMirrored.Rounded.VolumeDown
+      else -> Icons.AutoMirrored.Rounded.VolumeUp
     },
     overflowValue = if (mpvVolume > 100) boostVolume.toFloat() else null,
     overflowRange = boostRange?.let { it.start.toFloat()..it.endInclusive.toFloat() },
