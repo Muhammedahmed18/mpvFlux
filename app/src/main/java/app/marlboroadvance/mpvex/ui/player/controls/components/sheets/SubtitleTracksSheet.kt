@@ -1,9 +1,6 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -19,10 +16,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.ui.player.TrackNode
 import app.marlboroadvance.mpvex.ui.theme.spacing
@@ -51,7 +48,6 @@ fun SubtitlesSheet(
   val items = remember(tracks) {
     val list = mutableListOf<SubtitleItem>()
     
-    // Internal/Local tracks section
     val internal = tracks.filter { it.external != true }
     val external = tracks.filter { it.external == true }
     
@@ -85,7 +81,7 @@ fun SubtitlesSheet(
             onClick = onAddSubtitle
           ),
           TrackAction(
-            label = "Online Search",
+            label = "Search Online",
             icon = Icons.Default.Search,
             onClick = onOpenOnlineSearch
           ),
@@ -134,7 +130,7 @@ fun SubtitlesSheet(
                     tint = if (isSelected) {
                       MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     } else {
-                      MaterialTheme.colorScheme.onSurfaceVariant
+                      MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                     }
                   )
                 }
@@ -149,14 +145,14 @@ fun SubtitlesSheet(
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
-                    .padding(horizontal = MaterialTheme.spacing.smaller, vertical = MaterialTheme.spacing.extraSmall)
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 16.dp, bottom = 8.dp)
             )
         }
         SubtitleItem.Divider -> {
-            Spacer(modifier = Modifier.height(MaterialTheme.spacing.small))
             HorizontalDivider(
-              modifier = Modifier.padding(vertical = MaterialTheme.spacing.small),
-              color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+              modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+              color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
             )
         }
       }

@@ -1,7 +1,6 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -9,8 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreTime
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -22,6 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AudioChannels
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
@@ -30,7 +29,14 @@ import app.marlboroadvance.mpvex.ui.player.TrackNode
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import org.koin.compose.koinInject
+
+sealed class AudioItem {
+  data class Track(val node: TrackNode) : AudioItem()
+  data class Header(val title: String) : AudioItem()
+  object Divider : AudioItem()
+}
 
 @Composable
 fun AudioTracksSheet(
@@ -44,8 +50,27 @@ fun AudioTracksSheet(
   val audioPreferences = koinInject<AudioPreferences>()
   val audioChannels by audioPreferences.audioChannels.collectAsState()
 
+  val items = remember(tracks) {
+    val list = mutableListOf<AudioItem>()
+    val internal = tracks.filter { it.external != true }
+    val external = tracks.filter { it.external == true }
+
+    if (internal.isNotEmpty()) {
+      list.add(AudioItem.Header("Embedded Audio"))
+      list.addAll(internal.map { AudioItem.Track(it) })
+    }
+
+    if (external.isNotEmpty()) {
+      if (internal.isNotEmpty()) list.add(AudioItem.Divider)
+      list.add(AudioItem.Header("External Audio"))
+      list.addAll(external.map { AudioItem.Track(it) })
+    }
+
+    list.toImmutableList()
+  }
+
   GenericTracksSheet(
-    tracks,
+    tracks = items,
     onDismissRequest = onDismissRequest,
     header = {
       val audioActions = remember {
@@ -64,41 +89,69 @@ fun AudioTracksSheet(
       }
       TrackActionsRow(actions = audioActions)
     },
-    track = {
-      val externalLabel = stringResource(R.string.generic_external)
-      val metadata = remember(it) {
-        mutableListOf<String>().apply {
-          if (!it.codec.isNullOrBlank()) add(it.codec)
-          if (it.audioChannels != null) {
-            add(it.demuxChannels ?: "${it.audioChannels}ch")
+    track = { item ->
+      when (item) {
+        is AudioItem.Track -> {
+          val node = item.node
+          val externalLabel = stringResource(R.string.generic_external)
+          val metadata = remember(node) {
+            mutableListOf<String>().apply {
+              if (!node.codec.isNullOrBlank()) add(node.codec)
+              if (node.audioChannels != null) {
+                add(node.demuxChannels ?: "${node.audioChannels}ch")
+              }
+              if (node.external == true) add(externalLabel)
+              if (!node.lang.isNullOrBlank() && node.title?.contains(node.lang, ignoreCase = true) != true) {
+                add(node.lang)
+              }
+            }
           }
-          if (it.external == true) add(externalLabel)
+
+          TrackSelectableBar(
+            title = getTrackTitle(node),
+            isSelected = node.isSelected,
+            onClick = { onSelect(node) },
+            metadata = metadata
+          )
+        }
+        is AudioItem.Header -> {
+          Text(
+            text = item.title,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+              .padding(horizontal = 16.dp)
+              .padding(top = 16.dp, bottom = 8.dp)
+          )
+        }
+        AudioItem.Divider -> {
+          HorizontalDivider(
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+          )
         }
       }
-
-      TrackSelectableBar(
-        title = getTrackTitle(it),
-        isSelected = it.isSelected,
-        onClick = { onSelect(it) },
-        metadata = metadata
-      )
     },
     footer = {
       Column(
         modifier = Modifier
           .fillMaxWidth()
-          .padding(vertical = MaterialTheme.spacing.small)
+          .padding(top = 8.dp, bottom = 16.dp)
       ) {
         Text(
           text = stringResource(id = R.string.pref_audio_channels),
           style = MaterialTheme.typography.titleSmall,
           color = MaterialTheme.colorScheme.primary,
           fontWeight = FontWeight.Bold,
+          modifier = Modifier.padding(horizontal = 16.dp)
         )
-        Spacer(modifier = Modifier.height(MaterialTheme.spacing.small))
+        Spacer(modifier = Modifier.height(12.dp))
         
         SingleChoiceSegmentedButtonRow(
-          modifier = Modifier.fillMaxWidth()
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp)
         ) {
           AudioChannels.entries.forEachIndexed { index, channel ->
             this@SingleChoiceSegmentedButtonRow.SegmentedButton(
