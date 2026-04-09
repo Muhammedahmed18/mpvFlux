@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.ui.player.Decoder
 import app.marlboroadvance.mpvex.ui.player.Panels
@@ -27,6 +28,8 @@ import app.marlboroadvance.mpvex.utils.media.MediaInfoParser
 import dev.vivvvek.seeker.Segment
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import androidx.compose.runtime.collectAsState as composeCollectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -70,6 +73,8 @@ fun PlayerSheets(
   onShowSheet: (Sheets) -> Unit,
   onDismissRequest: () -> Unit,
 ) {
+  val scope = rememberCoroutineScope()
+
   when (sheetShown) {
     Sheets.None -> {}
     Sheets.SubtitleTracks -> {
@@ -322,8 +327,9 @@ fun PlayerSheets(
         viewModel.refreshPlaylistItems()
       }
 
-      // Observe playlist updates
+      // Observe playlist updates and loading state
       val playlist by viewModel.playlistItems.collectAsState()
+      val loadingItemIndex by viewModel.loadingItemIndex.collectAsState()
       val playerPreferences = koinInject<app.marlboroadvance.mpvex.preferences.PlayerPreferences>()
 
       if (playlist.isNotEmpty()) {
@@ -334,11 +340,16 @@ fun PlayerSheets(
           playlist = playlistImmutable,
           onDismissRequest = onDismissRequest,
           onItemClick = { item ->
-            viewModel.playPlaylistItem(item.index)
+            scope.launch {
+              onDismissRequest()
+              delay(200)
+              viewModel.playPlaylistItem(item.index)
+            }
           },
           totalCount = totalCount,
           isM3UPlaylist = isM3U,
           playerPreferences = playerPreferences,
+          loadingItemIndex = loadingItemIndex,
         )
       }
     }

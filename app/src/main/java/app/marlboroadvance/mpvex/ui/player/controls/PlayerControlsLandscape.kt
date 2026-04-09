@@ -1,8 +1,6 @@
 package app.marlboroadvance.mpvex.ui.player.controls
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -11,21 +9,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.preferences.PlayerButton
@@ -53,22 +49,20 @@ fun TopLeftPlayerControlsLandscape(
   Row(
     modifier = Modifier.width(IntrinsicSize.Max),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
+    horizontalArrangement = Arrangement.spacedBy(16.dp),
   ) {
     ControlsButton(
       icon = Icons.AutoMirrored.Default.ArrowBack,
       onClick = onBackPress,
-      color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
-      modifier = Modifier.size(45.dp),
+      color = controlColor,
+      modifier = Modifier.size(48.dp),
     )
-
-    val titleInteractionSource = remember { MutableInteractionSource() }
 
     Box(
       modifier =
         Modifier
-          .height(45.dp)
-          .clip(RoundedCornerShape(50))
+          .height(48.dp)
+          .clip(CircleShape)
           .clickable(
             enabled = playlistModeEnabled,
             onClick = {
@@ -77,65 +71,53 @@ fun TopLeftPlayerControlsLandscape(
             },
           ),
     ) {
-      Surface(
-        shape = RoundedCornerShape(50),
-        color =
-          if (hideBackground) {
-            Color.Transparent
-          } else {
-            MaterialTheme.colorScheme.surfaceContainer.copy(
-              alpha = 0.55f,
-            )
-          },
-        contentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        border =
-          if (hideBackground) {
-            null
-          } else {
-            BorderStroke(
-              1.dp,
-              MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-            )
-          },
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+        modifier =
+          Modifier.padding(
+            horizontal = 8.dp,
+            vertical = 8.dp,
+          ),
       ) {
-        Row(
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
-          modifier =
-            Modifier.padding(
-              horizontal = MaterialTheme.spacing.medium,
-              vertical = MaterialTheme.spacing.small,
-            ),
-        ) {
-          viewModel.getPlaylistInfo()?.let { playlistInfo ->
-            Text(
-              text = playlistInfo,
-              textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-              style = MaterialTheme.typography.bodyMedium,
-              maxLines = 1,
-              overflow = TextOverflow.Visible,
-                            color = MaterialTheme.colorScheme.primary,
-            )
-            Text(
-              text = Typography.bullet.toString(),
-              textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-              style = MaterialTheme.typography.bodyMedium,
-              maxLines = 1,
-              color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
-              overflow = TextOverflow.Clip,
-            )
-          }
+        val textShadow = Shadow(
+          color = Color.Black.copy(alpha = 0.6f),
+          offset = Offset(0f, 2f),
+          blurRadius = 4f
+        )
+
+        viewModel.getPlaylistInfo()?.let { playlistInfo ->
           Text(
-            text = mediaTitle ?: "",
+            text = playlistInfo,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            style = MaterialTheme.typography.labelLarge.copy(
+              shadow = textShadow,
+              fontWeight = FontWeight.Bold
+            ),
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.bodyMedium,
-                        color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f, fill = false),
+            overflow = TextOverflow.Visible,
+            color = MaterialTheme.colorScheme.primary,
+          )
+          Text(
+            text = "|",
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium.copy(shadow = textShadow),
+            maxLines = 1,
+            color = controlColor.copy(alpha = 0.5f),
+            overflow = TextOverflow.Clip,
           )
         }
+        Text(
+          text = mediaTitle ?: "",
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+          style = MaterialTheme.typography.titleMedium.copy(
+            shadow = textShadow,
+            fontWeight = FontWeight.SemiBold
+          ),
+          color = controlColor,
+          modifier = Modifier.weight(1f, fill = false),
+        )
       }
     }
   }
@@ -161,7 +143,7 @@ fun TopRightPlayerControlsLandscape(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
+    horizontalArrangement = Arrangement.spacedBy(16.dp),
   ) {
     buttons.forEach { button ->
       RenderPlayerButton(
@@ -181,7 +163,7 @@ fun TopRightPlayerControlsLandscape(
         onOpenPanel = onOpenPanel,
         viewModel = viewModel,
         activity = activity,
-        buttonSize = 45.dp,
+        buttonSize = 48.dp,
       )
     }
   }
@@ -207,7 +189,7 @@ fun BottomRightPlayerControlsLandscape(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
+    horizontalArrangement = Arrangement.spacedBy(16.dp),
   ) {
     buttons.forEach { button ->
       RenderPlayerButton(
@@ -227,7 +209,7 @@ fun BottomRightPlayerControlsLandscape(
         onOpenPanel = onOpenPanel,
         viewModel = viewModel,
         activity = activity,
-        buttonSize = 45.dp,
+        buttonSize = 48.dp,
       )
     }
   }
@@ -253,7 +235,7 @@ fun BottomLeftPlayerControlsLandscape(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
+    horizontalArrangement = Arrangement.spacedBy(16.dp),
   ) {
     buttons.forEach { button ->
       RenderPlayerButton(
@@ -273,10 +255,8 @@ fun BottomLeftPlayerControlsLandscape(
         onOpenPanel = onOpenPanel,
         viewModel = viewModel,
         activity = activity,
-        buttonSize = 45.dp,
+        buttonSize = 48.dp,
       )
     }
   }
 }
-
-

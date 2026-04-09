@@ -1699,6 +1699,9 @@ class PlayerActivity :
     
     // Reset progress save tracking when new media loads
     progressSaveManager.resetTracking()
+
+    // Clear playlist loading state in ViewModel
+    viewModel.clearPlaylistLoadingState()
     
     setIntentExtras(intent.extras)
 

@@ -95,6 +95,14 @@ class PlayerViewModel(
   private val _playlistItems = kotlinx.coroutines.flow.MutableStateFlow<List<app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaylistItem>>(emptyList())
   val playlistItems: kotlinx.coroutines.flow.StateFlow<List<app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaylistItem>> = _playlistItems.asStateFlow()
 
+  // Playlist loading state - tracks when a playlist item is being loaded
+  private val _isLoadingPlaylistItem = MutableStateFlow(false)
+  val isLoadingPlaylistItem: StateFlow<Boolean> = _isLoadingPlaylistItem.asStateFlow()
+
+  // Tracks which playlist item index is currently loading (-1 if none)
+  private val _loadingItemIndex = MutableStateFlow(-1)
+  val loadingItemIndex: StateFlow<Int> = _loadingItemIndex.asStateFlow()
+
   // Wyzie Search Results
   private val _wyzieSearchResults = MutableStateFlow<List<WyzieSubtitle>>(emptyList())
   val wyzieSearchResults: StateFlow<List<WyzieSubtitle>> = _wyzieSearchResults.asStateFlow()
@@ -1689,7 +1697,19 @@ class PlayerViewModel(
 
   fun playPlaylistItem(index: Int) {
     val activity = host as? PlayerActivity ?: return
+    // Set loading state before delegating to activity
+    _isLoadingPlaylistItem.value = true
+    _loadingItemIndex.value = index
     activity.playPlaylistItem(index)
+  }
+
+  /**
+   * Clears the playlist item loading state.
+   * Call this when video has finished loading or loading was cancelled.
+   */
+  fun clearPlaylistLoadingState() {
+    _isLoadingPlaylistItem.value = false
+    _loadingItemIndex.value = -1
   }
 
   /**
@@ -1905,6 +1925,18 @@ class PlayerViewModel(
 
   override fun onCleared() {
     super.onCleared()
+    // Cancel all active coroutine jobs
+    timerJob?.cancel()
+    seekCoalesceJob?.cancel()
+    mediaSearchJob?.cancel()
+
+    // Clear collections to prevent memory leaks
+    _externalSubtitles.clear()
+    mpvPathToUriMap.clear()
+    metadataCache.evictAll()
+
+    // Reset callback to prevent holding activity reference
+    onPauseCallback = null
   }
 }
 

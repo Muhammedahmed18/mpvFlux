@@ -581,17 +581,14 @@ fun PlayerControls(
           modifier =
             Modifier
               .then(
-                if (showSystemNavigationBar) {
-                  val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-                  Modifier.padding(
-                    bottom = navBarPadding.calculateBottomPadding()
-                  )
+                if (showSystemStatusBar) {
+                  Modifier.windowInsetsPadding(WindowInsets.statusBars)
                 } else {
                   Modifier
                 }
               )
               .constrainAs(unlockControlsButton) {
-                bottom.linkTo(parent.bottom, spacing.large)
+                top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.small)
                 end.linkTo(parent.end, spacing.large)
               },
         ) {
@@ -645,7 +642,7 @@ fun PlayerControls(
 
               Row(
                 modifier = Modifier,
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
               ) {
                 if (playlistMode && viewModel.hasPlaylistSupport()) {
@@ -656,41 +653,42 @@ fun PlayerControls(
                     onClick = { viewModel.playPrevious() },
                     enabled = prevEnabled,
                     modifier = Modifier
-                      .size(56.dp)
+                      .size(48.dp)
                       .then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier),
                     shape = CircleShape,
-                    iconSize = 28.dp,
+                    iconSize = 24.dp,
                     type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal,
-                    color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface
+                    color = controlColor
                   )
                 }
 
                 // Main Play/Pause Button
-                val playButtonColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer
-                val playContentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onPrimaryContainer
+                val playContentColor = controlColor
+                val playContainerColor = if (hideBackground) Color.Transparent else Color.Black.copy(alpha = 0.5f)
                 
                 Surface(
                   modifier = Modifier
-                    .size(84.dp)
+                    .size(72.dp)
                     .graphicsLayer {
                       scaleX = scale
                       scaleY = scale
                     }
-                    .then(if (hideBackground) Modifier.background(buttonShadow, MaterialTheme.shapes.extraLarge) else Modifier)
-                    .clip(MaterialTheme.shapes.extraLarge)
-                    .clickable(interaction, ripple()) {
+                    .then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier)
+                    .clip(CircleShape)
+                    .clickable(interaction, ripple(color = Color.White)) {
                       resetControlsTimestamp = System.currentTimeMillis()
                       viewModel.pauseUnpause()
                     },
-                  shape = MaterialTheme.shapes.extraLarge,
-                  color = playButtonColor,
+                  shape = CircleShape,
+                  color = playContainerColor,
                   contentColor = playContentColor,
+                  border = if (hideBackground) null else BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)),
                 ) {
                   Image(
                     painter = rememberAnimatedVectorPainter(icon, paused == false),
                     modifier = Modifier
                       .fillMaxSize()
-                      .padding(24.dp),
+                      .padding(20.dp),
                     contentDescription = null,
                     colorFilter = ColorFilter.tint(playContentColor),
                   )
@@ -704,12 +702,12 @@ fun PlayerControls(
                     onClick = { viewModel.playNext() },
                     enabled = nextEnabled,
                     modifier = Modifier
-                      .size(56.dp)
+                      .size(48.dp)
                       .then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier),
                     shape = CircleShape,
-                    iconSize = 28.dp,
+                    iconSize = 24.dp,
                     type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal,
-                    color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurface
+                    color = controlColor
                   )
                 }
               }
@@ -1069,55 +1067,62 @@ fun PlayerControls(
     val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
     val speedPresets by playerPreferences.speedPresets.collectAsState()
 
-    PlayerSheets(
-      viewModel = viewModel,
-      sheetShown = sheetShown,
-      subtitles = subtitles.toImmutableList(),
-      onAddSubtitle = viewModel::addSubtitle,
-      onToggleSubtitle = { id ->
-        if (viewModel.isSubtitleSelected(id)) {
-          MPVLib.setPropertyString("sid", "no")
-          MPVLib.setPropertyString("secondary-sid", "no")
-        } else {
-          MPVLib.setPropertyInt("sid", id)
-          MPVLib.setPropertyString("secondary-sid", "no")
-        }
-      },
-      isSubtitleSelected = viewModel::isSubtitleSelected,
-      onRemoveSubtitle = viewModel::removeSubtitle,
-      audioTracks = audioTracks.toImmutableList(),
-      onAddAudio = viewModel::addAudio,
-      onSelectAudio = {
-        if (MPVLib.getPropertyInt("aid") == it.id) {
-          MPVLib.setPropertyString("aid", "no")
-        } else {
-          MPVLib.setPropertyInt("aid", it.id)
-        }
-      },
-      chapter = chapters.getOrNull(currentChapter ?: 0),
-      chapters = chapters.toImmutableList(),
-      onSeekToChapter = {
-        MPVLib.setPropertyInt("chapter", it)
-        viewModel.unpause()
-      },
-      decoder = decoder,
-      onUpdateDecoder = { MPVLib.setPropertyString("hwdec", it.value) },
-      speed = playbackSpeed ?: playerPreferences.defaultSpeed.get(),
-      onSpeedChange = { MPVLib.setPropertyFloat("speed", it.toFixed(2)) },
-      onMakeDefaultSpeed = { playerPreferences.defaultSpeed.set(it.toFixed(2)) },
-      onAddSpeedPreset = { playerPreferences.speedPresets += it.toFixed(2).toString() },
-      onRemoveSpeedPreset = { playerPreferences.speedPresets -= it.toFixed(2).toString() },
-      onResetSpeedPresets = playerPreferences.speedPresets::delete,
-      speedPresets = speedPresets.map { it.toFloat() }.sorted(),
-      onResetDefaultSpeed = {
-        MPVLib.setPropertyFloat("speed", playerPreferences.defaultSpeed.deleteAndGet().toFixed(2))
-      },
-      sleepTimerTimeRemaining = sleepTimerTimeRemaining,
-      onStartSleepTimer = viewModel::startTimer,
-      onOpenPanel = onOpenPanel,
-      onShowSheet = onOpenSheet,
-      onDismissRequest = { onOpenSheet(Sheets.None) },
-    )
+    // Smooth sheet enter/exit animation
+    AnimatedVisibility(
+      visible = sheetShown != Sheets.None,
+      enter = slideInVertically { it } + fadeIn(),
+      exit = slideOutVertically { it } + fadeOut()
+    ) {
+      PlayerSheets(
+        viewModel = viewModel,
+        sheetShown = sheetShown,
+        subtitles = subtitles.toImmutableList(),
+        onAddSubtitle = viewModel::addSubtitle,
+        onToggleSubtitle = { id ->
+          if (viewModel.isSubtitleSelected(id)) {
+            MPVLib.setPropertyString("sid", "no")
+            MPVLib.setPropertyString("secondary-sid", "no")
+          } else {
+            MPVLib.setPropertyInt("sid", id)
+            MPVLib.setPropertyString("secondary-sid", "no")
+          }
+        },
+        isSubtitleSelected = viewModel::isSubtitleSelected,
+        onRemoveSubtitle = viewModel::removeSubtitle,
+        audioTracks = audioTracks.toImmutableList(),
+        onAddAudio = viewModel::addAudio,
+        onSelectAudio = {
+          if (MPVLib.getPropertyInt("aid") == it.id) {
+            MPVLib.setPropertyString("aid", "no")
+          } else {
+            MPVLib.setPropertyInt("aid", it.id)
+          }
+        },
+        chapter = chapters.getOrNull(currentChapter ?: 0),
+        chapters = chapters.toImmutableList(),
+        onSeekToChapter = {
+          MPVLib.setPropertyInt("chapter", it)
+          viewModel.unpause()
+        },
+        decoder = decoder,
+        onUpdateDecoder = { MPVLib.setPropertyString("hwdec", it.value) },
+        speed = playbackSpeed ?: playerPreferences.defaultSpeed.get(),
+        onSpeedChange = { MPVLib.setPropertyFloat("speed", it.toFixed(2)) },
+        onMakeDefaultSpeed = { playerPreferences.defaultSpeed.set(it.toFixed(2)) },
+        onAddSpeedPreset = { playerPreferences.speedPresets += it.toFixed(2).toString() },
+        onRemoveSpeedPreset = { playerPreferences.speedPresets -= it.toFixed(2).toString() },
+        onResetSpeedPresets = playerPreferences.speedPresets::delete,
+        speedPresets = speedPresets.map { it.toFloat() }.sorted(),
+        onResetDefaultSpeed = {
+          MPVLib.setPropertyFloat("speed", playerPreferences.defaultSpeed.deleteAndGet().toFixed(2))
+        },
+        sleepTimerTimeRemaining = sleepTimerTimeRemaining,
+        onStartSleepTimer = viewModel::startTimer,
+        onOpenPanel = onOpenPanel,
+        onShowSheet = onOpenSheet,
+        onDismissRequest = { onOpenSheet(Sheets.None) },
+      )
+    }
 
     val panel by viewModel.panelShown.collectAsState()
     PlayerPanels(
