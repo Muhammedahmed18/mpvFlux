@@ -144,6 +144,23 @@ class VideoListViewModel(
     loadVideos()
   }
 
+  /**
+   * Ensures that data is loaded. If videos are already present, it does nothing.
+   * This is safe to call during recompositions or lifecycle events.
+   */
+  fun ensureDataLoaded() {
+    if (_videos.value.isEmpty()) {
+      Log.d(tag, "ensureDataLoaded: No data found, triggering load")
+      loadVideos()
+    } else {
+      Log.d(tag, "ensureDataLoaded: Data already present, skipping redundant scan")
+      // Still refresh playback info to update progress bars
+      viewModelScope.launch {
+        loadPlaybackInfo(_videos.value)
+      }
+    }
+  }
+
   private fun loadVideos() {
     viewModelScope.launch(Dispatchers.IO) {
       try {

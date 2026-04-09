@@ -257,7 +257,8 @@ data class VideoListScreen(
       val observer =
         LifecycleEventObserver { _, event ->
           if (event == Lifecycle.Event.ON_RESUME) {
-            viewModel.refresh()
+            // Use ensureDataLoaded instead of refresh to prevent redundant hard scans
+            viewModel.ensureDataLoaded()
           }
         }
       lifecycleOwner.lifecycle.addObserver(observer)
@@ -305,7 +306,7 @@ data class VideoListScreen(
       },
     ) { padding ->
       val autoScrollToLastPlayed by browserPreferences.autoScrollToLastPlayed.collectAsState()
-      
+
       Box(modifier = Modifier.fillMaxSize()) {
         VideoListContent(
           folderId = bucketId,
@@ -333,7 +334,7 @@ data class VideoListScreen(
           modifier = Modifier.padding(padding),
           showFloatingBottomBar = showFloatingBottomBar,
         )
-        
+
         // Floating Material 3 Button Group overlay with animation
         // Play Store gating is intentionally bypassed here.
         AnimatedVisibility(
@@ -582,18 +583,18 @@ private fun VideoListContent(
     else -> {
       val rememberedListIndex = rememberSaveable { mutableIntStateOf(0) }
       val rememberedListOffset = rememberSaveable { mutableIntStateOf(0) }
-      
+
       val initialListIndex = if (rememberedListIndex.intValue > 0) {
           rememberedListIndex.intValue
       } else if (autoScrollToLastPlayed && recentlyPlayedFilePath != null && videosWithInfo.isNotEmpty()) {
           videosWithInfo.indexOfFirst { it.video.path == recentlyPlayedFilePath }.coerceAtLeast(0)
       } else 0
-      
+
       val listState = rememberLazyListState(
           initialFirstVisibleItemIndex = initialListIndex,
           initialFirstVisibleItemScrollOffset = rememberedListOffset.intValue
       )
-      
+
       LaunchedEffect(listState) {
         snapshotFlow { Pair(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
           .collectLatest { (index, offset) ->
@@ -716,6 +717,18 @@ private fun VideoSortBottomSheet(
     sortOrderAsc = sortOrder.isAscending,
     onSortOrderChange = { isAsc ->
       onSortOrderChange(if (isAsc) SortOrder.Ascending else SortOrder.Descending)
+    },
+    onReset = {
+      onSortTypeChange(VideoSortType.Title)
+      onSortOrderChange(SortOrder.Ascending)
+      browserPreferences.showVideoThumbnails.set(true)
+      browserPreferences.showVideoExtension.set(false)
+      browserPreferences.showSubtitleIndicator.set(true)
+      appearancePreferences.unlimitedNameLines.set(false)
+      browserPreferences.showSizeChip.set(true)
+      browserPreferences.showResolutionChip.set(true)
+      browserPreferences.showFramerateInResolution.set(false)
+      browserPreferences.showDateChip.set(true)
     },
     types =
       listOf(
