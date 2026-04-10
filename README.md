@@ -10,7 +10,7 @@ A fork of MpvEx, free and open source media player app
 
 • Improved the battery efficency by removing polling loop functionality 
 
-• Advanced Subtitle Engine: Built a deep-integration subtitle search system (via Wyzie/SubDL) featuring hash-based "Perfect Sync" matching and strict client-side language filtering.
+• Advanced Subtitle Engine: Implemented a hashing-based subtitle matching system that analyzes the first and last 64KB of a video file. This enables accurate subtitle detection during online searches, ensuring perfectly synchronized subtitles with no audio delay.
 
 •Enhanced Resource Management: Implemented an asynchronous scanning engine and intelligent caching to ensure the UI remains responsive while processing massive local storage libraries.
 
