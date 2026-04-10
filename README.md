@@ -8,7 +8,7 @@ A fork of MpvEx, free and open source media player app
 
 • Updated UI to more modern, material 3 design
 
-• Improved the battery efficency by removing polling loop functionality 
+• Improved the battery efficency by removing polling loop logic and replacing with conditional based logic
 
 • Advanced Subtitle Engine: Implemented a hashing-based subtitle matching system that analyzes the first and last 64KB of a video file. This enables accurate subtitle detection during online searches, ensuring perfectly synchronized subtitles with no audio delay.
 
