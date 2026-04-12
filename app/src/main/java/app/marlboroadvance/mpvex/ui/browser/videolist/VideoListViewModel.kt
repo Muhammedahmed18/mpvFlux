@@ -58,10 +58,6 @@ class VideoListViewModel(
   private val _isLoading = MutableStateFlow(true)
   val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-  // Track if items were deleted/moved leaving folder empty
-  private val _videosWereDeletedOrMoved = MutableStateFlow(false)
-  val videosWereDeletedOrMoved: StateFlow<Boolean> = _videosWereDeletedOrMoved.asStateFlow()
-
   val lastPlayedInFolderPath: StateFlow<String?> =
     recentlyPlayedRepository
       .observeRecentlyPlayed(limit = 100)
@@ -81,9 +77,6 @@ class VideoListViewModel(
       }
       .distinctUntilChanged()
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-  // Track previous video count to detect if folder became empty
-  private var previousVideoCount = 0
 
   private val tag = "VideoListViewModel"
 
@@ -187,14 +180,6 @@ class VideoListViewModel(
           loadPlaybackInfo(enrichedList)
         }
 
-        // Check if folder became empty after having videos
-        if (previousVideoCount > 0 && videoList.isEmpty()) {
-          _videosWereDeletedOrMoved.value = true
-        } else if (videoList.isNotEmpty()) {
-          _videosWereDeletedOrMoved.value = false
-        }
-        previousVideoCount = videoList.size
-
         if (videoList.isEmpty()) {
           Log.d(tag, "No videos found for bucket $bucketId - attempting media rescan")
           triggerMediaScan()
@@ -222,13 +207,6 @@ class VideoListViewModel(
         _isLoading.value = false
       }
     }
-  }
-
-  /**
-   * Set flag indicating videos were deleted or moved
-   */
-  fun setVideosWereDeletedOrMoved() {
-    _videosWereDeletedOrMoved.value = true
   }
 
   private suspend fun loadPlaybackInfo(videos: List<Video>) {

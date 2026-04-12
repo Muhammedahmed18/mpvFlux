@@ -2,6 +2,7 @@ package app.marlboroadvance.mpvex.ui.browser.dialogs
 
 import android.content.Context
 import android.os.Environment
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,23 +15,28 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.SdCard
 import androidx.compose.material.icons.filled.Usb
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,61 +51,61 @@ import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.utils.storage.StorageVolumeUtils
 import java.io.File
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FolderPickerDialog(
   modifier: Modifier = Modifier,
   isOpen: Boolean,
   currentPath: String = Environment.getExternalStorageDirectory().absolutePath,
+  titlePrefix: String = "Move to",
   onDismiss: () -> Unit,
   onFolderSelected: (String) -> Unit,
 ) {
   if (!isOpen) return
 
   val context = LocalContext.current
+  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   
   // Get all available storage volumes
   val storageVolumes = remember(isOpen) {
     StorageVolumeUtils.getAllStorageVolumes(context)
   }
   
-  // If there's only one storage volume, start there directly
-  // Otherwise, start at storage root view to show all volumes
   var selectedPath by remember(isOpen, storageVolumes) {
     val initialPath = if (storageVolumes.size == 1) {
       StorageVolumeUtils.getVolumePath(storageVolumes.first())
     } else {
-      null // Show storage root with all volumes
+      null 
     }
     mutableStateOf(initialPath)
   }
   var showCreateFolderDialog by remember { mutableStateOf(false) }
 
-  // Determine what to show based on selectedPath
   val showStorageRoot = selectedPath == null
+  val currentDir = remember(selectedPath) { selectedPath?.let { File(it) } }
   
-  val currentDir = remember(selectedPath) { 
-    selectedPath?.let { File(it) }
+  val folders = remember(selectedPath) {
+    if (showStorageRoot) {
+      emptyList<File>()
+    } else {
+      currentDir?.listFiles { file -> file.isDirectory && !file.name.startsWith(".") }
+        ?.sortedBy { it.name.lowercase() }
+        ?: emptyList()
+    }
   }
-  
-  val folders =
-    remember(selectedPath) {
-      if (showStorageRoot) {
-        // Show storage volumes as "folders"
-        emptyList<File>()
-      } else {
-        currentDir
-          ?.listFiles { file -> file.isDirectory && !file.name.startsWith(".") }
-          ?.sortedBy { it.name.lowercase() }
-          ?: emptyList()
-      }
-    }
 
-  // Check if selected path is the same as current path
-  val isSameAsSource =
-    remember(selectedPath, currentPath) {
-      selectedPath != null && selectedPath == currentPath
+  val isSameAsSource = remember(selectedPath, currentPath) {
+    selectedPath != null && selectedPath == currentPath
+  }
+
+  val displayName = remember(selectedPath, storageVolumes) {
+    val volume = storageVolumes.find { StorageVolumeUtils.getVolumePath(it) == selectedPath }
+    if (volume != null) {
+      volume.getDescription(context)
+    } else {
+      selectedPath?.let { File(it).name } ?: "Select a storage location"
     }
+  }
 
   if (showCreateFolderDialog && selectedPath != null) {
     CreateFolderDialog(
@@ -110,188 +116,149 @@ fun FolderPickerDialog(
         showCreateFolderDialog = false
       },
     )
-    return
   }
 
-  AlertDialog(
+  ModalBottomSheet(
     onDismissRequest = onDismiss,
-    title = {
-      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-          text = "Select Folder",
-          style = MaterialTheme.typography.headlineMedium,
-          fontWeight = FontWeight.Bold,
-        )
-        Text(
-          text = selectedPath ?: "Select a storage location",
-          style = MaterialTheme.typography.bodyMedium,
-          fontWeight = FontWeight.Medium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-          modifier = Modifier.padding(top = 4.dp),
-        )
-        if (isSameAsSource) {
+    sheetState = sheetState,
+    dragHandle = { BottomSheetDefaults.DragHandle() },
+    containerColor = MaterialTheme.colorScheme.surface,
+  ) {
+    @Suppress("DEPRECATION")
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 24.dp)
+        .padding(bottom = 32.dp),
+      verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+      // Modern Header Section
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
           Text(
-            text = "Cannot select the same folder",
-            style = MaterialTheme.typography.bodyMedium,
+            text = "$titlePrefix:",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.padding(top = 4.dp),
+          )
+          Text(
+            text = displayName,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+            modifier = Modifier.basicMarquee()
+          )
+        }
+
+        IconButton(
+          onClick = { selectedPath?.let { onFolderSelected(it) } },
+          enabled = selectedPath != null && !isSameAsSource,
+          colors = IconButtonDefaults.filledIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+          ),
+          modifier = Modifier.size(56.dp)
+        ) {
+          Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = "Confirm Selection",
+            modifier = Modifier.size(32.dp)
           )
         }
       }
-    },
-    text = {
-      Column(
+
+      if (isSameAsSource) {
+        Text(
+          text = "Cannot select the same folder",
+          style = MaterialTheme.typography.bodyMedium,
+          fontWeight = FontWeight.Bold,
+          color = MaterialTheme.colorScheme.error,
+        )
+      }
+
+      // Modern Navigation Icon Bar
+      Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
       ) {
-        // Navigation buttons
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          // Back button - go to parent or storage root
-          if (selectedPath != null) {
-            FilledTonalIconButton(
-              onClick = {
-                val parent = currentDir?.parent
-                selectedPath = parent // null will show storage root
-              },
-              colors =
-                IconButtonDefaults.filledTonalIconButtonColors(
-                  containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                  contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                ),
-              shape = MaterialTheme.shapes.extraLarge,
-            ) {
-              Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Go back",
-              )
-            }
-          }
-
-          // Home button - go to internal storage
+        if (selectedPath != null) {
           FilledTonalIconButton(
-            onClick = {
-              selectedPath = Environment.getExternalStorageDirectory().absolutePath
-            },
-            colors =
-              IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-              ),
-            shape = MaterialTheme.shapes.extraLarge,
-          ) {
-            Icon(
-              imageVector = Icons.Default.Home,
-              contentDescription = "Go to internal storage",
+            onClick = { selectedPath = currentDir?.parent },
+            modifier = Modifier.size(48.dp),
+            colors = IconButtonDefaults.filledTonalIconButtonColors(
+              containerColor = MaterialTheme.colorScheme.secondaryContainer,
             )
-          }
-
-          // Create folder button - only enabled when not at storage root
-          FilledTonalIconButton(
-            onClick = { showCreateFolderDialog = true },
-            enabled = selectedPath != null,
-            colors =
-              IconButtonDefaults.filledTonalIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-              ),
-            shape = MaterialTheme.shapes.extraLarge,
           ) {
-            Icon(
-              imageVector = Icons.Default.CreateNewFolder,
-              contentDescription = "Create folder",
-            )
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
           }
         }
 
-        // Folder/Volume list
-        LazyColumn(
-          modifier =
-            Modifier
-              .fillMaxWidth()
-              .height(300.dp),
-          verticalArrangement = Arrangement.spacedBy(4.dp),
+        FilledTonalIconButton(
+          onClick = { selectedPath = Environment.getExternalStorageDirectory().absolutePath },
+          modifier = Modifier.size(48.dp),
+          colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+          )
         ) {
-          if (showStorageRoot) {
-            // Show storage volumes
-            items(storageVolumes) { volume ->
-              val volumePath = StorageVolumeUtils.getVolumePath(volume)
-              if (volumePath != null) {
-                StorageVolumeItem(
-                  context = context,
-                  volume = volume,
-                  volumePath = volumePath,
-                  onClick = { selectedPath = volumePath },
-                )
-              }
-            }
-            
-            if (storageVolumes.isEmpty()) {
-              item {
-                Text(
-                  text = "No storage devices found",
-                  style = MaterialTheme.typography.bodyLarge,
-                  fontWeight = FontWeight.Medium,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-                  modifier = Modifier.padding(16.dp),
-                )
-              }
-            }
-          } else {
-            // Show folders
-            items(folders) { folder ->
-              FolderItem(
-                folder = folder,
-                onClick = { selectedPath = folder.absolutePath },
+          Icon(Icons.Default.Home, "Home")
+        }
+
+        FilledTonalIconButton(
+          onClick = { showCreateFolderDialog = true },
+          enabled = selectedPath != null,
+          modifier = Modifier.size(48.dp),
+          colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+          )
+        ) {
+          Icon(Icons.Default.CreateNewFolder, "New Folder")
+        }
+      }
+
+      // Folder/Volume list
+      LazyColumn(
+        modifier = Modifier
+          .fillMaxWidth()
+          .height(300.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+      ) {
+        if (showStorageRoot) {
+          items(storageVolumes) { volume ->
+            val volumePath = StorageVolumeUtils.getVolumePath(volume)
+            if (volumePath != null) {
+              StorageVolumeItem(
+                context = context,
+                volume = volume,
+                volumePath = volumePath,
+                onClick = { selectedPath = volumePath },
               )
             }
-
-            if (folders.isEmpty()) {
-              item {
-                Text(
-                  text = "No subfolders",
-                  style = MaterialTheme.typography.bodyLarge,
-                  fontWeight = FontWeight.Medium,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-                  modifier = Modifier.padding(16.dp),
-                )
-              }
+          }
+        } else {
+          items(folders) { folder ->
+            FolderItem(
+              folder = folder,
+              onClick = { selectedPath = folder.absolutePath },
+            )
+          }
+          if (folders.isEmpty()) {
+            item {
+              Text(
+                text = "No subfolders",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp),
+              )
             }
           }
         }
       }
-    },
-    confirmButton = {
-      Button(
-        onClick = { selectedPath?.let { onFolderSelected(it) } },
-        enabled = selectedPath != null && !isSameAsSource,
-        colors =
-          ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-          ),
-        shape = MaterialTheme.shapes.extraLarge,
-      ) {
-        Text("Select", fontWeight = FontWeight.Bold)
-      }
-    },
-    dismissButton = {
-      TextButton(
-        onClick = onDismiss,
-        shape = MaterialTheme.shapes.extraLarge,
-      ) {
-        Text("Cancel", fontWeight = FontWeight.Medium)
-      }
-    },
-    containerColor = MaterialTheme.colorScheme.surface,
-    tonalElevation = 6.dp,
-    shape = MaterialTheme.shapes.extraLarge,
-    modifier = modifier,
-  )
+    }
+  }
 }
 
 @Composable
@@ -300,7 +267,6 @@ private fun StorageVolumeItem(
   volume: android.os.storage.StorageVolume,
   volumePath: String,
   onClick: () -> Unit,
-  modifier: Modifier = Modifier,
 ) {
   val description = volume.getDescription(context)
   val isPrimary = volume.isPrimary
@@ -314,12 +280,11 @@ private fun StorageVolumeItem(
   }
   
   Row(
-    modifier =
-      modifier
-        .fillMaxWidth()
-        .clickable(onClick = onClick)
-        .padding(horizontal = 12.dp, vertical = 12.dp),
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable(onClick = onClick)
+      .padding(vertical = 12.dp),
+    horizontalArrangement = Arrangement.spacedBy(16.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(
@@ -328,23 +293,16 @@ private fun StorageVolumeItem(
       tint = MaterialTheme.colorScheme.primary,
       modifier = Modifier.size(32.dp),
     )
-    Column(
-      verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
+    Column {
       Text(
         text = description,
         style = MaterialTheme.typography.bodyLarge,
         fontWeight = FontWeight.Bold,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
       )
       Text(
         text = volumePath,
         style = MaterialTheme.typography.bodyMedium,
-        fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
       )
     }
   }
@@ -354,15 +312,13 @@ private fun StorageVolumeItem(
 private fun FolderItem(
   folder: File,
   onClick: () -> Unit,
-  modifier: Modifier = Modifier,
 ) {
   Row(
-    modifier =
-      modifier
-        .fillMaxWidth()
-        .clickable(onClick = onClick)
-        .padding(horizontal = 12.dp, vertical = 8.dp),
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable(onClick = onClick)
+      .padding(vertical = 10.dp),
+    horizontalArrangement = Arrangement.spacedBy(16.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(
@@ -375,13 +331,10 @@ private fun FolderItem(
       text = folder.name,
       style = MaterialTheme.typography.bodyLarge,
       fontWeight = FontWeight.Medium,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
     )
   }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CreateFolderDialog(
   parentPath: String,
@@ -393,13 +346,7 @@ private fun CreateFolderDialog(
 
   AlertDialog(
     onDismissRequest = onDismiss,
-    title = {
-      Text(
-        "Create New Folder",
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Bold,
-      )
-    },
+    title = { Text("Create New Folder", fontWeight = FontWeight.Bold) },
     text = {
       Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(
@@ -408,22 +355,16 @@ private fun CreateFolderDialog(
             folderName = it
             error = null
           },
-          label = { Text("Folder name", fontWeight = FontWeight.Medium) },
+          label = { Text("Folder name") },
           singleLine = true,
           isError = error != null,
           modifier = Modifier.fillMaxWidth(),
-          colors =
-            OutlinedTextFieldDefaults.colors(
-              focusedBorderColor = MaterialTheme.colorScheme.primary,
-              focusedLabelColor = MaterialTheme.colorScheme.primary,
-            ),
           shape = MaterialTheme.shapes.extraLarge,
         )
         if (error != null) {
           Text(
             text = error!!,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.error,
           )
         }
@@ -432,47 +373,23 @@ private fun CreateFolderDialog(
     confirmButton = {
       Button(
         onClick = {
-          if (folderName.isBlank()) {
-            error = "Folder name cannot be empty"
-            return@Button
-          }
-
+          if (folderName.isBlank()) return@Button
           val newFolder = File(parentPath, folderName)
           if (newFolder.exists()) {
             error = "Folder already exists"
             return@Button
           }
-
-          try {
-            if (newFolder.mkdirs()) {
-              onFolderCreated(newFolder.absolutePath)
-            } else {
-              error = "Failed to create folder"
-            }
-          } catch (e: Exception) {
-            error = e.message ?: "Unknown error"
-          }
+          if (newFolder.mkdirs()) onFolderCreated(newFolder.absolutePath)
+          else error = "Failed to create folder"
         },
-        enabled = folderName.isNotBlank(),
-        colors =
-          ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-          ),
         shape = MaterialTheme.shapes.extraLarge,
       ) {
         Text("Create", fontWeight = FontWeight.Bold)
       }
     },
     dismissButton = {
-      TextButton(
-        onClick = onDismiss,
-        shape = MaterialTheme.shapes.extraLarge,
-      ) {
-        Text("Cancel", fontWeight = FontWeight.Medium)
-      }
+      TextButton(onClick = onDismiss) { Text("Cancel") }
     },
-    containerColor = MaterialTheme.colorScheme.surface,
-    tonalElevation = 6.dp,
     shape = MaterialTheme.shapes.extraLarge,
   )
 }

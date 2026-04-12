@@ -1,34 +1,50 @@
 package app.marlboroadvance.mpvex.ui.browser.dialogs
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.WavyProgressIndicatorDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.utils.media.CopyPasteOps
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FileOperationProgressDialog(
   isOpen: Boolean,
@@ -40,39 +56,124 @@ fun FileOperationProgressDialog(
 ) {
   if (!isOpen) return
 
-  val operationName =
-    when (operationType) {
-      is CopyPasteOps.OperationType.Copy -> "Copying"
-      is CopyPasteOps.OperationType.Move -> "Moving"
-    }
-
   val isOperationComplete = progress.isComplete || progress.isCancelled || progress.error != null
 
-  AlertDialog(
-    onDismissRequest = {
-      if (isOperationComplete) {
-        onDismiss()
+  val sheetState = rememberModalBottomSheetState(
+    skipPartiallyExpanded = true,
+    confirmValueChange = { isOperationComplete }
+  )
+
+  val operationName = when (operationType) {
+    is CopyPasteOps.OperationType.Copy -> "Copying"
+    is CopyPasteOps.OperationType.Move -> "Moving"
+  }
+
+  ModalBottomSheet(
+    onDismissRequest = { if (isOperationComplete) onDismiss() },
+    sheetState = sheetState,
+    dragHandle = { BottomSheetDefaults.DragHandle() },
+    containerColor = MaterialTheme.colorScheme.surface,
+    modifier = modifier,
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 24.dp)
+        .padding(bottom = 32.dp),
+      verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+      // Header Section
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            text = "$operationName files",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.ExtraBold,
+          )
+          if (!isOperationComplete) {
+            Text(
+              text = "File ${progress.currentFileIndex} of ${progress.totalFiles}",
+              style = MaterialTheme.typography.bodyMedium,
+              color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+          }
+        }
+
+        // Action Button: Cancel (during) or Done/Close (after)
+        if (!isOperationComplete) {
+          IconButton(
+            onClick = onCancel,
+            modifier = Modifier.size(48.dp)
+          ) {
+            Icon(
+              imageVector = Icons.Default.Close,
+              contentDescription = "Cancel",
+              tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+          }
+        } else {
+          val isSuccess = progress.isComplete && progress.error == null && !progress.isCancelled
+          
+          if (isSuccess) {
+            AnimatedVisibility(
+              visible = true,
+              enter = fadeIn() + scaleIn(animationSpec = tween(300)),
+              exit = fadeOut() + scaleOut()
+            ) {
+              IconButton(
+                onClick = onDismiss,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                  containerColor = MaterialTheme.colorScheme.primaryContainer,
+                  contentColor = MaterialTheme.colorScheme.primary,
+                ),
+                modifier = Modifier.size(56.dp)
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Check,
+                  contentDescription = "Done",
+                  modifier = Modifier.size(32.dp)
+                )
+              }
+            }
+          } else {
+            IconButton(
+              onClick = onDismiss,
+              modifier = Modifier.size(48.dp)
+            ) {
+              Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Dismiss",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+              )
+            }
+          }
+        }
       }
-    },
-    title = {
-      Text(
-        text = "$operationName files",
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Bold,
-      )
-    },
-    text = {
+
+      // Progress Content
       Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
-        // Status Messages
         when {
           progress.error != null -> {
             StatusCard(
               message = progress.error,
               containerColor = MaterialTheme.colorScheme.errorContainer,
               contentColor = MaterialTheme.colorScheme.onErrorContainer,
+              icon = Icons.Default.Error
+            )
+          }
+          progress.isCancelled -> {
+            StatusCard(
+              message = "Operation cancelled",
+              containerColor = MaterialTheme.colorScheme.surfaceVariant,
+              contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+              icon = Icons.Default.Info
             )
           }
           progress.isComplete -> {
@@ -80,69 +181,33 @@ fun FileOperationProgressDialog(
               message = "Operation completed successfully!",
               containerColor = MaterialTheme.colorScheme.primaryContainer,
               contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+              icon = Icons.Default.CheckCircle
             )
           }
-          progress.isCancelled -> {
-            StatusCard(
-              message = "Operation cancelled",
-              containerColor = MaterialTheme.colorScheme.secondaryContainer,
-              contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-          }
-        }
-
-        // Progress Section (only show during operation)
-        if (!isOperationComplete) {
-          Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            // Current File Info
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-              Text(
-                text = "File ${progress.currentFileIndex} of ${progress.totalFiles}",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-              )
-              Text(
-                text = progress.currentFile,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface,
-              )
-            }
-
-            // Current File Progress
-            ProgressSection(
-              label = "Current file",
-              progress = progress.currentFileProgress,
-            )
-
-            // Overall Progress
-            ProgressSection(
-              label = "Overall progress",
-              progress = progress.overallProgress,
-            )
-
-            // Size Information
+          else -> {
+            // Current File Name
             Text(
-              text = "${CopyPasteOps.formatBytes(
-                progress.bytesProcessed,
-              )} of ${CopyPasteOps.formatBytes(progress.totalBytes)}",
-              style = MaterialTheme.typography.bodyLarge,
-              fontWeight = FontWeight.Medium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              modifier = Modifier.fillMaxWidth(),
+              text = progress.currentFile,
+              style = MaterialTheme.typography.titleMedium,
+              fontWeight = FontWeight.Bold,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+            )
+
+            // Overall Progress Section
+            ProgressSection(
+              label = "Overall Progress",
+              progress = progress.overallProgress,
+              details = "${CopyPasteOps.formatBytes(progress.bytesProcessed)} / ${CopyPasteOps.formatBytes(progress.totalBytes)}"
             )
           }
         }
 
-        // Summary (when complete)
         if (isOperationComplete) {
           Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SummaryRow(
-              label = "Files processed",
-              value = "${progress.currentFileIndex} / ${progress.totalFiles}",
+              label = "Total Files",
+              value = progress.totalFiles.toString(),
             )
             SummaryRow(
               label = "Total size",
@@ -151,41 +216,11 @@ fun FileOperationProgressDialog(
           }
         }
       }
-    },
-    confirmButton = {
-      if (isOperationComplete) {
-        Button(
-          onClick = onDismiss,
-          colors =
-            ButtonDefaults.buttonColors(
-              containerColor = MaterialTheme.colorScheme.primary,
-            ),
-          shape = MaterialTheme.shapes.extraLarge,
-        ) {
-          Text("Done", fontWeight = FontWeight.Bold)
-        }
-      } else {
-        TextButton(
-          onClick = onCancel,
-          shape = MaterialTheme.shapes.extraLarge,
-        ) {
-          Icon(
-            imageVector = Icons.Default.Cancel,
-            contentDescription = "Cancel",
-            modifier = Modifier.padding(end = 4.dp),
-          )
-          Text("Cancel", fontWeight = FontWeight.Medium)
-        }
-      }
-    },
-    containerColor = MaterialTheme.colorScheme.surface,
-    tonalElevation = 6.dp,
-    shape = MaterialTheme.shapes.extraLarge,
-    modifier = modifier,
-  )
+    }
+  }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoadingDialog(
   isOpen: Boolean,
@@ -194,54 +229,60 @@ fun LoadingDialog(
 ) {
   if (!isOpen) return
 
-  AlertDialog(
+  ModalBottomSheet(
     onDismissRequest = onDismissRequest,
-    title = null,
-    text = {
-      Column(
-        modifier =
-          Modifier
-            .fillMaxWidth()
-            .padding(vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-      ) {
-        Text(
-          text = message,
-          style = MaterialTheme.typography.bodyLarge,
-          fontWeight = FontWeight.Medium,
-          color = MaterialTheme.colorScheme.onSurface,
-          textAlign = TextAlign.Center,
-        )
-      }
-    },
-    confirmButton = {},
+    dragHandle = { BottomSheetDefaults.DragHandle() },
     containerColor = MaterialTheme.colorScheme.surface,
-    tonalElevation = 6.dp,
-    shape = MaterialTheme.shapes.extraLarge,
-  )
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(24.dp)
+        .padding(bottom = 16.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+      CircularProgressIndicator(
+        modifier = Modifier.size(48.dp),
+        color = MaterialTheme.colorScheme.primary,
+        strokeWidth = 4.dp
+      )
+      Text(
+        text = message,
+        style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.Medium,
+        textAlign = TextAlign.Center,
+      )
+    }
+  }
 }
 
 @Composable
 private fun StatusCard(
   message: String,
-  containerColor: androidx.compose.ui.graphics.Color,
-  contentColor: androidx.compose.ui.graphics.Color,
+  containerColor: Color,
+  contentColor: Color,
+  icon: ImageVector? = null
 ) {
   Card(
-    colors =
-      CardDefaults.cardColors(
-        containerColor = containerColor,
-      ),
+    colors = CardDefaults.cardColors(containerColor = containerColor),
     shape = MaterialTheme.shapes.extraLarge,
   ) {
-    Text(
-      text = message,
-      style = MaterialTheme.typography.bodyLarge,
-      color = contentColor,
-      fontWeight = FontWeight.Bold,
+    Row(
       modifier = Modifier.padding(20.dp),
-    )
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+      if (icon != null) {
+        Icon(icon, null, tint = contentColor)
+      }
+      Text(
+        text = message,
+        style = MaterialTheme.typography.bodyLarge,
+        color = contentColor,
+        fontWeight = FontWeight.Bold,
+      )
+    }
   }
 }
 
@@ -250,41 +291,45 @@ private fun StatusCard(
 private fun ProgressSection(
   label: String,
   progress: Float,
+  details: String
 ) {
-  Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+  val percentage = (progress * 100).toInt().coerceIn(0, 100)
+  
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.SpaceBetween,
+      verticalAlignment = Alignment.Bottom
     ) {
+      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+          text = label,
+          style = MaterialTheme.typography.labelLarge,
+          color = MaterialTheme.colorScheme.primary,
+          fontWeight = FontWeight.Bold
+        )
+        Text(
+          text = "$percentage%",
+          style = MaterialTheme.typography.labelMedium,
+          color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+          fontWeight = FontWeight.SemiBold
+        )
+      }
       Text(
-        text = label,
-        style = MaterialTheme.typography.bodyLarge,
-        fontWeight = FontWeight.Medium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-      Text(
-        text = "${(progress * 100).toInt()}%",
-        style = MaterialTheme.typography.bodyLarge,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
+        text = details,
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
       )
     }
+    
     LinearWavyProgressIndicator(
-      modifier =
-        Modifier
-          .fillMaxWidth()
-          .padding(horizontal = 8.dp),
+      modifier = Modifier.fillMaxWidth(),
       color = MaterialTheme.colorScheme.primary,
       trackColor = MaterialTheme.colorScheme.surfaceVariant,
       stroke = WavyProgressIndicatorDefaults.linearIndicatorStroke,
       trackStroke = WavyProgressIndicatorDefaults.linearTrackStroke,
-      gapSize = WavyProgressIndicatorDefaults.LinearIndicatorTrackGapSize,
       amplitude = { 0.5f },
-      wavelength = WavyProgressIndicatorDefaults.LinearIndeterminateWavelength,
-      waveSpeed = WavyProgressIndicatorDefaults.LinearIndeterminateWavelength,
-      progress = {
-        progress
-      },
+      progress = { progress },
     )
   }
 }
@@ -301,14 +346,12 @@ private fun SummaryRow(
     Text(
       text = label,
       style = MaterialTheme.typography.bodyLarge,
-      fontWeight = FontWeight.Medium,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
     Text(
       text = value,
       style = MaterialTheme.typography.bodyLarge,
       fontWeight = FontWeight.Bold,
-      color = MaterialTheme.colorScheme.onSurface,
     )
   }
 }

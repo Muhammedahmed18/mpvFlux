@@ -8,7 +8,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
-import app.marlboroadvance.mpvex.preferences.preference.collectAsState
+import app.marlboroadvance.mpvex.repository.wyzie.WyzieEpisode
+import app.marlboroadvance.mpvex.repository.wyzie.WyzieSeason
+import app.marlboroadvance.mpvex.repository.wyzie.WyzieSubtitle
+import app.marlboroadvance.mpvex.repository.wyzie.WyzieTmdbResult
+import app.marlboroadvance.mpvex.repository.wyzie.WyzieTvShowDetails
 import app.marlboroadvance.mpvex.ui.player.Decoder
 import app.marlboroadvance.mpvex.ui.player.Panels
 import app.marlboroadvance.mpvex.ui.player.Sheets
@@ -19,10 +23,10 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.ChaptersSh
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.DecodersSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.FrameNavigationSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.MoreSheet
+import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.OnlineSubtitleSearchSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaybackSpeedSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaylistSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.SubtitlesSheet
-import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.OnlineSubtitleSearchSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.VideoZoomSheet
 import app.marlboroadvance.mpvex.utils.media.MediaInfoParser
 import dev.vivvvek.seeker.Segment
@@ -31,10 +35,10 @@ import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
-import androidx.compose.runtime.collectAsState as composeCollectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import app.marlboroadvance.mpvex.preferences.preference.collectAsState as collectPreferenceAsState
 
 @Composable
 fun PlayerSheets(
@@ -45,6 +49,7 @@ fun PlayerSheets(
   onAddSubtitle: (Uri) -> Unit,
   onToggleSubtitle: (Int) -> Unit,
   isSubtitleSelected: (Int) -> Boolean,
+  onAddSubtitleFromStorage: (String) -> Unit = {},
   onRemoveSubtitle: (Int) -> Unit,
   // audio sheet
   audioTracks: ImmutableList<TrackNode>,
@@ -143,22 +148,22 @@ fun PlayerSheets(
     }
 
     Sheets.OnlineSubtitleSearch -> {
-      val isSearching by viewModel.isSearchingSub.composeCollectAsState()
-      val isDownloading by viewModel.isDownloadingSub.composeCollectAsState()
-      val results by viewModel.wyzieSearchResults.composeCollectAsState()
-      val isOnlineSectionExpanded by viewModel.isOnlineSectionExpanded.composeCollectAsState()
+      val isSearching by viewModel.isSearchingSub.collectAsState()
+      val isDownloading by viewModel.isDownloadingSub.collectAsState()
+      val results by viewModel.wyzieSearchResults.collectAsState()
+      val isOnlineSectionExpanded by viewModel.isOnlineSectionExpanded.collectAsState()
 
       // Media Search / Autocomplete
-      val mediaResults by viewModel.mediaSearchResults.composeCollectAsState()
-      val isSearchingMedia by viewModel.isSearchingMedia.composeCollectAsState()
+      val mediaResults by viewModel.mediaSearchResults.collectAsState()
+      val isSearchingMedia by viewModel.isSearchingMedia.collectAsState()
       
       // TV Show / Seasons / Episodes
-      val selectedTvShow by viewModel.selectedTvShow.composeCollectAsState()
-      val isFetchingTvDetails by viewModel.isFetchingTvDetails.composeCollectAsState()
-      val selectedSeason by viewModel.selectedSeason.composeCollectAsState()
-      val seasonEpisodes by viewModel.seasonEpisodes.composeCollectAsState()
-      val isFetchingEpisodes by viewModel.isFetchingEpisodes.composeCollectAsState()
-      val selectedEpisode by viewModel.selectedEpisode.composeCollectAsState()
+      val selectedTvShow by viewModel.selectedTvShow.collectAsState()
+      val isFetchingTvDetails by viewModel.isFetchingTvDetails.collectAsState()
+      val selectedSeason by viewModel.selectedSeason.collectAsState()
+      val seasonEpisodes by viewModel.seasonEpisodes.collectAsState()
+      val isFetchingEpisodes by viewModel.isFetchingEpisodes.collectAsState()
+      val selectedEpisode by viewModel.selectedEpisode.collectAsState()
 
       OnlineSubtitleSearchSheet(
         onDismissRequest = onDismissRequest,
@@ -187,7 +192,7 @@ fun PlayerSheets(
         isFetchingEpisodes = isFetchingEpisodes,
         selectedEpisode = selectedEpisode,
         onSelectEpisode = { viewModel.selectEpisode(it) },
-        onClearMediaSelection = { viewModel.clearMediaSelection() }
+        onClearMediaSelection = { viewModel.clearMediaSelection() },
       )
     }
 
@@ -250,7 +255,7 @@ fun PlayerSheets(
     }
 
     Sheets.VideoZoom -> {
-      val videoZoom by viewModel.videoZoom.composeCollectAsState()
+      val videoZoom by viewModel.videoZoom.collectAsState()
       VideoZoomSheet(
         videoZoom = videoZoom,
         onSetVideoZoom = viewModel::setVideoZoom,
@@ -261,8 +266,8 @@ fun PlayerSheets(
 
     Sheets.AspectRatios -> {
       val playerPreferences = koinInject<app.marlboroadvance.mpvex.preferences.PlayerPreferences>()
-      val customRatiosSet by playerPreferences.customAspectRatios.collectAsState()
-      val currentRatio by viewModel.currentAspectRatio.composeCollectAsState()
+      val customRatiosSet by playerPreferences.customAspectRatios.collectPreferenceAsState()
+      val currentRatio by viewModel.currentAspectRatio.collectAsState()
       val customRatios =
         customRatiosSet.mapNotNull { str ->
           val parts = str.split("|")
@@ -306,8 +311,8 @@ fun PlayerSheets(
     }
 
     Sheets.FrameNavigation -> {
-      val currentFrame by viewModel.currentFrame.composeCollectAsState()
-      val totalFrames by viewModel.totalFrames.composeCollectAsState()
+      val currentFrame by viewModel.currentFrame.collectAsState()
+      val totalFrames by viewModel.totalFrames.collectAsState()
       FrameNavigationSheet(
         currentFrame = currentFrame,
         totalFrames = totalFrames,

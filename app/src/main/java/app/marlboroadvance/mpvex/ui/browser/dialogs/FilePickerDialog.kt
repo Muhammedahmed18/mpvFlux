@@ -159,6 +159,15 @@ fun FilePickerDialog(
     }
   }
 
+  val displayName = remember(selectedPath, storageVolumes) {
+    val volume = storageVolumes.find { StorageVolumeUtils.getVolumePath(it) == selectedPath }
+    if (volume != null) {
+      volume.getDescription(context)
+    } else {
+      selectedPath?.let { File(it).name } ?: "Select a storage location"
+    }
+  }
+
   val configuration = LocalConfiguration.current
   val isPortrait = configuration.orientation == Configuration.ORIENTATION_PORTRAIT
 
@@ -187,13 +196,15 @@ fun FilePickerDialog(
                         fontWeight = FontWeight.Bold,
                       )
                       Text(
-                        text = selectedPath ?: "Select a storage location",
+                        text = displayName,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier
+                          .padding(top = 4.dp)
+                          .basicMarquee(),
                       )
                   }
                   Row(
@@ -225,13 +236,15 @@ fun FilePickerDialog(
                             fontWeight = FontWeight.Bold,
                           )
                           Text(
-                            text = selectedPath ?: "Select a storage location",
+                            text = displayName,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier
+                              .padding(top = 4.dp)
+                              .basicMarquee(),
                           )
                       }
                       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

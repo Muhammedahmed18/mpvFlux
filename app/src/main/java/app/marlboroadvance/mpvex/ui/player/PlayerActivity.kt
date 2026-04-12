@@ -2328,6 +2328,10 @@ class PlayerActivity :
 
     // Load the new file
     getPlayableUri(intent)?.let { uri ->
+      // Calculate hash for the new file
+      val currentUri = intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM)
+      currentUri?.let { viewModel.calculateVideoHash(it) }
+
       // Avoid blocking UI thread while mpv opens network streams (e.g., HLS).
       lifecycleScope.launch(Dispatchers.Default) {
         MPVLib.command("loadfile", uri)

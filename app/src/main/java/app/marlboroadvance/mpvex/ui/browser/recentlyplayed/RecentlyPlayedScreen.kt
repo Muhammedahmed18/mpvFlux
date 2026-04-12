@@ -6,32 +6,22 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -49,16 +39,14 @@ import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
-import app.marlboroadvance.mpvex.preferences.MediaLayoutMode
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
-import app.marlboroadvance.mpvex.presentation.components.ConfirmDialog
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
 import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
-import app.marlboroadvance.mpvex.ui.browser.fab.FabScrollHelper
+import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationSheet
 import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistDetailScreen
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
@@ -84,8 +72,7 @@ object RecentlyPlayedScreen : Screen {
 
     val recentItems by viewModel.recentItems.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
-    val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
-    val deleteFilesCheckbox = rememberSaveable { mutableStateOf(false) }
+    val showDeleteSheet = rememberSaveable { mutableStateOf(false) }
     val advancedPreferences = koinInject<AdvancedPreferences>()
     val appearancePreferences = koinInject<app.marlboroadvance.mpvex.preferences.AppearancePreferences>()
     val enableRecentlyPlayed by advancedPreferences.enableRecentlyPlayed.collectAsState()
@@ -226,7 +213,7 @@ object RecentlyPlayedScreen : Screen {
             onSelectAll = { selectionManager.selectAll() },
             onInvertSelection = { selectionManager.invertSelection() },
             onDeselectAll = { selectionManager.clear() },
-            onDeleteClick = { deleteDialogOpen.value = true },
+            onDeleteClick = { showDeleteSheet.value = true },
           )
         },
     ) { padding ->
@@ -289,61 +276,16 @@ object RecentlyPlayedScreen : Screen {
         }
       }
 
-      // Delete confirmation dialog
-      if (deleteDialogOpen.value && selectionManager.isInSelectionMode) {
-        // Remove selected items from history
-        val itemCount = selectionManager.selectedCount
-        val itemText = if (itemCount == 1) "item" else "items"
-        val deleteFiles = deleteFilesCheckbox.value
-
-        val title = if (deleteFiles) {
-          "Delete $itemCount $itemText?"
-        } else {
-          "Remove $itemCount $itemText from history?"
-        }
-
-        val subtitle = buildString {
-          if (deleteFiles) {
-            append("This will permanently delete the original video file(s) from your device storage.\n\n")
-            append("This action cannot be undone.")
-          } else {
-            append("This will remove the selected $itemText from your recently played list. ")
-            append("The original video files will not be deleted.")
+      // Delete confirmation sheet
+      DeleteConfirmationSheet(
+          isOpen = showDeleteSheet.value && selectionManager.isInSelectionMode,
+          selectedCount = selectionManager.selectedCount,
+          onDismiss = { showDeleteSheet.value = false },
+          onConfirm = { deleteFiles ->
+              selectionManager.deleteSelected(deleteFiles)
+              showDeleteSheet.value = false
           }
-        }
-
-        ConfirmDialog(
-          title = title,
-          subtitle = subtitle,
-          customContent = {
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Checkbox(
-                checked = deleteFilesCheckbox.value,
-                onCheckedChange = {
-                  deleteFilesCheckbox.value = it
-                },
-              )
-              Text(
-                text = "Also delete original file(s)",
-                modifier = Modifier.padding(start = 8.dp),
-                style = MaterialTheme.typography.bodyMedium,
-              )
-            }
-          },
-          onConfirm = {
-            selectionManager.deleteSelected(deleteFilesCheckbox.value)
-            deleteDialogOpen.value = false
-            deleteFilesCheckbox.value = false
-          },
-          onCancel = {
-            deleteDialogOpen.value = false
-            deleteFilesCheckbox.value = false
-          },
-        )
-      }
+      )
       
       // Link dialog
       PlayLinkSheet(

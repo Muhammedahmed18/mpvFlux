@@ -142,7 +142,6 @@ fun FileSystemBrowserScreen(path: String? = null) {
   val isAtRoot by viewModel.isAtRoot.collectAsState()
   val breadcrumbs by viewModel.breadcrumbs.collectAsState()
   val playlistMode by playerPreferences.playlistMode.collectAsState()
-  val itemsWereDeletedOrMoved by viewModel.itemsWereDeletedOrMoved.collectAsState()
   val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
 
   // VideoCard settings
@@ -157,7 +156,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
   val showUnplayedOldVideoLabel by appearancePreferences.showUnplayedOldVideoLabel.collectAsState()
   val unplayedOldVideoDays by appearancePreferences.unplayedOldVideoDays.collectAsState()
 
-  // FolderCard specific settings
+  // FolderCard settings
   val showTotalVideosChip by browserPreferences.showTotalVideosChip.collectAsState()
   val showTotalDurationChip by browserPreferences.showTotalDurationChip.collectAsState()
   val showTotalSizeChip by browserPreferences.showTotalSizeChip.collectAsState()
@@ -463,7 +462,6 @@ fun FileSystemBrowserScreen(path: String? = null) {
                 error = error,
                 isAtRoot = isAtRoot,
                 breadcrumbs = breadcrumbs,
-                itemsWereDeletedOrMoved = itemsWereDeletedOrMoved,
                 showSubtitleIndicator = showSubtitleIndicator,
                 navigationBarHeight = navigationBarHeight,
                 videoCardSettings = videoCardSettings,
@@ -641,6 +639,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
     FolderPickerDialog(
       isOpen = folderPickerOpen.value,
       currentPath = currentPath,
+      titlePrefix = if (operationType.value is CopyPasteOps.OperationType.Copy) "Copy to" else "Move to",
       onDismiss = { folderPickerOpen.value = false },
       onFolderSelected = { destinationPath ->
         folderPickerOpen.value = false
@@ -675,12 +674,6 @@ fun FileSystemBrowserScreen(path: String? = null) {
         },
         onDismiss = {
           progressDialogOpen.value = false
-          // Set flag if move operation was successful
-          if (operationType.value is CopyPasteOps.OperationType.Move &&
-            operationProgress.isComplete &&
-            operationProgress.error == null) {
-            viewModel.setItemsWereDeletedOrMoved()
-          }
           operationType.value = null
           videoSelectionManager.clear()
           viewModel.refresh()
@@ -768,7 +761,6 @@ private fun FileSystemBrowserContent(
   error: String?,
   isAtRoot: Boolean,
   breadcrumbs: List<app.marlboroadvance.mpvex.domain.browser.PathComponent>,
-  itemsWereDeletedOrMoved: Boolean,
   showSubtitleIndicator: Boolean,
   navigationBarHeight: Dp,
   videoCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings,
@@ -844,7 +836,7 @@ private fun FileSystemBrowserContent(
       )
     }
 
-    items.isEmpty() && itemsWereDeletedOrMoved && !isAtRoot -> {
+    items.isEmpty() && !isLoading && !isAtRoot -> {
       EmptyState(
         icon = Icons.Filled.FolderOpen,
         title = "Empty folder",
@@ -988,6 +980,7 @@ fun FileSystemSortBottomSheet(
   val showVideoThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
   val showVideoExtension by browserPreferences.showVideoExtension.collectAsState()
   val showTotalVideosChip by browserPreferences.showTotalVideosChip.collectAsState()
+  val showTotalDurationChip by browserPreferences.showTotalDurationChip.collectAsState()
   val showTotalSizeChip by browserPreferences.showTotalSizeChip.collectAsState()
   val showFolderPath by browserPreferences.showFolderPath.collectAsState()
   val showSizeChip by browserPreferences.showSizeChip.collectAsState()
@@ -1022,6 +1015,7 @@ fun FileSystemSortBottomSheet(
       appearancePreferences.unlimitedNameLines.set(false)
       browserPreferences.showFolderPath.set(false)
       browserPreferences.showTotalVideosChip.set(true)
+      browserPreferences.showTotalDurationChip.set(false)
       browserPreferences.showTotalSizeChip.set(false)
       browserPreferences.showSizeChip.set(true)
       browserPreferences.showResolutionChip.set(true)
@@ -1075,6 +1069,11 @@ fun FileSystemSortBottomSheet(
         label = "Total Videos",
         checked = showTotalVideosChip,
         onCheckedChange = { browserPreferences.showTotalVideosChip.set(it) },
+      ),
+      VisibilityToggle(
+        label = "Total Duration",
+        checked = showTotalDurationChip,
+        onCheckedChange = { browserPreferences.showTotalDurationChip.set(it) },
       ),
       VisibilityToggle(
         label = "Folder Size",

@@ -18,8 +18,13 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,6 +39,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
@@ -83,7 +90,6 @@ class MediaInfoActivity : ComponentActivity() {
     var fileName by remember { mutableStateOf("Media File") }
     var mediaInfo by remember { mutableStateOf<MediaInfoOps.MediaInfoData?>(null) }
 
-    // LargeTopAppBar with exitUntilCollapsed for the collapsing title effect
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     LaunchedEffect(Unit) {
@@ -141,7 +147,6 @@ class MediaInfoActivity : ComponentActivity() {
       containerColor = MaterialTheme.colorScheme.surface,
       topBar = {
         LargeTopAppBar(
-          // Strip the extension from the top bar title
           title = {
             Text(
               text = fileName.substringBeforeLast('.'),
@@ -225,22 +230,25 @@ class MediaInfoActivity : ComponentActivity() {
     mediaInfo: MediaInfoOps.MediaInfoData,
     fullMediaInfoText: String?,
   ) {
+    val scope = rememberCoroutineScope()
+    val pagerState = rememberPagerState(pageCount = { 2 })
+    
     val sections = remember(fullMediaInfoText) {
       fullMediaInfoText?.let { parseMediaInfoText(it) } ?: emptyList()
     }
 
-    // Build hero chips: resolution badge, video codec, audio codec(s), file size
     val video = mediaInfo.videoStreams.firstOrNull()
     val heroChips = remember(mediaInfo) {
       buildList {
         video?.let { v ->
+          val w = v.width.filter { it.isDigit() }.toIntOrNull() ?: 0
           val h = v.height.filter { it.isDigit() }.toIntOrNull() ?: 0
           val resLabel = when {
-            h >= 2160 -> "4K UHD"
-            h >= 1080 -> "1080p"
-            h >= 720  -> "720p"
-            h > 0     -> "${h}p"
-            else      -> null
+            w >= 3840 || h >= 2160 -> "4K UHD"
+            w >= 1920 || h >= 1080 -> "1080p"
+            w >= 1280 || h >= 720  -> "720p"
+            h > 0                  -> "${h}p"
+            else                   -> null
           }
           resLabel?.let { add(it) }
           if (v.format.isNotBlank() && v.format != "---") add(v.format)
@@ -254,21 +262,51 @@ class MediaInfoActivity : ComponentActivity() {
       }
     }
 
+    Column(modifier = Modifier.fillMaxSize()) {
+      // Fixed Hero Section
+      if (heroChips.isNotEmpty()) {
+        HeroChipRow(heroChips)
+      }
+
+      PrimaryTabRow(
+        selectedTabIndex = pagerState.currentPage,
+        containerColor = MaterialTheme.colorScheme.surface,
+        divider = {}
+      ) {
+        Tab(
+          selected = pagerState.currentPage == 0,
+          onClick = { scope.launch { pagerState.animateScrollToPage(0) } },
+          text = { Text("Architecture") }
+        )
+        Tab(
+          selected = pagerState.currentPage == 1,
+          onClick = { scope.launch { pagerState.animateScrollToPage(1) } },
+          text = { Text("Technical Log") }
+        )
+      }
+
+      HorizontalPager(
+        state = pagerState,
+        modifier = Modifier.weight(1f),
+        verticalAlignment = Alignment.Top
+      ) { page ->
+        when (page) {
+          0 -> ArchitectureTab(mediaInfo)
+          1 -> TechnicalLogTab(sections)
+        }
+      }
+    }
+  }
+
+  @Composable
+  private fun ArchitectureTab(mediaInfo: MediaInfoOps.MediaInfoData) {
+    var tracksDialogData by remember { mutableStateOf<TracksDialogData?>(null) }
+
     LazyColumn(
       modifier = Modifier.fillMaxSize(),
       contentPadding = PaddingValues(bottom = 32.dp),
     ) {
-      // Hero chip row
-      if (heroChips.isNotEmpty()) {
-        item {
-          HeroChipRow(heroChips)
-        }
-      }
-
-      // ── Architecture section ──────────────────────────────────
-      item { SectionDividerHeader("Architecture") }
-
-      // Video stream cards
+      // Video streams
       mediaInfo.videoStreams.forEachIndexed { i, v ->
         item {
           StreamCard(
@@ -287,20 +325,57 @@ class MediaInfoActivity : ComponentActivity() {
         }
       }
 
-      // Audio stream cards
-      mediaInfo.audioStreams.forEachIndexed { i, a ->
+      // Combined Audio Streams
+      if (mediaInfo.audioStreams.isNotEmpty()) {
         item {
+          val audioProperties = remember(mediaInfo.audioStreams) {
+            mediaInfo.audioStreams.mapIndexed { index, a ->
+              val lang = if (a.language.isNotBlank() && a.language != "---") a.language else "Unknown"
+              val fmt = if (a.format.isNotBlank() && a.format != "---") a.format else ""
+              val channels = if (a.channels.isNotBlank() && a.channels != "---") "${a.channels} ch" else ""
+              val details = listOf(lang, fmt, channels).filter { it.isNotBlank() }.joinToString(", ")
+              "Track #${index + 1}" to details
+            }
+          }
+
           StreamCard(
-            title = "Audio #${i + 1}",
-            badge = a.format.takeIf { it.isNotBlank() && it != "---" },
+            title = "Audio Tracks",
+            badge = "${mediaInfo.audioStreams.size} tracks",
             icon = Icons.Default.MusicNote,
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
             onContainerColor = MaterialTheme.colorScheme.onTertiaryContainer,
-            properties = listOfNotNull(
-              "Channels" to a.channels,
-              "Language" to a.language,
-              "Bitrate"  to a.bitRate,
-            ).filter { (_, v2) -> v2.isNotBlank() && v2 != "---" },
+            properties = audioProperties.take(4),
+            isExpandable = audioProperties.size > 4,
+            onExpandToggle = {
+              tracksDialogData = TracksDialogData("Audio Tracks", audioProperties)
+            }
+          )
+        }
+      }
+
+      // Combined Subtitle Streams
+      if (mediaInfo.textStreams.isNotEmpty()) {
+        item {
+          val subtitleProperties = remember(mediaInfo.textStreams) {
+            mediaInfo.textStreams.mapIndexed { index, t ->
+              val lang = if (t.language.isNotBlank() && t.language != "---") t.language else "Unknown"
+              val fmt = if (t.format.isNotBlank() && t.format != "---") t.format else ""
+              val details = listOf(lang, fmt).filter { it.isNotBlank() }.joinToString(", ")
+              "Track #${index + 1}" to details
+            }
+          }
+
+          StreamCard(
+            title = "Subtitles",
+            badge = "${mediaInfo.textStreams.size} tracks",
+            icon = Icons.Default.Subtitles,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            onContainerColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            properties = subtitleProperties.take(4),
+            isExpandable = subtitleProperties.size > 4,
+            onExpandToggle = {
+              tracksDialogData = TracksDialogData("Subtitles", subtitleProperties)
+            }
           )
         }
       }
@@ -321,30 +396,159 @@ class MediaInfoActivity : ComponentActivity() {
         )
       }
 
-      // ── Technical log section ─────────────────────────────────
-      if (sections.isNotEmpty()) {
-        item { SectionDividerHeader("Technical Log") }
-        sections.forEach { section ->
-          item {
-            Text(
-              text = section.name,
-              modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-              style = MaterialTheme.typography.titleSmall,
-              fontWeight = FontWeight.Bold,
-              color = MaterialTheme.colorScheme.primary,
-            )
+      item { Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)) }
+    }
+
+    // Tracks Detail Dialog
+    tracksDialogData?.let { data ->
+      TracksDetailDialog(
+        title = data.title,
+        properties = data.properties,
+        onDismiss = { tracksDialogData = null }
+      )
+    }
+  }
+
+  private data class TracksDialogData(val title: String, val properties: List<Pair<String, String>>)
+
+  @Composable
+  private fun TracksDetailDialog(
+    title: String,
+    properties: List<Pair<String, String>>,
+    onDismiss: () -> Unit
+  ) {
+    Dialog(
+      onDismissRequest = onDismiss,
+      properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+      Surface(
+        modifier = Modifier
+          .fillMaxWidth(0.92f)
+          .wrapContentHeight()
+          .padding(vertical = 24.dp),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 6.dp
+      ) {
+        Column(
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp)
+        ) {
+          Text(
+            text = title,
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+          )
+          
+          HorizontalDivider(
+            modifier = Modifier.padding(top = 8.dp),
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant
+          )
+
+          Box(
+            modifier = Modifier
+              .weight(1f, fill = false)
+              .verticalScroll(rememberScrollState())
+              .padding(vertical = 8.dp)
+          ) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+              properties.forEach { (label, value) ->
+                TrackItemRow(label, value)
+              }
+            }
           }
-          items(section.properties) { (k, v) -> TechnicalPropertyRow(k, v) }
-          item {
-            HorizontalDivider(
-              modifier = Modifier.padding(horizontal = 16.dp),
-              thickness = 0.5.dp,
-              color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-            )
+
+          HorizontalDivider(
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant
+          )
+
+          Box(
+            modifier = Modifier
+              .fillMaxWidth()
+              .padding(horizontal = 16.dp, vertical = 8.dp),
+            contentAlignment = Alignment.CenterEnd
+          ) {
+            TextButton(onClick = onDismiss) {
+              Text("Close")
+            }
           }
         }
       }
+    }
+  }
 
+  @Composable
+  private fun TrackItemRow(label: String, value: String) {
+    val context = LocalContext.current
+    Surface(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(vertical = 4.dp)
+        .clickable {
+          val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+          cm.setPrimaryClip(ClipData.newPlainText(label, value))
+          Toast.makeText(context, "Copied $label", Toast.LENGTH_SHORT).show()
+        },
+      shape = MaterialTheme.shapes.medium,
+      color = MaterialTheme.colorScheme.surfaceContainerLowest
+    ) {
+      Row(
+        modifier = Modifier.padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+          )
+          Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium
+          )
+        }
+        Icon(
+          Icons.Default.ContentCopy,
+          contentDescription = null,
+          modifier = Modifier.size(16.dp),
+          tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        )
+      }
+    }
+  }
+
+  @Composable
+  private fun TechnicalLogTab(sections: List<InfoSection>) {
+    LazyColumn(
+      modifier = Modifier.fillMaxSize(),
+      contentPadding = PaddingValues(bottom = 32.dp),
+    ) {
+      sections.forEach { section ->
+        item {
+          Text(
+            text = section.name,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+          )
+        }
+        items(section.properties) { (k, v) -> TechnicalPropertyRow(k, v) }
+        item {
+          HorizontalDivider(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            thickness = 0.5.dp,
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+          )
+        }
+      }
       item { Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)) }
     }
   }
@@ -368,37 +572,6 @@ class MediaInfoActivity : ComponentActivity() {
     }
   }
 
-  // ── Section divider header ────────────────────────────────────────────────
-
-  @Composable
-  private fun SectionDividerHeader(title: String) {
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = 12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-      HorizontalDivider(
-        modifier = Modifier.width(12.dp),
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant,
-      )
-      Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = MaterialTheme.typography.labelSmall.letterSpacing,
-        color = MaterialTheme.colorScheme.primary,
-      )
-      HorizontalDivider(
-        modifier = Modifier.weight(1f),
-        thickness = 0.5.dp,
-        color = MaterialTheme.colorScheme.outlineVariant,
-      )
-    }
-  }
-
   // ── Per-stream elevated card ──────────────────────────────────────────────
 
   @Composable
@@ -409,6 +582,8 @@ class MediaInfoActivity : ComponentActivity() {
     containerColor: Color,
     onContainerColor: Color,
     properties: List<Pair<String, String>>,
+    isExpandable: Boolean = false,
+    onExpandToggle: () -> Unit = {},
   ) {
     if (properties.isEmpty()) return
     ElevatedCard(
@@ -480,7 +655,37 @@ class MediaInfoActivity : ComponentActivity() {
           if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
         }
       }
-      Spacer(modifier = Modifier.height(6.dp))
+
+      if (isExpandable) {
+        HorizontalDivider(
+          modifier = Modifier.padding(horizontal = 14.dp),
+          thickness = 0.5.dp,
+          color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+        )
+        Box(
+          modifier = Modifier.fillMaxWidth(),
+          contentAlignment = Alignment.Center,
+        ) {
+          TextButton(
+            onClick = onExpandToggle,
+            modifier = Modifier.padding(vertical = 4.dp),
+          ) {
+            Text(
+              "View All Tracks",
+              style = MaterialTheme.typography.labelLarge,
+              fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(Modifier.width(4.dp))
+            Icon(
+              Icons.AutoMirrored.Filled.OpenInNew,
+              contentDescription = null,
+              modifier = Modifier.size(18.dp),
+            )
+          }
+        }
+      } else {
+        Spacer(modifier = Modifier.height(6.dp))
+      }
     }
   }
 

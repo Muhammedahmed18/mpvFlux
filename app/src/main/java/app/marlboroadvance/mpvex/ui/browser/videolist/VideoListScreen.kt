@@ -12,34 +12,22 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SwapVert
-import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TooltipAnchorPosition
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.animateFloatingActionButton
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -73,7 +61,6 @@ import app.marlboroadvance.mpvex.preferences.VideoSortType
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
-import app.marlboroadvance.mpvex.BuildConfig
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserBottomBar
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
@@ -90,7 +77,6 @@ import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
-import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
 import app.marlboroadvance.mpvex.utils.media.CopyPasteOps
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
 import app.marlboroadvance.mpvex.utils.sort.SortUtils
@@ -130,7 +116,6 @@ data class VideoListScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val recentlyPlayedFilePath by viewModel.recentlyPlayedFilePath.collectAsState()
     val lastPlayedInFolderPath by viewModel.lastPlayedInFolderPath.collectAsState()
-    val videosWereDeletedOrMoved by viewModel.videosWereDeletedOrMoved.collectAsState()
     val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
 
     // VideoCard settings
@@ -171,7 +156,6 @@ data class VideoListScreen(
       remember(videosWithPlaybackInfo, videoSortType, videoSortOrder) {
         val infoById = videosWithPlaybackInfo.associateBy { it.video.id }
         val sortedVideos = SortUtils.sortVideos(videosWithPlaybackInfo.map { it.video }, videoSortType, videoSortOrder)
-        // Maintain the playback info mapping — O(1) lookup per item
         sortedVideos.map { video ->
           infoById[video.id] ?: VideoWithPlaybackInfo(video)
         }
@@ -242,22 +226,18 @@ data class VideoListScreen(
     var showFloatingBottomBar by remember { mutableStateOf(false) }
     val animationDuration = 300
 
-    // Handle selection mode changes with animation
     LaunchedEffect(selectionManager.isInSelectionMode) {
       showFloatingBottomBar = selectionManager.isInSelectionMode
     }
 
-    // Predictive back: Only intercept when in selection mode
     BackHandler(enabled = selectionManager.isInSelectionMode) {
       selectionManager.clear()
     }
 
-    // Listen for lifecycle resume events and refresh videos when coming into focus
     DisposableEffect(lifecycleOwner) {
       val observer =
         LifecycleEventObserver { _, event ->
           if (event == Lifecycle.Event.ON_RESUME) {
-            // Use ensureDataLoaded instead of refresh to prevent redundant hard scans
             viewModel.ensureDataLoaded()
           }
         }
@@ -315,7 +295,6 @@ data class VideoListScreen(
           isLoading = isLoading && videos.isEmpty(),
           isRefreshing = isRefreshing,
           recentlyPlayedFilePath = lastPlayedInFolderPath ?: recentlyPlayedFilePath,
-          videosWereDeletedOrMoved = videosWereDeletedOrMoved,
           autoScrollToLastPlayed = autoScrollToLastPlayed,
           onRefresh = { viewModel.refresh() },
           selectionManager = selectionManager,
@@ -323,9 +302,6 @@ data class VideoListScreen(
             if (selectionManager.isInSelectionMode) {
               selectionManager.toggle(video)
             } else {
-              // Always use MediaUtils.playFile which lets PlayerActivity auto-generate playlist
-              // This avoids TransactionTooLargeException from passing large playlists
-              // PlayerActivity will auto-generate playlist from folder if playlistMode is enabled
               MediaUtils.playFile(video, context, "video_list")
             }
           },
@@ -335,8 +311,6 @@ data class VideoListScreen(
           showFloatingBottomBar = showFloatingBottomBar,
         )
 
-        // Floating Material 3 Button Group overlay with animation
-        // Play Store gating is intentionally bypassed here.
         AnimatedVisibility(
           visible = showFloatingBottomBar,
           enter = slideInVertically(
@@ -385,7 +359,7 @@ data class VideoListScreen(
         onSortOrderChange = { order -> browserPreferences.videoSortOrder.set(order) },
       )
 
-      // Delete Dialog
+      // Delete Dialog (Sheet)
       DeleteConfirmationDialog(
         isOpen = deleteDialogOpen.value,
         onDismiss = { deleteDialogOpen.value = false },
@@ -412,12 +386,13 @@ data class VideoListScreen(
         }
       }
 
-      // Folder Picker Dialog
+      // Folder Picker (Sheet)
       FolderPickerDialog(
         isOpen = folderPickerOpen.value,
         currentPath =
           videos.firstOrNull()?.let { File(it.path).parent }
             ?: Environment.getExternalStorageDirectory().absolutePath,
+        titlePrefix = if (operationType.value is CopyPasteOps.OperationType.Copy) "Copy to" else "Move to",
         onDismiss = { folderPickerOpen.value = false },
         onFolderSelected = { destinationPath ->
           folderPickerOpen.value = false
@@ -441,24 +416,15 @@ data class VideoListScreen(
         },
       )
 
-      // File Operation Progress Dialog
+      // File Operation Progress (Sheet)
       if (operationType.value != null) {
         FileOperationProgressDialog(
           isOpen = progressDialogOpen.value,
           operationType = operationType.value!!,
           progress = operationProgress,
-          onCancel = {
-            CopyPasteOps.cancelOperation()
-          },
+          onCancel = { CopyPasteOps.cancelOperation() },
           onDismiss = {
             progressDialogOpen.value = false
-            // Set flag if move operation was successful
-            if (operationType.value is CopyPasteOps.OperationType.Move &&
-              operationProgress.isComplete &&
-              operationProgress.error == null
-            ) {
-              viewModel.setVideosWereDeletedOrMoved()
-            }
             operationType.value = null
             selectionManager.clear()
             viewModel.refresh()
@@ -466,7 +432,7 @@ data class VideoListScreen(
         )
       }
 
-      // Private Space Loading Dialog
+      // Private Space Loading Sheet
       LoadingDialog(
         isOpen = movingToPrivateSpace.value,
         message = "Moving to private space...",
@@ -476,16 +442,10 @@ data class VideoListScreen(
       if (showPrivateSpaceCompletionDialog.value) {
         androidx.compose.material3.AlertDialog(
           onDismissRequest = { showPrivateSpaceCompletionDialog.value = false },
-          title = {
-            Text(
-              text = "Moved to Private Space",
-              style = MaterialTheme.typography.headlineSmall,
-            )
-          },
+          title = { Text(text = "Moved to Private Space", style = MaterialTheme.typography.headlineSmall) },
           text = {
             Text(
-              text =
-                "Successfully moved ${privateSpaceMovedCount.intValue} video(s) to private space.\n\n" +
+              text = "Successfully moved ${privateSpaceMovedCount.intValue} video(s) to private space.\n\n" +
                   "To access private space, long press on the app name at the top of the main screen.",
               style = MaterialTheme.typography.bodyMedium,
             )
@@ -522,7 +482,6 @@ private fun VideoListContent(
   isLoading: Boolean,
   isRefreshing: androidx.compose.runtime.MutableState<Boolean>,
   recentlyPlayedFilePath: String?,
-  videosWereDeletedOrMoved: Boolean,
   autoScrollToLastPlayed: Boolean,
   onRefresh: suspend () -> Unit,
   selectionManager: SelectionManager<Video, Long>,
@@ -540,7 +499,6 @@ private fun VideoListContent(
   val showVideoThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
   val density = LocalDensity.current
   val navigationBarHeight = app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight.current
-  // Standardized thumbnail size (must match VideoCard.kt thumbWidthDp)
   val thumbWidthDp = 160.dp
   val aspect = 16f / 9f
   val thumbWidthPx = with(density) { thumbWidthDp.roundToPx() }
@@ -559,19 +517,11 @@ private fun VideoListContent(
 
   when {
     isLoading && videosWithInfo.isEmpty() -> {
-      Box(
-        modifier = modifier
-          .fillMaxSize(),
-        contentAlignment = Alignment.Center,
-      ) {
-        CircularProgressIndicator(
-          modifier = Modifier.size(48.dp),
-          color = MaterialTheme.colorScheme.primary,
-        )
+      Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(modifier = Modifier.size(48.dp), color = MaterialTheme.colorScheme.primary)
       }
     }
-
-    videosWithInfo.isEmpty() && videosWereDeletedOrMoved -> {
+    videosWithInfo.isEmpty() && !isLoading -> {
       EmptyState(
         icon = Icons.Filled.VideoLibrary,
         title = "No videos in this folder",
@@ -579,22 +529,15 @@ private fun VideoListContent(
         modifier = modifier.fillMaxSize(),
       )
     }
-
     else -> {
       val rememberedListIndex = rememberSaveable { mutableIntStateOf(0) }
       val rememberedListOffset = rememberSaveable { mutableIntStateOf(0) }
-
       val initialListIndex = if (rememberedListIndex.intValue > 0) {
           rememberedListIndex.intValue
       } else if (autoScrollToLastPlayed && recentlyPlayedFilePath != null && videosWithInfo.isNotEmpty()) {
           videosWithInfo.indexOfFirst { it.video.path == recentlyPlayedFilePath }.coerceAtLeast(0)
       } else 0
-
-      val listState = rememberLazyListState(
-          initialFirstVisibleItemIndex = initialListIndex,
-          initialFirstVisibleItemScrollOffset = rememberedListOffset.intValue
-      )
-
+      val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialListIndex, initialFirstVisibleItemScrollOffset = rememberedListOffset.intValue)
       LaunchedEffect(listState) {
         snapshotFlow { Pair(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
           .collectLatest { (index, offset) ->
@@ -602,40 +545,13 @@ private fun VideoListContent(
             rememberedListOffset.intValue = offset
           }
       }
-
-      FabScrollHelper.trackScrollForFabVisibility(
-        listState = listState,
-        gridState = null,
-        isFabVisible = isFabVisible,
-        expanded = false,
-        onExpandedChange = {},
-      )
-
-      val isAtTop by remember {
-        derivedStateOf {
-          listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-        }
-      }
-
+      FabScrollHelper.trackScrollForFabVisibility(listState = listState, gridState = null, isFabVisible = isFabVisible, expanded = false, onExpandedChange = {})
+      val isAtTop by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 } }
       val hasEnoughItems = videosWithInfo.size > 20
+      val scrollbarAlpha by animateFloatAsState(targetValue = if (isAtTop || !hasEnoughItems) 0f else 1f, animationSpec = tween(durationMillis = 200), label = "scrollbarAlpha")
 
-      val scrollbarAlpha by animateFloatAsState(
-        targetValue = if (isAtTop || !hasEnoughItems) 0f else 1f,
-        animationSpec = tween(durationMillis = 200),
-        label = "scrollbarAlpha",
-      )
-
-      PullRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = onRefresh,
-        listState = listState,
-        modifier = modifier.fillMaxSize(),
-      ) {
-        Box(
-          modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = navigationBarHeight)
-        ) {
+      PullRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, listState = listState, modifier = modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().padding(bottom = navigationBarHeight)) {
           LazyColumnScrollbar(
             state = listState,
             settings = ScrollbarSettings(
@@ -646,34 +562,24 @@ private fun VideoListContent(
             LazyColumn(
               state = listState,
               modifier = Modifier.fillMaxSize(),
-              contentPadding = PaddingValues(
-                start = 8.dp,
-                end = 8.dp,
-                bottom = if (showFloatingBottomBar) 88.dp else 16.dp
-              ),
+              contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = if (showFloatingBottomBar) 88.dp else 16.dp),
             ) {
               items(
                 count = videosWithInfo.size,
                 key = { index -> "${videosWithInfo[index].video.id}_${videosWithInfo[index].video.path}" },
               ) { index ->
                 val videoWithInfo = videosWithInfo[index]
-                val isRecentlyPlayed = recentlyPlayedFilePath?.let { videoWithInfo.video.path == it } ?: false
-
                 VideoCard(
                   video = videoWithInfo.video,
                   settings = videoCardSettings,
                   progressPercentage = videoWithInfo.progressPercentage,
-                  isRecentlyPlayed = isRecentlyPlayed,
+                  isRecentlyPlayed = recentlyPlayedFilePath?.let { videoWithInfo.video.path == it } ?: false,
                   isSelected = selectionManager.isSelected(videoWithInfo.video),
                   isOldAndUnplayed = videoWithInfo.isOldAndUnplayed,
                   isWatched = videoWithInfo.isWatched,
                   onClick = { onVideoClick(videoWithInfo.video) },
                   onLongClick = { onVideoLongClick(videoWithInfo.video) },
-                  onThumbClick = if (tapThumbnailToSelect) {
-                    { onVideoLongClick(videoWithInfo.video) }
-                  } else {
-                    { onVideoClick(videoWithInfo.video) }
-                  },
+                  onThumbClick = if (tapThumbnailToSelect) { { onVideoLongClick(videoWithInfo.video) } } else { { onVideoClick(videoWithInfo.video) } },
                   showSubtitleIndicator = showSubtitleIndicator,
                   allowThumbnailGeneration = true,
                 )
@@ -711,13 +617,9 @@ private fun VideoSortBottomSheet(
     onDismiss = onDismiss,
     title = "Sort & View Options",
     sortType = sortType.displayName,
-    onSortTypeChange = { typeName ->
-      VideoSortType.entries.find { it.displayName == typeName }?.let(onSortTypeChange)
-    },
+    onSortTypeChange = { typeName -> VideoSortType.entries.find { it.displayName == typeName }?.let(onSortTypeChange) },
     sortOrderAsc = sortOrder.isAscending,
-    onSortOrderChange = { isAsc ->
-      onSortOrderChange(if (isAsc) SortOrder.Ascending else SortOrder.Descending)
-    },
+    onSortOrderChange = { isAsc -> onSortOrderChange(if (isAsc) SortOrder.Ascending else SortOrder.Descending) },
     onReset = {
       onSortTypeChange(VideoSortType.Title)
       onSortOrderChange(SortOrder.Ascending)
@@ -730,20 +632,8 @@ private fun VideoSortBottomSheet(
       browserPreferences.showFramerateInResolution.set(false)
       browserPreferences.showDateChip.set(true)
     },
-    types =
-      listOf(
-        VideoSortType.Title.displayName,
-        VideoSortType.Duration.displayName,
-        VideoSortType.Date.displayName,
-        VideoSortType.Size.displayName,
-      ),
-    icons =
-      listOf(
-        ImageVector.vectorResource(id = R.drawable.sort_by_alpha_24px),
-        Icons.Filled.AccessTime,
-        Icons.Filled.CalendarToday,
-        Icons.Filled.SwapVert,
-      ),
+    types = listOf(VideoSortType.Title.displayName, VideoSortType.Duration.displayName, VideoSortType.Date.displayName, VideoSortType.Size.displayName),
+    icons = listOf(ImageVector.vectorResource(id = R.drawable.sort_by_alpha_24px), Icons.Filled.AccessTime, Icons.Filled.CalendarToday, Icons.Filled.SwapVert),
     getLabelForType = { type, _ ->
       when (type) {
         VideoSortType.Title.displayName -> Pair("A-Z", "Z-A")
@@ -753,48 +643,15 @@ private fun VideoSortBottomSheet(
         else -> Pair("Asc", "Desc")
       }
     },
-    visibilityToggles =
-      listOf(
-        VisibilityToggle(
-          label = "Thumbnails",
-          checked = showThumbnails,
-          onCheckedChange = { browserPreferences.showVideoThumbnails.set(it) },
-        ),
-        VisibilityToggle(
-          label = "Extension",
-          checked = showVideoExtension,
-          onCheckedChange = { browserPreferences.showVideoExtension.set(it) },
-        ),
-        VisibilityToggle(
-          label = "Subtitles",
-          checked = showSubtitleIndicator,
-          onCheckedChange = { browserPreferences.showSubtitleIndicator.set(it) },
-        ),
-        VisibilityToggle(
-          label = "Full Name",
-          checked = unlimitedNameLines,
-          onCheckedChange = { appearancePreferences.unlimitedNameLines.set(it) },
-        ),
-        VisibilityToggle(
-          label = "Size",
-          checked = showSizeChip,
-          onCheckedChange = { browserPreferences.showSizeChip.set(it) },
-        ),
-        VisibilityToggle(
-          label = "Resolution",
-          checked = showResolutionChip,
-          onCheckedChange = { browserPreferences.showResolutionChip.set(it) },
-        ),
-        VisibilityToggle(
-          label = "Framerate",
-          checked = showFramerateInResolution,
-          onCheckedChange = { browserPreferences.showFramerateInResolution.set(it) },
-        ),
-        VisibilityToggle(
-          label = "Date",
-          checked = showDateChip,
-          onCheckedChange = { browserPreferences.showDateChip.set(it) },
-        ),
-      ),
+    visibilityToggles = listOf(
+      VisibilityToggle(label = "Thumbnails", checked = showThumbnails, onCheckedChange = { browserPreferences.showVideoThumbnails.set(it) }),
+      VisibilityToggle(label = "Extension", checked = showVideoExtension, onCheckedChange = { browserPreferences.showVideoExtension.set(it) }),
+      VisibilityToggle(label = "Subtitles", checked = showSubtitleIndicator, onCheckedChange = { browserPreferences.showSubtitleIndicator.set(it) }),
+      VisibilityToggle(label = "Full Name", checked = unlimitedNameLines, onCheckedChange = { appearancePreferences.unlimitedNameLines.set(it) }),
+      VisibilityToggle(label = "Size", checked = showSizeChip, onCheckedChange = { browserPreferences.showSizeChip.set(it) }),
+      VisibilityToggle(label = "Resolution", checked = showResolutionChip, onCheckedChange = { browserPreferences.showResolutionChip.set(it) }),
+      VisibilityToggle(label = "Framerate", checked = showFramerateInResolution, onCheckedChange = { browserPreferences.showFramerateInResolution.set(it) }),
+      VisibilityToggle(label = "Date", checked = showDateChip, onCheckedChange = { browserPreferences.showDateChip.set(it) }),
+    ),
   )
 }

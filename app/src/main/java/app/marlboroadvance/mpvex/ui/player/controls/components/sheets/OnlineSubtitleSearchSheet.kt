@@ -55,23 +55,31 @@ fun OnlineSubtitleSearchSheet(
   isFetchingEpisodes: Boolean = false,
   selectedEpisode: app.marlboroadvance.mpvex.repository.wyzie.WyzieEpisode? = null,
   onSelectEpisode: (app.marlboroadvance.mpvex.repository.wyzie.WyzieEpisode) -> Unit = {},
-  onClearMediaSelection: () -> Unit = {}
+  onClearMediaSelection: () -> Unit = {},
 ) {
-  val items = remember(searchResults, isSearching, isOnlineSectionExpanded) {
+  var showVerifiedOnly by remember { mutableStateOf(false) }
+
+  val items = remember(searchResults, isSearching, isOnlineSectionExpanded, showVerifiedOnly) {
     val list = mutableListOf<OnlineSubtitleItem>()
     
+    val filteredResults = if (showVerifiedOnly) {
+        searchResults.filter { it.isHashMatch }
+    } else {
+        searchResults
+    }
+
     // Online Search Results section
-    if (searchResults.isNotEmpty() || isSearching) {
-        val hashMatches = searchResults.count { it.isHashMatch }
-        val headerText = if (hashMatches > 0) {
-            "Verified Matches ($hashMatches) + Others"
-        } else {
-            "Online Results (${searchResults.size})"
+    if (filteredResults.isNotEmpty() || isSearching) {
+        val hashMatches = filteredResults.count { it.isHashMatch }
+        val headerText = when {
+            showVerifiedOnly -> "Verified Matches ($hashMatches)"
+            hashMatches > 0 -> "Verified Matches ($hashMatches) + Others"
+            else -> "Online Results (${filteredResults.size})"
         }
         list.add(OnlineSubtitleItem.Header(headerText))
         
         if (isOnlineSectionExpanded) {
-            list.addAll(searchResults.map { OnlineSubtitleItem.OnlineTrack(it) })
+            list.addAll(filteredResults.map { OnlineSubtitleItem.OnlineTrack(it) })
         }
     }
 
@@ -160,6 +168,19 @@ fun OnlineSubtitleSearchSheet(
                 CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(8.dp))
               }
+
+              // Verified Only Toggle
+              val hasHashMatches = remember(searchResults) { searchResults.any { it.isHashMatch } }
+              if (hasHashMatches || showVerifiedOnly) {
+                  IconButton(onClick = { showVerifiedOnly = !showVerifiedOnly }) {
+                    Icon(
+                        if (showVerifiedOnly) Icons.Default.Verified else Icons.Default.FilterList,
+                        contentDescription = "Show Verified Only",
+                        tint = if (showVerifiedOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                  }
+              }
+
               IconButton(onClick = {
                 if (searchQuery.isNotBlank()) {
                   onSearchMedia(searchQuery)
