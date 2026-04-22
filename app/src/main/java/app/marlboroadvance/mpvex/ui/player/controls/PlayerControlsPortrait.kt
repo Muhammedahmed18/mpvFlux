@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -60,7 +61,7 @@ fun TopPlayerControlsPortrait(
                 modifier = Modifier.size(48.dp)
             )
 
-            Box(
+            Surface(
                 modifier =
                 Modifier
                     .clip(CircleShape)
@@ -71,27 +72,22 @@ fun TopPlayerControlsPortrait(
                             onOpenSheet(Sheets.Playlist)
                         },
                     ),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+                shape = CircleShape,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
                     modifier = Modifier.padding(
-                        horizontal = 8.dp,
+                        horizontal = 16.dp,
                         vertical = 8.dp,
                     ),
                 ) {
-                    val textShadow = Shadow(
-                        color = Color.Black.copy(alpha = 0.6f),
-                        offset = Offset(0f, 2f),
-                        blurRadius = 4f
-                    )
-
                     viewModel.getPlaylistInfo()?.let { playlistInfo ->
                         Text(
                             text = playlistInfo,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             style = MaterialTheme.typography.labelLarge.copy(
-                                shadow = textShadow,
                                 fontWeight = FontWeight.Bold
                             ),
                             maxLines = 1,
@@ -101,9 +97,9 @@ fun TopPlayerControlsPortrait(
                         Text(
                             text = "|",
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            style = MaterialTheme.typography.bodyMedium.copy(shadow = textShadow),
+                            style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
-                            color = controlColor.copy(alpha = 0.5f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                             overflow = TextOverflow.Clip,
                         )
                     }
@@ -112,10 +108,9 @@ fun TopPlayerControlsPortrait(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.titleMedium.copy(
-                            shadow = textShadow,
                             fontWeight = FontWeight.SemiBold
                         ),
-                        color = controlColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f, fill = false),
                     )
                 }

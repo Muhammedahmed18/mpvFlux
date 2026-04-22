@@ -178,7 +178,7 @@ dependencies {
   implementation(libs.material)
   implementation(libs.androidx.compose.material)
   implementation(libs.androidx.ui.tooling.preview)
-  debugImplementation(libs.androidx.ui.tooling)
+  implementation(libs.androidx.ui.tooling)
   implementation(libs.bundles.compose.navigation3)
   implementation(libs.androidx.appcompat)
   implementation(libs.androidx.compose.constraintlayout)

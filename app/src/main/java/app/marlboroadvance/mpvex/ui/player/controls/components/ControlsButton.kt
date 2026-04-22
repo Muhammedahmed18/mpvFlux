@@ -82,26 +82,21 @@ fun ControlsButton(
     // Glassmorphism update: Use dark translucent colors for high contrast visibility on video
     val containerColor = when {
         hideBackground || !enabled -> Color.Transparent
-        type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-        type == ControlsButtonType.Tonal -> Color.Black.copy(alpha = 0.5f)
+        type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+        type == ControlsButtonType.Tonal -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
         else -> Color.Transparent
     }
 
     val baseContentColor = color ?: when {
-        type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.primary
+        type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.onPrimaryContainer
+        type == ControlsButtonType.Tonal -> MaterialTheme.colorScheme.onSecondaryContainer
         else -> controlColor // controlColor is white (0xFFFFFFFF)
     }
     
     val contentColor = if (enabled) baseContentColor else baseContentColor.copy(alpha = 0.38f)
 
     // Ultra-thin "glass edge" border using white transparency
-    val border = when {
-        hideBackground || !enabled -> null
-        else -> BorderStroke(
-            0.5.dp,
-            Color.White.copy(alpha = 0.12f)
-        )
-    }
+    val border = null
 
     Surface(
         modifier = modifier

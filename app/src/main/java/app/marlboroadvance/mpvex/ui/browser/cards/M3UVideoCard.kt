@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stream
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -29,16 +28,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
-import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import androidx.compose.foundation.combinedClickable
-import org.koin.compose.koinInject
 
 /**
  * Card for displaying M3U/M3U8 playlist items (streaming URLs)
@@ -159,5 +154,3 @@ fun M3UVideoCard(
     }
   }
 }
-
-

@@ -642,7 +642,7 @@ fun PlayerControls(
 
               Row(
                 modifier = Modifier,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
               ) {
                 if (playlistMode && viewModel.hasPlaylistSupport()) {
@@ -663,8 +663,8 @@ fun PlayerControls(
                 }
 
                 // Main Play/Pause Button
-                val playContentColor = controlColor
-                val playContainerColor = if (hideBackground) Color.Transparent else Color.Black.copy(alpha = 0.5f)
+                val playContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                val playContainerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
                 
                 Surface(
                   modifier = Modifier
@@ -682,7 +682,7 @@ fun PlayerControls(
                   shape = CircleShape,
                   color = playContainerColor,
                   contentColor = playContentColor,
-                  border = if (hideBackground) null else BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f)),
+                  border = null,
                 ) {
                   Image(
                     painter = rememberAnimatedVectorPainter(icon, paused == false),
