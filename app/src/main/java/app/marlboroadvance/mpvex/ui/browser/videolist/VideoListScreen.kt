@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -298,14 +299,18 @@ data class VideoListScreen(
           autoScrollToLastPlayed = autoScrollToLastPlayed,
           onRefresh = { viewModel.refresh() },
           selectionManager = selectionManager,
-          onVideoClick = { video ->
-            if (selectionManager.isInSelectionMode) {
-              selectionManager.toggle(video)
-            } else {
-              MediaUtils.playFile(video, context, "video_list")
+          onVideoClick = remember(selectionManager) {
+            { video ->
+              if (selectionManager.isInSelectionMode) {
+                selectionManager.toggle(video)
+              } else {
+                MediaUtils.playFile(video, context, "video_list")
+              }
             }
           },
-          onVideoLongClick = { video -> selectionManager.toggle(video) },
+          onVideoLongClick = remember(selectionManager) {
+            { video -> selectionManager.toggle(video) }
+          },
           isFabVisible = isFabVisible,
           modifier = Modifier.padding(padding),
           showFloatingBottomBar = showFloatingBottomBar,
@@ -562,24 +567,41 @@ private fun VideoListContent(
             LazyColumn(
               state = listState,
               modifier = Modifier.fillMaxSize(),
-              contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = if (showFloatingBottomBar) 88.dp else 16.dp),
+              contentPadding = PaddingValues(top = 8.dp, start = 8.dp, end = 8.dp, bottom = if (showFloatingBottomBar) 88.dp else 16.dp),
+              verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
               items(
                 count = videosWithInfo.size,
-                key = { index -> "${videosWithInfo[index].video.id}_${videosWithInfo[index].video.path}" },
+                key = { index -> videosWithInfo[index].video.id },
               ) { index ->
                 val videoWithInfo = videosWithInfo[index]
+                val video = videoWithInfo.video
+
+                val currentOnClick = remember(video.id, onVideoClick) {
+                  { onVideoClick(video) }
+                }
+                val currentOnLongClick = remember(video.id, onVideoLongClick) {
+                  { onVideoLongClick(video) }
+                }
+                val currentOnThumbClick = remember(video.id, tapThumbnailToSelect, onVideoClick, onVideoLongClick) {
+                  if (tapThumbnailToSelect) {
+                    { onVideoLongClick(video) }
+                  } else {
+                    { onVideoClick(video) }
+                  }
+                }
+
                 VideoCard(
-                  video = videoWithInfo.video,
+                  video = video,
                   settings = videoCardSettings,
                   progressPercentage = videoWithInfo.progressPercentage,
-                  isRecentlyPlayed = recentlyPlayedFilePath?.let { videoWithInfo.video.path == it } ?: false,
-                  isSelected = selectionManager.isSelected(videoWithInfo.video),
+                  isRecentlyPlayed = recentlyPlayedFilePath?.let { video.path == it } ?: false,
+                  isSelected = selectionManager.isSelected(video),
                   isOldAndUnplayed = videoWithInfo.isOldAndUnplayed,
                   isWatched = videoWithInfo.isWatched,
-                  onClick = { onVideoClick(videoWithInfo.video) },
-                  onLongClick = { onVideoLongClick(videoWithInfo.video) },
-                  onThumbClick = if (tapThumbnailToSelect) { { onVideoLongClick(videoWithInfo.video) } } else { { onVideoClick(videoWithInfo.video) } },
+                  onClick = currentOnClick,
+                  onLongClick = currentOnLongClick,
+                  onThumbClick = currentOnThumbClick,
                   showSubtitleIndicator = showSubtitleIndicator,
                   allowThumbnailGeneration = true,
                 )

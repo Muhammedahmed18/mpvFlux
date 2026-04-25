@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -371,10 +372,12 @@ private fun RecentItemsContent(
           state = listState,
           modifier = Modifier.fillMaxSize(),
           contentPadding = PaddingValues(
+            top = 8.dp,
             start = 8.dp,
             end = 8.dp,
             bottom = if (isInSelectionMode) 88.dp else 16.dp
           ),
+          verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
           items(
             count = recentItems.size,

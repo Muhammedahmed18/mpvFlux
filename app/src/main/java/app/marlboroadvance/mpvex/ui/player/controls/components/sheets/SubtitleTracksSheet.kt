@@ -1,8 +1,10 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -73,31 +75,39 @@ fun SubtitlesSheet(
     tracks = items,
     onDismissRequest = onDismissRequest,
     header = {
-      val subtitleActions = remember {
-        listOf(
-          TrackAction(
-            label = "Add",
-            icon = Icons.Default.Add,
-            onClick = onAddSubtitle
-          ),
-          TrackAction(
-            label = "Search Online",
-            icon = Icons.Default.Search,
-            onClick = onOpenOnlineSearch
-          ),
-          TrackAction(
-            label = "Settings",
-            icon = Icons.Default.Palette,
-            onClick = onOpenSubtitleSettings
-          ),
-          TrackAction(
-            label = "Delay",
-            icon = Icons.Default.MoreTime,
-            onClick = onOpenSubtitleDelay
-          )
+      Column(modifier = Modifier.padding(top = MaterialTheme.spacing.medium)) {
+        Text(
+          text = "Subtitles",
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.ExtraBold,
+          modifier = Modifier.padding(horizontal = MaterialTheme.spacing.medium)
         )
+        val subtitleActions = remember {
+          listOf(
+            TrackAction(
+              label = "Add",
+              icon = Icons.Default.Add,
+              onClick = onAddSubtitle
+            ),
+            TrackAction(
+              label = "Search",
+              icon = Icons.Default.Search,
+              onClick = onOpenOnlineSearch
+            ),
+            TrackAction(
+              label = "Style",
+              icon = Icons.Default.Palette,
+              onClick = onOpenSubtitleSettings
+            ),
+            TrackAction(
+              label = "Sync",
+              icon = Icons.Default.MoreTime,
+              onClick = onOpenSubtitleDelay
+            )
+          )
+        }
+        TrackActionsRow(actions = subtitleActions)
       }
-      TrackActionsRow(actions = subtitleActions)
     },
     track = { item ->
       when (item) {
@@ -117,20 +127,25 @@ fun SubtitlesSheet(
           }
 
           TrackSelectableBar(
+            id = track.id,
             title = getTrackTitle(track),
             isSelected = isSelected,
             onClick = { onToggleSubtitle(track.id) },
             metadata = metadata,
             trailingContent = if (track.external == true) {
               {
-                IconButton(onClick = { onRemoveSubtitle(track.id) }) {
+                IconButton(
+                  onClick = { onRemoveSubtitle(track.id) },
+                  modifier = Modifier.padding(end = 4.dp)
+                ) {
                   Icon(
                     Icons.Default.Delete,
                     contentDescription = null,
+                    modifier = Modifier.size(20.dp),
                     tint = if (isSelected) {
-                      MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                      MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
                     } else {
-                      MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                      MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                     }
                   )
                 }
@@ -139,21 +154,21 @@ fun SubtitlesSheet(
           )
         }
         is SubtitleItem.Header -> {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 16.dp, bottom = 8.dp)
-            )
+          Text(
+            text = item.title,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+              .padding(horizontal = 16.dp)
+              .padding(top = 8.dp, bottom = 4.dp)
+          )
         }
         SubtitleItem.Divider -> {
-            HorizontalDivider(
-              modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
-              color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-            )
+          HorizontalDivider(
+            modifier = Modifier.padding(vertical = 4.dp, horizontal = 16.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+          )
         }
       }
     },

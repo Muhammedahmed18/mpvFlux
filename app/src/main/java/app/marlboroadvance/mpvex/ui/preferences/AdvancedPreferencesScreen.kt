@@ -10,10 +10,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -42,6 +42,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
@@ -69,7 +70,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
-import me.zhanghai.compose.preference.Preference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import me.zhanghai.compose.preference.SwitchPreference
 import me.zhanghai.compose.preference.TwoTargetIconButtonPreference
@@ -98,7 +98,6 @@ object AdvancedPreferencesScreen : Screen {
     val clearedHistoryMsg = stringResource(R.string.pref_advanced_cleared_playback_history)
     val clearedFontsMsg = stringResource(R.string.pref_advanced_cleared_fonts_cache)
 
-    // OLED Optimization: Pure black background in dark mode
     val darkMode by appPreferences.darkMode.collectAsState()
     val systemDarkTheme = isSystemInDarkTheme()
     val isDark = when (darkMode) {
@@ -108,7 +107,8 @@ object AdvancedPreferencesScreen : Screen {
     }
     val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
 
-    // Export settings launcher
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
     val exportLauncher =
       rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("text/xml"),
@@ -132,7 +132,6 @@ object AdvancedPreferencesScreen : Screen {
         }
       }
 
-    // Import settings launcher
     val importLauncher =
       rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -156,7 +155,6 @@ object AdvancedPreferencesScreen : Screen {
         }
       }
 
-    // Export results dialog
     if (showExportDialog && exportStats != null) {
       AlertDialog(
         onDismissRequest = { showExportDialog = false },
@@ -180,7 +178,6 @@ object AdvancedPreferencesScreen : Screen {
       )
     }
 
-    // Import results dialog
     if (showImportDialog && importStats != null) {
       AlertDialog(
         onDismissRequest = { showImportDialog = false },
@@ -206,20 +203,21 @@ object AdvancedPreferencesScreen : Screen {
       color = backgroundColor
     ) {
       Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
           TopAppBar(
-            modifier = Modifier.statusBarsPadding(),
+            scrollBehavior = scrollBehavior,
             colors = TopAppBarDefaults.topAppBarColors(
               containerColor = Color.Transparent,
-              scrolledContainerColor = Color.Transparent
+              scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
             ),
             title = { 
               Text(
                 text = stringResource(R.string.pref_advanced),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
               )
             },
             navigationIcon = {
@@ -227,7 +225,6 @@ object AdvancedPreferencesScreen : Screen {
                 Icon(
                   Icons.AutoMirrored.Rounded.ArrowBack, 
                   contentDescription = null,
-                  tint = MaterialTheme.colorScheme.secondary,
                 )
               }
             },
@@ -276,8 +273,11 @@ object AdvancedPreferencesScreen : Screen {
           val mpvConfStorageLocation by preferences.mpvConfStorageUri.collectAsState()
           LazyColumn(
             modifier = Modifier
-              .fillMaxSize()
-              .padding(padding),
+              .fillMaxSize(),
+            contentPadding = PaddingValues(
+              top = padding.calculateTopPadding(),
+              bottom = padding.calculateBottomPadding() + 16.dp
+            )
           ) {
             item {
               PreferenceSectionHeader(title = "Backup & Restore")

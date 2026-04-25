@@ -144,8 +144,9 @@ fun VideoCard(
   )
 
   val selectionBackgroundColor by animateColorAsState(
-    targetValue = if (isSelected) MaterialTheme.colorScheme.tertiary.copy(alpha = 0.3f)
-    else MaterialTheme.colorScheme.tertiary.copy(alpha = 0f),
+    // M3: use secondaryContainer for selection states, not tertiary (tertiary is for accents)
+    targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+    else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0f),
     label = "selectionBackgroundColor"
   )
 
@@ -157,13 +158,15 @@ fun VideoCard(
         onClick = onClick,
         onLongClick = onLongClick,
       ),
-    colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+    // M3: ElevatedCard-style tonal surface so items have a "layer" feel in the list
+    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
         .background(selectionBackgroundColor)
-        .padding(12.dp),
+        // M3 list-item spec: 16dp horizontal, 12dp vertical
+        .padding(horizontal = 16.dp, vertical = 12.dp),
       verticalAlignment = Alignment.Top,
     ) {
       VideoThumbnail(
@@ -227,14 +230,25 @@ private fun VideoInfoPanel(
       },
       color = when {
         isRecentlyPlayed -> MaterialTheme.colorScheme.tertiary
-        isWatched -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        // M3: onSurfaceVariant is the semantic "de-emphasized" color token
+        isWatched -> MaterialTheme.colorScheme.onSurfaceVariant
         else -> MaterialTheme.colorScheme.onSurface
       },
       maxLines = maxLines,
       overflow = TextOverflow.Ellipsis,
     )
 
-    Spacer(modifier = Modifier.height(6.dp))
+    // M3: surface the most important secondary info (duration) directly in the panel,
+    // so it reads clearly even when thumbnails are disabled
+    Spacer(modifier = Modifier.height(2.dp))
+    Text(
+      text = video.durationFormatted,
+      style = MaterialTheme.typography.bodySmall,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    // M3: 8dp gap reads more clearly than 6dp between title block and chips
+    Spacer(modifier = Modifier.height(8.dp))
 
     VideoMetadataChips(
       video = video,
@@ -270,8 +284,9 @@ fun VideoThumbnail(
     BoxWithConstraints(
       modifier = Modifier
         .fillMaxSize()
-        .clip(RoundedCornerShape(20.dp))
-        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+        // M3 shape scale: inner components use "Large" (12dp), not 20dp (arbitrary/too pill-like)
+        .clip(RoundedCornerShape(12.dp))
+        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
         .combinedClickable(
           onClick = onThumbClick,
           onLongClick = onLongClick,
@@ -319,66 +334,49 @@ fun VideoThumbnail(
           contentScale = ContentScale.Crop,
         )
       } else {
+        // M3: smaller, softer placeholder icon using onSurfaceVariant (de-emphasis token)
         Icon(
           imageVector = Icons.Filled.PlayArrow,
           contentDescription = null,
-          modifier = Modifier.size(48.dp),
-          tint = MaterialTheme.colorScheme.secondary,
+          modifier = Modifier.size(32.dp),
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
 
-      // Overlays - Top Row
-      Row(
+      // Overlays - Top Row (left badges only; duration moved to info panel)
+      Box(
         modifier = Modifier
-          .align(Alignment.TopCenter)
-          .fillMaxWidth()
+          .align(Alignment.TopStart)
           .padding(8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.Top
       ) {
         // Left side: Watched or New
-        Box {
-          if (isWatched) {
-            Surface(
-              shape = CircleShape,
-              color = MaterialTheme.colorScheme.primary,
-              modifier = Modifier.size(24.dp),
-            ) {
-              Icon(
-                imageVector = Icons.Filled.Check,
-                contentDescription = null,
-                modifier = Modifier.padding(4.dp),
-                tint = MaterialTheme.colorScheme.onPrimary,
-              )
-            }
-          } else if (isNew) {
-            Box(
-              modifier = Modifier
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-            ) {
-              Text(
-                text = stringResource(R.string.video_label_new),
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onPrimary,
-              )
-            }
+        if (isWatched) {
+          Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(24.dp),
+          ) {
+            Icon(
+              imageVector = Icons.Filled.Check,
+              contentDescription = null,
+              modifier = Modifier.padding(4.dp),
+              tint = MaterialTheme.colorScheme.onPrimary,
+            )
           }
-        }
-
-        // Right side: Duration pill
-        Box(
-          modifier = Modifier
-            .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.7f))
-            .padding(horizontal = 8.dp, vertical = 2.dp),
-        ) {
-          Text(
-            text = video.durationFormatted,
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White,
-          )
+        } else if (isNew) {
+          Box(
+            modifier = Modifier
+              // M3: small label badge uses 4dp corner, not full pill — differentiates from circular watched badge
+              .clip(RoundedCornerShape(4.dp))
+              .background(MaterialTheme.colorScheme.primary)
+              .padding(horizontal = 6.dp, vertical = 2.dp),
+          ) {
+            Text(
+              text = stringResource(R.string.video_label_new),
+              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+              color = MaterialTheme.colorScheme.onPrimary,
+            )
+          }
         }
       }
 
@@ -392,16 +390,18 @@ fun VideoThumbnail(
         Box(
           modifier = Modifier
             .align(Alignment.BottomCenter)
-            .padding(bottom = 16.dp, start = 16.dp, end = 16.dp)
+            // M3: 8dp bottom padding aligns with thumbnail's internal 8dp overlay padding
+            .padding(bottom = 8.dp, start = 8.dp, end = 8.dp)
             .fillMaxWidth()
-            .height(6.dp)
+            // M3 LinearProgressIndicator height = 4dp
+            .height(4.dp)
         ) {
-          // Track
+          // Track — M3 uses primaryContainer (not raw white alpha) for the track
           Box(
             modifier = Modifier
               .matchParentSize()
               .clip(RoundedCornerShape(50))
-              .background(Color.White.copy(alpha = 0.25f))
+              .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
           )
 
           // Progress
@@ -457,7 +457,8 @@ fun VideoMetadataChips(
 ) {
   FlowRow(
     modifier = modifier,
-    horizontalArrangement = Arrangement.spacedBy(4.dp),
+    // M3: 6dp spacing reads more comfortably than 4dp for dense chip rows
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
     verticalArrangement = Arrangement.spacedBy(4.dp)
   ) {
     // Subtitles
@@ -504,15 +505,17 @@ fun VideoMetadataChips(
 @Composable
 private fun MetadataChip(
   text: String,
-  containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
-  contentColor: Color = MaterialTheme.colorScheme.onSurface
+  // M3: surfaceContainerHighest gives better tonal separation than surfaceContainerHigh
+  containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+  contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
   Text(
     text = text,
     style = MaterialTheme.typography.labelSmall,
     modifier = Modifier
-      .background(containerColor, CircleShape)
-      .padding(horizontal = 8.dp, vertical = 4.dp),
+      // M3 shape scale: "Small" = 4dp, but 8dp is appropriate for dense label chips
+      .background(containerColor, RoundedCornerShape(8.dp))
+      .padding(horizontal = 8.dp, vertical = 3.dp),
     color = contentColor,
   )
 }
@@ -524,84 +527,84 @@ private fun formatDate(timestampSeconds: Long): String {
 @Preview(showBackground = true, name = "Video Card Primary States")
 @Composable
 fun VideoCardPrimaryPreview() {
-    val sampleVideo = getSampleVideo()
+  val sampleVideo = getSampleVideo()
 
-    MaterialTheme {
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            StateLabel("Extension: ON")
-            VideoCard(video = sampleVideo, settings = VideoCardSettings(showVideoExtension = true), onClick = {})
+  MaterialTheme {
+    Column(
+      modifier = Modifier
+        .background(MaterialTheme.colorScheme.surface)
+        .padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+      StateLabel("Extension: ON")
+      VideoCard(video = sampleVideo, settings = VideoCardSettings(showVideoExtension = true), onClick = {})
 
-            StateLabel("Extension: OFF")
-            VideoCard(video = sampleVideo, settings = VideoCardSettings(showVideoExtension = false), onClick = {})
+      StateLabel("Extension: OFF")
+      VideoCard(video = sampleVideo, settings = VideoCardSettings(showVideoExtension = false), onClick = {})
 
-            StateLabel("Selected State (Hanging Badge)")
-            VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isSelected = true)
+      StateLabel("Selected State (Hanging Badge)")
+      VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isSelected = true)
 
-            StateLabel("Recently Played (No Italic)")
-            VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isRecentlyPlayed = true)
+      StateLabel("Recently Played (No Italic)")
+      VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isRecentlyPlayed = true)
 
-            StateLabel("Progress Bar (50%)")
-            VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, progressPercentage = 0.5f
-            )
-        }
+      StateLabel("Progress Bar (50%)")
+      VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, progressPercentage = 0.5f
+      )
     }
+  }
 }
 
 @Preview(showBackground = true, name = "Video Card Status States")
 @Composable
 fun VideoCardStatusPreview() {
-    val sampleVideo = getSampleVideo()
+  val sampleVideo = getSampleVideo()
 
-    MaterialTheme {
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.surface)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            StateLabel("New / Unplayed Label")
-            VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isOldAndUnplayed = true)
+  MaterialTheme {
+    Column(
+      modifier = Modifier
+        .background(MaterialTheme.colorScheme.surface)
+        .padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+      StateLabel("New / Unplayed Label")
+      VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isOldAndUnplayed = true)
 
-            StateLabel("Watched (Dimmed + Tick)")
-            VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isWatched = true)
-        }
+      StateLabel("Watched (Dimmed + Tick)")
+      VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isWatched = true)
     }
+  }
 }
 
 private fun getSampleVideo() = Video(
-    id = 1,
-    title = "Sample Video File",
-    displayName = "Sample Video File.mp4",
-    path = "/storage/emulated/0/Movies/Sample.mp4",
-    uri = Uri.EMPTY,
-    duration = 3600000,
-    durationFormatted = "01:00:00",
-    size = 1024 * 1024 * 500,
-    sizeFormatted = "500 MB",
-    dateModified = 1776686400L, // Apr 20, 2026
-    dateAdded = System.currentTimeMillis() / 1000,
-    mimeType = "video/mp4",
-    bucketId = "1",
-    bucketDisplayName = "Movies",
-    width = 1920,
-    height = 1080,
-    fps = 24f,
-    resolution = "1920x1080 @ 24",
-    hasEmbeddedSubtitles = true,
-    subtitleCodec = "SRT ASS"
+  id = 1,
+  title = "Sample Video File",
+  displayName = "Sample Video File.mp4",
+  path = "/storage/emulated/0/Movies/Sample.mp4",
+  uri = Uri.EMPTY,
+  duration = 3600000,
+  durationFormatted = "01:00:00",
+  size = 1024 * 1024 * 500,
+  sizeFormatted = "500 MB",
+  dateModified = 1776686400L, // Apr 20, 2026
+  dateAdded = System.currentTimeMillis() / 1000,
+  mimeType = "video/mp4",
+  bucketId = "1",
+  bucketDisplayName = "Movies",
+  width = 1920,
+  height = 1080,
+  fps = 24f,
+  resolution = "1920x1080 @ 24",
+  hasEmbeddedSubtitles = true,
+  subtitleCodec = "SRT ASS"
 )
 
 @Composable
 private fun StateLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(top = 8.dp)
-    )
+  Text(
+    text = text,
+    style = MaterialTheme.typography.labelLarge,
+    color = MaterialTheme.colorScheme.primary,
+    modifier = Modifier.padding(top = 8.dp)
+  )
 }

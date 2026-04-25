@@ -73,21 +73,29 @@ fun AudioTracksSheet(
     tracks = items,
     onDismissRequest = onDismissRequest,
     header = {
-      val audioActions = remember {
-        listOf(
-          TrackAction(
-            label = "Add",
-            icon = Icons.Default.Add,
-            onClick = onAddAudioTrack
-          ),
-          TrackAction(
-            label = "Delay",
-            icon = Icons.Default.MoreTime,
-            onClick = onOpenDelayPanel
-          )
+      Column(modifier = Modifier.padding(top = MaterialTheme.spacing.medium)) {
+        Text(
+          text = "Audio Tracks",
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.ExtraBold,
+          modifier = Modifier.padding(horizontal = MaterialTheme.spacing.medium)
         )
+        val audioActions = remember {
+          listOf(
+            TrackAction(
+              label = "Add Track",
+              icon = Icons.Default.Add,
+              onClick = onAddAudioTrack
+            ),
+            TrackAction(
+              label = "Sync Delay",
+              icon = Icons.Default.MoreTime,
+              onClick = onOpenDelayPanel
+            )
+          )
+        }
+        TrackActionsRow(actions = audioActions)
       }
-      TrackActionsRow(actions = audioActions)
     },
     track = { item ->
       when (item) {
@@ -98,7 +106,7 @@ fun AudioTracksSheet(
             mutableListOf<String>().apply {
               if (!node.codec.isNullOrBlank()) add(node.codec)
               if (node.audioChannels != null) {
-                add(node.demuxChannels ?: "${node.audioChannels}ch")
+                add(node.demuxChannels ?: "${node.audioChannels}CH")
               }
               if (node.external == true) add(externalLabel)
               if (!node.lang.isNullOrBlank() && node.title?.contains(node.lang, ignoreCase = true) != true) {
@@ -108,6 +116,7 @@ fun AudioTracksSheet(
           }
 
           TrackSelectableBar(
+            id = node.id,
             title = getTrackTitle(node),
             isSelected = node.isSelected,
             onClick = { onSelect(node) },
@@ -117,17 +126,17 @@ fun AudioTracksSheet(
         is AudioItem.Header -> {
           Text(
             text = item.title,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,
             modifier = Modifier
               .padding(horizontal = 16.dp)
-              .padding(top = 16.dp, bottom = 8.dp)
+              .padding(top = 8.dp, bottom = 4.dp)
           )
         }
         AudioItem.Divider -> {
           HorizontalDivider(
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 16.dp),
+            modifier = Modifier.padding(vertical = 4.dp, horizontal = 16.dp),
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
           )
         }
@@ -141,17 +150,15 @@ fun AudioTracksSheet(
       ) {
         Text(
           text = stringResource(id = R.string.pref_audio_channels),
-          style = MaterialTheme.typography.titleSmall,
-          color = MaterialTheme.colorScheme.primary,
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
           fontWeight = FontWeight.Bold,
-          modifier = Modifier.padding(horizontal = 16.dp)
+          modifier = Modifier.padding(horizontal = 4.dp)
         )
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         
         SingleChoiceSegmentedButtonRow(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp)
+          modifier = Modifier.fillMaxWidth()
         ) {
           AudioChannels.entries.forEachIndexed { index, channel ->
             this@SingleChoiceSegmentedButtonRow.SegmentedButton(
@@ -169,7 +176,7 @@ fun AudioTracksSheet(
               label = { 
                 Text(
                   text = stringResource(id = channel.title),
-                  style = MaterialTheme.typography.labelMedium
+                  style = MaterialTheme.typography.labelSmall
                 ) 
               }
             )

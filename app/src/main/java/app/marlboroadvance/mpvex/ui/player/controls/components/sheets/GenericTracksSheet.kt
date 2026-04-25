@@ -1,6 +1,12 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
 import android.content.res.Configuration.ORIENTATION_PORTRAIT
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,9 +24,10 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -28,16 +35,17 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -54,26 +62,14 @@ fun getTrackTitle(track: TrackNode): String {
   } else {
     track.title
   }
-  val lang = track.lang?.uppercase()
-  val id = track.id
-
-  return when {
-    !title.isNullOrBlank() && !lang.isNullOrBlank() -> {
-      stringResource(R.string.player_sheets_track_title_w_lang, id, title, lang)
-    }
-    !title.isNullOrBlank() -> {
-      stringResource(R.string.player_sheets_track_title_wo_lang, id, title)
-    }
-    !lang.isNullOrBlank() -> {
-      stringResource(R.string.player_sheets_track_lang_wo_title, id, lang)
-    }
-    else -> {
-      val fallbackRes = if (track.type == "audio") {
-        R.string.player_sheets_chapter_title_substitute_audio
-      } else {
-        R.string.player_sheets_chapter_title_substitute_subtitle
-      }
-      stringResource(fallbackRes, id)
+  
+  return if (!title.isNullOrBlank()) {
+    title
+  } else {
+    if (track.type == "audio") {
+      stringResource(R.string.player_sheets_chapter_title_substitute_audio, track.id)
+    } else {
+      stringResource(R.string.player_sheets_chapter_title_substitute_subtitle, track.id)
     }
   }
 }
@@ -93,12 +89,16 @@ fun <T> GenericTracksSheet(
   val configuration = LocalConfiguration.current
   
   val calculatedMaxWidth = customMaxWidth ?: if (configuration.orientation == ORIENTATION_PORTRAIT) {
-    2000.dp 
+    640.dp 
   } else {
-    640.dp
+    560.dp
   }
 
-  PlayerSheet(onDismissRequest, customMaxWidth = calculatedMaxWidth) {
+  PlayerSheet(
+    onDismissRequest = onDismissRequest,
+    customMaxWidth = calculatedMaxWidth,
+    surfaceColor = MaterialTheme.colorScheme.surfaceContainerLow
+  ) {
     Column(
       modifier = modifier
         .fillMaxWidth()
@@ -108,14 +108,17 @@ fun <T> GenericTracksSheet(
       LazyColumn(
         state = listState,
         modifier = Modifier.weight(1f, fill = false),
-        contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.medium),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        contentPadding = PaddingValues(
+          horizontal = MaterialTheme.spacing.medium,
+          vertical = MaterialTheme.spacing.small
+        ),
+        verticalArrangement = Arrangement.spacedBy(4.dp) // Tighter spacing
       ) {
         items(tracks) {
           track(it)
         }
       }
-      Spacer(modifier = Modifier.height(MaterialTheme.spacing.small))
+      
       Box(
         modifier = Modifier
           .fillMaxWidth()
@@ -134,26 +137,26 @@ fun TrackMetadataBadge(
   modifier: Modifier = Modifier,
 ) {
   val containerColor = if (isSelected) {
-    MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.08f)
   } else {
-    MaterialTheme.colorScheme.surfaceVariant
+    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.05f)
   }
   
   val contentColor = if (isSelected) {
-    MaterialTheme.colorScheme.primary
+    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
   } else {
-    MaterialTheme.colorScheme.onSurfaceVariant
+    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
   }
 
   Surface(
     color = containerColor,
-    shape = RoundedCornerShape(4.dp),
+    shape = MaterialTheme.shapes.extraSmall, // More subtle than Circle
     modifier = modifier
   ) {
     Text(
-      text = text.uppercase(),
+      text = text, // No uppercase
       style = MaterialTheme.typography.labelSmall,
-      fontWeight = FontWeight.Bold,
+      fontWeight = FontWeight.Medium,
       color = contentColor,
       modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
     )
@@ -162,6 +165,7 @@ fun TrackMetadataBadge(
 
 @Composable
 fun TrackSelectableBar(
+  id: Int,
   title: String,
   isSelected: Boolean,
   onClick: () -> Unit,
@@ -169,42 +173,53 @@ fun TrackSelectableBar(
   metadata: List<String> = emptyList(),
   trailingContent: @Composable (RowScope.() -> Unit)? = null,
 ) {
+  val haptic = LocalHapticFeedback.current
   val containerColor = if (isSelected) {
-    MaterialTheme.colorScheme.primaryContainer
+    MaterialTheme.colorScheme.surfaceContainerHighest
   } else {
-    Color.Transparent
+    MaterialTheme.colorScheme.surfaceContainerLow
   }
 
   Surface(
-    onClick = onClick,
-    modifier = modifier
-      .fillMaxWidth()
-      .clip(RoundedCornerShape(12.dp)),
-    shape = RoundedCornerShape(12.dp),
+    onClick = {
+      haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+      onClick()
+    },
+    modifier = modifier.fillMaxWidth(),
+    shape = MaterialTheme.shapes.medium,
     color = containerColor,
   ) {
     ListItem(
+      modifier = Modifier.padding(vertical = 0.dp), // Tighter density
       colors = ListItemDefaults.colors(
         containerColor = Color.Transparent,
       ),
+      leadingContent = {
+        Text(
+          text = "#$id",
+          style = MaterialTheme.typography.labelMedium,
+          color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+          fontWeight = FontWeight.Bold
+        )
+      },
       headlineContent = {
         Text(
           text = title,
-          style = MaterialTheme.typography.bodyLarge,
-          fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+          style = MaterialTheme.typography.titleSmall, // 14sp
+          fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+          color = if (isSelected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f)
         )
       },
       supportingContent = if (metadata.isNotEmpty()) {
         {
-          Text(
-            text = metadata.joinToString(" • "),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isSelected) {
-              MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-            } else {
-              MaterialTheme.colorScheme.onSurfaceVariant
+          Row(
+            modifier = Modifier.padding(top = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+          ) {
+            metadata.forEach { text ->
+              TrackMetadataBadge(text, isSelected)
             }
-          )
+          }
         }
       } else null,
       trailingContent = {
@@ -215,10 +230,27 @@ fun TrackSelectableBar(
           if (trailingContent != null) {
             trailingContent()
           }
-          RadioButton(
-            selected = isSelected,
-            onClick = null // Handled by the surface click
-          )
+          
+          AnimatedVisibility(
+            visible = isSelected,
+            enter = fadeIn() + expandHorizontally(),
+            exit = fadeOut() + shrinkHorizontally()
+          ) {
+            // Tonal token: Circle with checkmark
+            Box(
+              modifier = Modifier
+                .size(28.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+              contentAlignment = Alignment.Center
+            ) {
+              Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+              )
+            }
+          }
         }
       }
     )
@@ -239,7 +271,7 @@ fun TrackActionsRow(
   LazyRow(
     modifier = modifier
       .fillMaxWidth()
-      .padding(bottom = MaterialTheme.spacing.small),
+      .padding(vertical = MaterialTheme.spacing.smaller),
     contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.medium),
     horizontalArrangement = Arrangement.spacedBy(8.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -250,7 +282,7 @@ fun TrackActionsRow(
         label = {
           Text(
             text = action.label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium
           )
         },
@@ -258,12 +290,12 @@ fun TrackActionsRow(
           Icon(
             action.icon,
             contentDescription = null,
-            modifier = Modifier.size(20.dp),
+            modifier = Modifier.size(16.dp),
           )
         },
-        shape = RoundedCornerShape(16.dp),
+        shape = CircleShape,
         colors = AssistChipDefaults.assistChipColors(
-          containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+          containerColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
           labelColor = MaterialTheme.colorScheme.onSurface,
           leadingIconContentColor = MaterialTheme.colorScheme.primary,
         ),
@@ -291,13 +323,13 @@ fun AddTrackRow(
     FilledTonalButton(
       onClick = onClick,
       modifier = Modifier.weight(1f),
-      shape = RoundedCornerShape(12.dp),
-      contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.medium, vertical = 8.dp)
+      shape = MaterialTheme.shapes.medium,
+      contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.medium, vertical = 6.dp)
     ) {
       Icon(
         Icons.Default.Add,
         contentDescription = null,
-        modifier = Modifier.size(20.dp),
+        modifier = Modifier.size(18.dp),
       )
       Spacer(modifier = Modifier.size(MaterialTheme.spacing.small))
       Text(

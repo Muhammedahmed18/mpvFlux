@@ -181,6 +181,8 @@ fun PlayerControls(
   val abLoopA by viewModel.abLoopA.collectAsState()
   val abLoopB by viewModel.abLoopB.collectAsState()
 
+  val activity = LocalActivity.current as PlayerActivity
+
   val onOpenSheet: (Sheets) -> Unit = {
     viewModel.setSheetShown(it)
     if (it == Sheets.None) {
@@ -238,10 +240,10 @@ fun PlayerControls(
     }
   }
 
-  val transparentOverlay by animateFloatAsState(
-    if (controlsShown && !areControlsLocked) .8f else 0f,
-    animationSpec = playerControlsExitAnimationSpec(),
-    label = "controls_transparent_overlay",
+  val scrimAlpha by animateFloatAsState(
+    targetValue = if (controlsShown && !areControlsLocked) 1f else 0f,
+    animationSpec = if (controlsShown) playerControlsEnterAnimationSpec() else playerControlsExitAnimationSpec(),
+    label = "scrim_alpha",
   )
 
   GestureHandler(
@@ -270,12 +272,12 @@ fun PlayerControls(
             .fillMaxSize()
             .background(
               Brush.verticalGradient(
-                Pair(0f, Color.Black),
-                Pair(.4f, Color.Transparent),
-                Pair(.6f, Color.Transparent),
-                Pair(1f, Color.Black),
+                0.0f to Color.Black.copy(alpha = 0.8f),
+                0.35f to Color.Transparent,
+                0.65f to Color.Transparent,
+                1.0f to Color.Black.copy(alpha = 0.8f),
               ),
-              alpha = transparentOverlay,
+              alpha = scrimAlpha,
             ),
       ) {
         val (topLeftControls, topRightControls) = createRefs()
@@ -294,7 +296,6 @@ fun PlayerControls(
         val swapVolumeAndBrightness by playerPreferences.swapVolumeAndBrightness.collectAsState()
         val reduceMotion by playerPreferences.reduceMotion.collectAsState()
 
-        val activity = LocalActivity.current as PlayerActivity
         val aspect by viewModel.videoAspect.collectAsState()
         val currentZoom by viewModel.videoZoom.collectAsState()
 
@@ -619,7 +620,7 @@ fun PlayerControls(
           val isPressed by interaction.collectIsPressedAsState()
           
           val scale by animateFloatAsState(
-            targetValue = if (isPressed) 0.92f else 1f,
+            targetValue = if (isPressed) 0.94f else 1f,
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioLowBouncy,
                 stiffness = Spring.StiffnessLow
@@ -642,7 +643,7 @@ fun PlayerControls(
 
               Row(
                 modifier = Modifier,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp),
                 verticalAlignment = Alignment.CenterVertically,
               ) {
                 if (playlistMode && viewModel.hasPlaylistSupport()) {
@@ -653,22 +654,22 @@ fun PlayerControls(
                     onClick = { viewModel.playPrevious() },
                     enabled = prevEnabled,
                     modifier = Modifier
-                      .size(48.dp)
+                      .size(56.dp)
                       .then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier),
                     shape = CircleShape,
-                    iconSize = 24.dp,
+                    iconSize = 32.dp,
                     type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal,
                     color = controlColor
                   )
                 }
 
-                // Main Play/Pause Button
+                // Main Play/Pause Hero Button
                 val playContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                val playContainerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                val playContainerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
                 
                 Surface(
                   modifier = Modifier
-                    .size(72.dp)
+                    .size(84.dp)
                     .graphicsLayer {
                       scaleX = scale
                       scaleY = scale
@@ -683,12 +684,13 @@ fun PlayerControls(
                   color = playContainerColor,
                   contentColor = playContentColor,
                   border = null,
+                  tonalElevation = 4.dp
                 ) {
                   Image(
                     painter = rememberAnimatedVectorPainter(icon, paused == false),
                     modifier = Modifier
                       .fillMaxSize()
-                      .padding(20.dp),
+                      .padding(24.dp),
                     contentDescription = null,
                     colorFilter = ColorFilter.tint(playContentColor),
                   )
@@ -702,10 +704,10 @@ fun PlayerControls(
                     onClick = { viewModel.playNext() },
                     enabled = nextEnabled,
                     modifier = Modifier
-                      .size(48.dp)
+                      .size(56.dp)
                       .then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier),
                     shape = CircleShape,
-                    iconSize = 24.dp,
+                    iconSize = 32.dp,
                     type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal,
                     color = controlColor
                   )
@@ -746,12 +748,13 @@ fun PlayerControls(
               )
               .constrainAs(seekbar) {
                 if (isPortrait) {
-                  bottom.linkTo(playerPauseButton.top, spacing.small)
+                  bottom.linkTo(playerPauseButton.top, spacing.medium)
                 } else {
-                  bottom.linkTo(parent.bottom, spacing.small)
+                  bottom.linkTo(parent.bottom, spacing.medium)
                 }
-                start.linkTo(parent.start, spacing.large)
-                end.linkTo(parent.end, spacing.large)
+                start.linkTo(parent.start, 24.dp)
+                end.linkTo(parent.end, 24.dp)
+                width = Dimension.fillToConstraints
               },
         ) {
           val invertDuration by playerPreferences.invertDuration.collectAsState()
@@ -851,6 +854,7 @@ fun PlayerControls(
               onBackPress = onBackPress,
               onOpenSheet = onOpenSheet,
               viewModel = viewModel,
+              activity = activity,
             )
           } else {
             TopLeftPlayerControlsLandscape(
@@ -859,6 +863,7 @@ fun PlayerControls(
               onBackPress = onBackPress,
               onOpenSheet = onOpenSheet,
               viewModel = viewModel,
+              activity = activity,
             )
           }
         }

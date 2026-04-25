@@ -1,19 +1,10 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,90 +13,124 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
 /**
- * A minimalist icon for preference items. 
- * Updated with a colored rounded square background for One UI 7 / Material 3 Expressive style.
+ * Modern Material 3 Expressive Icon Container.
+ * Uses tonal palettes instead of manual alpha for better accessibility.
  */
 @Composable
 fun PreferenceIcon(
-  imageVector: ImageVector,
-  modifier: Modifier = Modifier,
-  contentDescription: String? = null,
-  tint: Color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-  containerColor: Color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+    imageVector: ImageVector,
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null,
+    containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
+    iconColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
 ) {
-  Box(
-    modifier = modifier
-      .padding(end = 16.dp) // Expressive Spacing: Added breathing space between icon and text
-      .size(40.dp)
-      .clip(RoundedCornerShape(12.dp))
-      .background(containerColor),
-    contentAlignment = Alignment.Center,
-  ) {
-    Icon(
-      imageVector = imageVector,
-      contentDescription = contentDescription,
-      tint = tint,
-      modifier = Modifier.size(24.dp), // Keeps a standard hit area but light visual weight
-    )
-  }
+    Box(
+        modifier = modifier
+            .size(42.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(containerColor),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            tint = iconColor,
+            modifier = Modifier.size(22.dp),
+        )
+    }
 }
 
 /**
- * A grouped container for preference items.
- * Updated to use a Surface with rounded corners and a container color to match One UI 7 grouped style.
+ * A grouped container using the M3 'SurfaceContainer' role.
  */
 @Composable
 fun PreferenceCard(
-  modifier: Modifier = Modifier,
-  content: @Composable ColumnScope.() -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
-  Surface(
-    modifier = modifier
-      .fillMaxWidth()
-      .padding(horizontal = 12.dp)
-      .padding(bottom = 6.dp),
-    shape = RoundedCornerShape(20.dp),
-    color = MaterialTheme.colorScheme.surfaceContainer,
-  ) {
-    Column(
-      modifier = Modifier.fillMaxWidth(),
-      verticalArrangement = Arrangement.spacedBy(0.dp),
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-      content()
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        ) {
+            content()
+        }
     }
-  }
 }
 
 /**
- * A subtle divider to separate preferences.
- * Reduced padding to align with the new grouped card edges.
+ * Native Material 3 ListItem wrapper for Preferences.
  */
+@Composable
+fun Preference(
+    title: @Composable () -> Unit,
+    summary: (@Composable () -> Unit)? = null,
+    icon: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailingContent: (@Composable () -> Unit)? = null,
+    enabled: Boolean = true,
+) {
+    ListItem(
+        headlineContent = title,
+        supportingContent = summary,
+        leadingContent = icon,
+        trailingContent = trailingContent,
+        modifier = modifier.clickable(enabled = enabled, onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+    )
+}
+
+/**
+ * Compatibility wrapper for the redesigned UI.
+ */
+@Composable
+fun PreferenceItem(
+    title: String,
+    summary: String? = null,
+    icon: @Composable (() -> Unit)? = null,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Preference(
+        title = { Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
+        summary = summary?.let { { Text(text = it, style = MaterialTheme.typography.bodySmall) } },
+        icon = icon,
+        onClick = onClick,
+        modifier = modifier
+    )
+}
+
 @Composable
 fun PreferenceDivider(
-  modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier,
 ) {
-  HorizontalDivider(
-    modifier = modifier.padding(horizontal = 16.dp),
-    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-    thickness = 0.5.dp,
-  )
+    HorizontalDivider(
+        modifier = modifier.padding(horizontal = 16.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
+        thickness = 0.5.dp,
+    )
 }
 
-/**
- * A modern section header using Material 3 Expressive style.
- */
 @Composable
 fun PreferenceSectionHeader(
-  title: String,
-  modifier: Modifier = Modifier,
+    title: String,
+    modifier: Modifier = Modifier,
 ) {
-  Text(
-    text = title,
-    style = MaterialTheme.typography.labelLarge,
-    color = MaterialTheme.colorScheme.primary,
-    modifier = modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
-  )
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold,
+        modifier = modifier.padding(start = 32.dp, top = 24.dp, bottom = 8.dp),
+    )
 }

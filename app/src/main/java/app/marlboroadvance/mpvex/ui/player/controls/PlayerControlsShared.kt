@@ -1,7 +1,6 @@
 package app.marlboroadvance.mpvex.ui.player.controls
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -9,16 +8,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -49,10 +43,6 @@ import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOutMap
 import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Headset
-import androidx.compose.material.icons.outlined.Autorenew
-import androidx.compose.ui.draw.rotate
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -65,10 +55,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -83,10 +71,11 @@ import app.marlboroadvance.mpvex.ui.player.Sheets
 import app.marlboroadvance.mpvex.ui.player.VideoAspect
 import app.marlboroadvance.mpvex.ui.player.controls.components.ControlsButton
 import app.marlboroadvance.mpvex.ui.player.controls.components.ControlsButtonType
-import app.marlboroadvance.mpvex.ui.player.controls.components.CurrentChapter
 import app.marlboroadvance.mpvex.ui.theme.controlColor
-import app.marlboroadvance.mpvex.ui.theme.spacing
 import dev.vivvvek.seeker.Segment
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
+import java.util.Locale
 
 @Composable
 fun RenderPlayerButton(
@@ -125,12 +114,13 @@ fun RenderPlayerButton(
 
     PlayerButton.VIDEO_TITLE -> {
       val playlistModeEnabled = viewModel.hasPlaylistSupport()
+      val containerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.8f)
 
       Surface(
         modifier =
           Modifier
-            .widthIn(max = 280.dp)
-            .clip(CircleShape)
+            .widthIn(max = 320.dp)
+            .clip(MaterialTheme.shapes.medium)
             .clickable(
               enabled = playlistModeEnabled,
               onClick = {
@@ -138,24 +128,24 @@ fun RenderPlayerButton(
                 onOpenSheet(Sheets.Playlist)
               },
             ),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
-        shape = CircleShape,
+        color = containerColor,
+        shape = MaterialTheme.shapes.medium,
       ) {
         Column(
-          verticalArrangement = Arrangement.spacedBy(0.dp),
+          verticalArrangement = Arrangement.spacedBy(2.dp),
           modifier =
             Modifier.padding(
-              horizontal = MaterialTheme.spacing.medium,
-              vertical = 8.dp,
+              horizontal = 12.dp,
+              vertical = 6.dp,
             ),
         ) {
           viewModel.getPlaylistInfo()?.let { playlistInfo ->
             Text(
-              text = playlistInfo.uppercase(),
+              text = playlistInfo.uppercase(Locale.US),
               textAlign = TextAlign.Start,
               style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Black,
-                letterSpacing = 0.5.sp
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
               ),
               maxLines = 1,
               overflow = TextOverflow.Visible,
@@ -167,7 +157,7 @@ fun RenderPlayerButton(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.titleMedium.copy(
-              fontWeight = FontWeight.SemiBold
+              fontWeight = FontWeight.Bold
             ),
             color = MaterialTheme.colorScheme.onSurface,
           )
@@ -189,13 +179,13 @@ fun RenderPlayerButton(
 
     PlayerButton.PLAYBACK_SPEED -> {
       if (isSpeedNonOne) {
+        val containerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f)
+        val contentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurfaceVariant
+        
         Surface(
           shape = buttonShape,
-          color = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-          contentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSecondaryContainer,
-          tonalElevation = 0.dp,
-          shadowElevation = 0.dp,
-          border = null,
+          color = containerColor,
+          contentColor = contentColor,
           modifier = Modifier
             .height(buttonSize)
             .clip(buttonShape)
@@ -210,23 +200,23 @@ fun RenderPlayerButton(
         ) {
           Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
-            modifier = Modifier.padding(
-              horizontal = MaterialTheme.spacing.medium,
-              vertical = MaterialTheme.spacing.small,
-            ),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 12.dp),
           ) {
             Icon(
               imageVector = Icons.Default.Speed,
               contentDescription = "Playback Speed",
-              tint = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSecondaryContainer,
-              modifier = Modifier.size(20.dp),
+              tint = contentColor,
+              modifier = Modifier.size(18.dp),
             )
             Text(
-              text = String.format("%.2fx", playbackSpeed),
+              text = String.format(Locale.US, "%.2fx", playbackSpeed),
               maxLines = 1,
-              style = MaterialTheme.typography.labelLarge,
-              color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSecondaryContainer
+              style = MaterialTheme.typography.labelLarge.copy(
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+              ),
+              color = contentColor
             )
           }
         }
@@ -242,18 +232,13 @@ fun RenderPlayerButton(
     }
 
     PlayerButton.DECODER -> {
+        val containerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f)
+        val contentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurfaceVariant
+
       Surface(
         shape = buttonShape,
-        color =
-          if (hideBackground) {
-            Color.Transparent
-          } else {
-            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
-          },
-        contentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSecondaryContainer,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp,
-        border = null,
+        color = containerColor,
+        contentColor = contentColor,
         modifier = Modifier
           .height(buttonSize)
           .clip(buttonShape)
@@ -268,20 +253,17 @@ fun RenderPlayerButton(
       ) {
         Row(
           verticalAlignment = Alignment.CenterVertically,
-          modifier =
-            Modifier
-              .padding(
-                horizontal = MaterialTheme.spacing.medium,
-                vertical = MaterialTheme.spacing.small,
-              ),
+          modifier = Modifier.padding(horizontal = 12.dp),
         ) {
           Text(
             text = decoder.title,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.labelLarge,
-            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-            color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSecondaryContainer
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            ),
+            color = contentColor
           )
         }
       }
@@ -298,12 +280,11 @@ fun RenderPlayerButton(
     }
 
     PlayerButton.FRAME_NAVIGATION -> {
-      val isExpanded by viewModel.isFrameNavigationExpanded.collectAsState()
+      val isFrameExpanded by viewModel.isFrameNavigationExpanded.collectAsState()
       val isSnapshotLoading by viewModel.isSnapshotLoading.collectAsState()
-      val context = LocalContext.current
 
       AnimatedContent(
-        targetState = isExpanded,
+        targetState = isFrameExpanded,
         transitionSpec = {
           (fadeIn(animationSpec = tween(200)) + expandHorizontally(animationSpec = tween(250)))
             .togetherWith(fadeOut(animationSpec = tween(200)) + shrinkHorizontally(animationSpec = tween(250)))
@@ -314,218 +295,61 @@ fun RenderPlayerButton(
         if (expanded) {
           Surface(
             shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-            border = null,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.height(buttonSize),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f),
+            modifier = Modifier.height(buttonSize)
           ) {
             Row(
-              horizontalArrangement = Arrangement.spacedBy(2.dp),
               verticalAlignment = Alignment.CenterVertically,
-              modifier = Modifier.padding(horizontal = 4.dp),
+              horizontalArrangement = Arrangement.spacedBy(8.dp),
+              modifier = Modifier.padding(horizontal = 8.dp)
             ) {
-              // Previous frame button
-              Surface(
-                shape = buttonShape,
-                color = Color.Transparent,
-                modifier = Modifier
-                  .size(buttonSize - 4.dp)
-                  .clip(buttonShape)
-                  .clickable(onClick = {
-                    viewModel.frameStepBackward()
-                    viewModel.resetFrameNavigationTimer()
-                  }),
-              ) {
-                Box(contentAlignment = Alignment.Center) {
-                  Icon(
-                    imageVector = Icons.Default.FastRewind,
-                    contentDescription = "Previous Frame",
-                    tint = controlColor,
-                    modifier = Modifier.size(20.dp),
-                  )
-                }
-              }
-
-              // Camera / Loading button
-              if (isSnapshotLoading) {
-                Surface(
-                  shape = buttonShape,
-                  color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                  border = null,
-                  modifier = Modifier.size(buttonSize - 4.dp),
-                ) {
-                  Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                    CircularProgressIndicator(
-                      modifier = Modifier.size(16.dp),
-                      strokeWidth = 2.dp,
-                      color = controlColor,
-                    )
-                  }
-                }
-              } else {
-                @OptIn(ExperimentalFoundationApi::class)
-                Surface(
-                  shape = buttonShape,
-                  color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                  border = null,
-                  modifier = Modifier
-                    .size(buttonSize - 4.dp)
-                    .clip(buttonShape)
-                    .combinedClickable(
-                      onClick = {
-                        viewModel.takeSnapshot(context)
-                        viewModel.resetFrameNavigationTimer()
-                      },
-                      onLongClick = { onOpenSheet(Sheets.FrameNavigation) },
-                    ),
-                ) {
-                  Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                      imageVector = Icons.Default.CameraAlt,
-                      contentDescription = "Take Screenshot",
-                      tint = controlColor,
-                      modifier = Modifier.size(20.dp),
-                    )
-                  }
-                }
-              }
-
-              // Next frame button
-              Surface(
-                shape = buttonShape,
-                color = Color.Transparent,
-                modifier = Modifier
-                  .size(buttonSize - 4.dp)
-                  .clip(buttonShape)
-                  .clickable(onClick = {
-                    viewModel.frameStepForward()
-                    viewModel.resetFrameNavigationTimer()
-                  }),
-              ) {
-                Box(contentAlignment = Alignment.Center) {
-                  Icon(
-                    imageVector = Icons.Default.FastForward,
-                    contentDescription = "Next Frame",
-                    tint = controlColor,
-                    modifier = Modifier.size(20.dp),
-                  )
-                }
-              }
+              ControlsButton(
+                icon = Icons.Default.FastRewind,
+                onClick = { viewModel.frameStepBackward() },
+                color = controlColor,
+                type = ControlsButtonType.Transparent,
+                modifier = Modifier.size(36.dp)
+              )
+              ControlsButton(
+                icon = Icons.Default.CameraAlt,
+                onClick = { viewModel.takeSnapshot(activity) },
+                color = controlColor,
+                type = ControlsButtonType.Transparent,
+                modifier = Modifier.size(36.dp),
+                enabled = !isSnapshotLoading
+              )
+              ControlsButton(
+                icon = Icons.Default.FastForward,
+                onClick = { viewModel.frameStepForward() },
+                color = controlColor,
+                type = ControlsButtonType.Transparent,
+                modifier = Modifier.size(36.dp)
+              )
+              ControlsButton(
+                icon = Icons.Default.Close,
+                onClick = { (viewModel.isFrameNavigationExpanded as? MutableStateFlow<Boolean>)?.update { false } },
+                color = controlColor,
+                type = ControlsButtonType.Transparent,
+                modifier = Modifier.size(36.dp)
+              )
             }
           }
         } else {
-          // Collapsed: Show camera icon button
           ControlsButton(
             icon = Icons.Default.Camera,
-            onClick = viewModel::toggleFrameNavigationExpanded,
-            onLongClick = { onOpenSheet(Sheets.FrameNavigation) },
+            onClick = { (viewModel.isFrameNavigationExpanded as? MutableStateFlow<Boolean>)?.update { true } },
             color = controlColor,
             modifier = Modifier.size(buttonSize),
-            shape = buttonShape,
+            shape = buttonShape
           )
         }
       }
     }
 
-    PlayerButton.VIDEO_ZOOM -> {
-      if (kotlin.math.abs(currentZoom) >= 0.005f) {
-        @OptIn(ExperimentalFoundationApi::class)
-        Surface(
-          shape = buttonShape,
-          color = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
-          contentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onPrimaryContainer,
-          tonalElevation = 0.dp,
-          shadowElevation = 0.dp,
-          border = null,
-          modifier = Modifier
-            .height(buttonSize)
-            .clip(buttonShape)
-            .combinedClickable(
-              interactionSource = remember { MutableInteractionSource() },
-              indication = ripple(bounded = true, color = Color.White),
-              onClick = {
-                clickEvent()
-                onOpenSheet(Sheets.VideoZoom)
-              },
-              onLongClick = {
-                clickEvent()
-                viewModel.resetVideoZoom()
-              },
-            ),
-        ) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
-            modifier = Modifier.padding(
-              horizontal = MaterialTheme.spacing.medium,
-              vertical = MaterialTheme.spacing.small,
-            ),
-          ) {
-            Icon(
-              imageVector = Icons.Default.ZoomIn,
-              contentDescription = "Video Zoom",
-              tint = if (hideBackground) controlColor else MaterialTheme.colorScheme.onPrimaryContainer,
-              modifier = Modifier.size(20.dp),
-            )
-            Text(
-              text = String.format("%.0f%%", currentZoom * 100),
-              maxLines = 1,
-              style = MaterialTheme.typography.labelLarge,
-              color = if (hideBackground) controlColor else MaterialTheme.colorScheme.onPrimaryContainer
-            )
-          }
-        }
-      } else {
-        ControlsButton(
-          Icons.Default.ZoomIn,
-          onClick = {
-            clickEvent()
-            onOpenSheet(Sheets.VideoZoom)
-          },
-          onLongClick = { viewModel.resetVideoZoom() },
-          color = controlColor,
-          modifier = Modifier.size(buttonSize),
-          shape = buttonShape,
-        )
-      }
-    }
-
-    PlayerButton.PICTURE_IN_PICTURE -> {
-      ControlsButton(
-        Icons.Default.PictureInPictureAlt,
-        onClick = { activity.enterPipModeHidingOverlay() },
-        color = controlColor,
-        modifier = Modifier.size(buttonSize),
-        shape = buttonShape,
-      )
-    }
-
     PlayerButton.ASPECT_RATIO -> {
       ControlsButton(
-        icon =
-          when (aspect) {
-            VideoAspect.Fit -> Icons.Default.AspectRatio
-            VideoAspect.Stretch -> Icons.Default.ZoomOutMap
-            VideoAspect.Crop -> Icons.Default.FitScreen
-          },
-        onClick = {
-          when (aspect) {
-            VideoAspect.Fit -> viewModel.changeVideoAspect(VideoAspect.Stretch)
-            VideoAspect.Stretch -> viewModel.changeVideoAspect(VideoAspect.Crop)
-            VideoAspect.Crop -> viewModel.changeVideoAspect(VideoAspect.Fit)
-          }
-        },
-        onLongClick = { onOpenSheet(Sheets.AspectRatios) },
-        color = controlColor,
-        modifier = Modifier.size(buttonSize),
-        shape = buttonShape,
-      )
-    }
-
-    PlayerButton.LOCK_CONTROLS -> {
-      ControlsButton(
-        Icons.Default.LockOpen,
-        onClick = viewModel::lockControls,
+        icon = Icons.Default.AspectRatio,
+        onClick = { onOpenSheet(Sheets.AspectRatios) },
         color = controlColor,
         modifier = Modifier.size(buttonSize),
         shape = buttonShape,
@@ -534,9 +358,8 @@ fun RenderPlayerButton(
 
     PlayerButton.AUDIO_TRACK -> {
       ControlsButton(
-        Icons.Default.Audiotrack,
+        icon = Icons.Default.Audiotrack,
         onClick = { onOpenSheet(Sheets.AudioTracks) },
-        onLongClick = { onOpenPanel(Panels.AudioDelay) },
         color = controlColor,
         modifier = Modifier.size(buttonSize),
         shape = buttonShape,
@@ -545,9 +368,28 @@ fun RenderPlayerButton(
 
     PlayerButton.SUBTITLES -> {
       ControlsButton(
-        Icons.Default.Subtitles,
+        icon = Icons.Default.Subtitles,
         onClick = { onOpenSheet(Sheets.SubtitleTracks) },
-        onLongClick = { onOpenPanel(Panels.SubtitleDelay) },
+        color = controlColor,
+        modifier = Modifier.size(buttonSize),
+        shape = buttonShape,
+      )
+    }
+
+    PlayerButton.VIDEO_ZOOM -> {
+      ControlsButton(
+        icon = if (currentZoom > 1f) Icons.Default.ZoomOutMap else Icons.Default.ZoomIn,
+        onClick = { onOpenSheet(Sheets.VideoZoom) },
+        color = controlColor,
+        modifier = Modifier.size(buttonSize),
+        shape = buttonShape,
+      )
+    }
+
+    PlayerButton.PICTURE_IN_PICTURE -> {
+      ControlsButton(
+        icon = Icons.Default.PictureInPictureAlt,
+        onClick = { activity.enterPipModeHidingOverlay() },
         color = controlColor,
         modifier = Modifier.size(buttonSize),
         shape = buttonShape,
@@ -556,272 +398,93 @@ fun RenderPlayerButton(
 
     PlayerButton.MORE_OPTIONS -> {
       ControlsButton(
-        Icons.Default.MoreVert,
+        icon = Icons.Default.MoreVert,
         onClick = { onOpenSheet(Sheets.More) },
-        onLongClick = { onOpenPanel(Panels.VideoFilters) },
         color = controlColor,
         modifier = Modifier.size(buttonSize),
         shape = buttonShape,
       )
     }
-
-    PlayerButton.CURRENT_CHAPTER -> {
-      if (isPortrait) {
-      } else {
-        AnimatedVisibility(
-          chapters.getOrNull(currentChapter ?: 0) != null,
-          enter = fadeIn(),
-          exit = fadeOut(),
-        ) {
-          chapters.getOrNull(currentChapter ?: 0)?.let { chapter ->
-            CurrentChapter(
-              chapter = chapter,
-              onClick = { onOpenSheet(Sheets.Chapters) },
-            )
-          }
-        }
-      }
+    
+    PlayerButton.LOCK_CONTROLS -> {
+        ControlsButton(
+            icon = Icons.Default.LockOpen,
+            onClick = { viewModel.lockControls() },
+            color = controlColor,
+            modifier = Modifier.size(buttonSize),
+            shape = buttonShape,
+        )
     }
 
     PlayerButton.REPEAT_MODE -> {
-      val repeatMode by viewModel.repeatMode.collectAsState()
-      val icon = when (repeatMode) {
-        app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> Icons.Default.Repeat
-        app.marlboroadvance.mpvex.ui.player.RepeatMode.ONE -> Icons.Default.RepeatOne
-        app.marlboroadvance.mpvex.ui.player.RepeatMode.ALL -> Icons.Default.RepeatOn
-      }
-      ControlsButton(
-        icon = icon,
-        onClick = viewModel::cycleRepeatMode,
-        type = if (repeatMode == app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF) ControlsButtonType.Tonal else ControlsButtonType.Filled,
-        color = if (hideBackground) {
-          when (repeatMode) {
-            app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> controlColor
-            else -> MaterialTheme.colorScheme.primary
-          }
-        } else {
-          null // Handled by type
-        },
-        modifier = Modifier.size(buttonSize),
-        shape = buttonShape,
-      )
-    }
-
-    PlayerButton.CUSTOM_SKIP -> {
-      val playerPreferences = org.koin.compose.koinInject<app.marlboroadvance.mpvex.preferences.PlayerPreferences>()
-      ControlsButton(
-        icon = Icons.Default.FastForward,
-        onClick = { viewModel.seekBy(playerPreferences.customSkipDuration.get()) },
-        color = controlColor,
-        modifier = Modifier.size(buttonSize),
-        shape = buttonShape,
-      )
+        val repeatModeState by viewModel.repeatMode.collectAsState()
+        val icon = when (repeatModeState) {
+            app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> Icons.Default.Repeat
+            app.marlboroadvance.mpvex.ui.player.RepeatMode.ONE -> Icons.Default.RepeatOne
+            app.marlboroadvance.mpvex.ui.player.RepeatMode.ALL -> Icons.Default.RepeatOn
+        }
+        ControlsButton(
+            icon = icon,
+            onClick = { viewModel.cycleRepeatMode() },
+            color = if (repeatModeState == app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF) controlColor else MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.size(buttonSize),
+            shape = buttonShape,
+        )
     }
 
     PlayerButton.SHUFFLE -> {
-      // Only show shuffle button if there's a playlist (more than one video)
-      if (viewModel.hasPlaylistSupport()) {
         val shuffleEnabled by viewModel.shuffleEnabled.collectAsState()
         ControlsButton(
-          icon = if (shuffleEnabled) Icons.Default.ShuffleOn else Icons.Default.Shuffle,
-          onClick = viewModel::toggleShuffle,
-          type = if (shuffleEnabled) ControlsButtonType.Filled else ControlsButtonType.Tonal,
-          color = if (hideBackground) {
-            if (shuffleEnabled) MaterialTheme.colorScheme.primary else controlColor
-          } else {
-            null // Handled by type
-          },
-          modifier = Modifier.size(buttonSize),
-          shape = buttonShape,
+            icon = if (shuffleEnabled) Icons.Default.ShuffleOn else Icons.Default.Shuffle,
+            onClick = { viewModel.toggleShuffle() },
+            color = if (shuffleEnabled) MaterialTheme.colorScheme.tertiary else controlColor,
+            modifier = Modifier.size(buttonSize),
+            shape = buttonShape,
         )
-      }
     }
-
+    
     PlayerButton.MIRROR -> {
-      val isMirrored by viewModel.isMirrored.collectAsState()
-      ControlsButton(
-        icon = Icons.Default.Flip,
-        onClick = viewModel::toggleMirroring,
-        type = if (isMirrored) ControlsButtonType.Filled else ControlsButtonType.Tonal,
-        color = if (hideBackground) {
-          if (isMirrored) MaterialTheme.colorScheme.primary else controlColor
-        } else {
-          null // Handled by type
-        },
-        modifier = Modifier.size(buttonSize),
-        shape = buttonShape,
-      )
+        val isMirrored by viewModel.isMirrored.collectAsState()
+        ControlsButton(
+            icon = Icons.Default.Flip,
+            onClick = { viewModel.toggleMirroring() },
+            color = if (isMirrored) MaterialTheme.colorScheme.tertiary else controlColor,
+            modifier = Modifier.size(buttonSize),
+            shape = buttonShape,
+        )
     }
 
     PlayerButton.VERTICAL_FLIP -> {
-      val isVerticalFlipped by viewModel.isVerticalFlipped.collectAsState()
-      val vFlipColor = if (isVerticalFlipped) MaterialTheme.colorScheme.primary else controlColor
-      
-      Surface(
-        shape = buttonShape,
-        color = if (hideBackground) {
-            Color.Transparent 
-        } else {
-            if (isVerticalFlipped) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
-        },
-        contentColor = if (hideBackground) vFlipColor else if (isVerticalFlipped) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
-        border = null,
-        modifier = Modifier
-          .size(buttonSize)
-          .clip(buttonShape)
-          .clickable(onClick = viewModel::toggleVerticalFlip),
-      ) {
-        Box(contentAlignment = Alignment.Center) {
-          Icon(
-            imageVector = Icons.Default.Flip,
-            contentDescription = "Vertical Flip",
-            tint = vFlipColor,
-            modifier = Modifier
-              .padding(MaterialTheme.spacing.small)
-              .size(20.dp)
-              .rotate(90f),
-          )
-        }
-      }
+        val isVerticalFlipped by viewModel.isVerticalFlipped.collectAsState()
+        ControlsButton(
+            icon = Icons.Default.Flip, 
+            onClick = { viewModel.toggleVerticalFlip() },
+            color = if (isVerticalFlipped) MaterialTheme.colorScheme.tertiary else controlColor,
+            modifier = Modifier.size(buttonSize),
+            shape = buttonShape,
+        )
     }
 
     PlayerButton.AB_LOOP -> {
-      val isExpanded by viewModel.isABLoopExpanded.collectAsState()
-      val loopA by viewModel.abLoopA.collectAsState()
-      val loopB by viewModel.abLoopB.collectAsState()
-
-      AnimatedContent(
-        targetState = isExpanded,
-        transitionSpec = {
-          (fadeIn(animationSpec = tween(200)) + expandHorizontally(animationSpec = tween(250)))
-            .togetherWith(fadeOut(animationSpec = tween(200)) + shrinkHorizontally(animationSpec = tween(250)))
-            .using(SizeTransform(clip = false))
-        },
-        label = "ABLoopExpandCollapse",
-      ) { expanded ->
-        if (expanded) {
-          Surface(
-            shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-            border = null,
-            modifier = Modifier.height(buttonSize),
-          ) {
-            Row(
-              horizontalArrangement = Arrangement.spacedBy(2.dp),
-              verticalAlignment = Alignment.CenterVertically,
-              modifier = Modifier.padding(horizontal = 4.dp),
-            ) {
-              // Point A Button - always transparent background
-              Surface(
-                shape = buttonShape,
-                color = if (loopA != null) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
-                modifier = Modifier
-                  .height(buttonSize - 4.dp)
-                  .widthIn(min = buttonSize - 4.dp)
-                  .clip(buttonShape)
-                  .clickable(onClick = { viewModel.setLoopA() }),
-              ) {
-                Box(contentAlignment = Alignment.Center) {
-                  Text(
-                    text = if (loopA != null) viewModel.formatTimestamp(loopA!!) else "A",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (loopA != null) {
-                      MaterialTheme.colorScheme.onTertiaryContainer
-                    } else {
-                      controlColor
-                    },
-                    modifier = Modifier.padding(horizontal = if (loopA != null) 8.dp else 0.dp),
-                  )
+        val abLoopA by viewModel.abLoopA.collectAsState()
+        val abLoopB by viewModel.abLoopB.collectAsState()
+        val isLooping = abLoopA != null && abLoopB != null
+        
+        ControlsButton(
+            icon = Icons.Default.FitScreen,
+            onClick = { 
+                when {
+                    abLoopA == null -> viewModel.setLoopA()
+                    abLoopB == null -> viewModel.setLoopB()
+                    else -> viewModel.clearABLoop()
                 }
-              }
-
-              // Clear/Close Button - always has background
-              Surface(
-                shape = buttonShape,
-                color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                border = null,
-                modifier = Modifier
-                  .size(buttonSize - 4.dp)
-                  .clip(buttonShape)
-                  .clickable(onClick = {
-                    viewModel.clearABLoop()
-                    viewModel.toggleABLoopExpanded()
-                  }),
-              ) {
-                Box(contentAlignment = Alignment.Center) {
-                  Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Clear Loop",
-                    tint = controlColor,
-                    modifier = Modifier.size(16.dp),
-                  )
-                }
-              }
-
-              // Point B Button - always transparent background
-              Surface(
-                shape = buttonShape,
-                color = if (loopB != null) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
-                modifier = Modifier
-                  .height(buttonSize - 4.dp)
-                  .widthIn(min = buttonSize - 4.dp)
-                  .clip(buttonShape)
-                  .clickable(onClick = { viewModel.setLoopB() }),
-              ) {
-                Box(contentAlignment = Alignment.Center) {
-                  Text(
-                    text = if (loopB != null) viewModel.formatTimestamp(loopB!!) else "B",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (loopB != null) {
-                      MaterialTheme.colorScheme.onTertiaryContainer
-                    } else {
-                      controlColor
-                    },
-                    modifier = Modifier.padding(horizontal = if (loopB != null) 8.dp else 0.dp),
-                  )
-                }
-              }
-            }
-          }
-        } else {
-          // Collapsed: Show Autorenew icon
-          Surface(
+            },
+            color = if (isLooping) MaterialTheme.colorScheme.tertiary else controlColor,
+            modifier = Modifier.size(buttonSize),
             shape = buttonShape,
-            color = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-            border = null,
-            modifier = Modifier
-              .size(buttonSize)
-              .clip(buttonShape)
-              .clickable(onClick = viewModel::toggleABLoopExpanded),
-          ) {
-            Box(contentAlignment = Alignment.Center) {
-              Icon(
-                imageVector = Icons.Outlined.Autorenew,
-                contentDescription = "AB Loop",
-                tint = if (loopA != null && loopB != null) {
-                  MaterialTheme.colorScheme.primary
-                } else {
-                  controlColor
-                },
-                modifier = Modifier.size(24.dp),
-              )
-            }
-          }
-        }
-      }
+        )
     }
 
-    PlayerButton.BACKGROUND_PLAYBACK -> {
-      ControlsButton(
-        icon = Icons.Default.Headset,
-        onClick = { activity.triggerBackgroundPlayback() },
-        color = controlColor,
-        modifier = Modifier.size(buttonSize),
-        shape = buttonShape,
-      )
-    }
-
-    PlayerButton.NONE -> { /* Do nothing */
-    }
+    else -> {}
   }
 }

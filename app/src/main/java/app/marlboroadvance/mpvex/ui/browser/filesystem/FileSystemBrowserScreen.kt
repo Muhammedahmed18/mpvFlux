@@ -876,10 +876,12 @@ private fun FileSystemBrowserContent(
             state = listState,
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
+              top = 8.dp,
               start = 8.dp,
               end = 8.dp,
               bottom = navigationBarHeight
             ),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
           ) {
             // Breadcrumb navigation (if not at root)
             if (!isAtRoot && breadcrumbs.isNotEmpty()) {

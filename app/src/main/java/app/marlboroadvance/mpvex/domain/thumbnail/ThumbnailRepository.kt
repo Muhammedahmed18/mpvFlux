@@ -101,15 +101,26 @@ class ThumbnailRepository(
               return@async null
             }
 
+            // Calculate target dimensions for generation to avoid black bars.
+            // We use the UI's requested aspect ratio or default to 16:9 if unknown.
+            val aspect = if (widthPx > 0 && heightPx > 0) {
+              widthPx.toFloat() / heightPx.toFloat()
+            } else {
+              16f / 9f
+            }
+            
+            val targetWidth = diskCacheDimension
+            val targetHeight = (targetWidth / aspect).toInt()
+
             // Check if this video should use MediaStore
             val videoKey = videoBaseKey(video)
             val thumbnail = if (useMediaStoreForVideo.containsKey(videoKey)) {
-              generateWithMediaStore(video, diskCacheDimension)
+              generateWithMediaStore(video, targetWidth, targetHeight)
             } else {
-              val fastResult = generateWithFastThumbnails(video, diskCacheDimension)
+              val fastResult = generateWithFastThumbnails(video, targetWidth, targetHeight)
               if (fastResult == null) {
                 useMediaStoreForVideo[videoKey] = true
-                generateWithMediaStore(video, diskCacheDimension)
+                generateWithMediaStore(video, targetWidth, targetHeight)
               } else {
                 fastResult
               }
@@ -264,10 +275,11 @@ class ThumbnailRepository(
 
   private fun diskKey(video: Video): String {
     val baseKey = videoBaseKey(video)
+    // We add 'v2' to the key to force regeneration with the correct aspect ratio (no black bars)
     return if (isNetworkUrl(video.path)) {
-      "$baseKey|disk|d$diskCacheDimension|pos3"
+      "$baseKey|disk|d$diskCacheDimension|v2|pos3"
     } else {
-      "$baseKey|disk|d$diskCacheDimension"
+      "$baseKey|disk|d$diskCacheDimension|v2"
     }
   }
 
@@ -306,24 +318,30 @@ class ThumbnailRepository(
 
   private suspend fun generateWithFastThumbnails(
     video: Video,
-    dimension: Int,
+    width: Int,
+    height: Int,
   ): Bitmap? {
     return runCatching {
       val positionSec = preferredPositionSeconds(video)
       
+      // FastThumbnails usually returns the frame at its native aspect ratio.
+      // We pass the larger dimension to ensure quality.
+      val dimension = maxOf(width, height)
       val bmp = FastThumbnails.generateAsync(
           video.path.ifBlank { video.uri.toString() },
           positionSec,
           dimension,
           useHwDec = false
       ) ?: return@runCatching null
+      
       rotateIfNeeded(video, bmp)
     }.getOrNull()
   }
 
   private suspend fun generateWithMediaStore(
     video: Video,
-    dimension: Int,
+    width: Int,
+    height: Int,
   ): Bitmap? {
     // MediaStore only works for local files, not network URLs
     if (isNetworkUrl(video.path)) {
@@ -341,14 +359,15 @@ class ThumbnailRepository(
             android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
             video.id
           )
-          android.util.Log.d("ThumbnailRepository", "Generating MediaStore thumbnail for ${video.displayName} using loadThumbnail")
+          android.util.Log.d("ThumbnailRepository", "Generating MediaStore thumbnail for ${video.displayName} using loadThumbnail ($width x $height)")
           val thumbnail = context.contentResolver.loadThumbnail(
             contentUri,
-            android.util.Size(dimension, dimension),
+            android.util.Size(width, height),
             null
           )
           android.util.Log.d("ThumbnailRepository", "MediaStore thumbnail generated successfully for ${video.displayName}")
-          rotateIfNeeded(video, thumbnail)
+          // On Q+, loadThumbnail handles rotation automatically based on EXIF/Metadata
+          thumbnail
         } else {
           // Use legacy API for older versions
           android.util.Log.d("ThumbnailRepository", "Generating MediaStore thumbnail for ${video.displayName} using getThumbnail")
@@ -360,11 +379,11 @@ class ThumbnailRepository(
             null
           )
           if (thumbnail != null) {
-            // Scale to desired dimension
+            // Scale to desired width while maintaining original thumbnail's aspect ratio
             val scaled = Bitmap.createScaledBitmap(
               thumbnail,
-              dimension,
-              (dimension * thumbnail.height) / thumbnail.width,
+              width,
+              (width * thumbnail.height) / thumbnail.width,
               true
             )
             if (scaled != thumbnail) {
@@ -398,7 +417,7 @@ class ThumbnailRepository(
         val thumbnail = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
           android.media.ThumbnailUtils.createVideoThumbnail(
             file,
-            android.util.Size(dimension, dimension),
+            android.util.Size(width, height),
             null
           )
         } else {
@@ -407,11 +426,11 @@ class ThumbnailRepository(
             video.path,
             android.provider.MediaStore.Video.Thumbnails.MINI_KIND
           )?.let { thumb ->
-            // Scale to desired dimension
+            // Scale to desired width
             Bitmap.createScaledBitmap(
               thumb,
-              dimension,
-              (dimension * thumb.height) / thumb.width,
+              width,
+              (width * thumb.height) / thumb.width,
               true
             ).also {
               if (it != thumb) thumb.recycle()
@@ -421,7 +440,12 @@ class ThumbnailRepository(
         
         if (thumbnail != null) {
           android.util.Log.d("ThumbnailRepository", "ThumbnailUtils thumbnail generated successfully for ${video.displayName}")
-          rotateIfNeeded(video, thumbnail)
+          // On Q+, ThumbnailUtils also handles rotation automatically with the Size API
+          if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+             thumbnail
+          } else {
+             rotateIfNeeded(video, thumbnail)
+          }
         } else {
           android.util.Log.e("ThumbnailRepository", "ThumbnailUtils returned null for ${video.displayName}")
           null

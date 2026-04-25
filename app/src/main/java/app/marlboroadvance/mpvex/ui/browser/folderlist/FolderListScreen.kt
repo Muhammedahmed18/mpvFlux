@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -337,7 +338,13 @@ private fun FolderListContent(
         LazyColumn(
           state = listState,
           modifier = Modifier.fillMaxSize(),
-          contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = navigationBarHeight),
+          contentPadding = PaddingValues(
+            start = 8.dp, 
+            end = 8.dp, 
+            top = 12.dp, // Added breathing space from top bar
+            bottom = navigationBarHeight + 12.dp // Added bottom breathing space
+          ),
+          verticalArrangement = Arrangement.spacedBy(8.dp), // Added space between cards
         ) {
           items(folders, key = { it.bucketId }) { folder ->
             FolderCard(
