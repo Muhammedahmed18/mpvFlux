@@ -1,6 +1,6 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -9,23 +9,38 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Badge
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,89 +80,83 @@ fun FolderCard(
     val bouncySpring = spring<Float>(dampingRatio = Spring.DampingRatioLowBouncy)
 
     val cardScale by animateFloatAsState(
-        targetValue = if (isSelected) 0.98f else 1f,
+        targetValue = if (isSelected) 0.96f else 1f,
         animationSpec = bouncySpring,
         label = "cardScale"
     )
 
-    val selectionBackgroundColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-        else Color.Transparent,
-        label = "selectionBackgroundColor"
+    val containerColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+        else MaterialTheme.colorScheme.surfaceContainerLow,
+        label = "containerColor"
     )
 
-    Card(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
             .scale(cardScale)
+            .clip(RoundedCornerShape(20.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
             ),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
-        shape = RoundedCornerShape(16.dp),
+        color = containerColor,
+        shape = RoundedCornerShape(20.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(selectionBackgroundColor)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            // ── Leading Icon ──────────────────────────────────────────────────
-            FolderIconBox(
-                isSelected = isSelected,
-                customIcon = customIcon,
-                onThumbClick = onThumbClick,
-                onLongClick = onLongClick
-            )
-
-            // ── Content ───────────────────────────────────────────────────────
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
+        ListItem(
+            modifier = Modifier.padding(vertical = 4.dp),
+            colors = ListItemDefaults.colors(
+                containerColor = Color.Transparent,
+                headlineColor = MaterialTheme.colorScheme.onSurface,
+                supportingColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+            headlineContent = {
                 Text(
                     text = folder.name,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = if (settings.unlimitedNameLines) Int.MAX_VALUE else 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-
-                if (settings.showFolderPath && displayPath.isNotEmpty()) {
-                    Text(
-                        text = displayPath,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+            },
+            supportingContent = {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (settings.showFolderPath && displayPath.isNotEmpty()) {
+                        Text(
+                            text = displayPath,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    FolderMetadataChips(folder, settings, customChipContent)
                 }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                FolderMetadataChips(folder, settings, customChipContent)
-            }
-
-            // ── Trailing Badge ────────────────────────────────────────────────
-            if (settings.showTotalVideosChip && folder.videoCount > 0) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Text(
-                        text = folder.videoCount.toString(),
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
+            },
+            leadingContent = {
+                FolderIconBox(
+                    isSelected = isSelected,
+                    customIcon = customIcon,
+                    onThumbClick = onThumbClick,
+                    onLongClick = onLongClick
+                )
+            },
+            trailingContent = {
+                if (settings.showTotalVideosChip && folder.videoCount > 0) {
+                    Badge(
+                        containerColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.1f)
+                        else MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+                        else MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(start = 8.dp)
+                    ) {
+                        Text(
+                            text = folder.videoCount.toString(),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                    }
                 }
             }
-        }
+        )
     }
 }
 
@@ -158,46 +167,38 @@ private fun FolderIconBox(
     onThumbClick: () -> Unit,
     onLongClick: (() -> Unit)?,
 ) {
-    Box(modifier = Modifier.size(48.dp)) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f))
-                .combinedClickable(onClick = onThumbClick, onLongClick = onLongClick),
-            contentAlignment = Alignment.Center
-        ) {
+    val containerColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.primary
+        else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
+        label = "iconContainerColor"
+    )
+    val iconColor by animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary
+        else MaterialTheme.colorScheme.onPrimaryContainer,
+        label = "iconColor"
+    )
+
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(containerColor)
+            .combinedClickable(onClick = onThumbClick, onLongClick = onLongClick),
+        contentAlignment = Alignment.Center
+    ) {
+        AnimatedContent(
+            targetState = isSelected,
+            transitionSpec = {
+                (fadeIn() + scaleIn(initialScale = 0.8f)).togetherWith(fadeOut() + scaleOut(targetScale = 0.8f))
+            },
+            label = "iconSwap"
+        ) { selected ->
             Icon(
-                imageVector = customIcon ?: Icons.Filled.Folder,
+                imageVector = if (selected) Icons.Filled.Check else (customIcon ?: Icons.Filled.Folder),
                 contentDescription = null,
                 modifier = Modifier.size(24.dp),
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                tint = iconColor
             )
-        }
-
-        // Selection Badge (consistent with VideoCard)
-        val bouncySpring = spring<Float>(dampingRatio = Spring.DampingRatioLowBouncy)
-        AnimatedVisibility(
-            visible = isSelected,
-            enter = fadeIn(bouncySpring) + scaleIn(bouncySpring, transformOrigin = TransformOrigin(1f, 1f)),
-            exit = fadeOut(bouncySpring) + scaleOut(bouncySpring, transformOrigin = TransformOrigin(1f, 1f)),
-            modifier = Modifier.align(Alignment.BottomEnd)
-        ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primary,
-                shape = CircleShape,
-                modifier = Modifier
-                    .size(20.dp)
-                    .offset(x = 4.dp, y = 4.dp),
-                border = BorderStroke(2.dp, MaterialTheme.colorScheme.surfaceContainerLow)
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = "Selected",
-                    modifier = Modifier.padding(3.dp),
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                )
-            }
         }
     }
 }
@@ -210,8 +211,9 @@ private fun FolderMetadataChips(
     customChipContent: (@Composable () -> Unit)?
 ) {
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = Modifier.padding(top = 4.dp)
     ) {
         customChipContent?.invoke()
 
@@ -229,17 +231,18 @@ private fun FolderMetadataChips(
 
 @Composable
 private fun MetadataChip(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(6.dp))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    )
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f),
+        shape = RoundedCornerShape(8.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+        )
+    }
 }
-
-// ── Helpers ──────────────────────────────────────────────────────────────────
 
 private fun cleanPath(path: String, folderName: String): String {
     val trimmed = path.trimEnd('/')

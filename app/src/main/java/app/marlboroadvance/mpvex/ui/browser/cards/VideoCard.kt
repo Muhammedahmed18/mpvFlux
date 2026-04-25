@@ -2,8 +2,8 @@ package app.marlboroadvance.mpvex.ui.browser.cards
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -51,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -143,12 +143,14 @@ fun VideoCard(
     label = "cardScale"
   )
 
-  val selectionBackgroundColor by animateColorAsState(
-    // M3: use secondaryContainer for selection states, not tertiary (tertiary is for accents)
-    targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-    else MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0f),
-    label = "selectionBackgroundColor"
+  val selectionBorderWidth by animateDpAsState(
+    targetValue = if (isSelected) 2.dp else 0.dp,
+    label = "selectionBorderWidth"
   )
+
+  // Removed animateColorAsState to prevent flickering during theme changes
+  val containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+    else MaterialTheme.colorScheme.surfaceContainerLow
 
   Card(
     modifier = modifier
@@ -158,14 +160,15 @@ fun VideoCard(
         onClick = onClick,
         onLongClick = onLongClick,
       ),
-    // M3: ElevatedCard-style tonal surface so items have a "layer" feel in the list
-    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    // M3 \"Container-Transform\" influenced: card expands and gains border on selection
+    shape = RoundedCornerShape(16.dp),
+    colors = CardDefaults.cardColors(containerColor = containerColor),
+    border = if (isSelected) BorderStroke(selectionBorderWidth, MaterialTheme.colorScheme.primary) else null,
+    elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 2.dp else 0.dp)
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .background(selectionBackgroundColor)
-        // M3 list-item spec: 16dp horizontal, 12dp vertical
         .padding(horizontal = 16.dp, vertical = 12.dp),
       verticalAlignment = Alignment.Top,
     ) {
@@ -180,7 +183,7 @@ fun VideoCard(
         allowThumbnailGeneration = allowThumbnailGeneration,
         onThumbClick = onThumbClick,
         onLongClick = onLongClick,
-        modifier = Modifier.requiredSize(width = 160.dp, height = 90.dp) // LOCKED: Cannot be compressed by Row height
+        modifier = Modifier.requiredSize(width = 160.dp, height = 90.dp)
       )
 
       Spacer(modifier = Modifier.width(16.dp))
@@ -219,18 +222,18 @@ private fun VideoInfoPanel(
   modifier: Modifier = Modifier
 ) {
   Column(
-    modifier = modifier,
+    modifier = modifier.alpha(if (isWatched) 0.6f else 1f),
   ) {
     Text(
       text = displayTitle,
       style = if (useFolderNameStyle) {
         MaterialTheme.typography.titleMedium
       } else {
-        MaterialTheme.typography.titleSmall
+        MaterialTheme.typography.titleMedium // Boosted from titleSmall
       },
+      fontWeight = FontWeight.SemiBold, // Modern M3 emphasis
       color = when {
         isRecentlyPlayed -> MaterialTheme.colorScheme.tertiary
-        // M3: onSurfaceVariant is the semantic "de-emphasized" color token
         isWatched -> MaterialTheme.colorScheme.onSurfaceVariant
         else -> MaterialTheme.colorScheme.onSurface
       },
@@ -238,16 +241,7 @@ private fun VideoInfoPanel(
       overflow = TextOverflow.Ellipsis,
     )
 
-    // M3: surface the most important secondary info (duration) directly in the panel,
-    // so it reads clearly even when thumbnails are disabled
-    Spacer(modifier = Modifier.height(2.dp))
-    Text(
-      text = video.durationFormatted,
-      style = MaterialTheme.typography.bodySmall,
-      color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-
-    // M3: 8dp gap reads more clearly than 6dp between title block and chips
+    // Duration moved to thumbnail overlay in Refined B style
     Spacer(modifier = Modifier.height(8.dp))
 
     VideoMetadataChips(
@@ -284,8 +278,8 @@ fun VideoThumbnail(
     BoxWithConstraints(
       modifier = Modifier
         .fillMaxSize()
-        // M3 shape scale: inner components use "Large" (12dp), not 20dp (arbitrary/too pill-like)
-        .clip(RoundedCornerShape(12.dp))
+        // M3 Large shape: 16dp
+        .clip(RoundedCornerShape(16.dp))
         .background(MaterialTheme.colorScheme.surfaceContainerHighest)
         .combinedClickable(
           onClick = onThumbClick,
@@ -330,26 +324,45 @@ fun VideoThumbnail(
         Image(
           bitmap = thumbnail!!.asImageBitmap(),
           contentDescription = null,
-          modifier = Modifier.matchParentSize(),
+          modifier = Modifier.matchParentSize().alpha(if (isWatched) 0.6f else 1f),
           contentScale = ContentScale.Crop,
         )
       } else {
-        // M3: smaller, softer placeholder icon using onSurfaceVariant (de-emphasis token)
         Icon(
           imageVector = Icons.Filled.PlayArrow,
           contentDescription = null,
-          modifier = Modifier.size(32.dp),
+          modifier = Modifier.size(32.dp).alpha(if (isWatched) 0.6f else 1f),
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
 
-      // Overlays - Top Row (left badges only; duration moved to info panel)
+      // Overlays
+      val showProgress = progressPercentage != null && showProgressBar && !isWatched
+      
+      // Duration Overlay (Bottom End) - Adjusted to avoid collision with progress bar
+      Surface(
+        color = Color.Black.copy(alpha = 0.7f),
+        shape = RoundedCornerShape(4.dp),
+        modifier = Modifier
+          .align(Alignment.BottomEnd)
+          .padding(
+            bottom = if (showProgress) 16.dp else 8.dp,
+            end = 8.dp
+          )
+      ) {
+        Text(
+          text = video.durationFormatted,
+          style = MaterialTheme.typography.labelSmall,
+          color = Color.White,
+          modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+        )
+      }
+
       Box(
         modifier = Modifier
           .align(Alignment.TopStart)
           .padding(8.dp),
       ) {
-        // Left side: Watched or New
         if (isWatched) {
           Surface(
             shape = CircleShape,
@@ -366,7 +379,6 @@ fun VideoThumbnail(
         } else if (isNew) {
           Box(
             modifier = Modifier
-              // M3: small label badge uses 4dp corner, not full pill — differentiates from circular watched badge
               .clip(RoundedCornerShape(4.dp))
               .background(MaterialTheme.colorScheme.primary)
               .padding(horizontal = 6.dp, vertical = 2.dp),
@@ -380,31 +392,26 @@ fun VideoThumbnail(
         }
       }
 
-      // Progress Bar - Floating Pill
-      if (progressPercentage != null && showProgressBar && !isWatched) {
+      // Progress Bar
+      if (showProgress) {
         val animatedProgress by animateFloatAsState(
-          targetValue = progressPercentage,
+          targetValue = progressPercentage ?: 0f,
           label = "VideoProgressAnimation"
         )
 
         Box(
           modifier = Modifier
             .align(Alignment.BottomCenter)
-            // M3: 8dp bottom padding aligns with thumbnail's internal 8dp overlay padding
-            .padding(bottom = 8.dp, start = 8.dp, end = 8.dp)
+            .padding(bottom = 4.dp, start = 8.dp, end = 8.dp)
             .fillMaxWidth()
-            // M3 LinearProgressIndicator height = 4dp
-            .height(4.dp)
+            .height(3.dp)
         ) {
-          // Track — M3 uses primaryContainer (not raw white alpha) for the track
           Box(
             modifier = Modifier
               .matchParentSize()
               .clip(RoundedCornerShape(50))
               .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
           )
-
-          // Progress
           Box(
             modifier = Modifier
               .fillMaxHeight()
@@ -414,14 +421,12 @@ fun VideoThumbnail(
           )
         }
       }
-
     }
 
     // Selection Badge
     val bouncySpring = spring<Float>(dampingRatio = Spring.DampingRatioLowBouncy)
     AnimatedVisibility(
       visible = isSelected,
-      // Use the same spring and anchor growth to the bottom-right corner to stop "sliding"
       enter = fadeIn(bouncySpring) + scaleIn(bouncySpring, transformOrigin = TransformOrigin(1f, 1f)),
       exit = fadeOut(bouncySpring) + scaleOut(bouncySpring, transformOrigin = TransformOrigin(1f, 1f)),
       modifier = Modifier.align(Alignment.BottomEnd)
@@ -457,11 +462,9 @@ fun VideoMetadataChips(
 ) {
   FlowRow(
     modifier = modifier,
-    // M3: 6dp spacing reads more comfortably than 4dp for dense chip rows
     horizontalArrangement = Arrangement.spacedBy(6.dp),
     verticalArrangement = Arrangement.spacedBy(4.dp)
   ) {
-    // Subtitles
     if (showSubtitleIndicator && video.hasEmbeddedSubtitles && video.subtitleCodec.isNotBlank()) {
       video.subtitleCodec.split(" ").forEach { codec ->
         MetadataChip(
@@ -471,13 +474,9 @@ fun VideoMetadataChips(
         )
       }
     }
-
-    // Size
     if (showSizeChip && video.sizeFormatted != "0 B" && video.sizeFormatted != "--") {
       MetadataChip(text = video.sizeFormatted)
     }
-
-    // Resolution & FPS
     if (showResolutionChip && video.height > 0) {
       val resText = when {
         video.width >= 3840 || video.height >= 2160 -> "4K"
@@ -494,8 +493,6 @@ fun VideoMetadataChips(
       }
       MetadataChip(text = displayResolution)
     }
-
-    // Date
     if (showDateChip && video.dateModified > 0) {
       MetadataChip(text = formatDate(video.dateModified))
     }
@@ -505,19 +502,21 @@ fun VideoMetadataChips(
 @Composable
 private fun MetadataChip(
   text: String,
-  // M3: surfaceContainerHighest gives better tonal separation than surfaceContainerHigh
-  containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHighest,
+  containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
   contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
-  Text(
-    text = text,
-    style = MaterialTheme.typography.labelSmall,
-    modifier = Modifier
-      // M3 shape scale: "Small" = 4dp, but 8dp is appropriate for dense label chips
-      .background(containerColor, RoundedCornerShape(8.dp))
-      .padding(horizontal = 8.dp, vertical = 3.dp),
-    color = contentColor,
-  )
+  Surface(
+    color = containerColor,
+    contentColor = contentColor,
+    shape = RoundedCornerShape(8.dp),
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+  ) {
+    Text(
+      text = text,
+      style = MaterialTheme.typography.labelSmall,
+      modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+    )
+  }
 }
 
 private fun formatDate(timestampSeconds: Long): String {
@@ -542,15 +541,14 @@ fun VideoCardPrimaryPreview() {
       StateLabel("Extension: OFF")
       VideoCard(video = sampleVideo, settings = VideoCardSettings(showVideoExtension = false), onClick = {})
 
-      StateLabel("Selected State (Hanging Badge)")
+      StateLabel("Selected State (Outlined + Tonal)")
       VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isSelected = true)
 
-      StateLabel("Recently Played (No Italic)")
+      StateLabel("Recently Played")
       VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isRecentlyPlayed = true)
 
       StateLabel("Progress Bar (50%)")
-      VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, progressPercentage = 0.5f
-      )
+      VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, progressPercentage = 0.5f)
     }
   }
 }
@@ -570,7 +568,7 @@ fun VideoCardStatusPreview() {
       StateLabel("New / Unplayed Label")
       VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isOldAndUnplayed = true)
 
-      StateLabel("Watched (Dimmed + Tick)")
+      StateLabel("Watched (Dimmed Content + Bright Tick)")
       VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isWatched = true)
     }
   }
@@ -586,7 +584,7 @@ private fun getSampleVideo() = Video(
   durationFormatted = "01:00:00",
   size = 1024 * 1024 * 500,
   sizeFormatted = "500 MB",
-  dateModified = 1776686400L, // Apr 20, 2026
+  dateModified = 1776686400L,
   dateAdded = System.currentTimeMillis() / 1000,
   mimeType = "video/mp4",
   bucketId = "1",
