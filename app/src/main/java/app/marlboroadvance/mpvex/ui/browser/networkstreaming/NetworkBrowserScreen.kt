@@ -1,6 +1,5 @@
 package app.marlboroadvance.mpvex.ui.browser.networkstreaming
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -132,10 +131,6 @@ data class NetworkBrowserScreen(
     // Load files when connectionId or currentPath changes
     LaunchedEffect(connectionId, currentPath) {
       viewModel.loadFiles()
-    }
-
-    BackHandler {
-      backstack.removeLastOrNull()
     }
 
     Scaffold(

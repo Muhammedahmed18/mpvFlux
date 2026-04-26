@@ -8,11 +8,32 @@ import app.marlboroadvance.mpvex.utils.media.MediaLibraryEvents
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+
+/**
+ * Data snapshot representing the playback state at a specific point in time.
+ */
+data class PlaybackStateSnapshot(
+    val mediaIdentifier: String,
+    val position: Int,
+    val duration: Int,
+    val playbackSpeed: Double,
+    val videoZoom: Float,
+    val sid: Int,
+    val secondarySid: Int,
+    val subDelay: Int,
+    val subSpeed: Double,
+    val aid: Int,
+    val audioDelay: Int,
+    val externalSubtitles: String,
+    val savePositionOnQuit: Boolean
+)
 
 /**
  * Centralized manager for video playback progress saving.
@@ -30,25 +51,22 @@ class ProgressSaveManager : KoinComponent {
         private const val SAVE_DEBOUNCE_MS = 500L
     }
     
+    /**
+     * Saves playback progress using a pre-captured snapshot of the state.
+     */
     fun saveProgress(
-        mediaIdentifier: String,
-        getPosition: () -> Int?,
-        getDuration: () -> Int?,
-        getPlaybackSpeed: () -> Double?,
-        getVideoZoom: () -> Float?,
-        getSid: () -> Int?,
-        getSecondarySid: () -> Int?,
-        getSubDelay: () -> Int?,
-        getSubSpeed: () -> Double?,
-        getAid: () -> Int?,
-        getAudioDelay: () -> Int?,
-        getExternalSubtitles: () -> String,
-        savePositionOnQuit: Boolean,
+        snapshot: PlaybackStateSnapshot,
         oldState: PlaybackStateEntity? = null,
         isImmediate: Boolean = false
     ) {
-        // Cancel any pending save operation
-        currentSaveJob?.cancel()
+        val mediaIdentifier = snapshot.mediaIdentifier
+        
+        // Cancel pending save only if it's the same media or if this is a regular (non-immediate) save.
+        // We allow multiple "Immediate" saves for different videos (e.g., during rapid playlist switching)
+        // to ensure the closing video's progress is written even if the next video already requested a save.
+        if (!isImmediate || lastSavedMediaIdentifier == mediaIdentifier) {
+            currentSaveJob?.cancel()
+        }
         
         currentSaveJob = CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -57,62 +75,64 @@ class ProgressSaveManager : KoinComponent {
                     delay(SAVE_DEBOUNCE_MS)
                 }
                 
-                if (!isActive) return@launch
+                if (!isActive && !isImmediate) return@launch
                 
-                val currentPos = getPosition() ?: 0
-                val duration = getDuration() ?: 0
-                
-                // Skip save if position hasn't changed significantly (more than 1 second)
-                // Unless it's an immediate save (like reaching end of video)
-                if (!isImmediate && 
-                    lastSavedMediaIdentifier == mediaIdentifier && 
-                    lastSavedPosition != null && 
-                    kotlin.math.abs(lastSavedPosition!! - currentPos) <= 1) {
-                    Log.d(TAG, "Skipping save - position unchanged: $currentPos")
-                    return@launch
+                // Use NonCancellable for immediate saves to ensure database write completes 
+                // even if the activity or scope is being destroyed.
+                withContext(if (isImmediate) NonCancellable else Dispatchers.IO) {
+                    val currentPos = snapshot.position
+                    val duration = snapshot.duration
+                    
+                    // Skip save if position hasn't changed significantly (more than 1 second)
+                    // Unless it's an immediate save (like reaching end of video or closing player)
+                    if (!isImmediate && 
+                        lastSavedMediaIdentifier == mediaIdentifier && 
+                        lastSavedPosition != null && 
+                        kotlin.math.abs(lastSavedPosition!! - currentPos) <= 1) {
+                        return@withContext
+                    }
+            
+                    Log.d(TAG, "Saving progress for: $mediaIdentifier at position: $currentPos (immediate: $isImmediate)")
+
+                    val positionToSave = calculateSavePosition(currentPos, duration, snapshot.savePositionOnQuit, oldState)
+                    val timeRemaining = if (duration > positionToSave) duration - positionToSave else 0
+                    
+                    // Get watched threshold from preferences (default 95%)
+                    val thresholdPercent = browserPreferences.watchedThreshold.get()
+                    val isWatched = if (duration > 0) {
+                        currentPos >= (duration * (thresholdPercent / 100f))
+                    } else {
+                        false
+                    }
+
+                    playbackStateRepository.upsert(
+                        PlaybackStateEntity(
+                            mediaTitle = mediaIdentifier,
+                            lastPosition = positionToSave,
+                            playbackSpeed = snapshot.playbackSpeed,
+                            videoZoom = snapshot.videoZoom,
+                            sid = snapshot.sid,
+                            secondarySid = snapshot.secondarySid,
+                            subDelay = snapshot.subDelay,
+                            subSpeed = snapshot.subSpeed,
+                            aid = snapshot.aid,
+                            audioDelay = snapshot.audioDelay,
+                            timeRemaining = timeRemaining,
+                            externalSubtitles = snapshot.externalSubtitles,
+                            hasBeenWatched = isWatched
+                        ),
+                    )
+                    
+                    lastSavedPosition = currentPos
+                    lastSavedMediaIdentifier = mediaIdentifier
+                    
+                    Log.d(TAG, "Progress saved successfully for $mediaIdentifier")
+
+                    // Notify UI to refresh in real-time
+                    MediaLibraryEvents.notifyChanged()
                 }
-        
-                Log.d(TAG, "Saving progress for: $mediaIdentifier at position: $currentPos (immediate: $isImmediate)")
-
-                val positionToSave = calculateSavePosition(currentPos, duration, savePositionOnQuit, oldState)
-                val timeRemaining = if (duration > positionToSave) duration - positionToSave else 0
-                
-                // Get watched threshold from preferences (default 95%)
-                val thresholdPercent = browserPreferences.watchedThreshold.get()
-                val isWatched = if (duration > 0) {
-                    currentPos >= (duration * (thresholdPercent / 100f))
-                } else {
-                    false
-                }
-
-                playbackStateRepository.upsert(
-                    PlaybackStateEntity(
-                        mediaTitle = mediaIdentifier,
-                        lastPosition = positionToSave,
-                        playbackSpeed = getPlaybackSpeed() ?: 1.0,
-                        videoZoom = getVideoZoom() ?: 0f,
-                        sid = getSid() ?: 0,
-                        secondarySid = getSecondarySid() ?: -1,
-                        subDelay = getSubDelay() ?: 0,
-                        subSpeed = getSubSpeed() ?: 1.0,
-                        aid = getAid() ?: 0,
-                        audioDelay = getAudioDelay() ?: 0,
-                        timeRemaining = timeRemaining,
-                        externalSubtitles = getExternalSubtitles(),
-                        hasBeenWatched = isWatched
-                    ),
-                )
-                
-                lastSavedPosition = currentPos
-                lastSavedMediaIdentifier = mediaIdentifier
-                
-                Log.d(TAG, "Progress saved successfully")
-
-                // Notify UI to refresh in real-time
-                MediaLibraryEvents.notifyChanged()
-                
             } catch (e: Exception) {
-                Log.e(TAG, "Error saving progress", e)
+                Log.e(TAG, "Error saving progress for $mediaIdentifier", e)
             }
         }
     }

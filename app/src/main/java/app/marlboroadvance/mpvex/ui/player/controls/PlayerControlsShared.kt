@@ -2,14 +2,19 @@ package app.marlboroadvance.mpvex.ui.player.controls
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,32 +22,32 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AspectRatio
-import androidx.compose.material.icons.filled.Audiotrack
-import androidx.compose.material.icons.filled.Bookmarks
-import androidx.compose.material.icons.filled.Camera
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.FitScreen
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PictureInPictureAlt
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.RepeatOn
-import androidx.compose.material.icons.filled.RepeatOne
-import androidx.compose.material.icons.filled.ScreenRotation
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.ShuffleOn
-import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.filled.Subtitles
-import androidx.compose.material.icons.filled.ZoomIn
-import androidx.compose.material.icons.filled.ZoomOutMap
-import androidx.compose.material.icons.filled.Flip
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.Audiotrack
+import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.Camera
+import androidx.compose.material.icons.outlined.CameraAlt
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.FastForward
+import androidx.compose.material.icons.outlined.FastRewind
+import androidx.compose.material.icons.outlined.FitScreen
+import androidx.compose.material.icons.outlined.Flip
+import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PictureInPictureAlt
+import androidx.compose.material.icons.outlined.Repeat
+import androidx.compose.material.icons.outlined.RepeatOn
+import androidx.compose.material.icons.outlined.RepeatOne
+import androidx.compose.material.icons.outlined.ScreenRotation
+import androidx.compose.material.icons.outlined.Shuffle
+import androidx.compose.material.icons.outlined.ShuffleOn
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.material.icons.outlined.Subtitles
+import androidx.compose.material.icons.outlined.ZoomIn
+import androidx.compose.material.icons.outlined.ZoomOutMap
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -56,10 +61,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -96,71 +106,106 @@ fun RenderPlayerButton(
   viewModel: PlayerViewModel,
   activity: PlayerActivity,
   buttonSize: Dp = 48.dp,
+  modifier: Modifier = Modifier,
 ) {
   val clickEvent = LocalPlayerButtonsClickEvent.current
-  val buttonShape = CircleShape
+  val buttonShape = RoundedCornerShape(14.dp)
+  val glassBorder = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f))
   
   when (button) {
     PlayerButton.BACK_ARROW -> {
       ControlsButton(
-        icon = Icons.AutoMirrored.Default.ArrowBack,
+        icon = Icons.AutoMirrored.Outlined.ArrowBack,
         onClick = onBackPress,
         color = controlColor,
-        modifier = Modifier.size(buttonSize),
+        modifier = modifier.size(buttonSize),
         shape = buttonShape,
-        type = ControlsButtonType.Transparent
+        type = ControlsButtonType.Tonal
       )
     }
 
     PlayerButton.VIDEO_TITLE -> {
       val playlistModeEnabled = viewModel.hasPlaylistSupport()
-      val containerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.8f)
+      val containerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+      val interactionSource = remember { MutableInteractionSource() }
+      val isPressed by interactionSource.collectIsPressedAsState()
+      val scale by animateFloatAsState(
+          targetValue = if (isPressed) 0.98f else 1f,
+          animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
+          label = "title_scale"
+      )
 
       Surface(
         modifier =
-          Modifier
-            .widthIn(max = 320.dp)
-            .clip(MaterialTheme.shapes.medium)
+          modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(16.dp))
             .clickable(
               enabled = playlistModeEnabled,
+              interactionSource = interactionSource,
+              indication = ripple(color = Color.White),
               onClick = {
                 clickEvent()
                 onOpenSheet(Sheets.Playlist)
               },
             ),
         color = containerColor,
-        shape = MaterialTheme.shapes.medium,
+        shape = RoundedCornerShape(16.dp),
+        border = if (hideBackground) null else glassBorder
       ) {
         Column(
-          verticalArrangement = Arrangement.spacedBy(2.dp),
+          verticalArrangement = Arrangement.spacedBy(0.dp),
           modifier =
             Modifier.padding(
-              horizontal = 12.dp,
-              vertical = 6.dp,
+              horizontal = 16.dp,
+              vertical = 8.dp,
             ),
         ) {
-          viewModel.getPlaylistInfo()?.let { playlistInfo ->
-            Text(
-              text = playlistInfo.uppercase(Locale.US),
-              textAlign = TextAlign.Start,
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-              ),
-              maxLines = 1,
-              overflow = TextOverflow.Visible,
-              color = MaterialTheme.colorScheme.primary,
-            )
-          }
           Text(
             text = mediaTitle ?: "",
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.titleMedium.copy(
-              fontWeight = FontWeight.Bold
+              fontWeight = FontWeight.Medium,
+              letterSpacing = 0.2.sp,
+              lineHeight = 20.sp
             ),
             color = MaterialTheme.colorScheme.onSurface,
           )
+          
+          viewModel.getPlaylistInfo()?.let { playlistInfo ->
+            val parts = playlistInfo.split("/")
+            val annotatedString = if (parts.size == 2) {
+              buildAnnotatedString {
+                withStyle(style = SpanStyle(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                    fontWeight = FontWeight.Medium
+                )) {
+                  append(parts[0].trim())
+                }
+                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))) {
+                  append(" / ${parts[1].trim()}")
+                }
+              }
+            } else {
+              AnnotatedString(playlistInfo)
+            }
+
+            Text(
+              text = annotatedString,
+              textAlign = TextAlign.Start,
+              style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = FontWeight.Normal,
+                letterSpacing = 0.8.sp
+              ),
+              modifier = Modifier.padding(top = 2.dp),
+              maxLines = 1,
+              overflow = TextOverflow.Visible,
+            )
+          }
         }
       }
     }
@@ -168,29 +213,42 @@ fun RenderPlayerButton(
     PlayerButton.BOOKMARKS_CHAPTERS -> {
       if (chapters.isNotEmpty()) {
         ControlsButton(
-          Icons.Default.Bookmarks,
+          Icons.Outlined.Bookmarks,
           onClick = { onOpenSheet(Sheets.Chapters) },
           color = controlColor,
-          modifier = Modifier.size(buttonSize),
+          modifier = modifier.size(buttonSize),
           shape = buttonShape,
         )
       }
     }
 
     PlayerButton.PLAYBACK_SPEED -> {
+      val pillShape = RoundedCornerShape(50)
       if (isSpeedNonOne) {
-        val containerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f)
+        val containerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f)
         val contentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurfaceVariant
+        val interactionSource = remember { MutableInteractionSource() }
+        val isPressed by interactionSource.collectIsPressedAsState()
+        val scale by animateFloatAsState(
+            targetValue = if (isPressed) 0.95f else 1f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
+            label = "speed_scale"
+        )
         
         Surface(
-          shape = buttonShape,
+          shape = pillShape,
           color = containerColor,
           contentColor = contentColor,
-          modifier = Modifier
+          border = if (hideBackground) null else glassBorder,
+          modifier = modifier
             .height(buttonSize)
-            .clip(buttonShape)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(pillShape)
             .clickable(
-              interactionSource = remember { MutableInteractionSource() },
+              interactionSource = interactionSource,
               indication = ripple(bounded = true, color = Color.White),
               onClick = {
                 clickEvent()
@@ -201,10 +259,10 @@ fun RenderPlayerButton(
           Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 12.dp),
+            modifier = Modifier.padding(horizontal = 14.dp),
           ) {
             Icon(
-              imageVector = Icons.Default.Speed,
+              imageVector = Icons.Outlined.Speed,
               contentDescription = "Playback Speed",
               tint = contentColor,
               modifier = Modifier.size(18.dp),
@@ -214,7 +272,7 @@ fun RenderPlayerButton(
               maxLines = 1,
               style = MaterialTheme.typography.labelLarge.copy(
                 fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Medium
               ),
               color = contentColor
             )
@@ -222,28 +280,41 @@ fun RenderPlayerButton(
         }
       } else {
         ControlsButton(
-          icon = Icons.Default.Speed,
+          icon = Icons.Outlined.Speed,
           onClick = { onOpenSheet(Sheets.PlaybackSpeed) },
           color = controlColor,
-          modifier = Modifier.size(buttonSize),
+          modifier = modifier.size(buttonSize),
           shape = buttonShape,
         )
       }
     }
 
     PlayerButton.DECODER -> {
-        val containerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f)
+        val pillShape = RoundedCornerShape(50)
+        val containerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f)
         val contentColor = if (hideBackground) controlColor else MaterialTheme.colorScheme.onSurfaceVariant
+        val interactionSource = remember { MutableInteractionSource() }
+        val isPressed by interactionSource.collectIsPressedAsState()
+        val scale by animateFloatAsState(
+            targetValue = if (isPressed) 0.95f else 1f,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
+            label = "decoder_scale"
+        )
 
       Surface(
-        shape = buttonShape,
+        shape = pillShape,
         color = containerColor,
         contentColor = contentColor,
-        modifier = Modifier
+        border = if (hideBackground) null else glassBorder,
+        modifier = modifier
           .height(buttonSize)
-          .clip(buttonShape)
+          .graphicsLayer {
+              scaleX = scale
+              scaleY = scale
+          }
+          .clip(pillShape)
           .clickable(
-            interactionSource = remember { MutableInteractionSource() },
+            interactionSource = interactionSource,
             indication = ripple(bounded = true, color = Color.White),
             onClick = {
               clickEvent()
@@ -253,7 +324,7 @@ fun RenderPlayerButton(
       ) {
         Row(
           verticalAlignment = Alignment.CenterVertically,
-          modifier = Modifier.padding(horizontal = 12.dp),
+          modifier = Modifier.padding(horizontal = 14.dp),
         ) {
           Text(
             text = decoder.title,
@@ -261,7 +332,7 @@ fun RenderPlayerButton(
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.labelLarge.copy(
                 fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Medium
             ),
             color = contentColor
           )
@@ -271,10 +342,10 @@ fun RenderPlayerButton(
 
     PlayerButton.SCREEN_ROTATION -> {
       ControlsButton(
-        icon = Icons.Default.ScreenRotation,
+        icon = Icons.Outlined.ScreenRotation,
         onClick = viewModel::cycleScreenRotations,
         color = controlColor,
-        modifier = Modifier.size(buttonSize),
+        modifier = modifier.size(buttonSize),
         shape = buttonShape,
       )
     }
@@ -295,8 +366,9 @@ fun RenderPlayerButton(
         if (expanded) {
           Surface(
             shape = MaterialTheme.shapes.large,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.8f),
-            modifier = Modifier.height(buttonSize)
+            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f),
+            modifier = modifier.height(buttonSize),
+            border = glassBorder
           ) {
             Row(
               verticalAlignment = Alignment.CenterVertically,
@@ -304,14 +376,14 @@ fun RenderPlayerButton(
               modifier = Modifier.padding(horizontal = 8.dp)
             ) {
               ControlsButton(
-                icon = Icons.Default.FastRewind,
+                icon = Icons.Outlined.FastRewind,
                 onClick = { viewModel.frameStepBackward() },
                 color = controlColor,
                 type = ControlsButtonType.Transparent,
                 modifier = Modifier.size(36.dp)
               )
               ControlsButton(
-                icon = Icons.Default.CameraAlt,
+                icon = Icons.Outlined.CameraAlt,
                 onClick = { viewModel.takeSnapshot(activity) },
                 color = controlColor,
                 type = ControlsButtonType.Transparent,
@@ -319,14 +391,14 @@ fun RenderPlayerButton(
                 enabled = !isSnapshotLoading
               )
               ControlsButton(
-                icon = Icons.Default.FastForward,
+                icon = Icons.Outlined.FastForward,
                 onClick = { viewModel.frameStepForward() },
                 color = controlColor,
                 type = ControlsButtonType.Transparent,
                 modifier = Modifier.size(36.dp)
               )
               ControlsButton(
-                icon = Icons.Default.Close,
+                icon = Icons.Outlined.Close,
                 onClick = { (viewModel.isFrameNavigationExpanded as? MutableStateFlow<Boolean>)?.update { false } },
                 color = controlColor,
                 type = ControlsButtonType.Transparent,
@@ -336,10 +408,10 @@ fun RenderPlayerButton(
           }
         } else {
           ControlsButton(
-            icon = Icons.Default.Camera,
+            icon = Icons.Outlined.Camera,
             onClick = { (viewModel.isFrameNavigationExpanded as? MutableStateFlow<Boolean>)?.update { true } },
             color = controlColor,
-            modifier = Modifier.size(buttonSize),
+            modifier = modifier.size(buttonSize),
             shape = buttonShape
           )
         }
@@ -348,70 +420,70 @@ fun RenderPlayerButton(
 
     PlayerButton.ASPECT_RATIO -> {
       ControlsButton(
-        icon = Icons.Default.AspectRatio,
+        icon = Icons.Outlined.AspectRatio,
         onClick = { onOpenSheet(Sheets.AspectRatios) },
         color = controlColor,
-        modifier = Modifier.size(buttonSize),
+        modifier = modifier.size(buttonSize),
         shape = buttonShape,
       )
     }
 
     PlayerButton.AUDIO_TRACK -> {
       ControlsButton(
-        icon = Icons.Default.Audiotrack,
+        icon = Icons.Outlined.Audiotrack,
         onClick = { onOpenSheet(Sheets.AudioTracks) },
         color = controlColor,
-        modifier = Modifier.size(buttonSize),
+        modifier = modifier.size(buttonSize),
         shape = buttonShape,
       )
     }
 
     PlayerButton.SUBTITLES -> {
       ControlsButton(
-        icon = Icons.Default.Subtitles,
+        icon = Icons.Outlined.Subtitles,
         onClick = { onOpenSheet(Sheets.SubtitleTracks) },
         color = controlColor,
-        modifier = Modifier.size(buttonSize),
+        modifier = modifier.size(buttonSize),
         shape = buttonShape,
       )
     }
 
     PlayerButton.VIDEO_ZOOM -> {
       ControlsButton(
-        icon = if (currentZoom > 1f) Icons.Default.ZoomOutMap else Icons.Default.ZoomIn,
+        icon = if (currentZoom > 1f) Icons.Outlined.ZoomOutMap else Icons.Outlined.ZoomIn,
         onClick = { onOpenSheet(Sheets.VideoZoom) },
         color = controlColor,
-        modifier = Modifier.size(buttonSize),
+        modifier = modifier.size(buttonSize),
         shape = buttonShape,
       )
     }
 
     PlayerButton.PICTURE_IN_PICTURE -> {
       ControlsButton(
-        icon = Icons.Default.PictureInPictureAlt,
+        icon = Icons.Outlined.PictureInPictureAlt,
         onClick = { activity.enterPipModeHidingOverlay() },
         color = controlColor,
-        modifier = Modifier.size(buttonSize),
+        modifier = modifier.size(buttonSize),
         shape = buttonShape,
       )
     }
 
     PlayerButton.MORE_OPTIONS -> {
       ControlsButton(
-        icon = Icons.Default.MoreVert,
+        icon = Icons.Outlined.MoreVert,
         onClick = { onOpenSheet(Sheets.More) },
         color = controlColor,
-        modifier = Modifier.size(buttonSize),
+        modifier = modifier.size(buttonSize),
         shape = buttonShape,
       )
     }
     
     PlayerButton.LOCK_CONTROLS -> {
         ControlsButton(
-            icon = Icons.Default.LockOpen,
+            icon = Icons.Outlined.LockOpen,
             onClick = { viewModel.lockControls() },
             color = controlColor,
-            modifier = Modifier.size(buttonSize),
+            modifier = modifier.size(buttonSize),
             shape = buttonShape,
         )
     }
@@ -419,15 +491,15 @@ fun RenderPlayerButton(
     PlayerButton.REPEAT_MODE -> {
         val repeatModeState by viewModel.repeatMode.collectAsState()
         val icon = when (repeatModeState) {
-            app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> Icons.Default.Repeat
-            app.marlboroadvance.mpvex.ui.player.RepeatMode.ONE -> Icons.Default.RepeatOne
-            app.marlboroadvance.mpvex.ui.player.RepeatMode.ALL -> Icons.Default.RepeatOn
+            app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> Icons.Outlined.Repeat
+            app.marlboroadvance.mpvex.ui.player.RepeatMode.ONE -> Icons.Outlined.RepeatOne
+            app.marlboroadvance.mpvex.ui.player.RepeatMode.ALL -> Icons.Outlined.RepeatOn
         }
         ControlsButton(
             icon = icon,
             onClick = { viewModel.cycleRepeatMode() },
             color = if (repeatModeState == app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF) controlColor else MaterialTheme.colorScheme.tertiary,
-            modifier = Modifier.size(buttonSize),
+            modifier = modifier.size(buttonSize),
             shape = buttonShape,
         )
     }
@@ -435,10 +507,10 @@ fun RenderPlayerButton(
     PlayerButton.SHUFFLE -> {
         val shuffleEnabled by viewModel.shuffleEnabled.collectAsState()
         ControlsButton(
-            icon = if (shuffleEnabled) Icons.Default.ShuffleOn else Icons.Default.Shuffle,
+            icon = if (shuffleEnabled) Icons.Outlined.ShuffleOn else Icons.Outlined.Shuffle,
             onClick = { viewModel.toggleShuffle() },
             color = if (shuffleEnabled) MaterialTheme.colorScheme.tertiary else controlColor,
-            modifier = Modifier.size(buttonSize),
+            modifier = modifier.size(buttonSize),
             shape = buttonShape,
         )
     }
@@ -446,10 +518,10 @@ fun RenderPlayerButton(
     PlayerButton.MIRROR -> {
         val isMirrored by viewModel.isMirrored.collectAsState()
         ControlsButton(
-            icon = Icons.Default.Flip,
+            icon = Icons.Outlined.Flip,
             onClick = { viewModel.toggleMirroring() },
             color = if (isMirrored) MaterialTheme.colorScheme.tertiary else controlColor,
-            modifier = Modifier.size(buttonSize),
+            modifier = modifier.size(buttonSize),
             shape = buttonShape,
         )
     }
@@ -457,10 +529,10 @@ fun RenderPlayerButton(
     PlayerButton.VERTICAL_FLIP -> {
         val isVerticalFlipped by viewModel.isVerticalFlipped.collectAsState()
         ControlsButton(
-            icon = Icons.Default.Flip, 
+            icon = Icons.Outlined.Flip, 
             onClick = { viewModel.toggleVerticalFlip() },
             color = if (isVerticalFlipped) MaterialTheme.colorScheme.tertiary else controlColor,
-            modifier = Modifier.size(buttonSize),
+            modifier = modifier.size(buttonSize),
             shape = buttonShape,
         )
     }
@@ -471,7 +543,7 @@ fun RenderPlayerButton(
         val isLooping = abLoopA != null && abLoopB != null
         
         ControlsButton(
-            icon = Icons.Default.FitScreen,
+            icon = Icons.Outlined.FitScreen,
             onClick = { 
                 when {
                     abLoopA == null -> viewModel.setLoopA()
@@ -480,7 +552,7 @@ fun RenderPlayerButton(
                 }
             },
             color = if (isLooping) MaterialTheme.colorScheme.tertiary else controlColor,
-            modifier = Modifier.size(buttonSize),
+            modifier = modifier.size(buttonSize),
             shape = buttonShape,
         )
     }

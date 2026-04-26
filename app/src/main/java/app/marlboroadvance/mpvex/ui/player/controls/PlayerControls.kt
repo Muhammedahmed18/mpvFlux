@@ -42,9 +42,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.outlined.SkipNext
+import androidx.compose.material.icons.outlined.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -272,10 +273,10 @@ fun PlayerControls(
             .fillMaxSize()
             .background(
               Brush.verticalGradient(
-                0.0f to Color.Black.copy(alpha = 0.8f),
-                0.35f to Color.Transparent,
-                0.65f to Color.Transparent,
-                1.0f to Color.Black.copy(alpha = 0.8f),
+                0.0f to Color.Black.copy(alpha = 0.55f),
+                0.15f to Color.Transparent,
+                0.85f to Color.Transparent,
+                1.0f to Color.Black.copy(alpha = 0.55f),
               ),
               alpha = scrimAlpha,
             ),
@@ -620,7 +621,7 @@ fun PlayerControls(
           val isPressed by interaction.collectIsPressedAsState()
           
           val scale by animateFloatAsState(
-            targetValue = if (isPressed) 0.94f else 1f,
+            targetValue = if (isPressed) 0.95f else 1f,
             animationSpec = spring(
                 dampingRatio = Spring.DampingRatioLowBouncy,
                 stiffness = Spring.StiffnessLow
@@ -637,8 +638,8 @@ fun PlayerControls(
 
             else -> {
               val buttonShadow = Brush.radialGradient(
-                  0.0f to Color.Black.copy(alpha = 0.45f),
-                  0.75f to Color.Transparent,
+                  0.0f to Color.Black.copy(alpha = 0.35f),
+                  0.85f to Color.Transparent,
               )
 
               Row(
@@ -650,7 +651,7 @@ fun PlayerControls(
                   // Previous Button
                   val prevEnabled = viewModel.hasPrevious()
                   ControlsButton(
-                    icon = Icons.Default.SkipPrevious,
+                    icon = Icons.Outlined.SkipPrevious,
                     onClick = { viewModel.playPrevious() },
                     enabled = prevEnabled,
                     modifier = Modifier
@@ -664,12 +665,13 @@ fun PlayerControls(
                 }
 
                 // Main Play/Pause Hero Button
-                val playContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                val playContainerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.9f)
-                
+                val playContentColor = MaterialTheme.colorScheme.onSurface
+                val playContainerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                val heroBorder = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
+
                 Surface(
                   modifier = Modifier
-                    .size(84.dp)
+                    .size(92.dp)
                     .graphicsLayer {
                       scaleX = scale
                       scaleY = scale
@@ -683,14 +685,14 @@ fun PlayerControls(
                   shape = CircleShape,
                   color = playContainerColor,
                   contentColor = playContentColor,
-                  border = null,
-                  tonalElevation = 4.dp
+                  border = if (hideBackground) null else heroBorder,
+                  tonalElevation = 0.dp
                 ) {
                   Image(
                     painter = rememberAnimatedVectorPainter(icon, paused == false),
                     modifier = Modifier
                       .fillMaxSize()
-                      .padding(24.dp),
+                      .padding(28.dp),
                     contentDescription = null,
                     colorFilter = ColorFilter.tint(playContentColor),
                   )
@@ -700,7 +702,7 @@ fun PlayerControls(
                   // Next Button
                   val nextEnabled = viewModel.hasNext()
                   ControlsButton(
-                    icon = Icons.Default.SkipNext,
+                    icon = Icons.Outlined.SkipNext,
                     onClick = { viewModel.playNext() },
                     enabled = nextEnabled,
                     modifier = Modifier

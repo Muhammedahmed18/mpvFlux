@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
@@ -58,7 +59,7 @@ fun ControlsButton(
     title: String? = null,
     color: Color? = null,
     type: ControlsButtonType = ControlsButtonType.Tonal,
-    shape: Shape = CircleShape,
+    shape: Shape = RoundedCornerShape(14.dp),
     iconSize: Dp = 24.dp,
     enabled: Boolean = true,
 ) {
@@ -66,10 +67,10 @@ fun ControlsButton(
     val isPressed by interactionSource.collectIsPressedAsState()
     
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.92f else 1f,
+        targetValue = if (isPressed) 0.95f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessLow
+            stiffness = Spring.StiffnessMedium
         ),
         label = "button_scale"
     )
@@ -79,24 +80,27 @@ fun ControlsButton(
 
     val clickEvent = LocalPlayerButtonsClickEvent.current
 
-    // Glassmorphism update: Use dark translucent colors for high contrast visibility on video
     val containerColor = when {
         hideBackground || !enabled -> Color.Transparent
-        type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
-        type == ControlsButtonType.Tonal -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
+        type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
+        type == ControlsButtonType.Tonal -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
         else -> Color.Transparent
     }
 
     val baseContentColor = color ?: when {
         type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.onPrimaryContainer
-        type == ControlsButtonType.Tonal -> MaterialTheme.colorScheme.onSecondaryContainer
-        else -> controlColor // controlColor is white (0xFFFFFFFF)
+        type == ControlsButtonType.Tonal -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> controlColor
     }
     
     val contentColor = if (enabled) baseContentColor else baseContentColor.copy(alpha = 0.38f)
 
-    // Ultra-thin "glass edge" border using white transparency
-    val border = null
+    // Modern glass edge border
+    val border = if (!hideBackground && type != ControlsButtonType.Transparent && enabled) {
+        BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f))
+    } else {
+        null
+    }
 
     Surface(
         modifier = modifier

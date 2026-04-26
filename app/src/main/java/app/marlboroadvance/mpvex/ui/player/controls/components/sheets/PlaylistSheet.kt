@@ -11,6 +11,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Movie
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,6 +78,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.vector.ImageVector
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import org.koin.compose.koinInject
@@ -478,6 +482,52 @@ fun PlaylistSheet(
 }
 
 @Composable
+fun PlayingAnimationIndicator(
+  color: Color,
+  modifier: Modifier = Modifier
+) {
+  val infiniteTransition = rememberInfiniteTransition(label = "playing")
+  
+  val height1 by infiniteTransition.animateFloat(
+    initialValue = 0.3f,
+    targetValue = 0.8f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(600, easing = LinearEasing),
+      repeatMode = RepeatMode.Reverse
+    ),
+    label = "bar1"
+  )
+  val height2 by infiniteTransition.animateFloat(
+    initialValue = 0.5f,
+    targetValue = 1f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(800, easing = LinearEasing),
+      repeatMode = RepeatMode.Reverse
+    ),
+    label = "bar2"
+  )
+  val height3 by infiniteTransition.animateFloat(
+    initialValue = 0.2f,
+    targetValue = 0.7f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(700, easing = LinearEasing),
+      repeatMode = RepeatMode.Reverse
+    ),
+    label = "bar3"
+  )
+
+  Row(
+    modifier = modifier.height(14.dp),
+    horizontalArrangement = Arrangement.spacedBy(2.dp),
+    verticalAlignment = Alignment.Bottom
+  ) {
+    Box(Modifier.width(3.dp).fillMaxHeight(height1).background(color, RoundedCornerShape(1.dp)))
+    Box(Modifier.width(3.dp).fillMaxHeight(height2).background(color, RoundedCornerShape(1.dp)))
+    Box(Modifier.width(3.dp).fillMaxHeight(height3).background(color, RoundedCornerShape(1.dp)))
+  }
+}
+
+@Composable
 fun PlaylistTrackListItem(
   item: PlaylistItem,
   thumbnailRepository: ThumbnailRepository,
@@ -487,23 +537,24 @@ fun PlaylistTrackListItem(
   isLoading: Boolean = false,
   modifier: Modifier = Modifier,
 ) {
-  // Use theme colors dynamically
-  val accentSecondary = MaterialTheme.colorScheme.tertiary
-
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
 
   val scale by animateFloatAsState(
-    targetValue = if (isPressed) 0.97f else 1f,
-    animationSpec = spring(
-      dampingRatio = Spring.DampingRatioMediumBouncy,
-      stiffness = Spring.StiffnessMedium
-    ),
+    targetValue = if (isPressed) 0.96f else 1f,
+    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
     label = "list_item_scale"
   )
 
+  val itemAlpha by animateFloatAsState(
+    targetValue = if (item.isWatched && !item.isPlaying) 0.6f else 1f,
+    label = "item_alpha"
+  )
+
+  val itemShape = RoundedCornerShape(18.dp)
+  val glassBorder = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f))
+
   // Convert PlaylistItem to Video for ThumbnailRepository
-  // Strip file:// prefix and URL decode the path (ThumbnailRepository expects plain decoded path)
   val cleanPath = remember(item.path) {
     val withoutPrefix = item.path.removePrefix("file://")
     try {
@@ -513,7 +564,6 @@ fun PlaylistTrackListItem(
     }
   }
   val video = remember(item.uri, cleanPath, item.title) {
-    android.util.Log.d("PlaylistSheet", "Creating Video for ${item.title}, cleanPath=$cleanPath")
     Video(
       id = item.index.toLong(),
       uri = item.uri,
@@ -538,246 +588,198 @@ fun PlaylistTrackListItem(
     )
   }
 
-  // Thumbnail size for playlist (matching the box size 100dp x 56dp)
   val thumbWidthPx = with(LocalDensity.current) { 100.dp.roundToPx() }
   val thumbHeightPx = with(LocalDensity.current) { 56.dp.roundToPx() }
-
-  // Create thumbnail key
   val thumbnailKey = remember(video.id, video.path, thumbWidthPx, thumbHeightPx) {
-    val key = thumbnailRepository.thumbnailKey(video, thumbWidthPx, thumbHeightPx)
-    android.util.Log.d("PlaylistSheet", "Thumbnail key for ${item.title}: $key")
-    key
+    thumbnailRepository.thumbnailKey(video, thumbWidthPx, thumbHeightPx)
   }
 
-  // Thumbnail state - check memory cache first
   var thumbnail by remember(thumbnailKey) {
-    val fromMemory = thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx)
-    android.util.Log.d("PlaylistSheet", "Initial memory cache for ${item.title}: ${if (fromMemory != null) "HIT" else "MISS"}")
-    mutableStateOf(fromMemory)
+    mutableStateOf(thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx))
   }
 
-  // Listen for thumbnail generation completion
   LaunchedEffect(thumbnailKey) {
-    android.util.Log.d("PlaylistSheet", "Collecting thumbnailReadyKeys for ${item.title}")
     thumbnailRepository.thumbnailReadyKeys
       .filter { it == thumbnailKey }
       .collect {
-        android.util.Log.d("PlaylistSheet", "thumbnailReadyKeys emitted for ${item.title}")
         thumbnail = thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx)
       }
   }
 
-  // Load thumbnail when needed
   LaunchedEffect(thumbnailKey, skipThumbnail) {
-    android.util.Log.d("PlaylistSheet", "LaunchedEffect triggered for ${item.title}, skipThumbnail=$skipThumbnail")
     if (skipThumbnail) {
       thumbnail = null
       return@LaunchedEffect
     }
-
-    // Check memory cache first
     val memoryThumbnail = thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx)
-    android.util.Log.d("PlaylistSheet", "Memory cache check for ${item.title}: ${if (memoryThumbnail != null) "HIT" else "MISS"}")
     if (memoryThumbnail != null) {
       thumbnail = memoryThumbnail
       return@LaunchedEffect
     }
-
-    // Load from disk cache or generate
-    android.util.Log.d("PlaylistSheet", "Loading thumbnail from repository for ${item.title}")
     val loadedThumbnail = withContext(Dispatchers.IO) {
       thumbnailRepository.getThumbnail(video, thumbWidthPx, thumbHeightPx)
     }
-    android.util.Log.d("PlaylistSheet", "Thumbnail loaded for ${item.title}: ${if (loadedThumbnail != null) "SUCCESS (${loadedThumbnail.width}x${loadedThumbnail.height})" else "NULL"}")
     if (loadedThumbnail != null) {
       thumbnail = loadedThumbnail
     }
   }
 
-  val borderModifier = if (item.isPlaying) {
-    Modifier.border(
-      width = 2.dp,
-      brush = Brush.linearGradient(listOf(accentColor, accentSecondary)),
-      shape = RoundedCornerShape(12.dp),
-    )
-  } else {
-    Modifier
-  }
-
   Surface(
     modifier = modifier
       .fillMaxWidth()
-      .padding(
-        horizontal = MaterialTheme.spacing.medium,
-        vertical = MaterialTheme.spacing.extraSmall,
-      )
-      .graphicsLayer { scaleX = scale; scaleY = scale }
-      .clip(RoundedCornerShape(12.dp))
-      .then(borderModifier)
+      .padding(horizontal = 12.dp, vertical = 4.dp)
+      .graphicsLayer { 
+          scaleX = scale
+          scaleY = scale 
+          alpha = itemAlpha
+      }
+      .clip(itemShape)
+      .then(if (item.isPlaying) Modifier.border(1.dp, accentColor.copy(alpha = 0.4f), itemShape) else Modifier)
       .clickable(
         interactionSource = interactionSource,
-        indication = ripple(bounded = true),
+        indication = ripple(color = Color.White),
         onClick = onClick
       ),
-    color = if (item.isPlaying) {
-      MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
-    } else {
-      Color.Transparent
-    },
-    shape = RoundedCornerShape(12.dp),
+    color = if (item.isPlaying) accentColor.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f),
+    shape = itemShape,
+    border = glassBorder,
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(MaterialTheme.spacing.smaller),
+        .padding(10.dp),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+      horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-      // Thumbnail with simple background, episode number, and progress
+      // Thumbnail Box
       Box(
         modifier = Modifier
           .width(100.dp)
           .height(56.dp)
-          .clip(RoundedCornerShape(8.dp))
-          .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+          .clip(RoundedCornerShape(14.dp))
+          .background(Color.White.copy(alpha = 0.08f)),
         contentAlignment = Alignment.Center,
       ) {
-        // Show actual thumbnail or fallback icon
         thumbnail?.let { bmp ->
           Image(
             bitmap = bmp.asImageBitmap(),
-            contentDescription = "Thumbnail",
+            contentDescription = null,
             modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Crop,
           )
         } ?: run {
-          // Movie icon as fallback placeholder
           Icon(
             imageVector = Icons.Outlined.Movie,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            tint = Color.White.copy(alpha = 0.3f),
             modifier = Modifier.size(24.dp),
           )
         }
 
-        // Video number badge in top-left with better visibility
+        // Top-left index badge
         Box(
           modifier = Modifier
             .align(Alignment.TopStart)
             .padding(6.dp)
-            .background(
-              color = Color.Black.copy(alpha = 0.7f),
-              shape = RoundedCornerShape(6.dp),
-            )
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
         ) {
           Text(
             text = "${item.index + 1}",
-            style = MaterialTheme.typography.labelMedium.copy(
-              fontWeight = FontWeight.Bold,
-              fontSize = 12.sp,
-            ),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
             color = Color.White,
           )
         }
+
+        // Glass pills inside thumbnail
+        Row(
+            modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (item.duration.isNotEmpty()) {
+                Surface(
+                    color = Color.Black.copy(alpha = 0.7f),
+                    shape = RoundedCornerShape(4.dp),
+                ) {
+                    Text(
+                        text = item.duration,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                        color = Color.White,
+                    )
+                }
+            }
+        }
+
+        // Integrated progress line at bottom
+        if (item.progressPercent > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.5.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(Color.White.copy(alpha = 0.2f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(item.progressPercent / 100f)
+                        .fillMaxHeight()
+                        .background(accentColor)
+                )
+            }
+        }
       }
 
-      // Title and info
+      // Title and status
       Column(
         modifier = Modifier.weight(1f),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
       ) {
         Text(
           text = item.title,
           style = MaterialTheme.typography.bodyMedium.copy(
-            fontWeight = if (item.isPlaying) FontWeight.Bold else FontWeight.Normal,
-            color = if (item.isPlaying) {
-              accentColor
-            } else if (item.isWatched) {
-              MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-              MaterialTheme.colorScheme.onSurface
-            },
+            fontWeight = FontWeight.Medium,
+            color = if (item.isPlaying) accentColor else MaterialTheme.colorScheme.onSurface,
           ),
-          maxLines = 2,
+          maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
-
-        // Duration and resolution chips - always show with loading state if empty
+        
         Row(
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          // Duration chip
-          if (item.duration.isNotEmpty()) {
-            Surface(
-              color = if (item.isPlaying) accentColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHighest,
-              shape = RoundedCornerShape(4.dp),
-            ) {
-              Text(
-                text = item.duration,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontSize = 10.sp,
-                ),
-                color = if (item.isPlaying) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
-              )
+            if (item.resolution.isNotEmpty()) {
+                Text(
+                    text = item.resolution,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                )
             }
-          } else {
-            LoadingChip(width = 40.dp)
-          }
-          
-          // Resolution chip
-          if (item.resolution.isNotEmpty()) {
-            Surface(
-              color = if (item.isPlaying) accentColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHighest,
-              shape = RoundedCornerShape(4.dp),
-            ) {
-              Text(
-                text = item.resolution,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontSize = 10.sp,
-                ),
-                color = if (item.isPlaying) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
-              )
+            if (item.isWatched && !item.isPlaying) {
+                Icon(
+                    imageVector = Icons.Outlined.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(12.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                )
             }
-          } else {
-            LoadingChip(width = 60.dp)
-          }
         }
       }
 
-      // Status badges with smooth animation
-      AnimatedVisibility(
-        visible = isLoading,
-        enter = fadeIn() + slideInHorizontally { it / 2 },
-        exit = fadeOut() + slideOutHorizontally { it / 2 }
-      ) {
+      // Status Indicator
+      if (isLoading) {
         LinearProgressIndicator(
-          modifier = Modifier.width(40.dp),
+          modifier = Modifier.width(32.dp).height(2.dp),
           color = accentColor,
           trackColor = accentColor.copy(alpha = 0.2f)
         )
-      }
-      if (!isLoading && item.isPlaying) {
-          Surface(
-            color = accentColor.copy(alpha = 0.15f),
-            shape = RoundedCornerShape(16.dp),
-          ) {
-            Text(
-              text = "Playing",
-              modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontWeight = FontWeight.SemiBold,
-                color = accentColor,
-              ),
-            )
-          }
-        }
-
+      } else if (item.isPlaying) {
+          PlayingAnimationIndicator(color = accentColor)
       }
     }
   }
+}
 
 @Composable
 fun PlaylistTrackGridItem(
@@ -788,24 +790,25 @@ fun PlaylistTrackGridItem(
   isLoading: Boolean = false,
   modifier: Modifier = Modifier,
 ) {
-  // Use theme colors dynamically
   val accentColor = MaterialTheme.colorScheme.primary
-  val accentSecondary = MaterialTheme.colorScheme.tertiary
-
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
 
   val scale by animateFloatAsState(
     targetValue = if (isPressed) 0.95f else 1f,
-    animationSpec = spring(
-      dampingRatio = Spring.DampingRatioMediumBouncy,
-      stiffness = Spring.StiffnessMedium
-    ),
+    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMedium),
     label = "grid_item_scale"
   )
 
-  // Convert PlaylistItem to Video for ThumbnailRepository
-  // Strip file:// prefix and URL decode the path (ThumbnailRepository expects plain decoded path)
+  val itemAlpha by animateFloatAsState(
+    targetValue = if (item.isWatched && !item.isPlaying) 0.6f else 1f,
+    label = "grid_alpha"
+  )
+
+  val itemShape = RoundedCornerShape(20.dp)
+  val glassBorder = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.12f))
+
+  // Thumbnail loading logic
   val cleanPath = remember(item.path) {
     val withoutPrefix = item.path.removePrefix("file://")
     try {
@@ -839,21 +842,14 @@ fun PlaylistTrackGridItem(
     )
   }
 
-  // Thumbnail size for grid (matching the box size 200dp x 112dp)
   val thumbWidthPx = with(LocalDensity.current) { 200.dp.roundToPx() }
   val thumbHeightPx = with(LocalDensity.current) { 112.dp.roundToPx() }
-
-  // Create thumbnail key
   val thumbnailKey = remember(video.id, video.path, thumbWidthPx, thumbHeightPx) {
     thumbnailRepository.thumbnailKey(video, thumbWidthPx, thumbHeightPx)
   }
-
-  // Thumbnail state - check memory cache first
   var thumbnail by remember(thumbnailKey) {
     mutableStateOf(thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx))
   }
-
-  // Listen for thumbnail generation completion
   LaunchedEffect(thumbnailKey) {
     thumbnailRepository.thumbnailReadyKeys
       .filter { it == thumbnailKey }
@@ -861,22 +857,16 @@ fun PlaylistTrackGridItem(
         thumbnail = thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx)
       }
   }
-
-  // Load thumbnail when needed
   LaunchedEffect(thumbnailKey, skipThumbnail) {
     if (skipThumbnail) {
       thumbnail = null
       return@LaunchedEffect
     }
-
-    // Check memory cache first
     val memoryThumbnail = thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx)
     if (memoryThumbnail != null) {
       thumbnail = memoryThumbnail
       return@LaunchedEffect
     }
-
-    // Load from disk cache or generate
     val loadedThumbnail = withContext(Dispatchers.IO) {
       thumbnailRepository.getThumbnail(video, thumbWidthPx, thumbHeightPx)
     }
@@ -885,222 +875,142 @@ fun PlaylistTrackGridItem(
     }
   }
 
-  val borderModifier = if (item.isPlaying) {
-    Modifier.border(
-      width = 2.dp,
-      brush = Brush.linearGradient(listOf(accentColor, accentSecondary)),
-      shape = RoundedCornerShape(12.dp),
-    )
-  } else {
-    Modifier
-  }
-
-  // YouTube-style vertical card
   Surface(
     modifier = modifier
       .width(200.dp)
-      .graphicsLayer { scaleX = scale; scaleY = scale }
-      .clip(RoundedCornerShape(12.dp))
-      .then(borderModifier)
+      .graphicsLayer { 
+          scaleX = scale
+          scaleY = scale 
+          alpha = itemAlpha
+      }
+      .clip(itemShape)
+      .then(if (item.isPlaying) Modifier.border(1.2.dp, accentColor.copy(alpha = 0.5f), itemShape) else Modifier)
       .clickable(
         interactionSource = interactionSource,
-        indication = ripple(bounded = true),
+        indication = ripple(color = Color.White),
         onClick = onClick
       ),
-    color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f),
-    shape = RoundedCornerShape(12.dp),
+    color = if (item.isPlaying) accentColor.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f),
+    shape = itemShape,
+    border = glassBorder,
   ) {
     Column(
-      modifier = Modifier.padding(MaterialTheme.spacing.smaller),
-      verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
+      modifier = Modifier.padding(10.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-      // Thumbnail with 16:9 aspect ratio
       Box(
         modifier = Modifier
           .fillMaxWidth()
           .height(112.dp)
-          .clip(RoundedCornerShape(8.dp))
-          .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+          .clip(RoundedCornerShape(14.dp))
+          .background(Color.White.copy(alpha = 0.08f)),
         contentAlignment = Alignment.Center,
       ) {
-        // Show actual thumbnail or fallback icon
         thumbnail?.let { bmp ->
           Image(
             bitmap = bmp.asImageBitmap(),
-            contentDescription = "Thumbnail",
+            contentDescription = null,
             modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Crop,
           )
         } ?: run {
-          // Movie icon as fallback placeholder
           Icon(
             imageVector = Icons.Outlined.Movie,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            tint = Color.White.copy(alpha = 0.3f),
             modifier = Modifier.size(32.dp),
           )
         }
 
-        // Video number badge in top-left
+        // Overlay badges
         Box(
           modifier = Modifier
             .align(Alignment.TopStart)
-            .padding(6.dp)
-            .background(
-              color = Color.Black.copy(alpha = 0.7f),
-              shape = RoundedCornerShape(6.dp),
-            )
+            .padding(8.dp)
+            .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp),
         ) {
           Text(
             text = "${item.index + 1}",
-            style = MaterialTheme.typography.labelMedium.copy(
-              fontWeight = FontWeight.Bold,
-              fontSize = 12.sp,
-            ),
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
             color = Color.White,
           )
         }
 
-        // Duration badge in bottom-right
         if (item.duration.isNotEmpty()) {
           Box(
             modifier = Modifier
               .align(Alignment.BottomEnd)
-              .padding(6.dp)
-              .background(
-                color = Color.Black.copy(alpha = 0.8f),
-                shape = RoundedCornerShape(4.dp),
-              )
+              .padding(8.dp)
+              .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
               .padding(horizontal = 6.dp, vertical = 2.dp),
           ) {
             Text(
               text = item.duration,
-              style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-              ),
+              style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
               color = Color.White,
             )
           }
-        } else {
-          // Loading duration badge
-          Box(
-            modifier = Modifier
-              .align(Alignment.BottomEnd)
-              .padding(6.dp)
-          ) {
-            LoadingChip(width = 40.dp, height = 18.dp, isDark = true)
-          }
         }
-
-        // Playing indicator overlay
-        if (item.isPlaying) {
-          Box(
-            modifier = Modifier
-              .matchParentSize()
-              .background(
-                brush = Brush.verticalGradient(
-                  colors = listOf(
-                    accentColor.copy(alpha = 0.3f),
-                    accentColor.copy(alpha = 0.1f),
-                  )
+        
+        // Progress line
+        if (item.progressPercent > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(Color.White.copy(alpha = 0.2f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(item.progressPercent / 100f)
+                        .fillMaxHeight()
+                        .background(accentColor)
                 )
-              )
-          )
+            }
         }
 
-        // Loading indicator overlay - horizontal line at bottom of thumbnail with smooth animation
-        androidx.compose.animation.AnimatedVisibility(
-          visible = isLoading,
-          modifier = Modifier
-            .fillMaxWidth()
-            .align(Alignment.BottomCenter),
-          enter = fadeIn(),
-          exit = fadeOut()
-        ) {
-          Box(
-            modifier = Modifier
-              .fillMaxWidth()
-              .padding(bottom = 4.dp)
-          ) {
-            LinearProgressIndicator(
-              modifier = Modifier.fillMaxWidth(),
-              color = accentColor,
-              trackColor = Color.Black.copy(alpha = 0.3f)
-            )
-          }
+        if (item.isPlaying) {
+            Box(Modifier.matchParentSize().background(accentColor.copy(alpha = 0.1f)))
         }
       }
 
-      // Title and metadata
-      Column(
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-      ) {
+      Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
           text = item.title,
-          modifier = Modifier.height(44.dp),
+          modifier = Modifier.height(40.dp),
           style = MaterialTheme.typography.bodyMedium.copy(
-            fontWeight = if (item.isPlaying) FontWeight.Bold else FontWeight.Medium,
-            fontSize = 14.sp,
-            color = if (item.isPlaying) {
-              accentColor
-            } else if (item.isWatched) {
-              MaterialTheme.colorScheme.onSurfaceVariant
-            } else {
-              MaterialTheme.colorScheme.onSurface
-            },
+            fontWeight = FontWeight.Medium,
+            color = if (item.isPlaying) accentColor else MaterialTheme.colorScheme.onSurface,
           ),
           maxLines = 2,
           overflow = TextOverflow.Ellipsis,
         )
 
-        // Resolution and status
         Row(
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
+          horizontalArrangement = Arrangement.SpaceBetween,
           verticalAlignment = Alignment.CenterVertically,
+          modifier = Modifier.fillMaxWidth()
         ) {
-          // Resolution chip
-          if (item.resolution.isNotEmpty()) {
-            Surface(
-              color = if (item.isPlaying) accentColor.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHighest,
-              shape = RoundedCornerShape(4.dp),
-            ) {
-              Text(
-                text = item.resolution,
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontSize = 10.sp,
-                ),
-                color = if (item.isPlaying) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
-              )
-            }
-          } else {
-            LoadingChip(width = 60.dp)
-          }
-
-          if (item.isPlaying) {
-            Surface(
-              color = accentColor.copy(alpha = 0.15f),
-              shape = RoundedCornerShape(4.dp),
-            ) {
-              Text(
-                text = "Playing",
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                style = MaterialTheme.typography.labelSmall.copy(
-                  fontSize = 10.sp,
-                  fontWeight = FontWeight.SemiBold,
-                  color = accentColor,
-                ),
-              )
-            }
+          Text(
+            text = item.resolution,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+          )
+          
+          if (isLoading) {
+             LinearProgressIndicator(modifier = Modifier.width(30.dp).height(2.dp), color = accentColor)
+          } else if (item.isPlaying) {
+             PlayingAnimationIndicator(color = accentColor)
+          } else if (item.isWatched) {
+             Icon(Icons.Outlined.Check, null, Modifier.size(12.dp), tint = accentColor.copy(alpha = 0.6f))
           }
         }
       }
     }
   }
 }
-
 
 @Composable
 fun LoadingChip(
@@ -1114,36 +1024,23 @@ fun LoadingChip(
     initialValue = 0f,
     targetValue = 1000f,
     animationSpec = infiniteRepeatable(
-      animation = tween(durationMillis = 1200, easing = LinearEasing),
+      animation = tween(1200, easing = LinearEasing),
       repeatMode = RepeatMode.Restart
     ),
     label = "shimmer"
   )
 
-  val baseColor = if (isDark) {
-    Color.White.copy(alpha = 0.1f)
-  } else {
-    MaterialTheme.colorScheme.surfaceContainerHighest
-  }
-  
-  val shimmerColor = if (isDark) {
-    Color.White.copy(alpha = 0.2f)
-  } else {
-    MaterialTheme.colorScheme.surfaceContainerHigh
-  }
+  val baseColor = if (isDark) Color.White.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceContainerHighest
+  val shimmerColor = if (isDark) Color.White.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceContainerHigh
 
   Box(
     modifier = modifier
       .width(width)
       .height(height)
-      .clip(RoundedCornerShape(4.dp))
+      .clip(RoundedCornerShape(6.dp))
       .background(
         brush = Brush.linearGradient(
-          colors = listOf(
-            baseColor,
-            shimmerColor,
-            baseColor,
-          ),
+          colors = listOf(baseColor, shimmerColor, baseColor),
           start = Offset(shimmerTranslate.value - 200f, 0f),
           end = Offset(shimmerTranslate.value, 0f)
         )

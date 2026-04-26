@@ -34,7 +34,7 @@ fun TopPlayerControlsPortrait(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             RenderPlayerButton(
                 button = PlayerButton.BACK_ARROW,
@@ -73,6 +73,7 @@ fun TopPlayerControlsPortrait(
                 onOpenPanel = {},
                 viewModel = viewModel,
                 activity = activity,
+                modifier = Modifier.weight(1f)
             )
         }
     }
@@ -101,7 +102,7 @@ fun BottomPlayerControlsPortrait(
             .fillMaxWidth()
             .padding(bottom = MaterialTheme.spacing.large)
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+        horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         buttons.forEach { button ->

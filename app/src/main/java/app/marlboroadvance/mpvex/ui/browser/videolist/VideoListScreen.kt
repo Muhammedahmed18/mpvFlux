@@ -231,10 +231,6 @@ data class VideoListScreen(
       showFloatingBottomBar = selectionManager.isInSelectionMode
     }
 
-    BackHandler(enabled = selectionManager.isInSelectionMode) {
-      selectionManager.clear()
-    }
-
     DisposableEffect(lifecycleOwner) {
       val observer =
         LifecycleEventObserver { _, event ->
@@ -246,6 +242,10 @@ data class VideoListScreen(
       onDispose {
         lifecycleOwner.lifecycle.removeObserver(observer)
       }
+    }
+
+    BackHandler(enabled = selectionManager.isInSelectionMode) {
+      selectionManager.clear()
     }
 
     Scaffold(

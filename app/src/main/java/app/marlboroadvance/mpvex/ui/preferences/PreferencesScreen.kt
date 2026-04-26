@@ -9,8 +9,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ViewQuilt
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -134,6 +134,12 @@ object PreferencesScreen : Screen {
                             icon = { PreferenceIcon(Icons.Rounded.Memory) },
                             onClick = { backstack.add(DecoderPreferencesScreen) }
                         )
+                    }
+                }
+
+                item { PreferenceSectionHeader(title = "Audio & Subtitles") }
+                item {
+                    PreferenceCard {
                         PreferenceItem(
                             title = stringResource(R.string.pref_subtitles),
                             summary = stringResource(R.string.pref_subtitles_summary),

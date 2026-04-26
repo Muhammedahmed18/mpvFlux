@@ -1,8 +1,6 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -11,7 +9,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreTime
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -31,7 +28,6 @@ import kotlinx.collections.immutable.toImmutableList
 sealed class SubtitleItem {
   data class Track(val node: TrackNode) : SubtitleItem()
   data class Header(val title: String) : SubtitleItem()
-  object Divider : SubtitleItem()
 }
 
 @Composable
@@ -55,15 +51,12 @@ fun SubtitlesSheet(
     
     if (internal.isNotEmpty() || external.isNotEmpty()) {
         if (internal.isNotEmpty()) {
-          list.add(SubtitleItem.Header("Embedded Subtitles"))
+          list.add(SubtitleItem.Header("EMBEDDED"))
           list.addAll(internal.map { SubtitleItem.Track(it) })
         }
         
         if (external.isNotEmpty()) {
-          if (internal.isNotEmpty()) {
-            list.add(SubtitleItem.Divider)
-          }
-          list.add(SubtitleItem.Header("External Subtitles"))
+          list.add(SubtitleItem.Header("EXTERNAL"))
           list.addAll(external.map { SubtitleItem.Track(it) })
         }
     }
@@ -78,8 +71,9 @@ fun SubtitlesSheet(
       Column(modifier = Modifier.padding(top = MaterialTheme.spacing.medium)) {
         Text(
           text = "Subtitles",
-          style = MaterialTheme.typography.titleMedium,
+          style = MaterialTheme.typography.headlineSmall,
           fontWeight = FontWeight.ExtraBold,
+          color = MaterialTheme.colorScheme.onSurface,
           modifier = Modifier.padding(horizontal = MaterialTheme.spacing.medium)
         )
         val subtitleActions = remember {
@@ -117,11 +111,15 @@ fun SubtitlesSheet(
           val externalLabel = stringResource(R.string.generic_external)
           
           val metadata = remember(track) {
-            mutableListOf<String>().apply {
-              if (!track.codec.isNullOrBlank()) add(track.codec)
-              if (track.external == true) add(externalLabel)
+            mutableListOf<TrackMetadata>().apply {
+              if (!track.codec.isNullOrBlank()) {
+                add(TrackMetadata(track.codec, MetadataType.PRIMARY))
+              }
+              if (track.external == true) {
+                add(TrackMetadata(externalLabel, MetadataType.WARNING))
+              }
               if (!track.lang.isNullOrBlank() && track.title?.contains(track.lang, ignoreCase = true) != true) {
-                add(track.lang)
+                add(TrackMetadata(track.lang))
               }
             }
           }
@@ -136,17 +134,13 @@ fun SubtitlesSheet(
               {
                 IconButton(
                   onClick = { onRemoveSubtitle(track.id) },
-                  modifier = Modifier.padding(end = 4.dp)
+                  modifier = Modifier.size(32.dp)
                 ) {
                   Icon(
                     Icons.Default.Delete,
                     contentDescription = null,
                     modifier = Modifier.size(20.dp),
-                    tint = if (isSelected) {
-                      MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                    } else {
-                      MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                    }
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                   )
                 }
               }
@@ -154,26 +148,15 @@ fun SubtitlesSheet(
           )
         }
         is SubtitleItem.Header -> {
-          Text(
-            text = item.title,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-              .padding(horizontal = 16.dp)
-              .padding(top = 8.dp, bottom = 4.dp)
-          )
-        }
-        SubtitleItem.Divider -> {
-          HorizontalDivider(
-            modifier = Modifier.padding(vertical = 4.dp, horizontal = 16.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+          TrackHeaderPill(
+            title = item.title,
+            modifier = Modifier.padding(horizontal = 16.dp)
           )
         }
       }
     },
     footer = {
-      Spacer(modifier = Modifier.height(MaterialTheme.spacing.medium))
+      // Clean bottom padding is handled by GenericTracksSheet
     },
     modifier = modifier,
   )

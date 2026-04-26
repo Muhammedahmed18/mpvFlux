@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.preferences.PlayerButton
 import app.marlboroadvance.mpvex.ui.player.Panels
@@ -24,7 +25,7 @@ fun TopLeftPlayerControlsLandscape(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    horizontalArrangement = Arrangement.spacedBy(16.dp),
   ) {
     RenderPlayerButton(
       button = PlayerButton.BACK_ARROW,
@@ -62,6 +63,7 @@ fun TopLeftPlayerControlsLandscape(
       onOpenPanel = {},
       viewModel = viewModel,
       activity = activity,
+      modifier = Modifier.weight(1f, fill = false)
     )
   }
 }
@@ -86,7 +88,7 @@ fun TopRightPlayerControlsLandscape(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     buttons.forEach { button ->
       RenderPlayerButton(
@@ -132,7 +134,7 @@ fun BottomRightPlayerControlsLandscape(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     buttons.forEach { button ->
       RenderPlayerButton(
@@ -178,7 +180,7 @@ fun BottomLeftPlayerControlsLandscape(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     buttons.forEach { button ->
       RenderPlayerButton(
