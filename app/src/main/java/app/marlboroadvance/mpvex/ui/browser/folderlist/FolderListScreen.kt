@@ -3,11 +3,8 @@ package app.marlboroadvance.mpvex.ui.browser.folderlist
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -37,7 +34,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -45,6 +41,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -64,7 +61,6 @@ import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.NavigationBarState
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings
-import app.marlboroadvance.mpvex.ui.browser.components.BrowserBottomBar
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
@@ -117,6 +113,7 @@ object FolderListScreen : Screen {
     val foldersWithNewCount by viewModel.foldersWithNewCount.collectAsState()
     val recentlyPlayedFilePath by viewModel.recentlyPlayedFilePath.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val isScanning by viewModel.isScanning.collectAsState()
     val scanStatus by viewModel.scanStatus.collectAsState()
     val hasCompletedInitialLoad by viewModel.hasCompletedInitialLoad.collectAsState()
 
@@ -227,6 +224,7 @@ object FolderListScreen : Screen {
               foldersWithNewCount = foldersWithNewCount,
               recentlyPlayedFilePath = recentlyPlayedFilePath,
               isLoading = isLoading,
+              isScanning = isScanning,
               scanStatus = scanStatus,
               hasCompletedInitialLoad = hasCompletedInitialLoad,
               tapThumbnailToSelect = tapThumbnailToSelect,
@@ -286,6 +284,7 @@ private fun FolderListContent(
   foldersWithNewCount: List<FolderWithNewCount>,
   recentlyPlayedFilePath: String?,
   isLoading: Boolean,
+  isScanning: Boolean,
   scanStatus: String?,
   hasCompletedInitialLoad: Boolean,
   tapThumbnailToSelect: Boolean,
@@ -298,8 +297,10 @@ private fun FolderListContent(
   onFolderClick: (VideoFolder) -> Unit,
   onFolderLongClick: (VideoFolder) -> Unit,
 ) {
-  val showLoading = (isLoading && folders.isEmpty()) || !hasCompletedInitialLoad
-  val showEmpty = folders.isEmpty() && !isLoading && hasCompletedInitialLoad
+  // Show full-screen loading ONLY if we have no folders AND the initial load isn't done, 
+  // or if explicitly triggered via a full-screen isLoading flag.
+  val showFullScreenLoading = (isLoading && folders.isEmpty()) || (!hasCompletedInitialLoad && folders.isEmpty())
+  val showEmpty = folders.isEmpty() && !isLoading && !isScanning && hasCompletedInitialLoad
 
   val isAtTop by remember {
     derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
@@ -317,8 +318,8 @@ private fun FolderListContent(
     listState = listState,
     modifier = Modifier.fillMaxSize(),
   ) {
-    if (showLoading || showEmpty) {
-      if (showLoading) {
+    if (showFullScreenLoading || showEmpty) {
+      if (showFullScreenLoading) {
         LoadingState(
           icon = Icons.Rounded.Folder,
           title = "Scanning for videos...",
@@ -341,10 +342,10 @@ private fun FolderListContent(
           contentPadding = PaddingValues(
             start = 8.dp, 
             end = 8.dp, 
-            top = 12.dp, // Added breathing space from top bar
-            bottom = navigationBarHeight + 12.dp // Added bottom breathing space
+            top = 12.dp, 
+            bottom = navigationBarHeight + 12.dp 
           ),
-          verticalArrangement = Arrangement.spacedBy(8.dp), // Added space between cards
+          verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
           items(folders, key = { it.bucketId }) { folder ->
             FolderCard(
@@ -368,10 +369,19 @@ private fun FolderListContent(
           ) {}
         }
       }
-      if (scanStatus != null && !showLoading) {
+      
+      // Background Scanning Indicator: Show a linear progress bar if scanning is in progress
+      // but we already have data on screen.
+      AnimatedVisibility(
+        visible = isScanning && !showFullScreenLoading,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = Modifier.align(Alignment.TopCenter)
+      ) {
         LinearProgressIndicator(
-          modifier = Modifier.fillMaxWidth().padding(2.dp),
-          color = MaterialTheme.colorScheme.secondary,
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+          color = MaterialTheme.colorScheme.primary,
+          trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
       }
     }

@@ -243,7 +243,7 @@ object PermissionUtils {
     ): Pair<Int, Int> =
       withContext(Dispatchers.IO) {
         if (!BuildConfig.SCOPED_STORAGE_ONLY || hasManageStoragePermission()) {
-          deleteVideosDirectly(videos)
+          deleteVideosDirectly(context, videos)
         } else {
           deleteVideosScoped(context, videos)
         }
@@ -252,7 +252,10 @@ object PermissionUtils {
     /**
      * Delete videos using direct file operations (requires MANAGE_EXTERNAL_STORAGE on Android 11+)
      */
-    private suspend fun deleteVideosDirectly(videos: List<Video>): Pair<Int, Int> =
+    private suspend fun deleteVideosDirectly(
+        context: Context,
+        videos: List<Video>
+    ): Pair<Int, Int> =
       withContext(Dispatchers.IO) {
         var deleted = 0
         var failed = 0
@@ -265,6 +268,9 @@ object PermissionUtils {
               RecentlyPlayedOps.onVideoDeleted(video.path)
               PlaybackStateOps.onVideoDeleted(video.path)
               Log.d(TAG, "✓ Deleted: ${video.displayName}")
+              
+              // Notify MediaStore immediately
+              android.media.MediaScannerConnection.scanFile(context, arrayOf(video.path), null, null)
             } else {
               failed++
               Log.w(TAG, "✗ Failed to delete: ${video.displayName}")
@@ -338,6 +344,9 @@ object PermissionUtils {
               RecentlyPlayedOps.onVideoDeleted(video.path)
               PlaybackStateOps.onVideoDeleted(video.path)
               Log.d(TAG, "✓ Deleted (file fallback): ${video.displayName}")
+              
+              // Notify MediaStore immediately
+              android.media.MediaScannerConnection.scanFile(context, arrayOf(video.path), null, null)
             } else {
               failed++
               Log.w(TAG, "✗ Failed to delete (file fallback): ${video.displayName}")

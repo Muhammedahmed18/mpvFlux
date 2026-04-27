@@ -51,12 +51,15 @@ class FolderListViewModel(
   private val _foldersWithNewCount = MutableStateFlow<List<FolderWithNewCount>>(emptyList())
   val foldersWithNewCount: StateFlow<List<FolderWithNewCount>> = _foldersWithNewCount.asStateFlow()
 
-  // Only show loading on fresh install (when there's no cached data)
+  // Full-screen loading (used only when no data exists)
   private val _isLoading = MutableStateFlow(false)
   val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+  // Background scanning state (used when updating existing data)
+  private val _isScanning = MutableStateFlow(false)
+  val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
+
   // Track if initial load has completed to prevent empty state flicker
-  // Default to true to prevent "Scanning" UI on tab switch
   private val _hasCompletedInitialLoad = MutableStateFlow(true)
   val hasCompletedInitialLoad: StateFlow<Boolean> = _hasCompletedInitialLoad.asStateFlow()
 
@@ -86,14 +89,12 @@ class FolderListViewModel(
     // Load cached folders instantly for immediate display
     val hasCachedData = loadCachedFolders()
 
-    // If no cached data (first launch), scan immediately and show loading. 
     if (!hasCachedData) {
       _hasCompletedInitialLoad.value = false
       loadVideoFolders()
     } else {
-      // If we have data, we scan silently in background after a short delay
+      // If we have data, we sync in background immediately but without full-screen loading
       viewModelScope.launch(Dispatchers.IO) {
-        kotlinx.coroutines.delay(2000) 
         loadVideoFolders()
       }
     }
@@ -216,11 +217,15 @@ class FolderListViewModel(
   }
 
   override fun refresh() {
-    Log.d(TAG, "Hard refreshing folder list (Pull to Refresh)")
+    Log.d(TAG, "Refreshing folder list")
     
-    // Condition 2: Reset completion flag to force scanning UI for pull-to-refresh
-    _isLoading.value = true
-    _hasCompletedInitialLoad.value = false
+    // Only show full-screen loading if we have NO data. Otherwise, show scanning indicator.
+    if (_allVideoFolders.value.isEmpty()) {
+      _isLoading.value = true
+      _hasCompletedInitialLoad.value = false
+    }
+    
+    _isScanning.value = true
     _scanStatus.value = "Preparing scan..."
     
     MediaFileRepository.clearCache()
@@ -228,7 +233,6 @@ class FolderListViewModel(
     triggerMediaScan()
     
     viewModelScope.launch(Dispatchers.IO) {
-      kotlinx.coroutines.delay(1000)
       loadVideoFolders()
     }
   }
@@ -246,19 +250,19 @@ class FolderListViewModel(
     val isListEmpty = _allVideoFolders.value.isEmpty()
     Log.d(TAG, "Permission granted (isListEmpty=$isListEmpty), triggering scan")
     
-    // Condition 1: Only force scanning UI if list is empty (first time grant)
     if (isListEmpty) {
       _isLoading.value = true
       _hasCompletedInitialLoad.value = false
-      _scanStatus.value = "Preparing scan..."
     }
+    
+    _isScanning.value = true
+    _scanStatus.value = "Preparing scan..."
     
     MediaFileRepository.clearCache()
     FolderViewScanner.clearCache()
     triggerMediaScan()
     
     viewModelScope.launch(Dispatchers.IO) {
-      kotlinx.coroutines.delay(800)
       loadVideoFolders()
     }
   }
@@ -301,13 +305,15 @@ class FolderListViewModel(
     currentScanJob?.cancel()
     currentScanJob = viewModelScope.launch(Dispatchers.IO) {
       try {
+        _isScanning.value = true
         val hasExistingData = _allVideoFolders.value.isNotEmpty()
         
-        // Only show full-screen loading if explicitly requested (via _hasCompletedInitialLoad = false)
-        // or if we have absolutely no data to show yet.
-        if (!hasExistingData || !_hasCompletedInitialLoad.value) {
+        // Only show full-screen loading if we have absolutely no data to show yet.
+        if (!hasExistingData) {
           _isLoading.value = true
           _scanStatus.value = "Scanning storage..."
+        } else {
+          _scanStatus.value = "Checking for changes..."
         }
 
         val currentFoldersMap = _allVideoFolders.value.associateBy { it.bucketId }
@@ -317,12 +323,6 @@ class FolderListViewModel(
             context = getApplication(),
             onProgress = { count -> _scanStatus.value = "Found $count folders..." }
           )
-
-        if (fastFolders.isEmpty() && hasExistingData && _hasCompletedInitialLoad.value) {
-             _isLoading.value = false
-             _scanStatus.value = null
-             return@launch
-        }
 
         var needsEnrichment = false
         val mergedFolders = fastFolders.map { fastFolder ->
@@ -343,12 +343,14 @@ class FolderListViewModel(
         _hasCompletedInitialLoad.value = true
         
         if (mergedFolders.isEmpty()) {
+             _isScanning.value = false
              _scanStatus.value = null
              return@launch
         }
 
         val needsDurationEnrichment = needsEnrichment && MetadataRetrieval.isFolderMetadataNeeded(browserPreferences)
         if (!needsDurationEnrichment) {
+             _isScanning.value = false
              _scanStatus.value = null
              return@launch
         }
@@ -374,6 +376,7 @@ class FolderListViewModel(
         _hasCompletedInitialLoad.value = true
       } finally {
         _isLoading.value = false
+        _isScanning.value = false
         _isEnriching.value = false
         _scanStatus.value = null
       }
