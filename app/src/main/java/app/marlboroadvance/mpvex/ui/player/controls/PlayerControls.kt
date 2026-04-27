@@ -2,6 +2,7 @@ package app.marlboroadvance.mpvex.ui.player.controls
 
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -26,19 +27,24 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
@@ -54,6 +60,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -63,20 +70,27 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import app.marlboroadvance.mpvex.R
@@ -108,13 +122,17 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.ControlsButtonTyp
 import app.marlboroadvance.mpvex.ui.theme.controlColor
 import app.marlboroadvance.mpvex.ui.theme.playerRippleConfiguration
 import app.marlboroadvance.mpvex.ui.theme.spacing
+import app.marlboroadvance.mpvex.ui.theme.MpvexTheme
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import kotlin.math.abs
+import kotlin.math.roundToInt
+import androidx.compose.ui.tooling.preview.Preview
 
 @Suppress("CompositionLocalAllowlist")
 val LocalPlayerButtonsClickEvent = staticCompositionLocalOf { {} }
@@ -138,7 +156,7 @@ fun <T> playerControlsEnterAnimationSpec(): FiniteAnimationSpec<T> =
   ExperimentalFoundationApi::class,
 )
 @Composable
-@Suppress("CyclomaticComplexMethod", "ViewModelForwarding")
+@Suppress("CyclomaticComplexMethod", "ViewModelForwarding", "LongMethod")
 fun PlayerControls(
   viewModel: PlayerViewModel,
   onBackPress: () -> Unit,
@@ -288,6 +306,7 @@ fun PlayerControls(
         val playerPauseButton = createRef()
         val seekbar = createRef()
         val (playerUpdates) = createRefs()
+        val nextUpPill = createRef()
 
         val isBrightnessSliderShown by viewModel.isBrightnessSliderShown.collectAsState()
         val isVolumeSliderShown by viewModel.isVolumeSliderShown.collectAsState()
@@ -801,6 +820,25 @@ fun PlayerControls(
           )
         }
 
+        val showNextUp by viewModel.showNextUp.collectAsState()
+        val nextItemTitle by viewModel.nextItemTitle.collectAsState()
+
+        AnimatedVisibility(
+            visible = showNextUp,
+            enter = slideInHorizontally { it } + fadeIn(),
+            exit = slideOutHorizontally { it } + fadeOut(),
+            modifier = Modifier.constrainAs(nextUpPill) {
+                bottom.linkTo(seekbar.top, spacing.medium)
+                end.linkTo(parent.end, spacing.large)
+            }
+        ) {
+            NextUpPill(
+                title = nextItemTitle ?: "",
+                onClick = { viewModel.playNext() },
+                onDismiss = { viewModel.dismissNextUp() }
+            )
+        }
+
         AnimatedVisibility(
           visible = controlsShown && !areControlsLocked,
           enter =
@@ -1137,4 +1175,129 @@ fun PlayerControls(
       onDismissRequest = { onOpenPanel(Panels.None) },
     )
   }
+}
+
+@Composable
+fun NextUpPill(
+    title: String,
+    onClick: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    val spacing = MaterialTheme.spacing
+    val scope = rememberCoroutineScope()
+    val offsetX = remember { Animatable(0f) }
+    
+    // Trigger haptic when appearing
+    LaunchedEffect(Unit) {
+        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+    }
+
+    Surface(
+        modifier = modifier
+            .padding(spacing.small)
+            .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (offsetX.value > 100f) {
+                            scope.launch {
+                                offsetX.animateTo(500f)
+                                onDismiss()
+                            }
+                        } else {
+                            scope.launch {
+                                offsetX.animateTo(0f)
+                            }
+                        }
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        // Only allow dragging to the right
+                        if (dragAmount > 0 || offsetX.value > 0) {
+                            scope.launch {
+                                offsetX.snapTo((offsetX.value + dragAmount).coerceAtLeast(0f))
+                            }
+                        }
+                    }
+                )
+            }
+            .height(56.dp)
+            .widthIn(min = 160.dp, max = 280.dp)
+            .blur(20.dp),
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.08f),
+        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.2f)),
+        tonalElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable { onClick() }
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.SkipNext,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "NEXT UP",
+                    color = Color.White.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = title,
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF000000)
+@Composable
+fun PreviewNextUpPill() {
+    MpvexTheme {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Gradient background to see the glass effect better
+            Box(
+                modifier = Modifier
+                    .size(300.dp, 200.dp)
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(Color(0xFF6200EE), Color(0xFF03DAC6))
+                        )
+                    )
+            )
+            
+            NextUpPill(
+                title = "S01 E05 - The Final Stand",
+                onClick = {},
+                onDismiss = {}
+            )
+        }
+    }
 }

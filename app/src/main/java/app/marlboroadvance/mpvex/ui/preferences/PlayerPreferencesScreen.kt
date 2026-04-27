@@ -214,6 +214,29 @@ object PlayerPreferencesScreen : Screen {
                 
                 PreferenceDivider()
 
+                val showNextUpPrompt by preferences.showNextUpPrompt.collectAsState()
+                SwitchPreference(
+                    value = showNextUpPrompt,
+                    onValueChange = preferences.showNextUpPrompt::set,
+                    title = {
+                        Text(
+                            text = "Show \"Next Up\" prompt",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    summary = {
+                        Text(
+                            text = "Show a button to play next video when reaching the end",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Light,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
+                )
+
+                PreferenceDivider()
+
                 val rememberBrightness by preferences.rememberBrightness.collectAsState()
                 SwitchPreference(
                   value = rememberBrightness,

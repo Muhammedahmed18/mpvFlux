@@ -80,4 +80,7 @@ class PlayerPreferences(
     deserializer = { it.toDoubleOrNull() ?: -1.0 }
   )
 
+  // Next Up logic
+  val showNextUpPrompt = preferenceStore.getBoolean("show_next_up_prompt", true)
+
 }

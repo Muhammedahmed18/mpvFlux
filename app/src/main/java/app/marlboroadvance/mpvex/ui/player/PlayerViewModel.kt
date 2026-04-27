@@ -18,6 +18,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
+import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.SubtitlesPreferences
@@ -84,6 +85,7 @@ class PlayerViewModel(
 ) : ViewModel(),
   KoinComponent {
   private val playerPreferences: PlayerPreferences by inject()
+  private val browserPreferences: BrowserPreferences by inject()
   private val gesturePreferences: GesturePreferences by inject()
   private val audioPreferences: AudioPreferences by inject()
   private val subtitlesPreferences: SubtitlesPreferences by inject()
@@ -125,8 +127,8 @@ class PlayerViewModel(
   val isSearchingMedia: StateFlow<Boolean> = _isSearchingMedia.asStateFlow()
 
   // TV Show Details
-  private val _selectedTvShow = MutableStateFlow<app.marlboroadvance.mpvex.repository.wyzie.WyzieTvShowDetails?>(null)
-  val selectedTvShow: StateFlow<app.marlboroadvance.mpvex.repository.wyzie.WyzieTvShowDetails?> = _selectedTvShow.asStateFlow()
+  private val _selectedTvShowDetails = MutableStateFlow<app.marlboroadvance.mpvex.repository.wyzie.WyzieTvShowDetails?>(null)
+  val selectedTvShow: StateFlow<app.marlboroadvance.mpvex.repository.wyzie.WyzieTvShowDetails?> = _selectedTvShowDetails.asStateFlow()
 
   private val _isFetchingTvDetails = MutableStateFlow(false)
   val isFetchingTvDetails: StateFlow<Boolean> = _isFetchingTvDetails.asStateFlow()
@@ -171,6 +173,13 @@ class PlayerViewModel(
   val currentVolume = MutableStateFlow(host.audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
   private val volumeBoostCap by MPVLib.propInt["volume-max"].collectAsState(viewModelScope)
 
+  // Next Up logic
+  private val _showNextUp = MutableStateFlow(false)
+  val showNextUp: StateFlow<Boolean> = _showNextUp.asStateFlow()
+
+  private val _nextItemTitle = MutableStateFlow<String?>(null)
+  val nextItemTitle: StateFlow<String?> = _nextItemTitle.asStateFlow()
+
   init {
     // REMOVED: High-frequency polling loop for performance optimization
     // Position is now handled by MPV property observation via pos StateFlow
@@ -179,7 +188,11 @@ class PlayerViewModel(
     // Observe position changes efficiently instead of polling
     viewModelScope.launch {
       MPVLib.propInt["time-pos"].collect { position ->
-        _precisePosition.value = position?.toFloat() ?: 0f
+        val currentPos = position?.toFloat() ?: 0f
+        _precisePosition.value = currentPos
+        
+        // Trigger "Next Up" prompt based on watched threshold
+        checkNextUpThreshold(currentPos)
       }
     }
     
@@ -193,6 +206,36 @@ class PlayerViewModel(
       }
     }
   }
+
+  private fun checkNextUpThreshold(currentPos: Float) {
+    if (!playerPreferences.showNextUpPrompt.get()) return
+    if (_showNextUp.value) return // Already showing
+
+    val totalDuration = _preciseDuration.value
+    if (totalDuration <= 0) return
+
+    // Use global watched threshold from BrowserPreferences (convert Int percentage to 0.0-1.0 float)
+    val threshold = browserPreferences.watchedThreshold.get() / 100f
+    val progress = currentPos / totalDuration
+
+    if (progress >= threshold && hasNext()) {
+      val activity = host as? PlayerActivity
+      if (activity != null) {
+        val nextIndex = activity.playlistIndex + 1
+        if (nextIndex < activity.playlist.size) {
+          val nextUri = activity.playlist[nextIndex]
+          _nextItemTitle.value = activity.getPlaylistItemTitle(nextUri)
+          _showNextUp.value = true
+          Log.d(TAG, "Next Up threshold reached ($threshold). Showing prompt for: ${_nextItemTitle.value}")
+        }
+      }
+    }
+  }
+
+  fun dismissNextUp() {
+    _showNextUp.value = false
+  }
+
   val maxVolume = host.audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
 
   val subtitleTracks: StateFlow<List<TrackNode>> =
@@ -566,6 +609,11 @@ class PlayerViewModel(
       _externalSubtitles.clear()
       // Reset hash when media changes
       _videoHash.value = null
+      
+      // Reset Next Up state when media changes
+      _showNextUp.value = false
+      _nextItemTitle.value = null
+      
       // Scan for previously downloaded/added subtitles
       scanLocalSubtitles(mediaTitle)
 
@@ -705,7 +753,7 @@ class PlayerViewModel(
       wyzieRepository.getTvShowDetails(id)
         .onSuccess { details ->
           val validSeasons = details.seasons.filter { it.season_number > 0 }.sortedBy { it.season_number }
-          _selectedTvShow.value = details.copy(seasons = validSeasons)
+          _selectedTvShowDetails.value = details.copy(seasons = validSeasons)
           _selectedSeason.value = null
           _seasonEpisodes.value = emptyList()
         }
@@ -717,7 +765,7 @@ class PlayerViewModel(
   }
 
   fun selectSeason(season: app.marlboroadvance.mpvex.repository.wyzie.WyzieSeason) {
-    val tvShowId = _selectedTvShow.value?.id ?: return
+    val tvShowId = _selectedTvShowDetails.value?.id ?: return
     _selectedSeason.value = season
     
     viewModelScope.launch {
@@ -737,12 +785,12 @@ class PlayerViewModel(
 
   fun selectEpisode(episode: app.marlboroadvance.mpvex.repository.wyzie.WyzieEpisode) {
     _selectedEpisode.value = episode
-    val tvShowName = _selectedTvShow.value?.name ?: currentMediaTitle
+    val tvShowName = _selectedTvShowDetails.value?.name ?: currentMediaTitle
     searchSubtitles(tvShowName, episode.season_number, episode.episode_number)
   }
 
   fun clearMediaSelection() {
-    _selectedTvShow.value = null
+    _selectedTvShowDetails.value = null
     _selectedSeason.value = null
     _seasonEpisodes.value = emptyList()
     _selectedEpisode.value = null
