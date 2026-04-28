@@ -1,9 +1,9 @@
 package app.marlboroadvance.mpvex.ui.player.controls
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -19,12 +19,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material.icons.rounded.ChevronLeft
+import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalRippleConfiguration
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -33,6 +34,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,24 +45,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import `is`.xyz.mpv.MPVLib
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
-import app.marlboroadvance.mpvex.presentation.components.LeftSideOvalShape
-import app.marlboroadvance.mpvex.presentation.components.RightSideOvalShape
 import app.marlboroadvance.mpvex.ui.player.Panels
 import app.marlboroadvance.mpvex.ui.player.PlayerUpdates
 import app.marlboroadvance.mpvex.ui.player.PlayerViewModel
@@ -68,6 +69,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.ln
 import kotlin.math.pow
@@ -77,7 +79,6 @@ import kotlin.math.sqrt
 @Composable
 fun GestureHandler(
   viewModel: PlayerViewModel,
-  interactionSource: MutableInteractionSource,
   modifier: Modifier = Modifier,
 ) {
   val playerPreferences = koinInject<PlayerPreferences>()
@@ -115,9 +116,9 @@ fun GestureHandler(
   val horizontalSwipeSensitivity by playerPreferences.horizontalSwipeSensitivity.collectAsState()
   var isLongPressing by remember { mutableStateOf(false) }
   var isDynamicSpeedControlActive by remember { mutableStateOf(false) }
-  var dynamicSpeedStartX by remember { mutableStateOf(0f) }
-  var dynamicSpeedStartValue by remember { mutableStateOf(2f) }
-  var lastAppliedSpeed by remember { mutableStateOf(2f) }
+  var dynamicSpeedStartX by remember { mutableFloatStateOf(0f) }
+  var dynamicSpeedStartValue by remember { mutableFloatStateOf(2f) }
+  var lastAppliedSpeed by remember { mutableFloatStateOf(2f) }
   var hasSwipedEnough by remember { mutableStateOf(false) }
   var longPressTriggeredDuringTouch by remember { mutableStateOf(false) }
   var isVerticalGestureActive by remember { mutableStateOf(false) }
@@ -129,18 +130,13 @@ fun GestureHandler(
   val coroutineScope = rememberCoroutineScope()
 
   // Isolated double-tap state tracking
-  var tapCount by remember { mutableStateOf(0) }
-  var lastTapTime by remember { mutableStateOf(0L) }
+  var tapCount by remember { mutableIntStateOf(0) }
+  var lastTapTime by remember { mutableLongStateOf(0L) }
   var lastTapPosition by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
   var lastTapRegion by remember { mutableStateOf<String?>(null) }
   var pendingSingleTapRegion by remember { mutableStateOf<String?>(null) }
-  var pendingSingleTapPosition by remember { mutableStateOf<androidx.compose.ui.geometry.Offset?>(null) }
   val doubleTapTimeout = 250L
   val multiTapContinueWindow = 650L
-
-  // Multi-tap seeking state
-  var lastSeekRegion by remember { mutableStateOf<String?>(null) }
-  var lastSeekTime by remember { mutableStateOf<Long?>(null) }
 
   // Auto-reset tap count on timeout and execute single tap if no double tap detected
   LaunchedEffect(tapCount, longPressTriggeredDuringTouch) {
@@ -163,7 +159,6 @@ fun GestureHandler(
           }
         }
         pendingSingleTapRegion = null
-        pendingSingleTapPosition = null
       }
       tapCount = 0
       lastTapRegion = null
@@ -206,7 +201,6 @@ fun GestureHandler(
 
           // Track for potential drag
           var isDrag = false
-          var wasConsumedByTapGesture = false
 
           do {
             val event = awaitPointerEvent()
@@ -225,7 +219,7 @@ fun GestureHandler(
 
             if (!pointer.pressed) {
               // Pointer lifted - this is a tap if it wasn't a drag
-              if (!isDrag && !wasConsumedByTapGesture) {
+              if (!isDrag) {
                 val timeSinceLastTap = downTime - lastTapTime
                 val positionChange = sqrt(
                   (downPosition.x - lastTapPosition.x) * (downPosition.x - lastTapPosition.x) +
@@ -253,8 +247,6 @@ fun GestureHandler(
                   lastTapTime = downTime
                   lastTapPosition = downPosition
                   pendingSingleTapRegion = null // Cancel pending single tap
-                  pendingSingleTapPosition = null
-                  wasConsumedByTapGesture = true
                   pointer.consume()
 
                   when (region) {
@@ -262,8 +254,6 @@ fun GestureHandler(
                       val rightGesture = gesturePreferences.rightSingleActionGesture.get()
                       if (rightGesture == SingleActionGesture.Seek) {
                         isDoubleTapSeeking = true
-                        lastSeekRegion = "right"
-                        lastSeekTime = System.currentTimeMillis()
                         if (!isSeekingForwards) viewModel.updateSeekAmount(0)
                       }
                       viewModel.handleRightDoubleTap()
@@ -272,8 +262,6 @@ fun GestureHandler(
                       val leftGesture = gesturePreferences.leftSingleActionGesture.get()
                       if (leftGesture == SingleActionGesture.Seek) {
                         isDoubleTapSeeking = true
-                        lastSeekRegion = "left"
-                        lastSeekTime = System.currentTimeMillis()
                         if (isSeekingForwards) viewModel.updateSeekAmount(0)
                       }
                       viewModel.handleLeftDoubleTap()
@@ -282,12 +270,10 @@ fun GestureHandler(
                       viewModel.handleCenterDoubleTap()
                     }
                   }
-                } else if (isMultiTapContinuation && isDoubleTapSeeking) {
+                } else if (isMultiTapContinuation) {
                   // Continue multi-tap seeking
                   tapCount++
-                  wasConsumedByTapGesture = true
                   pointer.consume()
-                  lastSeekTime = System.currentTimeMillis()
                   lastTapTime = downTime
                   lastTapPosition = downPosition
 
@@ -317,8 +303,6 @@ fun GestureHandler(
                   lastTapPosition = downPosition
                   lastTapRegion = region
                   pendingSingleTapRegion = region
-                  pendingSingleTapPosition = downPosition
-                  wasConsumedByTapGesture = true
                   pointer.consume()
                   // Don't execute single tap action yet - wait to see if second tap comes
                 }
@@ -357,7 +341,7 @@ fun GestureHandler(
           // Track long press separately
           var longPressTriggered = false
           val longPressDelay = 500L
-          var longPressJob = coroutineScope.launch {
+          val longPressJob = coroutineScope.launch {
             delay(longPressDelay)
             if (!longPressTriggered && paused == false) {
               val distance = sqrt(
@@ -416,16 +400,11 @@ fun GestureHandler(
                     longPressJob.cancel()
 
                     // Check if we're in long press mode with dynamic speed control
-                    if (isLongPressing && isDynamicSpeedControlActive && showDynamicSpeedOverlay && abs(deltaX) > 10f) {
-                      gestureType = "speed_control"
-                    } else {
-                      gestureType = if (abs(deltaX) > abs(deltaY) * 1.5f) {
-                        "horizontal"
-                      } else if (abs(deltaY) > abs(deltaX) * 1.5f) {
-                        "vertical"
-                      } else {
-                        null
-                      }
+                    gestureType = when {
+                      isLongPressing && isDynamicSpeedControlActive && showDynamicSpeedOverlay && abs(deltaX) > 10f -> "speed_control"
+                      abs(deltaX) > abs(deltaY) * 1.5f -> "horizontal"
+                      abs(deltaY) > abs(deltaX) * 1.5f -> "vertical"
+                      else -> null
                     }
 
                     // Initialize gesture-specific state
@@ -460,17 +439,17 @@ fun GestureHandler(
                         val speedPresets = listOf(0.25f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 4.0f)
                         val screenWidth = size.width.toFloat()
 
-                        val deltaX = currentPosition.x - dynamicSpeedStartX
+                        val speedControlDeltaX = currentPosition.x - dynamicSpeedStartX
                         val swipeDetectionThreshold = 10.dp.toPx()
 
-                        if (!hasSwipedEnough && abs(deltaX) >= swipeDetectionThreshold) {
+                        if (!hasSwipedEnough && abs(speedControlDeltaX) >= swipeDetectionThreshold) {
                           hasSwipedEnough = true
                           viewModel.playerUpdate.update { PlayerUpdates.DynamicSpeedControl(lastAppliedSpeed, true) }
                         }
 
                         if (hasSwipedEnough) {
                           val presetsRange = speedPresets.size - 1
-                          val indexDelta = (deltaX / screenWidth) * presetsRange * 3.5f
+                          val indexDelta = (speedControlDeltaX / screenWidth) * presetsRange * 3.5f
 
                           val startIndex = speedPresets.indexOfFirst {
                             abs(it - dynamicSpeedStartValue) < 0.01f
@@ -566,8 +545,7 @@ fun GestureHandler(
                             }
                           }
                           brightnessGesture -> changeBrightness()
-                          volumeGesture -> changeVolume()
-                          else -> {}
+                          else -> changeVolume()
                         }
 
                         change.consume()
@@ -853,10 +831,10 @@ fun GestureHandler(
                     change.consume()
                   }
 
-                  if (gestureType == "horizontal_seek" && hasStartedSeeking) {
+                  if (gestureType == "horizontal_seek") {
                     // Calculate seek amount based on horizontal movement
-                    val seekAmount = deltaX * seekSensitivity
-                    val targetPosition = (initialVideoPosition + seekAmount).coerceAtLeast(0f)
+                    val seekAmountHorizontal = deltaX * seekSensitivity
+                    val targetPosition = (initialVideoPosition + seekAmountHorizontal).coerceAtLeast(0f)
                     val maxDuration = duration?.toFloat() ?: 0f
                     val clampedPosition = targetPosition.coerceAtMost(maxDuration)
                     
@@ -917,11 +895,9 @@ fun GestureHandler(
   )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DoubleTapToSeekOvals(
   amount: Int,
-  text: String?,
   showOvals: Boolean,
   showSeekIcon: Boolean,
   showSeekTime: Boolean,
@@ -931,25 +907,42 @@ fun DoubleTapToSeekOvals(
   val gesturePreferences = koinInject<GesturePreferences>()
   val doubleTapSeekAreaWidth by gesturePreferences.doubleTapSeekAreaWidth.collectAsState()
   val seekAreaFraction = doubleTapSeekAreaWidth / 100f
+  val haptic = LocalHapticFeedback.current
   
-  val alpha by animateFloatAsState(if (amount == 0) 0f else 0.2f, label = "double_tap_animation_alpha")
+  // Dynamic Width (Phase 4)
+  val animatedFraction by animateFloatAsState(
+      targetValue = if (amount != 0) {
+          seekAreaFraction * (1f + (abs(amount).toFloat() / 150f).coerceAtMost(0.2f))
+      } else {
+          seekAreaFraction
+      },
+      animationSpec = spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow),
+      label = "dynamic_width"
+  )
 
-  // Scale animation for text
-  var scaleTarget by remember { mutableStateOf(1f) }
+  val alpha by animateFloatAsState(if (amount == 0) 0f else 0.35f, label = "double_tap_animation_alpha")
+
+  // Pop animation for content (Phase 2)
+  val scaleTarget = remember { mutableFloatStateOf(1f) }
   val scale by animateFloatAsState(
-      targetValue = scaleTarget,
-      animationSpec = tween(durationMillis = 150),
+      targetValue = scaleTarget.floatValue,
+      animationSpec = spring(
+          dampingRatio = Spring.DampingRatioLowBouncy,
+          stiffness = Spring.StiffnessLow
+      ),
       label = "text_scale"
   )
   
   LaunchedEffect(amount) {
-      if (amount != 0) {
-          scaleTarget = 1.2f
-          delay(100)
-          scaleTarget = 1f
-      } else {
-        scaleTarget = 1f
+      if (amount == 0) {
+          if (scaleTarget.floatValue != 1f) scaleTarget.floatValue = 1f
+          return@LaunchedEffect
       }
+
+      haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove) // Tactile (Phase 4)
+      scaleTarget.floatValue = 1.1f
+      delay(100)
+      scaleTarget.floatValue = 1f
   }
 
   Box(
@@ -960,47 +953,73 @@ fun DoubleTapToSeekOvals(
       LocalRippleConfiguration provides playerRippleConfiguration,
     ) {
       if (amount != 0) {
+        val shape = RoundedCornerShape(
+            topStart = if (amount > 0) 100.dp else 0.dp,
+            bottomStart = if (amount > 0) 100.dp else 0.dp,
+            topEnd = if (amount > 0) 0.dp else 100.dp,
+            bottomEnd = if (amount > 0) 0.dp else 100.dp
+        )
+
         Box(
           modifier = Modifier
             .fillMaxHeight()
-            .fillMaxWidth(seekAreaFraction),
+            .fillMaxWidth(animatedFraction),
           contentAlignment = Alignment.Center,
         ) {
           if (showOvals) {
+            // Glassmorphic Layer (Phase 3)
             Box(
               modifier = Modifier
                 .fillMaxSize()
-                .clip(if (amount > 0) RightSideOvalShape else LeftSideOvalShape)
-                .background(Color.White.copy(alpha))
+                .padding(vertical = 48.dp)
+                .blur(16.dp)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = alpha * 0.45f))
+            )
+            
+            // Interaction Overlay
+            Box(
+              modifier = Modifier
+                .fillMaxSize()
+                .clip(shape)
+                .background(Color.White.copy(alpha = alpha * 0.1f))
                 .indication(interactionSource, ripple()),
             )
           }
+
           if (showSeekIcon || showSeekTime) {
+            // Pill Container for the content
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .background(
+                        color = Color.Black.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(100.dp)
+                    )
+                    .padding(horizontal = 20.dp, vertical = 10.dp)
             ) {
                 if (amount < 0) {
                     CombiningChevronsAnimation(isRight = false, trigger = amount)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = "- ${abs(amount)}",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        color = Color.White,
-                        modifier = Modifier.scale(scale)
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
                     )
                 } else {
                     Text(
                         text = "+ ${abs(amount)}",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        color = Color.White,
-                        modifier = Modifier.scale(scale)
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.White
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     CombiningChevronsAnimation(isRight = true, trigger = amount)
                 }
             }
@@ -1020,14 +1039,14 @@ fun calculateNewVerticalGestureValue(originalValue: Float, startingY: Float, new
 }
 
 private fun formatSeekTime(seconds: Int): String {
-  val absSeconds = kotlin.math.abs(seconds)
+  val absSeconds = abs(seconds)
   val hours = absSeconds / 3600
   val minutes = (absSeconds % 3600) / 60
   val secs = absSeconds % 60
   return if (hours > 0) {
-    String.format("%d:%02d:%02d", hours, minutes, secs)
+    String.format(Locale.US, "%d:%02d:%02d", hours, minutes, secs)
   } else {
-    String.format("%02d:%02d", minutes, secs)
+    String.format(Locale.US, "%02d:%02d", minutes, secs)
   }
 }
 
@@ -1049,10 +1068,10 @@ fun CombiningChevronsAnimation(
         Box {
              // Static Chevron
              Icon(
-                imageVector = if (isRight) Icons.Filled.KeyboardArrowRight else Icons.Filled.KeyboardArrowLeft,
+                imageVector = if (isRight) Icons.Rounded.ChevronRight else Icons.Rounded.ChevronLeft,
                 contentDescription = null,
                 tint = Color.White,
-                modifier = Modifier.size(48.dp)
+                modifier = Modifier.size(32.dp)
             )
             
             // Render active moving chevrons
@@ -1078,21 +1097,24 @@ fun MovingChevron(
     LaunchedEffect(Unit) {
         progress.animateTo(
             targetValue = 1f,
-            animationSpec = tween(250, easing = LinearEasing)
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessLow
+            )
         )
         onFinished()
     }
     
-    val startOffset = if (isRight) -15f else 15f
+    val startOffset = if (isRight) -16f else 16f
     val currentOffset = startOffset * (1f - progress.value)
-    val alpha = 1f - progress.value
+    val alpha = (1f - progress.value) * 0.6f
     
     Icon(
-        imageVector = if (isRight) Icons.Filled.KeyboardArrowRight else Icons.Filled.KeyboardArrowLeft,
+        imageVector = if (isRight) Icons.Rounded.ChevronRight else Icons.Rounded.ChevronLeft,
         contentDescription = null,
         tint = Color.White,
         modifier = Modifier
-            .size(48.dp)
+            .size(32.dp)
             .alpha(alpha)
             .layout { measurable, constraints ->
                 val placeable = measurable.measure(constraints)

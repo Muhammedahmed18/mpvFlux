@@ -199,6 +199,8 @@ fun PlayerControls(
     
   val abLoopA by viewModel.abLoopA.collectAsState()
   val abLoopB by viewModel.abLoopB.collectAsState()
+  val showNextUp by viewModel.showNextUp.collectAsState()
+  val nextItemTitle by viewModel.nextItemTitle.collectAsState()
 
   val activity = LocalActivity.current as PlayerActivity
 
@@ -260,17 +262,22 @@ fun PlayerControls(
   }
 
   val scrimAlpha by animateFloatAsState(
-    targetValue = if (controlsShown && !areControlsLocked) 1f else 0f,
-    animationSpec = if (controlsShown) playerControlsEnterAnimationSpec() else playerControlsExitAnimationSpec(),
+    targetValue = if ((controlsShown && !areControlsLocked) || showNextUp) 1f else 0f,
+    animationSpec = if (controlsShown || showNextUp) playerControlsEnterAnimationSpec() else playerControlsExitAnimationSpec(),
     label = "scrim_alpha",
   )
 
   GestureHandler(
     viewModel = viewModel,
-    interactionSource = interactionSource,
   )
 
-  DoubleTapToSeekOvals(doubleTapSeekAmount, seekText, showDoubleTapOvals, showSeekTime, showSeekTime, interactionSource)
+  DoubleTapToSeekOvals(
+    amount = doubleTapSeekAmount,
+    showOvals = showDoubleTapOvals,
+    showSeekIcon = showSeekTime,
+    showSeekTime = showSeekTime,
+    interactionSource = interactionSource,
+  )
 
   CompositionLocalProvider(
     LocalRippleConfiguration provides playerRippleConfiguration,
@@ -820,15 +827,12 @@ fun PlayerControls(
           )
         }
 
-        val showNextUp by viewModel.showNextUp.collectAsState()
-        val nextItemTitle by viewModel.nextItemTitle.collectAsState()
-
         AnimatedVisibility(
             visible = showNextUp,
             enter = slideInHorizontally { it } + fadeIn(),
             exit = slideOutHorizontally { it } + fadeOut(),
             modifier = Modifier.constrainAs(nextUpPill) {
-                bottom.linkTo(seekbar.top, spacing.medium)
+                bottom.linkTo(parent.bottom, 100.dp)
                 end.linkTo(parent.end, spacing.large)
             }
         ) {
@@ -1188,6 +1192,17 @@ fun NextUpPill(
     val spacing = MaterialTheme.spacing
     val scope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.96f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioLowBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "next_up_pill_scale"
+    )
     
     // Trigger haptic when appearing
     LaunchedEffect(Unit) {
@@ -1198,6 +1213,10 @@ fun NextUpPill(
         modifier = modifier
             .padding(spacing.small)
             .offset { IntOffset(offsetX.value.roundToInt(), 0) }
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
@@ -1223,30 +1242,33 @@ fun NextUpPill(
                     }
                 )
             }
-            .height(56.dp)
-            .widthIn(min = 160.dp, max = 280.dp)
-            .blur(20.dp),
+            .height(64.dp)
+            .widthIn(min = 180.dp, max = 300.dp),
         shape = CircleShape,
-        color = Color.White.copy(alpha = 0.08f),
-        border = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.2f)),
-        tonalElevation = 0.dp
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        tonalElevation = 3.dp,
+        shadowElevation = 4.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .clickable { onClick() }
-                .padding(horizontal = 16.dp),
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = ripple(),
+                    onClick = onClick
+                )
+                .padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Start
         ) {
             Icon(
                 imageVector = Icons.Outlined.SkipNext,
                 contentDescription = null,
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.size(28.dp)
             )
             
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(16.dp))
             
             Column(
                 modifier = Modifier.weight(1f),
@@ -1254,16 +1276,16 @@ fun NextUpPill(
             ) {
                 Text(
                     text = "NEXT UP",
-                    color = Color.White.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.sp
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.2.sp
                 )
                 Text(
                     text = title,
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1282,10 +1304,10 @@ fun PreviewNextUpPill() {
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            // Gradient background to see the glass effect better
+            // Gradient background to see the look better
             Box(
                 modifier = Modifier
-                    .size(300.dp, 200.dp)
+                    .size(400.dp, 200.dp)
                     .background(
                         Brush.linearGradient(
                             colors = listOf(Color(0xFF6200EE), Color(0xFF03DAC6))
