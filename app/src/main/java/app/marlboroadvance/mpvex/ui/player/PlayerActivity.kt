@@ -188,6 +188,12 @@ class PlayerActivity :
   private var playlistId: Int? = null
 
   /**
+   * Cached pre-resolved URI for the next item in the playlist.
+   */
+  private var preResolvedNextUri: String? = null
+  private var preResolvedNextItemKey: Uri? = null
+
+  /**
    * Tracks the starting offset of the loaded playlist window in the full playlist.
    */
   private var playlistWindowOffset: Int = 0
@@ -214,9 +220,9 @@ class PlayerActivity :
   private var noisyReceiverRegistered = false
   private var mpvInitialized = false
   private var wasPlayingBeforePause = false
-  
+
   // ==================== Progress Save Management ====================
-  
+
   /**
    * Centralized manager for video progress saving operations.
    */
@@ -450,7 +456,7 @@ class PlayerActivity :
     }
 
     saveVideoProgress(isImmediate = true)
-    
+
     isUserFinishing = true
     finish()
   }
@@ -547,7 +553,7 @@ class PlayerActivity :
         mediaPlaybackService = null
       }
 
-      // We no longer cancel all pending saves here because "Immediate" saves 
+      // We no longer cancel all pending saves here because "Immediate" saves
       // use NonCancellable and separate jobs to ensure they finish during destruction.
       // progressSaveManager.cancelPendingSave() // REMOVED to allow final save to finish
 
@@ -611,7 +617,7 @@ class PlayerActivity :
   override fun onPause() {
     runCatching {
       val isInPip = isInPictureInPictureMode
-      val shouldPause = (!audioPreferences.automaticBackgroundPlayback.get() && !isManualBackgroundPlayback) || 
+      val shouldPause = (!audioPreferences.automaticBackgroundPlayback.get() && !isManualBackgroundPlayback) ||
                         (isUserFinishing && !isManualBackgroundPlayback)
 
       if (isFinishing && !isManualBackgroundPlayback) {
@@ -667,15 +673,15 @@ class PlayerActivity :
   override fun onStop() {
     runCatching {
       pipHelper.onStop()
-      
+
       if (noisyReceiverRegistered) {
         unregisterReceiver(noisyReceiver)
         noisyReceiverRegistered = false
       }
 
-      val shouldAllowBackgroundPlayback = isManualBackgroundPlayback || 
+      val shouldAllowBackgroundPlayback = isManualBackgroundPlayback ||
                                           audioPreferences.automaticBackgroundPlayback.get()
-      
+
       if (!shouldAllowBackgroundPlayback && (isUserFinishing || isFinishing)) {
         viewModel.pause()
       }
@@ -706,7 +712,7 @@ class PlayerActivity :
           viewModel.changeBrightnessTo(brightness)
         }
       }
-      
+
       isManualBackgroundPlayback = false
     }.onFailure { e ->
       Log.e(TAG, "Error during onStart", e)
@@ -730,11 +736,13 @@ class PlayerActivity :
       WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
 
     if (playerPreferences.showSystemStatusBar.get()) {
+      window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
       window.statusBarColor = android.graphics.Color.parseColor("#80000000")
     }
 
     try {
-      windowInsetsController.apply {
+      @Suppress("DEPRECATION")
+      WindowCompat.getInsetsController(window, window.decorView).apply {
         hide(WindowInsetsCompat.Type.statusBars())
         hide(WindowInsetsCompat.Type.navigationBars())
         systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -763,7 +771,7 @@ class PlayerActivity :
     WindowCompat.setDecorFitsSystemWindows(window, true)
 
     try {
-      windowInsetsController.apply {
+      WindowCompat.getInsetsController(window, window.decorView).apply {
         systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
         show(WindowInsetsCompat.Type.systemBars())
         show(WindowInsetsCompat.Type.navigationBars())
@@ -1082,7 +1090,7 @@ class PlayerActivity :
     }
 
     val lastSegment = uri.lastPathSegment?.substringAfterLast("/") ?: uri.path ?: "Unknown Video"
-    
+
     return try {
       java.net.URLDecoder.decode(lastSegment, "UTF-8")
     } catch (e: Exception) {
@@ -1190,7 +1198,7 @@ class PlayerActivity :
   private fun handlePauseStateChange(isPaused: Boolean) {
     if (isPaused) {
       saveVideoProgress(isImmediate = true)
-      
+
       if (!playerPreferences.keepScreenOnWhenPaused.get()) {
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
       }
@@ -1208,7 +1216,7 @@ class PlayerActivity :
   private fun handleEndOfFile(isEof: Boolean) {
     if (isEof) {
       saveVideoProgress(isImmediate = true)
-      
+
       if (viewModel.shouldRepeatCurrentFile()) {
         MPVLib.command("seek", "0", "absolute")
         viewModel.unpause()
@@ -1264,8 +1272,8 @@ class PlayerActivity :
         Log.d(TAG, "video-params/aspect changed: $aspect")
         pipHelper.updatePictureInPictureParams()
         val aspectOverride = MPVLib.getPropertyDouble("video-aspect-override") ?: -1.0
-        if (playerPreferences.orientation.get() == PlayerOrientation.Video && 
-            aspect != null && 
+        if (playerPreferences.orientation.get() == PlayerOrientation.Video &&
+            aspect != null &&
             aspectOverride <= 0.0) {
           setOrientation()
         }
@@ -1274,9 +1282,13 @@ class PlayerActivity :
   }
 
   internal fun onObserverEvent(
-    _property: String,
-    _value: String,
-  ) {}
+    property: String,
+    value: String,
+  ) {
+    if (property == "user-data/mpvex/trigger_next_up" && value == "yes") {
+      viewModel.triggerNextUp()
+    }
+  }
 
   internal fun onObserverEvent(_property: String) {}
 
@@ -1302,10 +1314,8 @@ class PlayerActivity :
       if (fileName.isBlank()) {
         fileName = intent.data?.lastPathSegment ?: "Unknown Video"
       }
-      mediaIdentifier = getMediaIdentifier(intent, fileName)
-    } else if (mediaIdentifier.isBlank()) {
-      mediaIdentifier = getMediaIdentifier(intent, fileName)
     }
+    mediaIdentifier = getMediaIdentifier(intent, fileName)
 
     startBackgroundPlayback()
 
@@ -1317,11 +1327,12 @@ class PlayerActivity :
     currentUri?.let { viewModel.calculateVideoHash(it) }
 
     viewModel.clearABLoop()
-    
+    viewModel.dismissNextUp()
+
     progressSaveManager.resetTracking()
 
     viewModel.clearPlaylistLoadingState()
-    
+
     setIntentExtras(intent.extras)
 
     lifecycleScope.launch(Dispatchers.IO) {
@@ -1340,7 +1351,7 @@ class PlayerActivity :
       withContext(Dispatchers.Main) {
         val savedAspect = playerPreferences.defaultVideoAspect.get()
         val savedCustomRatio = playerPreferences.defaultCustomAspectRatio.get()
-        
+
         if (savedCustomRatio > 0) {
           viewModel.setCustomAspectRatio(savedCustomRatio)
         } else {
@@ -1540,7 +1551,7 @@ class PlayerActivity :
    */
   private fun capturePlaybackSnapshot(): PlaybackStateSnapshot? {
     if (mediaIdentifier.isBlank()) return null
-    
+
     return PlaybackStateSnapshot(
       mediaIdentifier = mediaIdentifier,
       position = viewModel.pos ?: 0,
@@ -1563,12 +1574,12 @@ class PlayerActivity :
    */
   private fun saveVideoProgress(isImmediate: Boolean = false) {
     val snapshot = capturePlaybackSnapshot() ?: return
-    
+
     lifecycleScope.launch(Dispatchers.IO) {
-      val oldState = runCatching { 
-        playbackStateRepository.getVideoDataByTitle(snapshot.mediaIdentifier) 
+      val oldState = runCatching {
+        playbackStateRepository.getVideoDataByTitle(snapshot.mediaIdentifier)
       }.getOrNull()
-      
+
       progressSaveManager.saveProgress(
         snapshot = snapshot,
         oldState = oldState,
@@ -1820,7 +1831,7 @@ class PlayerActivity :
     window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
     WindowCompat.setDecorFitsSystemWindows(window, true)
     try {
-      windowInsetsController.apply {
+      WindowCompat.getInsetsController(window, window.decorView).apply {
         show(WindowInsetsCompat.Type.systemBars())
         show(WindowInsetsCompat.Type.navigationBars())
       }
@@ -2074,17 +2085,17 @@ class PlayerActivity :
     }
 
     MediaPlaybackService.createNotificationChannel(this)
-    
+
     val artist = runCatching { MPVLib.getPropertyString("metadata/artist") }.getOrNull() ?: ""
     val thumbnail = runCatching { MPVLib.grabThumbnail(1080) }.getOrNull()
-    
+
     val intent = Intent(this, MediaPlaybackService::class.java).apply {
       putExtra("media_title", fileName)
       putExtra("media_artist", artist)
     }
-    
+
     MediaPlaybackService.thumbnail = thumbnail
-    
+
     try {
       startForegroundService(intent)
       bindService(intent, serviceConnection, BIND_AUTO_CREATE)
@@ -2102,13 +2113,13 @@ class PlayerActivity :
       }
       serviceBound = false
     }
-    
+
     try {
       stopService(Intent(this, MediaPlaybackService::class.java))
     } catch (e: Exception) {
       Log.e(TAG, "Error stopping service", e)
     }
-    
+
     mediaPlaybackService = null
   }
 
@@ -2248,24 +2259,53 @@ class PlayerActivity :
       return
     }
 
-    // IMPORTANT: Capture snapshot and trigger save for the PREVIOUS video
-    // before we update the media identifier and other state variables.
+    // Capture snapshot for the PREVIOUS video
     if (fileName.isNotBlank()) {
-      saveVideoProgress(isImmediate = true)
+      val snapshot = capturePlaybackSnapshot()
+      lifecycleScope.launch(Dispatchers.IO) {
+        if (snapshot != null) {
+          val oldState = runCatching {
+            playbackStateRepository.getVideoDataByTitle(snapshot.mediaIdentifier)
+          }.getOrNull()
+
+          progressSaveManager.saveProgress(
+            snapshot = snapshot,
+            oldState = oldState,
+            isImmediate = true
+          )
+        }
+      }
     }
 
     val uri = playlist[index]
-    val playableUri = uri.openContentFd(this) ?: uri.toString()
-
     playlistIndex = index
 
-    fileName = getFileNameFromUri(uri)
-    mediaIdentifier = getMediaIdentifierFromUri(uri, fileName)
+    // Immediate UI Feedback: Predict filename and update UI before heavy processing
+    val rawFileName = getFileNameFromUri(uri)
+    fileName = rawFileName
+    mediaIdentifier = getMediaIdentifier(intent, rawFileName)
+    val displayTitle = formatTitle(rawFileName, isUriM3U(uri))
+    viewModel.setMediaTitle(displayTitle)
 
-    setHttpHeadersForUri(uri)
+    lifecycleScope.launch(Dispatchers.Default) {
+      // Step 1: Open content FD and load file as fast as possible
+      // Use pre-resolved URI if it matches the current request
+      val playableUri = if (preResolvedNextItemKey == uri && preResolvedNextUri != null) {
+        Log.d(TAG, "Using pre-resolved URI for $uri")
+        preResolvedNextUri!!
+      } else {
+        uri.openContentFd(this@PlayerActivity) ?: uri.toString()
+      }
+      MPVLib.command("loadfile", playableUri)
 
-    playlistId?.let { id ->
-      lifecycleScope.launch(Dispatchers.IO) {
+      // Reset pre-resolved cache
+      preResolvedNextUri = null
+      preResolvedNextItemKey = null
+
+      // Step 2: Handle heavy background tasks after engine has been poked
+      setHttpHeadersForUri(uri)
+
+      playlistId?.let { id ->
         val filePath = when (uri.scheme) {
           "file" -> uri.path ?: uri.toString()
           "content" -> {
@@ -2282,7 +2322,6 @@ class PlayerActivity :
               } else null
             } ?: uri.toString()
           }
-
           else -> uri.toString()
         }
 
@@ -2292,23 +2331,27 @@ class PlayerActivity :
           Log.e(TAG, "Error updating playlist history", e)
         }
       }
-    }
 
-    lifecycleScope.launch(Dispatchers.Default) {
-      MPVLib.command("loadfile", playableUri)
+      // Step 3: Refresh UI and metadata without artificial delay
+      withContext(Dispatchers.Main) {
+        updateDisplayTitle()
+        val durationMs = (MPVLib.getPropertyDouble("duration")?.times(1000))?.toLong() ?: 0L
+        updateMediaSessionMetadata(
+          title = getTitleForControls(),
+          durationMs = durationMs,
+        )
+        viewModel.refreshPlaylistItems()
+      }
     }
+  }
 
-    updateDisplayTitle()
+  fun preResolveNextItem(uri: Uri) {
+    if (preResolvedNextItemKey == uri) return
 
-    lifecycleScope.launch {
-      kotlinx.coroutines.delay(100)
-      val durationMs = (MPVLib.getPropertyDouble("duration")?.times(1000))?.toLong() ?: 0L
-      updateMediaSessionMetadata(
-        title = getTitleForControls(),
-        durationMs = durationMs,
-      )
-      viewModel.refreshPlaylistItems()
-    }
+    Log.d(TAG, "Pre-resolving next item: $uri")
+    val resolved = uri.openContentFd(this) ?: uri.toString()
+    preResolvedNextUri = resolved
+    preResolvedNextItemKey = uri
   }
 
   private fun formatTitle(title: String, isStream: Boolean = false): String {
@@ -2324,8 +2367,7 @@ class PlayerActivity :
   }
 
   private fun getFileNameFromUri(uri: Uri): String {
-    val rawTitle = getDisplayNameFromUri(uri) ?: extractFileNameFromUri(uri)
-    return formatTitle(rawTitle, isUriM3U(uri))
+    return getDisplayNameFromUri(uri) ?: extractFileNameFromUri(uri)
   }
 
   fun getTitleForControls(): String {
@@ -2458,14 +2500,11 @@ class PlayerActivity :
     }
 
     val uri = extractUriFromIntent(intent)
-    return if (uri != null && (uri.scheme?.startsWith("http") == true || uri.scheme == "rtmp" || uri.scheme == "ftp" || uri.scheme == "rtsp" || uri.scheme == "mms")) {
-      "${fileName}_${uri.toString().hashCode()}"
-    } else {
-      fileName
-    }
+    return getMediaIdentifierFromUri(uri, fileName)
   }
 
-  private fun getMediaIdentifierFromUri(uri: Uri, fileName: String): String {
+  private fun getMediaIdentifierFromUri(uri: Uri?, fileName: String): String {
+    if (uri == null) return fileName
     return if (uri.scheme?.startsWith("http") == true || uri.scheme == "rtmp" || uri.scheme == "ftp" || uri.scheme == "rtsp" || uri.scheme == "mms") {
       "${fileName}_${uri.toString().hashCode()}"
     } else {

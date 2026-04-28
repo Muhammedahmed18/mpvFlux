@@ -187,7 +187,7 @@ class PlayerViewModel(
     
     // Observe position changes efficiently instead of polling
     viewModelScope.launch {
-      MPVLib.propInt["time-pos"].collect { position ->
+      MPVLib.propDouble["time-pos"].collect { position ->
         val currentPos = position?.toFloat() ?: 0f
         _precisePosition.value = currentPos
         
@@ -209,7 +209,6 @@ class PlayerViewModel(
 
   private fun checkNextUpThreshold(currentPos: Float) {
     if (!playerPreferences.showNextUpPrompt.get()) return
-    if (_showNextUp.value) return // Already showing
 
     val totalDuration = _preciseDuration.value
     if (totalDuration <= 0) return
@@ -219,16 +218,32 @@ class PlayerViewModel(
     val progress = currentPos / totalDuration
 
     if (progress >= threshold && hasNext()) {
-      val activity = host as? PlayerActivity
-      if (activity != null) {
+      triggerNextUp()
+    } else if (_showNextUp.value) {
+      // Hide the prompt if we seek back before the threshold
+      _showNextUp.value = false
+      Log.d(TAG, "Backtracking detected. Hiding Next Up prompt.")
+    }
+  }
+
+  fun triggerNextUp() {
+    if (_showNextUp.value || !playerPreferences.showNextUpPrompt.get() || !hasNext()) return
+
+    val activity = host as? PlayerActivity
+    if (activity != null) {
         val nextIndex = activity.playlistIndex + 1
         if (nextIndex < activity.playlist.size) {
-          val nextUri = activity.playlist[nextIndex]
-          _nextItemTitle.value = activity.getPlaylistItemTitle(nextUri)
-          _showNextUp.value = true
-          Log.d(TAG, "Next Up threshold reached ($threshold). Showing prompt for: ${_nextItemTitle.value}")
+            val nextUri = activity.playlist[nextIndex]
+            _nextItemTitle.value = activity.getPlaylistItemTitle(nextUri)
+            _showNextUp.value = true
+            Log.d(TAG, "Next Up triggered. Showing prompt for: ${_nextItemTitle.value}")
+
+            // Phase 5: Smart Pre-fetching
+            // Pre-resolve the URI in the background before the user clicks
+            viewModelScope.launch(Dispatchers.IO) {
+                activity.preResolveNextItem(nextUri)
+            }
         }
-      }
     }
   }
 

@@ -221,6 +221,7 @@ class MPVView(
       "user-data/mpvex/seek_by_with_text" to MPVLib.MpvFormat.MPV_FORMAT_STRING,
       "user-data/mpvex/seek_to_with_text" to MPVLib.MpvFormat.MPV_FORMAT_STRING,
       "user-data/mpvex/software_keyboard" to MPVLib.MpvFormat.MPV_FORMAT_STRING,
+      "user-data/mpvex/trigger_next_up" to MPVLib.MpvFormat.MPV_FORMAT_STRING,
     )
 
   private fun setupAudioOptions() {
