@@ -1,12 +1,19 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import android.app.Application
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,11 +22,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Folder
@@ -27,8 +32,7 @@ import androidx.compose.material.icons.rounded.FolderOff
 import androidx.compose.material.icons.rounded.RemoveCircle
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -38,10 +42,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,6 +54,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -59,7 +64,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.FoldersPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
@@ -95,10 +99,9 @@ object FoldersPreferencesScreen : Screen {
 
     Scaffold(
       topBar = {
-        if (selectionState.isInSelectionMode) {
-          BrowserTopBar(
+        BrowserTopBar(
             title = stringResource(R.string.pref_folders_title),
-            isInSelectionMode = true,
+            isInSelectionMode = selectionState.isInSelectionMode,
             selectedCount = selectionState.selectedCount,
             totalCount = blacklistedFoldersList.size,
             onCancelSelection = { selectionState = selectionState.clear() },
@@ -110,58 +113,22 @@ object FoldersPreferencesScreen : Screen {
               preferences.blacklistedFolders.set(updated)
               selectionState = selectionState.clear()
             },
-            onSelectAll = {
-              selectionState = selectionState.selectAll(blacklistedFoldersList)
-            },
-            onInvertSelection = {
-              selectionState = selectionState.invertSelection(blacklistedFoldersList)
-            },
-            onDeselectAll = {
-              selectionState = selectionState.clear()
-            },
+            onSelectAll = { selectionState = selectionState.selectAll(blacklistedFoldersList) },
+            onInvertSelection = { selectionState = selectionState.invertSelection(blacklistedFoldersList) },
+            onDeselectAll = { selectionState = selectionState.clear() },
             useRemoveIcon = true,
-          )
-        } else {
-          TopAppBar(
-            modifier = Modifier.statusBarsPadding(),
-            colors = TopAppBarDefaults.topAppBarColors(
-              containerColor = Color.Transparent,
-              scrolledContainerColor = Color.Transparent
-            ),
-            title = {
-              Text(
-                text = stringResource(R.string.pref_folders_title),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary,
-              )
-            },
-            navigationIcon = {
-              IconButton(onClick = backstack::removeLastOrNull) {
-                Icon(
-                  Icons.AutoMirrored.Rounded.ArrowBack,
-                  contentDescription = null,
-                  tint = MaterialTheme.colorScheme.secondary,
-                )
-              }
-            },
-            actions = {
-              if (blacklistedFolders.isNotEmpty()) {
-                IconButton(
-                  onClick = { showClearAllDialog = true },
-                  modifier = Modifier.padding(horizontal = 2.dp),
-                ) {
-                  Icon(
-                    Icons.Rounded.Restore,
-                    contentDescription = stringResource(R.string.pref_folders_clear_all),
-                    modifier = Modifier.size(28.dp),
-                    tint = MaterialTheme.colorScheme.error,
-                  )
+            additionalActions = {
+                if (!selectionState.isInSelectionMode && blacklistedFolders.isNotEmpty()) {
+                    IconButton(onClick = { showClearAllDialog = true }) {
+                        Icon(
+                            Icons.Rounded.Restore,
+                            contentDescription = stringResource(R.string.pref_folders_clear_all),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
-              }
-            },
-          )
-        }
+            }
+        )
       },
     ) { padding ->
       Column(
@@ -173,11 +140,12 @@ object FoldersPreferencesScreen : Screen {
         if (!selectionState.isInSelectionMode) {
           Text(
             text = stringResource(R.string.pref_folders_summary),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 8.dp)
           )
 
-          Spacer(modifier = Modifier.height(16.dp))
+          Spacer(modifier = Modifier.height(24.dp))
         }
 
         if (blacklistedFolders.isEmpty()) {
@@ -192,7 +160,7 @@ object FoldersPreferencesScreen : Screen {
         } else {
           LazyColumn(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
           ) {
             items(blacklistedFoldersList) { folderPath ->
               BlacklistedFolderItem(
@@ -219,10 +187,11 @@ object FoldersPreferencesScreen : Screen {
         if (!selectionState.isInSelectionMode) {
           Spacer(modifier = Modifier.height(16.dp))
 
-          Card(
+          Surface(
             modifier = Modifier
               .fillMaxWidth()
-              .clickable {
+              .height(64.dp),
+            onClick = {
                 showAddSheet = true
                 isLoading = true
                 coroutineScope.launch(Dispatchers.IO) {
@@ -232,15 +201,13 @@ object FoldersPreferencesScreen : Screen {
                     isLoading = false
                   }
                 }
-              },
-            colors = CardDefaults.cardColors(
-              containerColor = MaterialTheme.colorScheme.primaryContainer,
-            ),
+            },
+            color = MaterialTheme.colorScheme.primaryContainer,
+            shape = MaterialTheme.shapes.extraLarge,
+            tonalElevation = 4.dp
           ) {
             Row(
-              modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+              modifier = Modifier.fillMaxSize(),
               horizontalArrangement = Arrangement.Center,
               verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -253,6 +220,7 @@ object FoldersPreferencesScreen : Screen {
               Text(
                 text = stringResource(R.string.pref_folders_add_folder),
                 style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
               )
             }
@@ -282,8 +250,8 @@ object FoldersPreferencesScreen : Screen {
     if (showClearAllDialog) {
       AlertDialog(
         onDismissRequest = { showClearAllDialog = false },
-        title = { Text(stringResource(R.string.pref_folders_clear_all_confirm_title)) },
-        text = { Text(stringResource(R.string.pref_folders_clear_all_confirm_message)) },
+        title = { Text(stringResource(R.string.pref_folders_clear_all_confirm_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
+        text = { Text(stringResource(R.string.pref_folders_clear_all_confirm_message), style = MaterialTheme.typography.bodyMedium) },
         confirmButton = {
           TextButton(
             onClick = {
@@ -291,7 +259,7 @@ object FoldersPreferencesScreen : Screen {
               showClearAllDialog = false
             },
           ) {
-            Text(stringResource(R.string.generic_confirm))
+            Text(stringResource(R.string.generic_confirm), fontWeight = FontWeight.Bold)
           }
         },
         dismissButton = {
@@ -299,6 +267,7 @@ object FoldersPreferencesScreen : Screen {
             Text(stringResource(R.string.generic_cancel))
           }
         },
+        shape = MaterialTheme.shapes.extraLarge
       )
     }
   }
@@ -314,20 +283,29 @@ private fun BlacklistedFolderItem(
   onLongClick: () -> Unit,
   onClick: () -> Unit,
 ) {
-  Card(
-    modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = if (isSelected) {
-        MaterialTheme.colorScheme.primaryContainer
-      } else {
-        MaterialTheme.colorScheme.surfaceVariant
-      },
-    ),
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+
+  val scale by animateFloatAsState(
+    targetValue = if (isPressed) 0.97f else 1f,
+    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
+    label = "folder_item_scale"
+  )
+
+  Surface(
+    modifier = Modifier
+        .fillMaxWidth()
+        .scale(scale),
+    shape = MaterialTheme.shapes.large,
+    color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
+    tonalElevation = if (isSelected) 4.dp else 1.dp
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
         .combinedClickable(
+          interactionSource = interactionSource,
+          indication = null,
           onClick = onClick,
           onLongClick = onLongClick,
         )
@@ -343,7 +321,7 @@ private fun BlacklistedFolderItem(
           Checkbox(
             checked = isSelected,
             onCheckedChange = null,
-            modifier = Modifier.padding(end = 8.dp),
+            modifier = Modifier.padding(end = 12.dp),
           )
         }
         Column {
@@ -356,6 +334,8 @@ private fun BlacklistedFolderItem(
             text = folderPath,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
           )
         }
       }
@@ -385,12 +365,10 @@ private fun AddFolderBottomSheet(
   var selectionState by remember { mutableStateOf(SelectionState<String>()) }
   var showDropdown by remember { mutableStateOf(false) }
 
-  // Filter folders that are not already blacklisted
   val availableFolders = remember(folders, blacklistedFolders) {
     folders.filter { it.path !in blacklistedFolders }
   }
 
-  // Get all available folder paths
   val availableFolderPaths = remember(availableFolders) {
     availableFolders.map { it.path }
   }
@@ -398,15 +376,16 @@ private fun AddFolderBottomSheet(
   ModalBottomSheet(
     onDismissRequest = onDismiss,
     sheetState = sheetState,
-    dragHandle = null, // We'll use our own header
+    shape = MaterialTheme.shapes.extraLarge,
+    dragHandle = { BottomSheetDefaults.DragHandle() },
+    containerColor = MaterialTheme.colorScheme.surfaceContainer
   ) {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(16.dp)
+        .padding(horizontal = 24.dp, vertical = 8.dp)
         .navigationBarsPadding(),
     ) {
-      // Header with title and tick icon
       Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -424,7 +403,7 @@ private fun AddFolderBottomSheet(
             } else {
               stringResource(R.string.pref_folders_select_folders)
             },
-            style = MaterialTheme.typography.titleLarge,
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -434,7 +413,8 @@ private fun AddFolderBottomSheet(
             Icon(
               Icons.Rounded.ArrowDropDown,
               contentDescription = stringResource(R.string.selection_options),
-              modifier = Modifier.size(24.dp),
+              modifier = Modifier.size(28.dp),
+              tint = MaterialTheme.colorScheme.primary
             )
           }
 
@@ -481,64 +461,71 @@ private fun AddFolderBottomSheet(
             } else {
               MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
             },
-            modifier = Modifier.size(28.dp)
+            modifier = Modifier.size(32.dp)
           )
         }
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(24.dp))
 
       if (isLoading) {
         Box(
           modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp),
+            .height(300.dp),
           contentAlignment = Alignment.Center,
         ) {
-          Text(stringResource(R.string.pref_folders_loading))
+          Text(stringResource(R.string.pref_folders_loading), style = MaterialTheme.typography.bodyLarge)
         }
       } else if (availableFolders.isEmpty()) {
         Box(
           modifier = Modifier
             .fillMaxWidth()
-            .height(200.dp),
+            .height(300.dp),
           contentAlignment = Alignment.Center,
         ) {
-          Text(stringResource(R.string.pref_folders_no_folders))
+          Text(stringResource(R.string.pref_folders_no_folders), style = MaterialTheme.typography.bodyLarge)
         }
       } else {
         LazyColumn(
           modifier = Modifier
             .fillMaxWidth()
             .height(400.dp),
+          verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
           items(availableFolders) { folder ->
-            Row(
-              modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                  selectionState = selectionState.toggle(folder.path)
-                }
-                .padding(vertical = 8.dp),
-              verticalAlignment = Alignment.CenterVertically,
+            Surface(
+                onClick = { selectionState = selectionState.toggle(folder.path) },
+                shape = MaterialTheme.shapes.large,
+                color = if (selectionState.isSelected(folder.path)) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent
             ) {
-              Checkbox(
-                checked = selectionState.isSelected(folder.path),
-                onCheckedChange = {
-                  selectionState = selectionState.toggle(folder.path)
-                },
-              )
-              Column(modifier = Modifier.padding(start = 8.dp)) {
-                Text(
-                  text = folder.name,
-                  style = MaterialTheme.typography.bodyLarge,
-                )
-                Text(
-                  text = folder.path,
-                  style = MaterialTheme.typography.bodySmall,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-              }
+                Row(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                  verticalAlignment = Alignment.CenterVertically,
+                ) {
+                  Checkbox(
+                    checked = selectionState.isSelected(folder.path),
+                    onCheckedChange = {
+                      selectionState = selectionState.toggle(folder.path)
+                    },
+                  )
+                  Column(modifier = Modifier.padding(start = 12.dp)) {
+                    Text(
+                      text = folder.name,
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                      text = folder.path,
+                      style = MaterialTheme.typography.bodySmall,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                      maxLines = 1,
+                      overflow = TextOverflow.Ellipsis
+                    )
+                  }
+                }
             }
           }
         }
@@ -547,12 +534,7 @@ private fun AddFolderBottomSheet(
   }
 }
 
-/**
- * Scans all storage volumes for folders containing videos
- * Uses optimized fast scanning for better performance
- */
 private suspend fun scanAllVideoFolders(context: Application): List<VideoFolder> {
-  // Use fast optimized scanning - 5-10x faster for large libraries
   return app.marlboroadvance.mpvex.repository.MediaFileRepository
     .getAllVideoFoldersFast(
       context = context

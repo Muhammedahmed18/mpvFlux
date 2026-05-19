@@ -1,25 +1,26 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -52,7 +53,6 @@ object PlayerPreferencesScreen : Screen {
     
     val orientationNames = PlayerOrientation.entries.associateWith { stringResource(it.titleRes) }
     
-    // OLED Optimization: Pure black background in dark mode
     val darkMode by appPreferences.darkMode.collectAsState()
     val systemDarkTheme = isSystemInDarkTheme()
     val isDark = when (darkMode) {
@@ -60,25 +60,22 @@ object PlayerPreferencesScreen : Screen {
       DarkMode.Light -> false
       DarkMode.System -> systemDarkTheme
     }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
+    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Surface(
       modifier = Modifier.fillMaxSize(),
       color = backgroundColor
     ) {
       Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
           TopAppBar(
-            modifier = Modifier.statusBarsPadding(),
-            colors = TopAppBarDefaults.topAppBarColors(
-              containerColor = Color.Transparent,
-              scrolledContainerColor = Color.Transparent
-            ),
             title = { 
               Text(
                 text = stringResource(id = R.string.pref_player),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.primary,
               ) 
@@ -92,14 +89,24 @@ object PlayerPreferencesScreen : Screen {
                 )
               }
             },
+            scrollBehavior = scrollBehavior,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                titleContentColor = MaterialTheme.colorScheme.primary
+            )
           )
         },
       ) { padding ->
         ProvidePreferenceLocals {
           LazyColumn(
-            modifier = Modifier
-              .fillMaxSize()
-              .padding(padding),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                top = padding.calculateTopPadding(),
+                bottom = padding.calculateBottomPadding() + 24.dp,
+                start = 8.dp,
+                end = 8.dp
+            )
           ) {
             item {
               PreferenceSectionHeader(title = "General")
@@ -123,9 +130,8 @@ object PlayerPreferencesScreen : Screen {
                   summary = { 
                     Text(
                       text = orientationNames[orientation] ?: "",
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
@@ -179,9 +185,8 @@ object PlayerPreferencesScreen : Screen {
                         "Automatically play next video when current ends"
                       else
                         "Stay on current video when it ends",
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
@@ -205,9 +210,8 @@ object PlayerPreferencesScreen : Screen {
                         "Show next/previous buttons for all videos in folder"
                       else
                         "Play videos individually (select multiple for playlist)",
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
@@ -228,9 +232,8 @@ object PlayerPreferencesScreen : Screen {
                     summary = {
                         Text(
                             text = "Show a button to play next video when reaching the end",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Light,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 )
@@ -266,9 +269,8 @@ object PlayerPreferencesScreen : Screen {
                   summary = {
                     Text(
                       text = "Automatically enter PIP mode when pressing home or back",
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
@@ -292,9 +294,8 @@ object PlayerPreferencesScreen : Screen {
                         "Screen stays awake while video is paused"
                       else
                         "Screen can turn off while video is paused",
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
@@ -368,9 +369,8 @@ object PlayerPreferencesScreen : Screen {
                      val summaryText = stringResource(R.string.pref_player_custom_skip_duration_summary)
                      Text(
                        text = "$summaryText ($customSkipDuration s)",
-                       style = MaterialTheme.typography.bodySmall,
-                       fontWeight = FontWeight.Light,
-                       color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                       style = MaterialTheme.typography.bodyMedium,
+                       color = MaterialTheme.colorScheme.onSurfaceVariant
                      )
                   },
                   onSliderValueChange = { preferences.customSkipDuration.set(it.roundToInt()) },
@@ -461,9 +461,8 @@ object PlayerPreferencesScreen : Screen {
                     val sensitivityPercent = (horizontalSwipeSensitivity * 1000).toInt()
                     Text(
                       text = "Current: ${sensitivityPercent}/100 (${if (sensitivityPercent < 30) "Low" else if (sensitivityPercent < 55) "Medium" else "High"})",
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                   onSliderValueChange = { preferences.horizontalSwipeSensitivity.set(it.toFixed(3)) },
@@ -491,9 +490,8 @@ object PlayerPreferencesScreen : Screen {
                       } else {
                         "%.2fx".format(holdForMultipleSpeed)
                       },
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                   onSliderValueChange = { preferences.holdForMultipleSpeed.set(it.toFixed(2)) },
@@ -516,9 +514,8 @@ object PlayerPreferencesScreen : Screen {
                   summary = { 
                     Text(
                       text = "Show advance overlay for speed control during long press and swipe",
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   }
                 )

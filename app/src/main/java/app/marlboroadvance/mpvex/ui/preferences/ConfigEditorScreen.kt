@@ -1,41 +1,28 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import android.widget.Toast
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -71,11 +58,11 @@ data class ConfigEditorScreen(
   @OptIn(ExperimentalMaterial3Api::class)
   @Composable
   override fun Content() {
-    val context      = LocalContext.current
-    val backStack    = LocalBackStack.current
-    val preferences  = koinInject<AdvancedPreferences>()
+    val context = LocalContext.current
+    val backStack = LocalBackStack.current
+    val preferences = koinInject<AdvancedPreferences>()
     val appPreferences = koinInject<AppearancePreferences>()
-    val scope        = rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
 
     val (fileName, initialValue) = when (configType) {
       ConfigType.MPV_CONF   -> "mpv.conf"   to preferences.mpvConf.get()
@@ -86,11 +73,10 @@ data class ConfigEditorScreen(
       ConfigType.INPUT_CONF -> "Edit input.conf"
     }
 
-    var configText       by remember { mutableStateOf(initialValue) }
+    var configText by remember { mutableStateOf(initialValue) }
     var hasUnsavedChanges by remember { mutableStateOf(false) }
     val mpvConfStorageLocation by preferences.mpvConfStorageUri.collectAsState()
 
-    // OLED Optimization: Pure black background in dark mode
     val darkMode by appPreferences.darkMode.collectAsState()
     val systemDarkTheme = isSystemInDarkTheme()
     val isDark = when (darkMode) {
@@ -98,15 +84,15 @@ data class ConfigEditorScreen(
       DarkMode.Light -> false
       DarkMode.System -> systemDarkTheme
     }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
+    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
-    // Load from external storage if a folder is configured
     LaunchedEffect(mpvConfStorageLocation) {
       if (mpvConfStorageLocation.isBlank()) return@LaunchedEffect
       withContext(Dispatchers.IO) {
         val tempFile = createTempFile()
         runCatching {
-          val tree       = DocumentFile.fromTreeUri(context, mpvConfStorageLocation.toUri())
+          val tree = DocumentFile.fromTreeUri(context, mpvConfStorageLocation.toUri())
           val configFile = tree?.findFile(fileName)
           if (configFile != null && configFile.exists()) {
             context.contentResolver.openInputStream(configFile.uri)?.copyTo(tempFile.outputStream())
@@ -129,23 +115,15 @@ data class ConfigEditorScreen(
 
           if (mpvConfStorageLocation.isNotBlank()) {
             val tree = DocumentFile.fromTreeUri(context, mpvConfStorageLocation.toUri())
-            if (tree == null) {
-              withContext(Dispatchers.Main) {
-                Toast.makeText(context, "No storage location set", Toast.LENGTH_LONG).show()
-              }
-              return@launch
-            }
-            val existing = tree.findFile(fileName)
-            val confFile = existing ?: tree.createFile("text/plain", fileName)?.also { it.renameTo(fileName) }
-            val uri = confFile?.uri ?: run {
-              withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Failed to create file", Toast.LENGTH_LONG).show()
-              }
-              return@launch
-            }
-            context.contentResolver.openOutputStream(uri, "wt")?.use { out ->
-              out.write(configText.toByteArray())
-              out.flush()
+            if (tree != null) {
+                val existing = tree.findFile(fileName)
+                val confFile = existing ?: tree.createFile("text/plain", fileName)?.also { it.renameTo(fileName) }
+                confFile?.uri?.let { uri ->
+                    context.contentResolver.openOutputStream(uri, "wt")?.use { out ->
+                      out.write(configText.toByteArray())
+                      out.flush()
+                    }
+                }
             }
           }
 
@@ -166,78 +144,96 @@ data class ConfigEditorScreen(
       modifier = Modifier.fillMaxSize(),
       color = backgroundColor
     ) {
-      Column(
-        modifier = Modifier.fillMaxSize()
-      ) {
-        // Fixed TopAppBar
-        TopAppBar(
-          title = {
-            Column {
-              Text(
-                text  = screenTitle,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary,
-              )
-              if (hasUnsavedChanges) {
+      Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = Color.Transparent,
+        topBar = {
+          TopAppBar(
+            scrollBehavior = scrollBehavior,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+            title = {
+              Column {
                 Text(
-                  text  = "Unsaved changes",
-                  style = MaterialTheme.typography.bodySmall,
-                  color = MaterialTheme.colorScheme.secondary,
+                  text = screenTitle,
+                  style = MaterialTheme.typography.titleLarge,
+                  fontWeight = FontWeight.Bold,
+                  color = MaterialTheme.colorScheme.primary,
+                )
+                if (hasUnsavedChanges) {
+                  Text(
+                    text = "Unsaved changes",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.error,
+                  )
+                }
+              }
+            },
+            navigationIcon = {
+              IconButton(onClick = { backStack.removeLastOrNull() }) {
+                Icon(
+                  Icons.AutoMirrored.Rounded.ArrowBack,
+                  contentDescription = "Back",
+                  tint = MaterialTheme.colorScheme.secondary,
                 )
               }
-            }
-          },
-          navigationIcon = {
-            IconButton(onClick = backStack::removeLastOrNull) {
-              Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = "Back",
-                tint = MaterialTheme.colorScheme.secondary,
-              )
-            }
-          },
-          actions = {
-            IconButton(
-              onClick  = { saveConfig() },
-              enabled  = hasUnsavedChanges,
-              modifier = Modifier.padding(horizontal = 12.dp).size(40.dp),
-              colors   = IconButtonDefaults.iconButtonColors(
-                containerColor        = if (hasUnsavedChanges) MaterialTheme.colorScheme.primaryContainer
-                                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-                contentColor          = if (hasUnsavedChanges) MaterialTheme.colorScheme.onPrimaryContainer
-                                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-                disabledContentColor   = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-              ),
-              shape = RoundedCornerShape(8.dp),
-            ) {
-              Icon(Icons.Rounded.Check, contentDescription = "Save")
-            }
-          },
-        )
-        
-        // Editor content with IME padding
+            },
+            actions = {
+              if (hasUnsavedChanges) {
+                  val saveScale by animateFloatAsState(
+                      targetValue = 1.1f,
+                      animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                      label = "save_scale"
+                  )
+                  IconButton(
+                    onClick = { saveConfig() },
+                    modifier = Modifier.scale(saveScale).padding(end = 8.dp)
+                  ) {
+                    Icon(
+                        Icons.Rounded.Check, 
+                        contentDescription = "Save",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(28.dp)
+                    )
+                  }
+              }
+            },
+          )
+        },
+      ) { padding ->
         val scrollState = rememberScrollState()
         Box(
           modifier = Modifier
             .fillMaxSize()
-            .weight(1f)
+            .padding(padding)
             .imePadding()
         ) {
-          BasicTextField(
-            value = configText,
-            onValueChange = { configText = it; hasUnsavedChanges = true },
-            modifier = Modifier
-              .fillMaxSize()
-              .verticalScroll(scrollState)
-              .padding(horizontal = 16.dp, vertical = 12.dp),
-            textStyle = TextStyle(
-              fontSize = 14.sp,
-              color = MaterialTheme.colorScheme.onSurface,
-            ),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-          )
+          Surface(
+              modifier = Modifier
+                  .fillMaxSize()
+                  .padding(12.dp),
+              shape = MaterialTheme.shapes.large,
+              color = MaterialTheme.colorScheme.surfaceContainerLow,
+              border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+          ) {
+              BasicTextField(
+                value = configText,
+                onValueChange = { configText = it; hasUnsavedChanges = true },
+                modifier = Modifier
+                  .fillMaxSize()
+                  .verticalScroll(scrollState)
+                  .padding(16.dp),
+                textStyle = TextStyle(
+                  fontSize = 14.sp,
+                  fontFamily = FontFamily.Monospace,
+                  color = MaterialTheme.colorScheme.onSurface,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+              )
+          }
         }
       }
     }

@@ -2,13 +2,17 @@ package app.marlboroadvance.mpvex.ui.browser.playlist
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -30,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -94,7 +99,6 @@ object PlaylistScreen : Screen {
     var showFloatingBottomBar by remember { mutableStateOf(false) }
     var showActionSheet by remember { mutableStateOf(false) }
     val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
-    val renameDialogOpen = rememberSaveable { mutableStateOf(false) }
     
     val navBarHeight = LocalNavigationBarHeight.current
 
@@ -127,18 +131,26 @@ object PlaylistScreen : Screen {
       },
       floatingActionButton = {
         if (!selectionManager.isInSelectionMode) {
+          val fabScale by animateFloatAsState(
+              targetValue = 1f,
+              animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+              label = "fab_scale"
+          )
           FloatingActionButton(
             onClick = { showActionSheet = true },
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = navBarHeight)
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier
+                .padding(bottom = navBarHeight)
+                .scale(fabScale)
           ) {
-            Icon(Icons.Default.Add, contentDescription = "Add Playlist")
+            Icon(Icons.Default.Add, contentDescription = "Add Playlist", modifier = Modifier.size(28.dp))
           }
         }
       }
     ) { padding ->
-      Box(modifier = Modifier.padding(padding)) {
+      Box(modifier = Modifier.padding(padding).fillMaxSize()) {
         if (playlistsWithCount.isEmpty()) {
           EmptyState(
             icon = Icons.AutoMirrored.Filled.PlaylistPlay,
@@ -155,8 +167,9 @@ object PlaylistScreen : Screen {
               start = 8.dp,
               top = 8.dp,
               end = 8.dp,
-              bottom = navBarHeight + 16.dp
-            )
+              bottom = navBarHeight + 32.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
           ) {
             items(items = playlistsWithCount, key = { it.playlist.id }) { item ->
               PlaylistCard(
@@ -180,13 +193,13 @@ object PlaylistScreen : Screen {
 
         AnimatedVisibility(
           visible = showFloatingBottomBar,
-          enter = slideInVertically(animationSpec = tween(300), initialOffsetY = { it }),
-          exit = slideOutVertically(animationSpec = tween(300), targetOffsetY = { it }),
+          enter = slideInVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium), initialOffsetY = { it }),
+          exit = slideOutVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium), targetOffsetY = { it }),
           modifier = Modifier.align(Alignment.BottomCenter)
         ) {
           BrowserBottomBar(
             isSelectionMode = true,
-            onRenameClick = { renameDialogOpen.value = true },
+            onRenameClick = { },
             onDeleteClick = { deleteDialogOpen.value = true },
             showRename = false,
             onCopyClick = {},
@@ -194,8 +207,7 @@ object PlaylistScreen : Screen {
             onAddToPlaylistClick = {},
             showCopy = false,
             showMove = false,
-            showAddToPlaylist = false,
-            modifier = Modifier.padding(bottom = 0.dp)
+            showAddToPlaylist = false
           )
         }
       }

@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex.ui.browser.filesystem
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -297,6 +298,16 @@ class FileSystemBrowserViewModel(
       if (success) {
         Log.d(TAG, "Successfully renamed folder from ${oldFile.path} to ${newFile.path}")
 
+        // Update local state immediately to avoid flicker
+        val updatedItems = _unsortedItems.value.map { item ->
+            if (item is FileSystemItem.Folder && item.path == oldFile.path) {
+                item.copy(name = newName, path = newFile.absolutePath)
+            } else {
+                item
+            }
+        }
+        _unsortedItems.value = updatedItems
+
         // Notify MediaStore about both paths to trigger indexing updates
         android.media.MediaScannerConnection.scanFile(
           getApplication(),
@@ -323,7 +334,29 @@ class FileSystemBrowserViewModel(
     newDisplayName: String,
   ): Result<Unit> {
     Log.d(TAG, "Renaming video ${video.displayName} to $newDisplayName")
-    return super.renameVideo(video, newDisplayName)
+    val result = super.renameVideo(video, newDisplayName)
+    if (result.isSuccess) {
+        // Soft update local state immediately
+        val oldPath = video.path
+        val parent = File(oldPath).parentFile
+        val newPath = parent?.let { File(it, newDisplayName).absolutePath } ?: oldPath
+        
+        val updatedItems = _unsortedItems.value.map { item ->
+            if (item is FileSystemItem.VideoFile && item.video.path == oldPath) {
+                val updatedVideo = item.video.copy(
+                    path = newPath,
+                    displayName = newDisplayName,
+                    title = newDisplayName.substringBeforeLast('.'),
+                    uri = Uri.fromFile(File(newPath))
+                )
+                item.copy(video = updatedVideo, name = newDisplayName, path = newPath)
+            } else {
+                item
+            }
+        }
+        _unsortedItems.value = updatedItems
+    }
+    return result
   }
 
   /**
@@ -357,17 +390,40 @@ class FileSystemBrowserViewModel(
           // Always show only videos (showAllFileTypes = false)
           MediaFileRepository
             .scanDirectory(getApplication(), path, showAllFileTypes = false)
-            .onSuccess { items ->
-              _unsortedItems.value = items
+            .onSuccess { freshItems ->
+              
+              // Merge with existing metadata to avoid UI flicker and redundant enrichment
+              val currentVideos = _unsortedItems.value.filterIsInstance<FileSystemItem.VideoFile>()
+                  .associateBy { it.video.path }
+                  
+              val mergedItems = freshItems.map { item ->
+                  if (item is FileSystemItem.VideoFile) {
+                      val existing = currentVideos[item.video.path]
+                      if (existing != null && (existing.video.fps > 0f || existing.video.subtitleCodec.isNotEmpty())) {
+                          item.copy(video = item.video.copy(
+                              fps = existing.video.fps,
+                              resolution = existing.video.resolution,
+                              hasEmbeddedSubtitles = existing.video.hasEmbeddedSubtitles,
+                              subtitleCodec = existing.video.subtitleCodec
+                          ))
+                      } else {
+                          item
+                      }
+                  } else {
+                      item
+                  }
+              }
 
-              val folderCount = items.filterIsInstance<FileSystemItem.Folder>().size
-              val videoCount = items.filterIsInstance<FileSystemItem.VideoFile>().size
+              _unsortedItems.value = mergedItems
+
+              val folderCount = mergedItems.filterIsInstance<FileSystemItem.Folder>().size
+              val videoCount = mergedItems.filterIsInstance<FileSystemItem.VideoFile>().size
               Log.d(TAG, "Loaded directory: $path with $folderCount folders, $videoCount videos")
 
               // Enrich videos with metadata if chips are enabled
               val enrichedItems = if (MetadataRetrieval.isVideoMetadataNeeded(browserPreferences)) {
                 Log.d(TAG, "Metadata chips enabled, enriching $videoCount videos")
-                val videoFiles = items.filterIsInstance<FileSystemItem.VideoFile>()
+                val videoFiles = mergedItems.filterIsInstance<FileSystemItem.VideoFile>()
                 val videos = videoFiles.map { it.video }
                 val enrichedVideos = MetadataRetrieval.enrichVideosIfNeeded(
                   context = getApplication(),
@@ -378,7 +434,7 @@ class FileSystemBrowserViewModel(
                 
                 // Replace videos in items with enriched versions
                 val enrichedVideoMap = enrichedVideos.associateBy { it.id }
-                items.map { item ->
+                mergedItems.map { item ->
                   when (item) {
                     is FileSystemItem.VideoFile -> {
                       val enrichedVideo = enrichedVideoMap[item.video.id]
@@ -392,7 +448,7 @@ class FileSystemBrowserViewModel(
                   }
                 }
               } else {
-                items
+                mergedItems
               }
 
               _unsortedItems.value = enrichedItems

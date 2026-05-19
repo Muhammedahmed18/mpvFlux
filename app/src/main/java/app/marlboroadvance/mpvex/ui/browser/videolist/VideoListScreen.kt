@@ -168,8 +168,7 @@ data class VideoListScreen(
         items = sortedVideosWithInfo.map { it.video },
         getId = { it.id },
         onDeleteItems = { items, _ -> viewModel.deleteVideos(items) },
-        onRenameItem = { video, newName -> viewModel.renameVideo(video, newName) },
-        onOperationComplete = { viewModel.refresh() },
+        onRenameItem = { video, newName -> viewModel.renameVideo(video, newName) }
       )
 
     // UI State

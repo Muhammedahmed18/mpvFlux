@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
@@ -40,6 +42,15 @@ class ThumbnailRepository(
 
   private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val maxconcurrentfolders = 3
+  
+  // Global limit: only allow 2 thumbnails to be generated at a time to save battery and CPU
+  private val generationSemaphore = Semaphore(2)
+
+  private val _thumbnailReadyKeys =
+    MutableSharedFlow<String>(
+      extraBufferCapacity = 256,
+    )
+  val thumbnailReadyKeys: SharedFlow<String> = _thumbnailReadyKeys.asSharedFlow()
 
   private data class FolderState(
     val signature: String,
@@ -49,14 +60,7 @@ class ThumbnailRepository(
   private val folderStates = ConcurrentHashMap<String, FolderState>()
   private val folderJobs = ConcurrentHashMap<String, Job>()
   
-  // Track videos that failed with FastThumbnails and should use MediaStore
   private val useMediaStoreForVideo = ConcurrentHashMap<String, Boolean>()
-
-  private val _thumbnailReadyKeys =
-    MutableSharedFlow<String>(
-      extraBufferCapacity = 256,
-    )
-  val thumbnailReadyKeys: SharedFlow<String> = _thumbnailReadyKeys.asSharedFlow()
 
   init {
     val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024L).toInt()
@@ -101,40 +105,40 @@ class ThumbnailRepository(
               return@async null
             }
 
-            // Calculate target dimensions for generation to avoid black bars.
-            // We use the UI's requested aspect ratio or default to 16:9 if unknown.
-            val aspect = if (widthPx > 0 && heightPx > 0) {
-              widthPx.toFloat() / heightPx.toFloat()
-            } else {
-              16f / 9f
-            }
-            
-            val targetWidth = diskCacheDimension
-            val targetHeight = (targetWidth / aspect).toInt()
+            // Acquire permit to generate. This throttles the CPU-intensive generation process.
+            generationSemaphore.withPermit {
+              val aspect = if (widthPx > 0 && heightPx > 0) {
+                widthPx.toFloat() / heightPx.toFloat()
+              } else {
+                16f / 9f
+              }
+              
+              val targetWidth = diskCacheDimension
+              val targetHeight = (targetWidth / aspect).toInt()
 
-            // Check if this video should use MediaStore
-            val videoKey = videoBaseKey(video)
-            val thumbnail = if (useMediaStoreForVideo.containsKey(videoKey)) {
-              generateWithMediaStore(video, targetWidth, targetHeight)
-            } else {
-              val fastResult = generateWithFastThumbnails(video, targetWidth, targetHeight)
-              if (fastResult == null) {
-                useMediaStoreForVideo[videoKey] = true
+              val videoKey = videoBaseKey(video)
+              val thumbnail = if (useMediaStoreForVideo.containsKey(videoKey)) {
                 generateWithMediaStore(video, targetWidth, targetHeight)
               } else {
-                fastResult
+                val fastResult = generateWithFastThumbnails(video, targetWidth, targetHeight)
+                if (fastResult == null) {
+                  useMediaStoreForVideo[videoKey] = true
+                  generateWithMediaStore(video, targetWidth, targetHeight)
+                } else {
+                  fastResult
+                }
               }
+
+              if (thumbnail == null) {
+                return@withPermit null
+              }
+
+              memoryCache.put(key, thumbnail)
+              _thumbnailReadyKeys.tryEmit(key)
+              writeToDisk(video, thumbnail)
+
+              thumbnail
             }
-
-            if (thumbnail == null) {
-              return@async null
-            }
-
-            memoryCache.put(key, thumbnail)
-            _thumbnailReadyKeys.tryEmit(key)
-            writeToDisk(video, thumbnail)
-
-            thumbnail
           } finally {
             ongoingOperations.remove(key)
           }
@@ -256,12 +260,9 @@ class ThumbnailRepository(
       return "$base|network"
     }
     
-    // For local files, prefer path as it's the most reliable identifier
-    // Fall back to metadata only if path is blank
     return if (video.path.isNotBlank()) {
       "${video.path}|local"
     } else {
-      // Fallback to metadata for content:// URIs without file path
       "${video.size}|${video.dateModified}|${video.duration}|${video.id}"
     }
   }
@@ -275,7 +276,6 @@ class ThumbnailRepository(
 
   private fun diskKey(video: Video): String {
     val baseKey = videoBaseKey(video)
-    // We add 'v2' to the key to force regeneration with the correct aspect ratio (no black bars)
     return if (isNetworkUrl(video.path)) {
       "$baseKey|disk|d$diskCacheDimension|v2|pos3"
     } else {
@@ -323,9 +323,6 @@ class ThumbnailRepository(
   ): Bitmap? {
     return runCatching {
       val positionSec = preferredPositionSeconds(video)
-      
-      // FastThumbnails usually returns the frame at its native aspect ratio.
-      // We pass the larger dimension to ensure quality.
       val dimension = maxOf(width, height)
       val bmp = FastThumbnails.generateAsync(
           video.path.ifBlank { video.uri.toString() },
@@ -343,34 +340,23 @@ class ThumbnailRepository(
     width: Int,
     height: Int,
   ): Bitmap? {
-    // MediaStore only works for local files, not network URLs
     if (isNetworkUrl(video.path)) {
-      android.util.Log.w("ThumbnailRepository", "Cannot use MediaStore for network URL: ${video.path}")
       return null
     }
     
     return withContext(Dispatchers.IO) {
-      // Try MediaStore first
       val mediaStoreThumbnail = runCatching {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-          // Use modern API for Android Q+
-          // Build proper MediaStore content URI
           val contentUri = android.content.ContentUris.withAppendedId(
             android.provider.MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
             video.id
           )
-          android.util.Log.d("ThumbnailRepository", "Generating MediaStore thumbnail for ${video.displayName} using loadThumbnail ($width x $height)")
-          val thumbnail = context.contentResolver.loadThumbnail(
+          context.contentResolver.loadThumbnail(
             contentUri,
             android.util.Size(width, height),
             null
           )
-          android.util.Log.d("ThumbnailRepository", "MediaStore thumbnail generated successfully for ${video.displayName}")
-          // On Q+, loadThumbnail handles rotation automatically based on EXIF/Metadata
-          thumbnail
         } else {
-          // Use legacy API for older versions
-          android.util.Log.d("ThumbnailRepository", "Generating MediaStore thumbnail for ${video.displayName} using getThumbnail")
           @Suppress("DEPRECATION")
           val thumbnail = android.provider.MediaStore.Video.Thumbnails.getThumbnail(
             context.contentResolver,
@@ -379,7 +365,6 @@ class ThumbnailRepository(
             null
           )
           if (thumbnail != null) {
-            // Scale to desired width while maintaining original thumbnail's aspect ratio
             val scaled = Bitmap.createScaledBitmap(
               thumbnail,
               width,
@@ -389,28 +374,20 @@ class ThumbnailRepository(
             if (scaled != thumbnail) {
               thumbnail.recycle()
             }
-            android.util.Log.d("ThumbnailRepository", "MediaStore thumbnail generated successfully for ${video.displayName}")
             rotateIfNeeded(video, scaled)
           } else {
-            android.util.Log.w("ThumbnailRepository", "MediaStore returned null thumbnail for ${video.displayName}")
             null
           }
         }
-      }.onFailure { e ->
-        android.util.Log.w("ThumbnailRepository", "MediaStore thumbnail failed for ${video.displayName}, will try ThumbnailUtils: ${e.message}")
       }.getOrNull()
       
-      // If MediaStore failed, try ThumbnailUtils as last resort
       if (mediaStoreThumbnail != null) {
         return@withContext mediaStoreThumbnail
       }
       
-      // Fallback to ThumbnailUtils (extracts directly from file)
       runCatching {
-        android.util.Log.d("ThumbnailRepository", "Generating thumbnail using ThumbnailUtils for ${video.displayName}")
         val file = java.io.File(video.path)
         if (!file.exists()) {
-          android.util.Log.e("ThumbnailRepository", "File does not exist: ${video.path}")
           return@runCatching null
         }
         
@@ -426,7 +403,6 @@ class ThumbnailRepository(
             video.path,
             android.provider.MediaStore.Video.Thumbnails.MINI_KIND
           )?.let { thumb ->
-            // Scale to desired width
             Bitmap.createScaledBitmap(
               thumb,
               width,
@@ -439,19 +415,14 @@ class ThumbnailRepository(
         }
         
         if (thumbnail != null) {
-          android.util.Log.d("ThumbnailRepository", "ThumbnailUtils thumbnail generated successfully for ${video.displayName}")
-          // On Q+, ThumbnailUtils also handles rotation automatically with the Size API
           if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
              thumbnail
           } else {
              rotateIfNeeded(video, thumbnail)
           }
         } else {
-          android.util.Log.e("ThumbnailRepository", "ThumbnailUtils returned null for ${video.displayName}")
           null
         }
-      }.onFailure { e ->
-        android.util.Log.e("ThumbnailRepository", "ThumbnailUtils thumbnail generation failed for ${video.displayName}", e)
       }.getOrNull()
     }
   }
@@ -461,20 +432,15 @@ class ThumbnailRepository(
     
     if (isNetworkUrl) {
       val durationSec = video.duration / 1000.0
-      
       if (durationSec > 0.0) {
         return 2.0.coerceIn(0.0, max(0.0, durationSec - 0.1))
       }
-      
       return 2.0
     }
     
     val durationSec = video.duration / 1000.0
-    
     if (durationSec <= 0.0 || durationSec < 20.0) return 0.0
-    
     val candidate = 3.0
-    
     return candidate.coerceIn(0.0, max(0.0, durationSec - 0.1))
   }
   

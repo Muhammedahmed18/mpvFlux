@@ -3,7 +3,6 @@ package app.marlboroadvance.mpvex.ui.preferences
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,7 +15,7 @@ import androidx.compose.ui.unit.dp
 
 /**
  * Modern Material 3 Expressive Icon Container.
- * Uses tonal palettes instead of manual alpha for better accessibility.
+ * Uses tonal palettes and updated shapes.
  */
 @Composable
 fun PreferenceIcon(
@@ -28,8 +27,8 @@ fun PreferenceIcon(
 ) {
     Box(
         modifier = modifier
-            .size(42.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .size(40.dp)
+            .clip(MaterialTheme.shapes.medium)
             .background(containerColor),
         contentAlignment = Alignment.Center,
     ) {
@@ -37,13 +36,14 @@ fun PreferenceIcon(
             imageVector = imageVector,
             contentDescription = contentDescription,
             tint = iconColor,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(20.dp),
         )
     }
 }
 
 /**
- * A grouped container using the M3 'SurfaceContainer' role.
+ * A grouped container using the M3 Expressive 'SurfaceContainer' roles.
+ * Uses 'extraLarge' shape for a more modern, friendly look.
  */
 @Composable
 fun PreferenceCard(
@@ -53,14 +53,15 @@ fun PreferenceCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(24.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp // Subtle depth
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 4.dp)
+                .padding(vertical = 8.dp)
         ) {
             content()
         }
@@ -102,8 +103,22 @@ fun PreferenceItem(
     modifier: Modifier = Modifier,
 ) {
     Preference(
-        title = { Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) },
-        summary = summary?.let { { Text(text = it, style = MaterialTheme.typography.bodySmall) } },
+        title = { 
+            Text(
+                text = title, 
+                style = MaterialTheme.typography.titleMedium, 
+                fontWeight = FontWeight.Bold 
+            ) 
+        },
+        summary = summary?.let { 
+            { 
+                Text(
+                    text = it, 
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                ) 
+            } 
+        },
         icon = icon,
         onClick = onClick,
         modifier = modifier
@@ -115,9 +130,9 @@ fun PreferenceDivider(
     modifier: Modifier = Modifier,
 ) {
     HorizontalDivider(
-        modifier = modifier.padding(horizontal = 16.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f),
-        thickness = 0.5.dp,
+        modifier = modifier.padding(horizontal = 24.dp),
+        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+        thickness = 1.dp,
     )
 }
 
@@ -127,10 +142,10 @@ fun PreferenceSectionHeader(
     modifier: Modifier = Modifier,
 ) {
     Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelMedium,
+        text = title,
+        style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(start = 32.dp, top = 24.dp, bottom = 8.dp),
+        modifier = modifier.padding(start = 28.dp, top = 24.dp, bottom = 8.dp),
     )
 }

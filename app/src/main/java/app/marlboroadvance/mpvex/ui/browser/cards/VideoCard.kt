@@ -14,22 +14,22 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -41,6 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,7 +53,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
@@ -60,10 +62,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
@@ -98,12 +104,12 @@ fun VideoCard(
   settings: VideoCardSettings,
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
-  isRecentlyPlayed: Boolean = false,
   onLongClick: (() -> Unit)? = null,
   isSelected: Boolean = false,
   progressPercentage: Float? = null,
   isOldAndUnplayed: Boolean = false,
   isWatched: Boolean = false,
+  isRecentlyPlayed: Boolean = false,
   onThumbClick: () -> Unit = {},
   showSubtitleIndicator: Boolean = true,
   overrideShowSizeChip: Boolean? = null,
@@ -133,43 +139,44 @@ fun VideoCard(
   val showSizeChip = overrideShowSizeChip ?: settings.showSizeChip
   val showResolutionChip = overrideShowResolutionChip ?: settings.showResolutionChip
 
+  // ── Interaction State ───────────────────────────────────────────────────
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+
   // ── Animated State ────────────────────────────────────────────────────────
 
-  val bouncySpring = spring<Float>(dampingRatio = Spring.DampingRatioLowBouncy)
-
-  val cardScale by animateFloatAsState(
-    targetValue = if (isSelected) 0.98f else 1f,
-    animationSpec = bouncySpring,
-    label = "cardScale"
-  )
-
   val selectionBorderWidth by animateDpAsState(
-    targetValue = if (isSelected) 2.dp else 0.dp,
+    targetValue = if (isSelected) 1.dp else 0.dp,
     label = "selectionBorderWidth"
   )
 
-  // Removed animateColorAsState to prevent flickering during theme changes
-  val containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-    else MaterialTheme.colorScheme.surfaceContainerLow
+  val containerColor = when {
+    isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
+    isPressed -> MaterialTheme.colorScheme.surfaceContainerLow
+    else -> MaterialTheme.colorScheme.surfaceContainerLow
+  }
 
   Card(
     modifier = modifier
       .fillMaxWidth()
-      .scale(cardScale)
       .combinedClickable(
+        interactionSource = interactionSource,
+        indication = ripple(color = MaterialTheme.colorScheme.primary),
         onClick = onClick,
         onLongClick = onLongClick,
       ),
-    // M3 \"Container-Transform\" influenced: card expands and gains border on selection
-    shape = RoundedCornerShape(16.dp),
+    shape = RoundedCornerShape(28.dp),
     colors = CardDefaults.cardColors(containerColor = containerColor),
-    border = if (isSelected) BorderStroke(selectionBorderWidth, MaterialTheme.colorScheme.primary) else null,
-    elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 2.dp else 0.dp)
+    border = if (isSelected) BorderStroke(selectionBorderWidth, MaterialTheme.colorScheme.outlineVariant) else null,
+    elevation = CardDefaults.cardElevation(
+      defaultElevation = if (isPressed) 4.dp else 1.dp,
+      pressedElevation = 4.dp
+    )
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = 12.dp),
+        .padding(horizontal = 20.dp, vertical = 16.dp),
       verticalAlignment = Alignment.Top,
     ) {
       VideoThumbnail(
@@ -183,17 +190,17 @@ fun VideoCard(
         allowThumbnailGeneration = allowThumbnailGeneration,
         onThumbClick = onThumbClick,
         onLongClick = onLongClick,
-        modifier = Modifier.requiredSize(width = 160.dp, height = 90.dp)
+        modifier = Modifier.requiredSize(width = 172.dp, height = 97.dp)
       )
 
-      Spacer(modifier = Modifier.width(16.dp))
+      Spacer(modifier = Modifier.width(20.dp))
 
       VideoInfoPanel(
         displayTitle = displayTitle,
         maxLines = maxLines,
         useFolderNameStyle = useFolderNameStyle,
-        isRecentlyPlayed = isRecentlyPlayed,
         isWatched = isWatched,
+        isRecentlyPlayed = isRecentlyPlayed,
         video = video,
         showSubtitleIndicator = showSubtitleIndicator,
         showSizeChip = showSizeChip,
@@ -211,8 +218,8 @@ private fun VideoInfoPanel(
   displayTitle: String,
   maxLines: Int,
   useFolderNameStyle: Boolean,
-  isRecentlyPlayed: Boolean,
   isWatched: Boolean,
+  isRecentlyPlayed: Boolean,
   video: Video,
   showSubtitleIndicator: Boolean,
   showSizeChip: Boolean,
@@ -222,27 +229,28 @@ private fun VideoInfoPanel(
   modifier: Modifier = Modifier
 ) {
   Column(
-    modifier = modifier.alpha(if (isWatched) 0.6f else 1f),
+    modifier = modifier,
   ) {
     Text(
       text = displayTitle,
       style = if (useFolderNameStyle) {
-        MaterialTheme.typography.titleMedium
+        MaterialTheme.typography.bodyLarge
       } else {
-        MaterialTheme.typography.titleMedium // Boosted from titleSmall
+        MaterialTheme.typography.bodyLarge
       },
-      fontWeight = FontWeight.SemiBold, // Modern M3 emphasis
+      fontWeight = FontWeight.Medium,
       color = when {
-        isRecentlyPlayed -> MaterialTheme.colorScheme.tertiary
+        isRecentlyPlayed -> MaterialTheme.colorScheme.primary
         isWatched -> MaterialTheme.colorScheme.onSurfaceVariant
         else -> MaterialTheme.colorScheme.onSurface
       },
       maxLines = maxLines,
       overflow = TextOverflow.Ellipsis,
+      lineHeight = 1.4.em,
+      modifier = if (isWatched) Modifier.alpha(0.6f) else Modifier
     )
 
-    // Duration moved to thumbnail overlay in Refined B style
-    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier = Modifier.height(12.dp))
 
     VideoMetadataChips(
       video = video,
@@ -278,9 +286,8 @@ fun VideoThumbnail(
     BoxWithConstraints(
       modifier = Modifier
         .fillMaxSize()
-        // M3 Large shape: 16dp
-        .clip(RoundedCornerShape(16.dp))
-        .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+        .clip(RoundedCornerShape(20.dp))
+        .background(MaterialTheme.colorScheme.surfaceVariant)
         .combinedClickable(
           onClick = onThumbClick,
           onLongClick = onLongClick,
@@ -299,13 +306,11 @@ fun VideoThumbnail(
       }
 
       LaunchedEffect(thumbnailKey) {
-        if (thumbnailRepository != null) {
-          thumbnailRepository.thumbnailReadyKeys
-            .filter { it == thumbnailKey }
-            .collect {
-              thumbnail = thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx)
-            }
-        }
+        thumbnailRepository?.thumbnailReadyKeys
+          ?.filter { it == thumbnailKey }
+          ?.collect {
+            thumbnail = thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx)
+          }
       }
 
       LaunchedEffect(thumbnailKey, allowThumbnailGeneration, showThumbnails) {
@@ -324,126 +329,160 @@ fun VideoThumbnail(
         Image(
           bitmap = thumbnail!!.asImageBitmap(),
           contentDescription = null,
-          modifier = Modifier.matchParentSize().alpha(if (isWatched) 0.6f else 1f),
+          modifier = Modifier.matchParentSize().alpha(if (isWatched) 0.4f else 1f),
           contentScale = ContentScale.Crop,
         )
       } else {
-        Icon(
-          imageVector = Icons.Filled.PlayArrow,
-          contentDescription = null,
-          modifier = Modifier.size(32.dp).alpha(if (isWatched) 0.6f else 1f),
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        Box(
+          modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.7f)),
+          contentAlignment = Alignment.Center
+        ) {
+          Icon(
+            imageVector = Icons.Filled.PlayArrow,
+            contentDescription = null,
+            modifier = Modifier.size(40.dp),
+            tint = MaterialTheme.colorScheme.secondary,
+          )
+        }
+      }
+
+      // Selection scrim overlay
+      if (isSelected) {
+        Box(
+          modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
         )
       }
 
       // Overlays
       val showProgress = progressPercentage != null && showProgressBar && !isWatched
-      
-      // Duration Overlay (Bottom End) - Adjusted to avoid collision with progress bar
+
       Surface(
-        color = Color.Black.copy(alpha = 0.7f),
-        shape = RoundedCornerShape(4.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.5f),
+        shape = RoundedCornerShape(8.dp),
         modifier = Modifier
-          .align(Alignment.BottomEnd)
+          .align(Alignment.BottomStart)
           .padding(
             bottom = if (showProgress) 16.dp else 8.dp,
-            end = 8.dp
+            start = 8.dp
           )
       ) {
         Text(
           text = video.durationFormatted,
           style = MaterialTheme.typography.labelSmall,
-          color = Color.White,
-          modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+          color = MaterialTheme.colorScheme.onSurface,
+          modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
         )
       }
 
       Box(
         modifier = Modifier
-          .align(Alignment.TopStart)
+          .align(Alignment.TopEnd)
           .padding(8.dp),
       ) {
         if (isWatched) {
           Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(24.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+            modifier = Modifier.size(20.dp),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
           ) {
             Icon(
               imageVector = Icons.Filled.Check,
-              contentDescription = null,
-              modifier = Modifier.padding(4.dp),
-              tint = MaterialTheme.colorScheme.onPrimary,
+              contentDescription = "Watched",
+              modifier = Modifier.padding(3.dp),
+              tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           }
         } else if (isNew) {
-          Box(
-            modifier = Modifier
-              .clip(RoundedCornerShape(4.dp))
-              .background(MaterialTheme.colorScheme.primary)
-              .padding(horizontal = 6.dp, vertical = 2.dp),
+          Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.padding(0.dp)
           ) {
-            Text(
-              text = stringResource(R.string.video_label_new),
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-              color = MaterialTheme.colorScheme.onPrimary,
-            )
+            Row(
+              modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+              verticalAlignment = Alignment.CenterVertically,
+              horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+              Box(
+                modifier = Modifier
+                  .size(4.dp)
+                  .clip(CircleShape)
+                  .background(MaterialTheme.colorScheme.secondary)
+              )
+              Text(
+                text = stringResource(R.string.video_label_new),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+              )
+            }
           }
         }
       }
 
-      // Progress Bar
+      // Progress Bar (Optimized Draw Phase)
       if (showProgress) {
         val animatedProgress by animateFloatAsState(
-          targetValue = progressPercentage ?: 0f,
+          targetValue = progressPercentage,
           label = "VideoProgressAnimation"
         )
+        val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+        val indicatorColor = MaterialTheme.colorScheme.secondary
 
         Box(
           modifier = Modifier
             .align(Alignment.BottomCenter)
-            .padding(bottom = 4.dp, start = 8.dp, end = 8.dp)
             .fillMaxWidth()
             .height(3.dp)
-        ) {
-          Box(
-            modifier = Modifier
-              .matchParentSize()
-              .clip(RoundedCornerShape(50))
-              .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
-          )
-          Box(
-            modifier = Modifier
-              .fillMaxHeight()
-              .fillMaxWidth(animatedProgress)
-              .clip(RoundedCornerShape(50))
-              .background(MaterialTheme.colorScheme.primary)
-          )
-        }
+            .drawBehind {
+              val barWidth = size.width
+              val barHeight = size.height
+
+              drawRect(
+                color = trackColor,
+                size = Size(barWidth, barHeight)
+              )
+
+              drawRect(
+                color = indicatorColor,
+                size = Size(barWidth * animatedProgress, barHeight)
+              )
+            }
+        )
       }
     }
 
     // Selection Badge
-    val bouncySpring = spring<Float>(dampingRatio = Spring.DampingRatioLowBouncy)
     AnimatedVisibility(
       visible = isSelected,
-      enter = fadeIn(bouncySpring) + scaleIn(bouncySpring, transformOrigin = TransformOrigin(1f, 1f)),
-      exit = fadeOut(bouncySpring) + scaleOut(bouncySpring, transformOrigin = TransformOrigin(1f, 1f)),
+      enter = fadeIn(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleIn(
+        spring(dampingRatio = Spring.DampingRatioNoBouncy),
+        transformOrigin = TransformOrigin(1f, 1f)
+      ),
+      exit = fadeOut(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleOut(
+        spring(dampingRatio = Spring.DampingRatioNoBouncy),
+        transformOrigin = TransformOrigin(1f, 1f)
+      ),
       modifier = Modifier.align(Alignment.BottomEnd)
     ) {
       Surface(
-        color = MaterialTheme.colorScheme.primary,
+        color = MaterialTheme.colorScheme.primaryContainer,
         shape = CircleShape,
         modifier = Modifier
-          .size(28.dp)
-          .offset(x = 6.dp, y = 6.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface)
+          .size(24.dp)
+          .padding(end = 8.dp, bottom = 8.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
       ) {
         Icon(
           imageVector = Icons.Filled.Check,
           contentDescription = "Selected",
-          modifier = Modifier.padding(4.dp),
-          tint = MaterialTheme.colorScheme.onPrimary,
+          modifier = Modifier.padding(3.dp),
+          tint = MaterialTheme.colorScheme.onPrimaryContainer,
         )
       }
     }
@@ -460,41 +499,85 @@ fun VideoMetadataChips(
   showDateChip: Boolean,
   modifier: Modifier = Modifier
 ) {
-  FlowRow(
+  val onSurface = MaterialTheme.colorScheme.onSurface
+  val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+  val secondary = MaterialTheme.colorScheme.secondary
+
+  Column(
     modifier = modifier,
-    horizontalArrangement = Arrangement.spacedBy(6.dp),
-    verticalArrangement = Arrangement.spacedBy(4.dp)
+    verticalArrangement = Arrangement.spacedBy(8.dp)
   ) {
     if (showSubtitleIndicator && video.hasEmbeddedSubtitles && video.subtitleCodec.isNotBlank()) {
-      video.subtitleCodec.split(" ").forEach { codec ->
-        MetadataChip(
-          text = codec,
-          containerColor = MaterialTheme.colorScheme.primary,
-          contentColor = MaterialTheme.colorScheme.onPrimary
-        )
+      FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+      ) {
+        video.subtitleCodec.split(" ").forEach { codec ->
+          MetadataChip(
+            text = codec,
+            containerColor = Color.Transparent,
+            contentColor = secondary,
+            isOutlined = true
+          )
+        }
       }
     }
-    if (showSizeChip && video.sizeFormatted != "0 B" && video.sizeFormatted != "--") {
-      MetadataChip(text = video.sizeFormatted)
-    }
-    if (showResolutionChip && video.height > 0) {
-      val resText = when {
-        video.width >= 3840 || video.height >= 2160 -> "4K"
-        video.width >= 2560 || video.height >= 1440 -> "1440p"
-        video.width >= 1920 || video.height >= 1080 -> "1080p"
-        video.width >= 1280 || video.height >= 720 -> "720p"
-        video.width >= 854 || video.height >= 480 -> "480p"
-        else -> "${video.height}p"
+
+    val metadataText = buildAnnotatedString {
+      var first = true
+      fun appendSeparator() {
+        if (!first) {
+          withStyle(SpanStyle(color = onSurfaceVariant.copy(alpha = 0.38f))) {
+            append("  •  ")
+          }
+        }
+        first = false
       }
-      val displayResolution = if (showFramerateInResolution && video.fps > 0) {
-        "$resText@${video.fps.toInt()}"
-      } else {
-        resText
+
+      if (showResolutionChip && video.height > 0) {
+        appendSeparator()
+        val resText = when {
+          video.width >= 3840 || video.height >= 2160 -> "4K"
+          video.width >= 2560 || video.height >= 1440 -> "1440p"
+          video.width >= 1920 || video.height >= 1080 -> "1080p"
+          video.width >= 1280 || video.height >= 720 -> "720p"
+          video.width >= 854 || video.height >= 480 -> "480p"
+          else -> "${video.height}p"
+        }
+
+        withStyle(SpanStyle(fontWeight = FontWeight.Medium, color = onSurface)) {
+          append(resText)
+        }
+
+        if (showFramerateInResolution && video.fps > 0) {
+          withStyle(SpanStyle(color = onSurfaceVariant, fontWeight = FontWeight.Normal)) {
+            append("@${video.fps.toInt()}")
+          }
+        }
       }
-      MetadataChip(text = displayResolution)
+
+      if (showSizeChip && video.sizeFormatted != "0 B" && video.sizeFormatted != "--") {
+        appendSeparator()
+        withStyle(SpanStyle(fontWeight = FontWeight.Medium, color = onSurface)) {
+          append(video.sizeFormatted)
+        }
+      }
+
+      if (showDateChip && video.dateModified > 0) {
+        appendSeparator()
+        withStyle(SpanStyle(color = MaterialTheme.colorScheme.tertiary)) {
+          append(formatDate(video.dateModified))
+        }
+      }
     }
-    if (showDateChip && video.dateModified > 0) {
-      MetadataChip(text = formatDate(video.dateModified))
+
+    if (metadataText.isNotEmpty()) {
+      Text(
+        text = metadataText,
+        style = MaterialTheme.typography.labelMedium,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+      )
     }
   }
 }
@@ -503,13 +586,18 @@ fun VideoMetadataChips(
 private fun MetadataChip(
   text: String,
   containerColor: Color = MaterialTheme.colorScheme.surfaceContainerLow,
-  contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant
+  contentColor: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+  isOutlined: Boolean = false
 ) {
   Surface(
-    color = containerColor,
+    color = if (isOutlined) Color.Transparent else containerColor,
     contentColor = contentColor,
     shape = RoundedCornerShape(8.dp),
-    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+    border = if (isOutlined) {
+      BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    } else {
+      BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+    }
   ) {
     Text(
       text = text,
@@ -541,11 +629,8 @@ fun VideoCardPrimaryPreview() {
       StateLabel("Extension: OFF")
       VideoCard(video = sampleVideo, settings = VideoCardSettings(showVideoExtension = false), onClick = {})
 
-      StateLabel("Selected State (Outlined + Tonal)")
+      StateLabel("Selected State (Tonal)")
       VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isSelected = true)
-
-      StateLabel("Recently Played")
-      VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isRecentlyPlayed = true)
 
       StateLabel("Progress Bar (50%)")
       VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, progressPercentage = 0.5f)
@@ -565,10 +650,13 @@ fun VideoCardStatusPreview() {
         .padding(16.dp),
       verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+      StateLabel("Recently Played")
+      VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isRecentlyPlayed = true)
+
       StateLabel("New / Unplayed Label")
       VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isOldAndUnplayed = true)
 
-      StateLabel("Watched (Dimmed Content + Bright Tick)")
+      StateLabel("Watched (Dimmed + Strikethrough)")
       VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {}, isWatched = true)
     }
   }

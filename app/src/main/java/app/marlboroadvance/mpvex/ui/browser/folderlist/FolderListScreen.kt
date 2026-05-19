@@ -1,20 +1,20 @@
 package app.marlboroadvance.mpvex.ui.browser.folderlist
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Folder
@@ -22,11 +22,9 @@ import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -34,16 +32,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
@@ -56,7 +53,6 @@ import app.marlboroadvance.mpvex.preferences.SortOrder
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
-import app.marlboroadvance.mpvex.repository.MediaFileRepository
 import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.NavigationBarState
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
@@ -65,6 +61,7 @@ import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
@@ -77,6 +74,7 @@ import app.marlboroadvance.mpvex.utils.permission.PermissionUtils
 import app.marlboroadvance.mpvex.utils.sort.SortUtils
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
+import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -100,7 +98,6 @@ object FolderListScreen : Screen {
   private fun MediaStoreFolderListContent() {
     val context = LocalContext.current
     val backstack = LocalBackStack.current
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
     val viewModel: FolderListViewModel = viewModel(
       factory = FolderListViewModel.factory(context.applicationContext as android.app.Application)
@@ -110,8 +107,6 @@ object FolderListScreen : Screen {
     val gesturePreferences = koinInject<GesturePreferences>()
 
     val videoFolders by viewModel.videoFolders.collectAsState()
-    val foldersWithNewCount by viewModel.foldersWithNewCount.collectAsState()
-    val recentlyPlayedFilePath by viewModel.recentlyPlayedFilePath.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val isScanning by viewModel.isScanning.collectAsState()
     val scanStatus by viewModel.scanStatus.collectAsState()
@@ -157,10 +152,7 @@ object FolderListScreen : Screen {
       items = sortedFolders,
       getId = { it.bucketId },
       onDeleteItems = { folders, _ ->
-        val ids = folders.map { it.bucketId }.toSet()
-        val videos = MediaFileRepository.getVideosForBuckets(context, ids)
-        viewModel.deleteVideos(videos)
-        Pair(videos.size, 0)
+        viewModel.deleteFolders(folders)
       },
       onRenameItem = { folder, newName ->
         viewModel.renameFolder(folder, newName)
@@ -183,19 +175,16 @@ object FolderListScreen : Screen {
       )
     }
 
-    DisposableEffect(lifecycleOwner) {
-      val observer = LifecycleEventObserver { _, event ->
-        if (event == Lifecycle.Event.ON_RESUME) viewModel.recalculateNewVideoCounts()
-      }
-      lifecycleOwner.lifecycle.addObserver(observer)
-      onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
     BackHandler(enabled = selectionManager.isInSelectionMode) {
       selectionManager.clear()
     }
 
+    val onRefresh: suspend () -> Unit = remember(viewModel) { { viewModel.refresh() } }
+
+    val currentTapThumbnailToSelect by androidx.compose.runtime.rememberUpdatedState(tapThumbnailToSelect)
+
     Scaffold(
+      contentWindowInsets = WindowInsets(0, 0, 0, 0),
       topBar = {
         if (permissionState.status !is PermissionStatus.Denied) {
           BrowserTopBar(
@@ -221,19 +210,17 @@ object FolderListScreen : Screen {
           PermissionStatus.Granted -> {
             FolderListContent(
               folders = sortedFolders,
-              foldersWithNewCount = foldersWithNewCount,
-              recentlyPlayedFilePath = recentlyPlayedFilePath,
               isLoading = isLoading,
               isScanning = isScanning,
               scanStatus = scanStatus,
               hasCompletedInitialLoad = hasCompletedInitialLoad,
-              tapThumbnailToSelect = tapThumbnailToSelect,
+              tapThumbnailToSelect = { currentTapThumbnailToSelect },
               navigationBarHeight = navigationBarHeight,
               listState = listState,
               isRefreshing = isRefreshing,
               selectionManager = selectionManager,
               folderCardSettings = folderCardSettings,
-              onRefresh = { viewModel.refresh() },
+              onRefresh = onRefresh,
               onFolderClick = { folder ->
                 if (selectionManager.isInSelectionMode) selectionManager.toggle(folder)
                 else backstack.add(VideoListScreen(folder.bucketId, folder.name))
@@ -252,8 +239,30 @@ object FolderListScreen : Screen {
         onDismiss = { sortDialogOpen.value = false },
         sortType = folderSortType,
         sortOrder = folderSortOrder,
+        unlimitedNameLines = unlimitedNameLines,
+        showFolderPath = showFolderPath,
+        showTotalVideosChip = showTotalVideosChip,
+        showTotalDurationChip = showTotalDurationChip,
+        showTotalSizeChip = showTotalSizeChip,
+        showDateChip = showDateChip,
         onSortTypeChange = { browserPreferences.folderSortType.set(it) },
         onSortOrderChange = { browserPreferences.folderSortOrder.set(it) },
+        onReset = {
+          browserPreferences.folderSortType.set(FolderSortType.Title)
+          browserPreferences.folderSortOrder.set(SortOrder.Ascending)
+          appearancePreferences.unlimitedNameLines.set(false)
+          browserPreferences.showFolderPath.set(false)
+          browserPreferences.showTotalVideosChip.set(true)
+          browserPreferences.showTotalDurationChip.set(false)
+          browserPreferences.showTotalSizeChip.set(false)
+          browserPreferences.showDateChip.set(false)
+        },
+        onUnlimitedNameLinesChange = { appearancePreferences.unlimitedNameLines.set(it) },
+        onShowFolderPathChange = { browserPreferences.showFolderPath.set(it) },
+        onShowTotalVideosChipChange = { browserPreferences.showTotalVideosChip.set(it) },
+        onShowTotalDurationChipChange = { browserPreferences.showTotalDurationChip.set(it) },
+        onShowTotalSizeChipChange = { browserPreferences.showTotalSizeChip.set(it) },
+        onShowDateChipChange = { browserPreferences.showDateChip.set(it) },
       )
 
       DeleteConfirmationDialog(
@@ -281,36 +290,41 @@ object FolderListScreen : Screen {
 @Composable
 private fun FolderListContent(
   folders: List<VideoFolder>,
-  foldersWithNewCount: List<FolderWithNewCount>,
-  recentlyPlayedFilePath: String?,
   isLoading: Boolean,
   isScanning: Boolean,
   scanStatus: String?,
   hasCompletedInitialLoad: Boolean,
-  tapThumbnailToSelect: Boolean,
+  tapThumbnailToSelect: () -> Boolean,
   navigationBarHeight: androidx.compose.ui.unit.Dp,
   listState: LazyListState,
   isRefreshing: androidx.compose.runtime.MutableState<Boolean>,
-  selectionManager: app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager<VideoFolder, String>,
+  selectionManager: SelectionManager<VideoFolder, String>,
   folderCardSettings: FolderCardSettings,
   onRefresh: suspend () -> Unit,
   onFolderClick: (VideoFolder) -> Unit,
   onFolderLongClick: (VideoFolder) -> Unit,
 ) {
-  // Show full-screen loading ONLY if we have no folders AND the initial load isn't done, 
-  // or if explicitly triggered via a full-screen isLoading flag.
   val showFullScreenLoading = (isLoading && folders.isEmpty()) || (!hasCompletedInitialLoad && folders.isEmpty())
   val showEmpty = folders.isEmpty() && !isLoading && !isScanning && hasCompletedInitialLoad
 
-  val isAtTop by remember {
-    derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 }
+  // A3: Anti-flicker for scanning indicator. 
+  // We wait for 400ms before showing the bar to prevent flashes on fast background scans.
+  var showScanningIndicator by remember { mutableStateOf(false) }
+  LaunchedEffect(isScanning) {
+    if (isScanning) {
+      delay(400)
+      showScanningIndicator = true
+    } else {
+      showScanningIndicator = false
+    }
   }
 
-  val hasEnoughItems = folders.size > 20
-  val scrollbarAlpha by animateFloatAsState(
-    targetValue = if (isAtTop || !hasEnoughItems) 0f else 1f,
-    label = "scrollbarAlpha",
-  )
+  val scrollbarAlpha by remember(folders.size) {
+    val hasEnoughItems = folders.size > 20
+    derivedStateOf {
+      if (!hasEnoughItems || (listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0)) 0f else 1f
+    }
+  }
 
   PullRefreshBox(
     isRefreshing = isRefreshing,
@@ -340,21 +354,27 @@ private fun FolderListContent(
           state = listState,
           modifier = Modifier.fillMaxSize(),
           contentPadding = PaddingValues(
-            start = 8.dp, 
-            end = 8.dp, 
-            top = 12.dp, 
-            bottom = navigationBarHeight + 12.dp 
+            start = 8.dp,
+            end = 8.dp,
+            top = 12.dp,
+            bottom = navigationBarHeight + 12.dp
           ),
           verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
           items(folders, key = { it.bucketId }) { folder ->
+            val isSelected by remember(selectionManager, folder.bucketId) {
+              derivedStateOf { selectionManager.isSelected(folder) }
+            }
             FolderCard(
               folder = folder,
               settings = folderCardSettings,
-              isSelected = selectionManager.isSelected(folder),
+              isSelected = isSelected,
               onClick = { onFolderClick(folder) },
               onLongClick = { onFolderLongClick(folder) },
-              onThumbClick = { if (tapThumbnailToSelect) onFolderLongClick(folder) else onFolderClick(folder) },
+              onThumbClick = {
+                if (tapThumbnailToSelect()) onFolderLongClick(folder)
+                else onFolderClick(folder)
+              },
             )
           }
         }
@@ -369,19 +389,17 @@ private fun FolderListContent(
           ) {}
         }
       }
-      
-      // Background Scanning Indicator: Show a linear progress bar if scanning is in progress
-      // but we already have data on screen.
-      AnimatedVisibility(
-        visible = isScanning && !showFullScreenLoading,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = Modifier.align(Alignment.TopCenter)
-      ) {
-        LinearProgressIndicator(
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
-          color = MaterialTheme.colorScheme.primary,
-          trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+
+      // A3: Replaced direct isScanning check with showScanningIndicator
+      if (showScanningIndicator) {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .padding(horizontal = 16.dp)
+            .align(Alignment.TopCenter)
+            .clip(RoundedCornerShape(2.dp))
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
         )
       }
     }
@@ -394,18 +412,22 @@ private fun FolderSortDialog(
   onDismiss: () -> Unit,
   sortType: FolderSortType,
   sortOrder: SortOrder,
+  unlimitedNameLines: Boolean,
+  showFolderPath: Boolean,
+  showTotalVideosChip: Boolean,
+  showTotalDurationChip: Boolean,
+  showTotalSizeChip: Boolean,
+  showDateChip: Boolean,
   onSortTypeChange: (FolderSortType) -> Unit,
   onSortOrderChange: (SortOrder) -> Unit,
+  onReset: () -> Unit,
+  onUnlimitedNameLinesChange: (Boolean) -> Unit,
+  onShowFolderPathChange: (Boolean) -> Unit,
+  onShowTotalVideosChipChange: (Boolean) -> Unit,
+  onShowTotalDurationChipChange: (Boolean) -> Unit,
+  onShowTotalSizeChipChange: (Boolean) -> Unit,
+  onShowDateChipChange: (Boolean) -> Unit,
 ) {
-  val browserPreferences = koinInject<BrowserPreferences>()
-  val appearancePreferences = koinInject<AppearancePreferences>()
-  val showTotalVideosChip by browserPreferences.showTotalVideosChip.collectAsState()
-  val showTotalDurationChip by browserPreferences.showTotalDurationChip.collectAsState()
-  val showTotalSizeChip by browserPreferences.showTotalSizeChip.collectAsState()
-  val showDateChip by browserPreferences.showDateChip.collectAsState()
-  val showFolderPath by browserPreferences.showFolderPath.collectAsState()
-  val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
-
   SortBottomSheet(
     isOpen = isOpen,
     onDismiss = onDismiss,
@@ -416,18 +438,19 @@ private fun FolderSortDialog(
     },
     sortOrderAsc = sortOrder.isAscending,
     onSortOrderChange = { onSortOrderChange(if (it) SortOrder.Ascending else SortOrder.Descending) },
-    onReset = {
-      onSortTypeChange(FolderSortType.Title)
-      onSortOrderChange(SortOrder.Ascending)
-      appearancePreferences.unlimitedNameLines.set(false)
-      browserPreferences.showFolderPath.set(false)
-      browserPreferences.showTotalVideosChip.set(true)
-      browserPreferences.showTotalDurationChip.set(false)
-      browserPreferences.showTotalSizeChip.set(false)
-      browserPreferences.showDateChip.set(false)
-    },
-    types = listOf(FolderSortType.Title.displayName, FolderSortType.Date.displayName, FolderSortType.Size.displayName, FolderSortType.VideoCount.displayName),
-    icons = listOf(ImageVector.vectorResource(id = R.drawable.sort_by_alpha_24px), Icons.Rounded.CalendarToday, Icons.Rounded.SwapVert, Icons.Rounded.VideoLibrary),
+    onReset = onReset,
+    types = listOf(
+      FolderSortType.Title.displayName,
+      FolderSortType.Date.displayName,
+      FolderSortType.Size.displayName,
+      FolderSortType.VideoCount.displayName,
+    ),
+    icons = listOf(
+      ImageVector.vectorResource(id = R.drawable.sort_by_alpha_24px),
+      Icons.Rounded.CalendarToday,
+      Icons.Rounded.SwapVert,
+      Icons.Rounded.VideoLibrary,
+    ),
     getLabelForType = { type, _ ->
       when (type) {
         FolderSortType.Title.displayName -> Pair("A-Z", "Z-A")
@@ -438,12 +461,12 @@ private fun FolderSortDialog(
       }
     },
     visibilityToggles = listOf(
-      VisibilityToggle(label = "Full Name", checked = unlimitedNameLines, onCheckedChange = { appearancePreferences.unlimitedNameLines.set(it) }),
-      VisibilityToggle(label = "Path", checked = showFolderPath, onCheckedChange = { browserPreferences.showFolderPath.set(it) }),
-      VisibilityToggle(label = "Total Videos", checked = showTotalVideosChip, onCheckedChange = { browserPreferences.showTotalVideosChip.set(it) }),
-      VisibilityToggle(label = "Total Duration", checked = showTotalDurationChip, onCheckedChange = { browserPreferences.showTotalDurationChip.set(it) }),
-      VisibilityToggle(label = "Folder Size", checked = showTotalSizeChip, onCheckedChange = { browserPreferences.showTotalSizeChip.set(it) }),
-      VisibilityToggle(label = "Date", checked = showDateChip, onCheckedChange = { browserPreferences.showDateChip.set(it) }),
+      VisibilityToggle(label = "Full Name", checked = unlimitedNameLines, onCheckedChange = onUnlimitedNameLinesChange),
+      VisibilityToggle(label = "Path", checked = showFolderPath, onCheckedChange = onShowFolderPathChange),
+      VisibilityToggle(label = "Total Videos", checked = showTotalVideosChip, onCheckedChange = onShowTotalVideosChipChange),
+      VisibilityToggle(label = "Total Duration", checked = showTotalDurationChip, onCheckedChange = onShowTotalDurationChipChange),
+      VisibilityToggle(label = "Folder Size", checked = showTotalSizeChip, onCheckedChange = onShowTotalSizeChipChange),
+      VisibilityToggle(label = "Date", checked = showDateChip, onCheckedChange = onShowDateChipChange),
     ),
   )
 }

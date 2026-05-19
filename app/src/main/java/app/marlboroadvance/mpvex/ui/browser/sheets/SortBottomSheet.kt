@@ -1,353 +1,280 @@
 package app.marlboroadvance.mpvex.ui.browser.sheets
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 
 /**
- * A redesigned Material 3 Sort Bottom Sheet.
- * Features:
- * - Headline typography for clarity
- * - Card-based 2x2 grid for sort selection
- * - Tonal checkmark indicator
- * - 2-column grid for View options
- * - Animated selection transitions
- * - Full Dynamic Color support
+ * SortBottomSheet — M3 Standard Implementation
+ * Uses canonical M3 components, tokens, and motion without custom physics or glassmorphism.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SortBottomSheet(
-    isOpen: Boolean,
-    onDismiss: () -> Unit,
-    title: String,
-    sortType: String,
-    onSortTypeChange: (String) -> Unit,
-    sortOrderAsc: Boolean,
-    onSortOrderChange: (Boolean) -> Unit,
-    types: List<String>,
-    icons: List<ImageVector>,
-    getLabelForType: (String, Boolean) -> Pair<String, String>,
-    modifier: Modifier = Modifier,
-    visibilityToggles: List<VisibilityToggle> = emptyList(),
-    showSortOptions: Boolean = true,
-    onReset: (() -> Unit)? = null,
+  isOpen: Boolean,
+  onDismiss: () -> Unit,
+  title: String,
+  sortType: String,
+  onSortTypeChange: (String) -> Unit,
+  sortOrderAsc: Boolean,
+  onSortOrderChange: (Boolean) -> Unit,
+  types: List<String>,
+  icons: List<androidx.compose.ui.graphics.vector.ImageVector>,
+  getLabelForType: (String, Boolean) -> Pair<String, String>,
+  modifier: Modifier = Modifier,
+  visibilityToggles: List<VisibilityToggle> = emptyList(),
+  showSortOptions: Boolean = true,
+  onReset: (() -> Unit)? = null,
 ) {
-    if (!isOpen) return
+  if (!isOpen) return
 
-    val (ascLabel, descLabel) = getLabelForType(sortType, sortOrderAsc)
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val haptic = LocalHapticFeedback.current
+  val (ascLabel, descLabel) = getLabelForType(sortType, sortOrderAsc)
+  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 2.dp,
-        dragHandle = { BottomSheetDefaults.DragHandle() },
+  ModalBottomSheet(
+    onDismissRequest = onDismiss,
+    sheetState = sheetState,
+    shape = BottomSheetDefaults.ExpandedShape,
+    containerColor = BottomSheetDefaults.ContainerColor,
+    tonalElevation = 3.dp,
+    dragHandle = { BottomSheetDefaults.DragHandle() },
+    contentWindowInsets = { WindowInsets.navigationBars }
+  ) {
+    Column(
+      modifier = modifier
+        .fillMaxWidth()
+        .verticalScroll(rememberScrollState())
+        .padding(bottom = 32.dp)
     ) {
-        Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 32.dp)
-        ) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.SemiBold
-                )
+      // ── Header ──
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+      ) {
+        Text(
+          text = title,
+          style = MaterialTheme.typography.titleLarge,
+          color = MaterialTheme.colorScheme.onSurface
+        )
 
-                if (onReset != null) {
-                    TextButton(
-                        onClick = {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onReset()
-                        }
-                    ) {
-                        Text("Reset")
-                    }
-                }
-            }
-
-            if (showSortOptions) {
-                SortOptionsSection(
-                    sortType = sortType,
-                    onSortTypeChange = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onSortTypeChange(it)
-                    },
-                    types = types,
-                    icons = icons,
-                    sortOrderAsc = sortOrderAsc,
-                    onSortOrderChange = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onSortOrderChange(it)
-                    },
-                    ascLabel = ascLabel,
-                    descLabel = descLabel
-                )
-            }
-
-            if (visibilityToggles.isNotEmpty()) {
-                if (showSortOptions) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 24.dp, horizontal = 24.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                }
-                ViewOptionsSection(
-                    toggles = visibilityToggles,
-                    onToggle = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
-                )
-            }
+        if (onReset != null) {
+          TextButton(onClick = onReset) {
+            Text(
+              text = "Reset",
+              style = MaterialTheme.typography.labelLarge
+            )
+          }
         }
+      }
+
+      if (showSortOptions) {
+        SortOptionsSection(
+          sortType = sortType,
+          onSortTypeChange = onSortTypeChange,
+          types = types,
+          icons = icons,
+          sortOrderAsc = sortOrderAsc,
+          onSortOrderChange = onSortOrderChange,
+          ascLabel = ascLabel,
+          descLabel = descLabel
+        )
+      }
+
+      if (visibilityToggles.isNotEmpty()) {
+        if (showSortOptions) {
+          HorizontalDivider(
+            modifier = Modifier.padding(vertical = 24.dp, horizontal = 24.dp),
+            thickness = DividerDefaults.Thickness
+          )
+        }
+        ViewOptionsSection(
+          toggles = visibilityToggles,
+          onToggle = { index, checked ->
+            visibilityToggles[index].onCheckedChange(checked)
+          }
+        )
+      }
     }
+  }
 }
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SortOptionsSection(
-    sortType: String,
-    onSortTypeChange: (String) -> Unit,
-    types: List<String>,
-    icons: List<ImageVector>,
-    sortOrderAsc: Boolean,
-    onSortOrderChange: (Boolean) -> Unit,
-    ascLabel: String,
-    descLabel: String
+  sortType: String,
+  onSortTypeChange: (String) -> Unit,
+  types: List<String>,
+  icons: List<androidx.compose.ui.graphics.vector.ImageVector>,
+  sortOrderAsc: Boolean,
+  onSortOrderChange: (Boolean) -> Unit,
+  ascLabel: String,
+  descLabel: String
 ) {
-    Column(
-        modifier = Modifier.padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(20.dp)
-    ) {
-        // Sort Type Selection
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeader(text = "Sort by")
-            
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                maxItemsInEachRow = 2
-            ) {
-                types.forEachIndexed { index, type ->
-                    val isSelected = sortType == type
-                    SortItemCard(
-                        text = type,
-                        icon = icons.getOrNull(index),
-                        isSelected = isSelected,
-                        onClick = { onSortTypeChange(type) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                
-                if (types.size % 2 != 0) {
-                    Spacer(modifier = Modifier.weight(1f))
-                }
-            }
-        }
+  Column(
+    modifier = Modifier.padding(horizontal = 24.dp),
+    verticalArrangement = Arrangement.spacedBy(24.dp)
+  ) {
+    // ── Sort By: 2x2 Grid of ElevatedFilterChips ──
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      SectionHeader(text = "Sort by")
 
-        // Order Selection
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeader(text = "Order")
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = sortOrderAsc,
-                    onClick = { onSortOrderChange(true) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    icon = { SegmentedButtonDefaults.Icon(sortOrderAsc) {
-                        Icon(Icons.Default.KeyboardArrowUp, null, Modifier.size(20.dp))
-                    }}
-                ) {
-                    Text(ascLabel, style = MaterialTheme.typography.bodyMedium)
-                }
-                SegmentedButton(
-                    selected = !sortOrderAsc,
-                    onClick = { onSortOrderChange(false) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    icon = { SegmentedButtonDefaults.Icon(!sortOrderAsc) {
-                        Icon(Icons.Default.KeyboardArrowDown, null, Modifier.size(20.dp))
-                    }}
-                ) {
-                    Text(descLabel, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SortItemCard(
-    text: String,
-    icon: ImageVector?,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val containerColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.secondaryContainer 
-                      else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-        label = "containerColor"
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer 
-                       else MaterialTheme.colorScheme.onSurfaceVariant,
-        label = "contentColor"
-    )
-
-    Surface(
-        onClick = onClick,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = containerColor,
-        contentColor = contentColor,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                maxLines = 1,
-                modifier = Modifier.weight(1f)
-            )
-            if (isSelected) {
-                // Tonal background for the check icon
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f)),
-                    contentAlignment = Alignment.Center
-                ) {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        types.chunked(2).forEachIndexed { rowIndex, rowTypes ->
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+          ) {
+            rowTypes.forEachIndexed { colIndex, type ->
+              val index = rowIndex * 2 + colIndex
+              ElevatedFilterChip(
+                modifier = Modifier.weight(1f),
+                selected = type == sortType,
+                onClick = { onSortTypeChange(type) },
+                label = {
+                  Text(
+                    text = type,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelLarge
+                  )
+                },
+                leadingIcon = if (index < icons.size) {
+                  {
                     Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                      imageVector = icons[index],
+                      contentDescription = null,
+                      modifier = Modifier.size(18.dp)
                     )
-                }
+                  }
+                } else null
+              )
             }
+            if (rowTypes.size == 1) {
+              Spacer(modifier = Modifier.weight(1f))
+            }
+          }
         }
+      }
     }
+
+    // ── Order: SegmentedButton ──
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      SectionHeader(text = "Order")
+
+      SingleChoiceSegmentedButtonRow(
+        modifier = Modifier.fillMaxWidth()
+      ) {
+        val options = listOf(ascLabel to true, descLabel to false)
+        val orderIcons = listOf(
+          Icons.Filled.ArrowUpward,
+          Icons.Filled.ArrowDownward
+        )
+
+        options.forEachIndexed { index, (label, isAsc) ->
+          SegmentedButton(
+            selected = (isAsc == sortOrderAsc),
+            onClick = { onSortOrderChange(isAsc) },
+            shape = SegmentedButtonDefaults.itemShape(
+              index = index,
+              count = options.size
+            ),
+            icon = {
+              SegmentedButtonDefaults.Icon(
+                active = (isAsc == sortOrderAsc)
+              )
+            },
+            label = {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+              ) {
+                Icon(
+                  imageVector = orderIcons[index],
+                  contentDescription = null,
+                  modifier = Modifier.size(18.dp)
+                )
+                Text(label)
+              }
+            }
+          )
+        }
+      }
+    }
+  }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ViewOptionsSection(
-    toggles: List<VisibilityToggle>,
-    onToggle: () -> Unit
+  toggles: List<VisibilityToggle>,
+  onToggle: (Int, Boolean) -> Unit
 ) {
-    Column(
-        modifier = Modifier.padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        SectionHeader(text = "View options")
+  Column(
+    modifier = Modifier.padding(horizontal = 24.dp),
+    verticalArrangement = Arrangement.spacedBy(8.dp)
+  ) {
+    SectionHeader(text = "View options")
 
-        // 2-Column Grid for View Options
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            maxItemsInEachRow = 2
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      toggles.chunked(2).forEachIndexed { rowIndex, rowToggles ->
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            toggles.forEach { toggle ->
-                Surface(
-                    onClick = {
-                        onToggle()
-                        toggle.onCheckedChange(!toggle.checked)
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(64.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    contentColor = MaterialTheme.colorScheme.onSurface
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = toggle.label,
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 2,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Switch(
-                            checked = toggle.checked,
-                            onCheckedChange = {
-                                onToggle()
-                                toggle.onCheckedChange(it)
-                            },
-                            modifier = Modifier.scale(0.8f)
-                        )
-                    }
+          rowToggles.forEachIndexed { colIndex, toggle ->
+            val index = rowIndex * 2 + colIndex
+            FilterChip(
+              modifier = Modifier.weight(1f),
+              selected = toggle.checked,
+              onClick = { onToggle(index, !toggle.checked) },
+              label = {
+                Text(
+                  text = toggle.label,
+                  modifier = Modifier.fillMaxWidth(),
+                  textAlign = TextAlign.Center,
+                  style = MaterialTheme.typography.labelLarge
+                )
+              },
+              leadingIcon = if (toggle.checked) {
+                {
+                  Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                  )
                 }
-            }
-            
-            // Spacer for odd numbers of items to maintain grid alignment
-            if (toggles.size % 2 != 0) {
-                Spacer(modifier = Modifier.weight(1f))
-            }
+              } else null
+            )
+          }
+          if (rowToggles.size == 1) {
+            Spacer(modifier = Modifier.weight(1f))
+          }
         }
+      }
     }
+  }
 }
 
 @Composable
 private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
-    )
+  Text(
+    text = text,
+    style = MaterialTheme.typography.titleSmall,
+    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier = Modifier.padding(start = 4.dp)
+  )
 }

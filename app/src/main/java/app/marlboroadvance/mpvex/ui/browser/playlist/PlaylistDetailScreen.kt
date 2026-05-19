@@ -7,23 +7,17 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
@@ -32,43 +26,30 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.SwapVert
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
+import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.cards.M3UVideoCard
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
+import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
@@ -78,24 +59,9 @@ import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import org.koin.compose.koinInject
 import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyGridState
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
-/**
- * Playlist detail screen showing videos in a playlist.
- *
- * **M3U Playlist Behavior:**
- * M3U playlists (streaming URLs) are handled differently to prevent ANR issues:
- * - Each stream is played individually (no playlist navigation in PlayerActivity)
- * - No next/previous buttons - each stream URL is opened standalone
- * - This prevents loading thousands of URLs into memory at once
- * - Users can manually select and play different streams from the list
- *
- * **Regular Playlist Behavior:**
- * Local file playlists support full playlist navigation:
- * - Next/previous buttons available during playback
- * - Playlist continuation and shuffle modes
- * - Full playlist loaded into PlayerActivity
- */
 @Serializable
 data class PlaylistDetailScreen(val playlistId: Int) : Screen {
   @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
@@ -105,14 +71,9 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
     val backStack = LocalBackStack.current
     val coroutineScope = rememberCoroutineScope()
 
-    // ViewModel
-    val viewModel: PlaylistDetailViewModel =
-      viewModel(
+    val viewModel: PlaylistDetailViewModel = viewModel(
         key = "PlaylistDetailViewModel_$playlistId",
-        factory = PlaylistDetailViewModel.factory(
-          context.applicationContext as android.app.Application,
-          playlistId,
-        ),
+        factory = PlaylistDetailViewModel.factory(context.applicationContext as android.app.Application, playlistId),
       )
 
     val playlist by viewModel.playlist.collectAsState()
@@ -123,7 +84,6 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
     val isLoading by viewModel.isLoading.collectAsState()
     val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
 
-    // VideoCard settings
     val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
     val showThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
     val showVideoExtension by browserPreferences.showVideoExtension.collectAsState()
@@ -153,9 +113,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
         unplayedOldVideoDays = unplayedOldVideoDays
       )
     }
-    val isRefreshing = remember { mutableStateOf(false) }
 
-    // Selection manager
     val selectionManager = rememberSelectionManager(
       items = videoItems,
       getId = { it.playlistItem.id },
@@ -166,16 +124,12 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
       onOperationComplete = { viewModel.refresh() },
     )
 
-    // UI State
     val listState = rememberLazyListState()
     val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
     var showUrlDialog by rememberSaveable { mutableStateOf(false) }
     var urlDialogContent by remember { mutableStateOf("") }
-
-    // Reorder mode state
     var isReorderMode by rememberSaveable { mutableStateOf(false) }
 
-    // Predictive back: Intercept when in selection mode or reorder mode
     BackHandler(enabled = selectionManager.isInSelectionMode || isReorderMode) {
       when {
         isReorderMode -> isReorderMode = false
@@ -199,19 +153,16 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
           },
           onCancelSelection = { selectionManager.clear() },
           isSingleSelection = selectionManager.isSingleSelection,
-          useRemoveIcon = true, // Show remove icon instead of delete for playlist
-          onInfoClick =
-            if (selectionManager.isSingleSelection) {
+          useRemoveIcon = true,
+          onInfoClick = if (selectionManager.isSingleSelection) {
               {
                 val item = selectionManager.getSelectedItems().firstOrNull()
                 if (item != null) {
                   if (playlist?.isM3uPlaylist == true) {
-                    // For M3U playlists, show URL dialog
                     urlDialogContent = item.video.path
                     showUrlDialog = true
                     selectionManager.clear()
                   } else {
-                    // For regular playlists, show MediaInfo activity
                     val intent = Intent(context, app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity::class.java)
                     intent.action = Intent.ACTION_VIEW
                     intent.data = item.video.uri
@@ -220,144 +171,81 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
                   }
                 }
               }
-            } else {
-              null
-            },
+            } else null,
           onShareClick = if (playlist?.isM3uPlaylist != true) {
-            // Hide share button for M3U playlists
             {
               val videosToShare = selectionManager.getSelectedItems().map { it.video }
               MediaUtils.shareVideos(context, videosToShare)
             }
-          } else {
-            null
-          },
-          onPlayClick = null, // Don't show play icon in selection mode for playlist
+          } else null,
           onSelectAll = { selectionManager.selectAll() },
           onInvertSelection = { selectionManager.invertSelection() },
           onDeselectAll = { selectionManager.clear() },
           onDeleteClick = { deleteDialogOpen.value = true },
           additionalActions = {
             when {
-              // Show done button when in reorder mode
               isReorderMode -> {
-                IconButton(
-                  onClick = { isReorderMode = false },
-                ) {
-                  Icon(
-                    imageVector = Icons.Filled.Check,
-                    contentDescription = "Done reordering",
-                    tint = MaterialTheme.colorScheme.primary,
-                  )
+                IconButton(onClick = { isReorderMode = false }) {
+                  Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
               }
-              // Show reorder button and play button when not in selection mode
               !selectionManager.isInSelectionMode && videos.isNotEmpty() -> {
-                Row(
-                  verticalAlignment = Alignment.CenterVertically,
-                ) {
-                  // Reorder button (hide for M3U playlists)
+                Row(verticalAlignment = Alignment.CenterVertically) {
                   if (playlist?.isM3uPlaylist != true) {
-                    IconButton(
-                      onClick = { isReorderMode = true },
-                    ) {
-                      Icon(
-                        imageVector = Icons.Outlined.SwapVert,
-                        contentDescription = "Reorder playlist",
-                        tint = MaterialTheme.colorScheme.onSurface,
-                      )
+                    IconButton(onClick = { isReorderMode = true }) {
+                      Icon(Icons.Outlined.SwapVert, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(Modifier.width(8.dp))
                   }
 
-                  // Play button
                   Button(
                     onClick = {
                       if (playlist?.isM3uPlaylist == true) {
-                        // M3U playlists: Play only the first/most recent stream (no playlist navigation)
-                        val mostRecentlyPlayedItem = videoItems
-                          .filter { it.playlistItem.lastPlayedAt > 0 }
-                          .maxByOrNull { it.playlistItem.lastPlayedAt }
-
+                        val mostRecentlyPlayedItem = videoItems.filter { it.playlistItem.lastPlayedAt > 0 }.maxByOrNull { it.playlistItem.lastPlayedAt }
                         val itemToPlay = mostRecentlyPlayedItem ?: videoItems.firstOrNull()
-
                         if (itemToPlay != null) {
-                          coroutineScope.launch {
-                            viewModel.updatePlayHistory(itemToPlay.video.path)
-                          }
-
-                          // Play single stream URL without playlist
+                          coroutineScope.launch { viewModel.updatePlayHistory(itemToPlay.video.path) }
                           MediaUtils.playFile(itemToPlay.video, context, "m3u_playlist")
                         }
-                      } else {
-                        // Regular playlists: Start playlist navigation
-                        if (videos.isNotEmpty()) {
+                      } else if (videos.isNotEmpty()) {
                           val firstVideo = videos.first()
-                          val intent = Intent(Intent.ACTION_VIEW, firstVideo.uri)
-                          intent.setClass(context, PlayerActivity::class.java)
-                          intent.putExtra("internal_launch", true)
-                          intent.putParcelableArrayListExtra("playlist", ArrayList(videos.map { it.uri }))
-                          intent.putExtra("playlist_index", 0)
-                          intent.putExtra("launch_source", "playlist")
-                          // Pass pre-resolved metadata to avoid ContentResolver queries
-                          intent.putExtra("title", firstVideo.displayName)
-                          intent.putExtra("absolute_path", firstVideo.path)
-                          intent.putExtra("video_id", firstVideo.id)
-                          intent.putExtra("date_modified", firstVideo.dateModified)
-                          intent.putExtra("size", firstVideo.size)
+                          val intent = Intent(Intent.ACTION_VIEW, firstVideo.uri).apply {
+                              setClass(context, PlayerActivity::class.java)
+                              putExtra("internal_launch", true)
+                              putParcelableArrayListExtra("playlist", ArrayList(videos.map { it.uri }))
+                              putExtra("playlist_index", 0)
+                              putExtra("launch_source", "playlist")
+                              putExtra("title", firstVideo.displayName)
+                              putExtra("absolute_path", firstVideo.path)
+                              putExtra("video_id", firstVideo.id)
+                              putExtra("date_modified", firstVideo.dateModified)
+                              putExtra("size", firstVideo.size)
+                          }
                           context.startActivity(intent)
-                        }
                       }
                     },
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                      containerColor = MaterialTheme.colorScheme.primary,
-                      contentColor = MaterialTheme.colorScheme.onPrimary,
-                    )
+                    shape = MaterialTheme.shapes.medium
                   ) {
-                    Icon(
-                      imageVector = Icons.Filled.PlayArrow,
-                      contentDescription = null,
-                      modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                      text = "Play All",
-                      style = MaterialTheme.typography.labelLarge,
-                      fontWeight = FontWeight.Bold
-                    )
+                    Icon(Icons.Filled.PlayArrow, contentDescription = null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Play All", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                   }
                 }
               }
             }
           },
         )
-      },
-      floatingActionButton = { },
+      }
     ) { padding ->
-      val pullToRefreshEnabled =
-        !selectionManager.isInSelectionMode && !isReorderMode
-
       PullRefreshBox(
-        isRefreshing = isRefreshing,
-        enabled = pullToRefreshEnabled,
+        isRefreshing = remember { mutableStateOf(false) },
+        enabled = !selectionManager.isInSelectionMode && !isReorderMode,
         listState = listState,
         modifier = Modifier.fillMaxSize().padding(padding),
         onRefresh = {
-          val isM3uPlaylist = playlist?.isM3uPlaylist == true
-          if (isM3uPlaylist) {
-            val result = viewModel.refreshM3UPlaylist()
-            result
-              .onSuccess {
-                Toast.makeText(context, "Playlist refreshed successfully", Toast.LENGTH_SHORT).show()
-              }
-              .onFailure { error ->
-                Toast.makeText(context, "Failed to refresh: ${error.message}", Toast.LENGTH_LONG).show()
-              }
-          } else {
-            viewModel.refreshNow()
-          }
+          if (playlist?.isM3uPlaylist == true) {
+            viewModel.refreshM3UPlaylist().onFailure { Toast.makeText(context, "Failed: ${it.message}", Toast.LENGTH_LONG).show() }
+          } else viewModel.refreshNow()
         },
       ) {
         PlaylistVideoListContent(
@@ -367,71 +255,63 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
           videoCardSettings = videoCardSettings,
           isM3uPlaylist = playlist?.isM3uPlaylist == true,
           isReorderMode = isReorderMode,
-          onReorder = { fromIndex, toIndex ->
-            coroutineScope.launch {
-              viewModel.reorderPlaylistItems(fromIndex, toIndex)
-            }
-          },
+          onReorder = { from, to -> coroutineScope.launch { viewModel.reorderPlaylistItems(from, to) } },
           onVideoItemClick = { item ->
-            if (selectionManager.isInSelectionMode) {
-              selectionManager.toggle(item)
-            } else {
-              coroutineScope.launch {
-                viewModel.updatePlayHistory(item.video.path)
-              }
-
+            if (selectionManager.isInSelectionMode) selectionManager.toggle(item)
+            else {
+              coroutineScope.launch { viewModel.updatePlayHistory(item.video.path) }
               val startIndex = videoItems.indexOfFirst { it.playlistItem.id == item.playlistItem.id }
               if (startIndex >= 0) {
-                if (videos.size == 1) {
-                  MediaUtils.playFile(item.video, context, "playlist_detail")
-                } else {
+                if (videos.size == 1) MediaUtils.playFile(item.video, context, "playlist_detail")
+                else {
                   val targetVideo = videos[startIndex]
-                  val intent = Intent(Intent.ACTION_VIEW, targetVideo.uri)
-                  intent.setClass(context, PlayerActivity::class.java)
-                  intent.putExtra("internal_launch", true)
-                  intent.putExtra("playlist_index", startIndex)
-                  intent.putExtra("launch_source", "playlist")
-                  intent.putExtra("playlist_id", playlistId)
-                  // Pass pre-resolved metadata to avoid ContentResolver queries
-                  intent.putExtra("title", targetVideo.displayName)
-                  intent.putExtra("absolute_path", targetVideo.path)
-                  intent.putExtra("video_id", targetVideo.id)
-                  intent.putExtra("date_modified", targetVideo.dateModified)
-                  intent.putExtra("size", targetVideo.size)
+                  val intent = Intent(Intent.ACTION_VIEW, targetVideo.uri).apply {
+                      setClass(context, PlayerActivity::class.java)
+                      putExtra("internal_launch", true)
+                      putExtra("playlist_index", startIndex)
+                      putExtra("launch_source", "playlist")
+                      putExtra("playlist_id", playlistId)
+                      putExtra("title", targetVideo.displayName)
+                      putExtra("absolute_path", targetVideo.path)
+                      putExtra("video_id", targetVideo.id)
+                      putExtra("date_modified", targetVideo.dateModified)
+                      putExtra("size", targetVideo.size)
+                  }
                   context.startActivity(intent)
                 }
-              } else {
-                MediaUtils.playFile(item.video, context, "playlist_detail")
-              }
+              } else MediaUtils.playFile(item.video, context, "playlist_detail")
             }
           },
-          onVideoItemLongClick = { item ->
-            selectionManager.toggle(item)
-          },
+          onVideoItemLongClick = { selectionManager.toggle(it) },
           listState = listState,
           modifier = Modifier.fillMaxSize(),
         )
       }
     }
 
-    // Dialogs
-    RemoveFromPlaylistDialog(
-      isOpen = deleteDialogOpen.value,
-      onDismiss = { deleteDialogOpen.value = false },
-      onConfirm = { selectionManager.deleteSelected() },
-      itemCount = selectionManager.selectedCount,
-    )
+    if (deleteDialogOpen.value) {
+        AlertDialog(
+            onDismissRequest = { deleteDialogOpen.value = false },
+            title = { Text("Remove from playlist?", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
+            text = { Text("Selected items will be removed from this playlist. Files will not be deleted.", style = MaterialTheme.typography.bodyMedium) },
+            confirmButton = {
+              TextButton(onClick = { selectionManager.deleteSelected(); deleteDialogOpen.value = false }) {
+                Text("Remove", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+              }
+            },
+            dismissButton = { TextButton(onClick = { deleteDialogOpen.value = false }) { Text("Cancel") } },
+            shape = MaterialTheme.shapes.extraLarge
+        )
+    }
 
-    // URL Dialog for M3U streams
     if (showUrlDialog) {
       StreamUrlDialog(
         url = urlDialogContent,
         onDismiss = { showUrlDialog = false },
         onCopy = {
-          val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-          val clip = ClipData.newPlainText("Stream URL", urlDialogContent)
-          clipboardManager.setPrimaryClip(clip)
-          Toast.makeText(context, "URL copied to clipboard", Toast.LENGTH_SHORT).show()
+          val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+          cm.setPrimaryClip(ClipData.newPlainText("URL", urlDialogContent))
+          Toast.makeText(context, "URL copied", Toast.LENGTH_SHORT).show()
         }
       )
     }
@@ -457,148 +337,81 @@ private fun PlaylistVideoListContent(
   val tapThumbnailToSelect by gesturePreferences.tapThumbnailToSelect.collectAsState()
   val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
 
-  // Find the most recently played video (highest lastPlayedAt timestamp)
   val mostRecentlyPlayedItem = remember(videoItems) {
-    videoItems.filter { it.playlistItem.lastPlayedAt > 0 }
-      .maxByOrNull { it.playlistItem.lastPlayedAt }
+    videoItems.filter { it.playlistItem.lastPlayedAt > 0 }.maxByOrNull { it.playlistItem.lastPlayedAt }
   }
 
-  when {
-    isLoading -> {
-      Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-      ) {
-        CircularProgressIndicator(
-          modifier = Modifier.size(48.dp),
-          color = MaterialTheme.colorScheme.primary,
-        )
-      }
+  if (isLoading) {
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+      CircularProgressIndicator(modifier = Modifier.size(48.dp), color = MaterialTheme.colorScheme.primary)
+    }
+  } else if (videoItems.isEmpty()) {
+    EmptyState(icon = Icons.AutoMirrored.Outlined.PlaylistAdd, title = "Empty Playlist", message = "Add some videos to this playlist", modifier = modifier.fillMaxSize())
+  } else {
+    val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
+        if (isReorderMode) onReorder(from.index, to.index)
     }
 
-    videoItems.isEmpty() -> {
-      Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-      ) {
-        Column(
-          horizontalAlignment = Alignment.CenterHorizontally,
-          verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          Icon(
-            imageVector = Icons.AutoMirrored.Outlined.PlaylistAdd,
-            contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-          Text(
-            text = "No videos in playlist",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-          Text(
-            text = "Add videos to get started",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-      }
-    }
-
-    else -> {
-      // Only show scrollbar if list has more than 20 items
-      val hasEnoughItems = videoItems.size > 20
-
-      // Animate scrollbar alpha
-      val scrollbarAlpha by animateFloatAsState(
-        targetValue = if (!hasEnoughItems) 0f else 1f,
-        animationSpec = tween(durationMillis = 200),
-        label = "scrollbarAlpha",
-      )
-
-      // Reorderable state
-      val reorderableLazyListState = rememberReorderableLazyListState(listState) { from, to ->
-        if (isReorderMode) {
-          onReorder(from.index, to.index)
-        }
-      }
-
-      LazyColumnScrollbar(
+    LazyColumnScrollbar(
+      state = listState,
+      settings = ScrollbarSettings(
+          thumbUnselectedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+          thumbSelectedColor = MaterialTheme.colorScheme.primary,
+      ),
+      modifier = modifier.fillMaxSize(),
+    ) {
+      LazyColumn(
         state = listState,
-        settings = ScrollbarSettings(
-          thumbUnselectedColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f * scrollbarAlpha),
-          thumbSelectedColor = MaterialTheme.colorScheme.primary.copy(alpha = scrollbarAlpha),
-        ),
-        modifier = modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = 12.dp, start = 8.dp, end = 8.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
       ) {
-        LazyColumn(
-          state = listState,
-          modifier = Modifier.fillMaxSize(),
-          contentPadding = PaddingValues(top = 8.dp, start = 8.dp, end = 8.dp, bottom = 16.dp),
-          verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          items(
-            count = videoItems.size,
-            key = { index -> videoItems[index].playlistItem.id },
-          ) { index ->
-            ReorderableItem(reorderableLazyListState, key = videoItems[index].playlistItem.id) {
-              val item = videoItems[index]
+        items(count = videoItems.size, key = { videoItems[it].playlistItem.id }) { index ->
+          ReorderableItem(reorderableState, key = videoItems[index].playlistItem.id) { isDragging ->
+            val item = videoItems[index]
+            val elevation by animateFloatAsState(if (isDragging) 8f else 0f, label = "elevation")
 
-              val progressPercentage = if (item.playlistItem.lastPosition > 0 && item.video.duration > 0) {
-                item.playlistItem.lastPosition.toFloat() / item.video.duration.toFloat() * 100f
-              } else null
-
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-              ) {
-                // Use M3UVideoCard for streaming URLs, VideoCard for local files
-                if (isM3uPlaylist) {
-                  M3UVideoCard(
-                    title = item.video.displayName,
-                    url = item.video.path,
-                    onClick = { onVideoItemClick(item) },
-                    onLongClick = { onVideoItemLongClick(item) },
-                    settings = videoCardSettings,
-                    isSelected = selectionManager.isSelected(item),
-                    isRecentlyPlayed = item.playlistItem.id == mostRecentlyPlayedItem?.playlistItem?.id,
-                    modifier = Modifier.weight(1f),
-                  )
-                } else {
-                  VideoCard(
-                    video = item.video,
-                    settings = videoCardSettings,
-                    progressPercentage = progressPercentage,
-                    isRecentlyPlayed = item.playlistItem.id == mostRecentlyPlayedItem?.playlistItem?.id,
-                    isSelected = selectionManager.isSelected(item),
-                    onClick = { onVideoItemClick(item) },
-                    onLongClick = { onVideoItemLongClick(item) },
-                    onThumbClick = if (tapThumbnailToSelect) {
-                      { onVideoItemLongClick(item) }
-                    } else {
-                      { onVideoItemClick(item) }
-                    },
-                    showSubtitleIndicator = showSubtitleIndicator,
-                    modifier = Modifier.weight(1f),
-                  )
-                }
-
-                // Drag handle - only show when in reorder mode, positioned at the end
-                if (isReorderMode) {
-                  IconButton(
-                    onClick = { },
-                    modifier = Modifier
-                      .size(48.dp)
-                      .draggableHandle(),
-                  ) {
-                    Icon(
-                      imageVector = Icons.Filled.DragHandle,
-                      contentDescription = "Drag to reorder",
-                      tint = MaterialTheme.colorScheme.primary,
+            Surface(
+                tonalElevation = elevation.dp,
+                shape = MaterialTheme.shapes.extraLarge,
+                color = Color.Transparent
+            ) {
+                Row(
+                  modifier = Modifier.fillMaxWidth(),
+                  verticalAlignment = Alignment.CenterVertically,
+                ) {
+                  if (isM3uPlaylist) {
+                    M3UVideoCard(
+                      title = item.video.displayName,
+                      url = item.video.path,
+                      onClick = { onVideoItemClick(item) },
+                      onLongClick = { onVideoItemLongClick(item) },
+                      settings = videoCardSettings,
+                      isSelected = selectionManager.isSelected(item),
+                      isRecentlyPlayed = item.playlistItem.id == mostRecentlyPlayedItem?.playlistItem?.id,
+                      modifier = Modifier.weight(1f),
+                    )
+                  } else {
+                    VideoCard(
+                      video = item.video,
+                      settings = videoCardSettings,
+                      progressPercentage = if (item.playlistItem.lastPosition > 0 && item.video.duration > 0) item.playlistItem.lastPosition.toFloat() / item.video.duration.toFloat() else null,
+                      isRecentlyPlayed = item.playlistItem.id == mostRecentlyPlayedItem?.playlistItem?.id,
+                      isSelected = selectionManager.isSelected(item),
+                      onClick = { onVideoItemClick(item) },
+                      onLongClick = { onVideoItemLongClick(item) },
+                      onThumbClick = { if (tapThumbnailToSelect || selectionManager.isInSelectionMode) onVideoItemLongClick(item) else onVideoItemClick(item) },
+                      showSubtitleIndicator = showSubtitleIndicator,
+                      modifier = Modifier.weight(1f),
                     )
                   }
+
+                  if (isReorderMode) {
+                    IconButton(onClick = { }, modifier = Modifier.size(48.dp).draggableHandle()) {
+                      Icon(Icons.Filled.DragHandle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                  }
                 }
-              }
             }
           }
         }
@@ -608,114 +421,19 @@ private fun PlaylistVideoListContent(
 }
 
 @Composable
-private fun StreamUrlDialog(
-  url: String,
-  onDismiss: () -> Unit,
-  onCopy: () -> Unit,
-) {
+private fun StreamUrlDialog(url: String, onDismiss: () -> Unit, onCopy: () -> Unit) {
   AlertDialog(
     onDismissRequest = onDismiss,
-    title = { Text("Stream URL") },
-    text = {
-      Text(
-        text = url,
-        style = MaterialTheme.typography.bodyMedium,
-        modifier = Modifier.fillMaxWidth()
-      )
-    },
+    title = { Text("Stream URL", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
+    text = { Text(text = url, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.fillMaxWidth()) },
     confirmButton = {
-      TextButton(
-        onClick = {
-          onCopy()
-          onDismiss()
-        }
-      ) {
-        Icon(
-          imageVector = Icons.Filled.ContentCopy,
-          contentDescription = null,
-          modifier = Modifier.padding(end = 4.dp).size(18.dp)
-        )
-        Text("Copy")
+      TextButton(onClick = { onCopy(); onDismiss() }) {
+        Icon(Icons.Filled.ContentCopy, contentDescription = null, Modifier.size(18.dp))
+        Spacer(Modifier.width(8.dp))
+        Text("Copy", fontWeight = FontWeight.Bold)
       }
     },
-    dismissButton = {
-      TextButton(onClick = onDismiss) {
-        Text("Close")
-      }
-    },
-  )
-}
-
-@Composable
-private fun RemoveFromPlaylistDialog(
-  isOpen: Boolean,
-  onDismiss: () -> Unit,
-  onConfirm: () -> Unit,
-  itemCount: Int,
-) {
-  if (!isOpen) return
-
-  val itemText = if (itemCount == 1) "video" else "videos"
-
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    title = {
-      Text(
-        text = "Remove $itemCount $itemText from playlist?",
-        style = MaterialTheme.typography.headlineMedium,
-        fontWeight = FontWeight.Bold,
-      )
-    },
-    text = {
-      Column(
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-      ) {
-        Card(
-          colors =
-            CardDefaults.cardColors(
-              containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-            ),
-          shape = MaterialTheme.shapes.extraLarge,
-        ) {
-          Text(
-            text = "The selected $itemText will be removed from this playlist. The original ${if (itemCount == 1) "file" else "files"} will not be deleted.",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.padding(16.dp),
-          )
-        }
-      }
-    },
-    confirmButton = {
-      Button(
-        onClick = {
-          onConfirm()
-          onDismiss()
-        },
-        colors =
-          ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.secondary,
-            contentColor = MaterialTheme.colorScheme.onSecondary,
-          ),
-        shape = MaterialTheme.shapes.extraLarge,
-      ) {
-        Text(
-          text = "Remove from Playlist",
-          fontWeight = FontWeight.Bold,
-        )
-      }
-    },
-    dismissButton = {
-      TextButton(
-        onClick = onDismiss,
-        shape = MaterialTheme.shapes.extraLarge,
-      ) {
-        Text("Cancel", fontWeight = FontWeight.Medium)
-      }
-    },
-    containerColor = MaterialTheme.colorScheme.surface,
-    tonalElevation = 6.dp,
-    shape = MaterialTheme.shapes.extraLarge,
+    dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    shape = MaterialTheme.shapes.extraLarge
   )
 }

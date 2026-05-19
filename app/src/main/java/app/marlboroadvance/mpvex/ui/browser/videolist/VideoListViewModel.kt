@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex.ui.browser.videolist
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -28,6 +29,7 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
 import androidx.compose.runtime.Immutable
+import kotlinx.coroutines.flow.combine
 
 @Immutable
 data class VideoWithPlaybackInfo(
@@ -85,7 +87,7 @@ class VideoListViewModel(
 
     // Observe metadata-impacting preferences to trigger re-enrichment when toggled
     viewModelScope.launch {
-      kotlinx.coroutines.flow.combine(
+      combine(
         browserPreferences.showResolutionChip.changes(),
         browserPreferences.showFramerateInResolution.changes(),
         browserPreferences.showSubtitleIndicator.changes(),
@@ -154,23 +156,66 @@ class VideoListViewModel(
     }
   }
 
+  override suspend fun renameVideo(video: Video, newDisplayName: String): Result<Unit> {
+    val result = super.renameVideo(video, newDisplayName)
+    if (result.isSuccess) {
+      // Soft update local state immediately
+      val oldPath = video.path
+      val parent = File(oldPath).parentFile
+      val newPath = parent?.let { File(it, newDisplayName).absolutePath } ?: oldPath
+      
+      val updatedVideos = _videos.value.map { v ->
+        if (v.path == oldPath) {
+          v.copy(
+            path = newPath,
+            displayName = newDisplayName,
+            title = newDisplayName.substringBeforeLast('.'),
+            uri = Uri.fromFile(File(newPath))
+          )
+        } else {
+          v
+        }
+      }
+      _videos.value = updatedVideos
+      loadPlaybackInfo(updatedVideos)
+    }
+    return result
+  }
+
   private fun loadVideos() {
     viewModelScope.launch(Dispatchers.IO) {
       try {
         // Step 1: Immediate load from MediaStore (fast)
-        var videoList = MediaFileRepository.getVideosInFolder(getApplication(), bucketId)
+        val freshVideoList = MediaFileRepository.getVideosInFolder(getApplication(), bucketId)
         
+        // Merge with existing metadata to avoid UI flicker and redundant enrichment
+        val currentVideos = _videos.value.associateBy { it.path }
+        val mergedList = freshVideoList.map { freshVideo ->
+          val existing = currentVideos[freshVideo.path]
+          if (existing != null && (existing.fps > 0f || existing.subtitleCodec.isNotEmpty())) {
+            // Preserve enriched metadata
+            freshVideo.copy(
+              fps = existing.fps,
+              resolution = existing.resolution,
+              hasEmbeddedSubtitles = existing.hasEmbeddedSubtitles,
+              subtitleCodec = existing.subtitleCodec,
+            )
+          } else {
+            freshVideo
+          }
+        }
+
         // Show initial list immediately so thumbnails can start generating
-        _videos.value = videoList
-        loadPlaybackInfo(videoList)
+        _videos.value = mergedList
+        loadPlaybackInfo(mergedList)
         _isLoading.value = false // Stop loading spinner as soon as we have the basic list
 
         // Step 2: Enrich with detailed metadata (framerate, resolution, codec) if needed
-        if (MetadataRetrieval.isVideoMetadataNeeded(browserPreferences) && videoList.isNotEmpty()) {
-          Log.d(tag, "Metadata chips enabled, enriching ${videoList.size} videos in background")
+        if (MetadataRetrieval.isVideoMetadataNeeded(browserPreferences) && mergedList.isNotEmpty()) {
+          Log.d(tag, "Metadata chips enabled, enriching ${mergedList.size} videos in background")
           val enrichedList = MetadataRetrieval.enrichVideosIfNeeded(
             context = getApplication(),
-            videos = videoList,
+            videos = mergedList,
             browserPreferences = browserPreferences,
             metadataCache = metadataCache
           )
@@ -180,7 +225,7 @@ class VideoListViewModel(
           loadPlaybackInfo(enrichedList)
         }
 
-        if (videoList.isEmpty()) {
+        if (freshVideoList.isEmpty()) {
           Log.d(tag, "No videos found for bucket $bucketId - attempting media rescan")
           triggerMediaScan()
           delay(1000)

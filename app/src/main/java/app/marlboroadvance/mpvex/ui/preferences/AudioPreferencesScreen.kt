@@ -2,27 +2,28 @@ package app.marlboroadvance.mpvex.ui.preferences
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -54,7 +55,6 @@ object AudioPreferencesScreen : Screen {
     
     val channelNames = AudioChannels.entries.associateWith { stringResource(it.title) }
 
-    // OLED Optimization: Pure black background in dark mode
     val darkMode by appPreferences.darkMode.collectAsState()
     val systemDarkTheme = isSystemInDarkTheme()
     val isDark = when (darkMode) {
@@ -62,25 +62,22 @@ object AudioPreferencesScreen : Screen {
       DarkMode.Light -> false
       DarkMode.System -> systemDarkTheme
     }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.background
+    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Surface(
       modifier = Modifier.fillMaxSize(),
       color = backgroundColor
     ) {
       Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
           TopAppBar(
-            modifier = Modifier.statusBarsPadding(),
-            colors = TopAppBarDefaults.topAppBarColors(
-              containerColor = Color.Transparent,
-              scrolledContainerColor = Color.Transparent
-            ),
             title = { 
               Text(
                 text = stringResource(R.string.pref_audio),
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.primary,
               )
@@ -94,14 +91,24 @@ object AudioPreferencesScreen : Screen {
                 )
               }
             },
+            scrollBehavior = scrollBehavior,
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                titleContentColor = MaterialTheme.colorScheme.primary
+            )
           )
         },
       ) { padding ->
         ProvidePreferenceLocals {
           LazyColumn(
-            modifier = Modifier
-              .fillMaxSize()
-              .padding(padding),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                top = padding.calculateTopPadding(),
+                bottom = padding.calculateBottomPadding() + 24.dp,
+                start = 8.dp,
+                end = 8.dp
+            )
           ) {
             item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_audio))
@@ -122,21 +129,11 @@ object AudioPreferencesScreen : Screen {
                     ) 
                   },
                   summary = {
-                    if (preferredLanguages.isNotBlank()) {
-                      Text(
-                        text = preferredLanguages,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Light,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                      )
-                    } else {
-                      Text(
-                        text = stringResource(R.string.not_set_video_default),
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Light,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                      )
-                    }
+                    Text(
+                      text = preferredLanguages.ifBlank { stringResource(R.string.not_set_video_default) },
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                   },
                   textField = { value, onValueChange, _ ->
                     Column {
@@ -166,9 +163,8 @@ object AudioPreferencesScreen : Screen {
                   summary = { 
                     Text(
                       text = stringResource(R.string.pref_audio_pitch_correction_summary),
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
@@ -189,9 +185,8 @@ object AudioPreferencesScreen : Screen {
                   summary = { 
                     Text(
                       text = stringResource(R.string.pref_audio_volume_normalization_summary),
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
@@ -229,9 +224,8 @@ object AudioPreferencesScreen : Screen {
                   summary = { 
                     Text(
                       text = channelNames[audioChannel] ?: "",
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
@@ -257,9 +251,8 @@ object AudioPreferencesScreen : Screen {
                       } else {
                         volumeBoostCap.toString()
                       },
-                      style = MaterialTheme.typography.bodySmall,
-                      fontWeight = FontWeight.Light,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                   onSliderValueChange = { preferences.volumeBoostCap.set(it.toInt()) },

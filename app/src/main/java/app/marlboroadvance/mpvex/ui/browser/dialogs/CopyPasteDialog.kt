@@ -34,6 +34,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -194,11 +197,11 @@ fun FileOperationProgressDialog(
               overflow = TextOverflow.Ellipsis,
             )
 
-            // Overall Progress Section
+            // Overall Progress Section - Refactored for Draw-phase updates
             ProgressSection(
               label = "Overall Progress",
-              progress = progress.overallProgress,
-              details = "${CopyPasteOps.formatBytes(progress.bytesProcessed)} / ${CopyPasteOps.formatBytes(progress.totalBytes)}"
+              progressProvider = { progress.overallProgress },
+              detailsProvider = { "${CopyPasteOps.formatBytes(progress.bytesProcessed)} / ${CopyPasteOps.formatBytes(progress.totalBytes)}" }
             )
           }
         }
@@ -290,11 +293,9 @@ private fun StatusCard(
 @Composable
 private fun ProgressSection(
   label: String,
-  progress: Float,
-  details: String
+  progressProvider: () -> Float,
+  detailsProvider: () -> String
 ) {
-  val percentage = (progress * 100).toInt().coerceIn(0, 100)
-  
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Row(
       modifier = Modifier.fillMaxWidth(),
@@ -308,15 +309,18 @@ private fun ProgressSection(
           color = MaterialTheme.colorScheme.primary,
           fontWeight = FontWeight.Bold
         )
+        // Wrapped in remember derived state to avoid frequent label recompositions
+        val percentageText by remember { derivedStateOf { "${(progressProvider() * 100).toInt().coerceIn(0, 100)}%" } }
         Text(
-          text = "$percentage%",
+          text = percentageText,
           style = MaterialTheme.typography.labelMedium,
           color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
           fontWeight = FontWeight.SemiBold
         )
       }
+      val detailsText by remember { derivedStateOf { detailsProvider() } }
       Text(
-        text = details,
+        text = detailsText,
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
       )
@@ -329,7 +333,7 @@ private fun ProgressSection(
       stroke = WavyProgressIndicatorDefaults.linearIndicatorStroke,
       trackStroke = WavyProgressIndicatorDefaults.linearTrackStroke,
       amplitude = { 0.5f },
-      progress = { progress },
+      progress = progressProvider,
     )
   }
 }

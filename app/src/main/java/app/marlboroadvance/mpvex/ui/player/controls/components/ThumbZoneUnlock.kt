@@ -1,186 +1,231 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathMeasure
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.ui.theme.controlColor
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
- * A modern "Glassmorphic Squircle" unlock button.
- * Requires a sustained press to unlock, preventing accidental triggers.
- * Matches the updated player UI with translucent surfaces and outlined icons.
+ * A redesigned "Thumb Zone" unlock button for one-handed operation.
+ * Features glass-morphism, a circular progress arc, and an atmospheric "light bleed" aura.
+ * Visually anchored to the corner while maintaining a generous hit area.
  */
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun ThumbZoneUnlock(
     onUnlock: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    
     var isPressed by remember { mutableStateOf(false) }
     var isUnlocked by remember { mutableStateOf(false) }
     val progress = remember { Animatable(0f) }
 
-    val cornerRadius = 18.dp
-    val unlockShape = RoundedCornerShape(cornerRadius)
-    val glassBorder = BorderStroke(0.5.dp, Color.White.copy(alpha = 0.15f))
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val glassColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.6f)
+    val glassBorderColor = Color.White.copy(alpha = 0.15f)
 
-    // Logic to handle the hold-to-unlock progress
+    // Handle the hold-to-unlock progress logic
     LaunchedEffect(isPressed) {
         if (isPressed && !isUnlocked) {
-            // Animate progress to 1 over 800ms
             progress.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(800, easing = LinearEasing)
             )
-            // If it reached the end, trigger unlock and reset
             if (progress.value == 1f) {
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 isUnlocked = true
                 onUnlock()
             }
         } else if (!isUnlocked) {
-            // Rapidly reset progress if released early
+            // Spring back to 0 on early release
             progress.animateTo(
                 targetValue = 0f,
-                animationSpec = spring(stiffness = Spring.StiffnessMedium)
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
             )
         }
     }
 
-    // Scale animation synchronized with the Play/Pause Hero button
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.92f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "PressScale"
+    // Post-unlock visibility and payoff animations
+    var isVisible by remember { mutableStateOf(true) }
+    val auraFlashAlpha = remember { Animatable(0f) }
+    val successPopScale = remember { Animatable(1f) }
+
+    LaunchedEffect(isUnlocked) {
+        if (isUnlocked) {
+            scope.launch {
+                // Aura flash payoff
+                auraFlashAlpha.animateTo(1f, tween(100))
+                auraFlashAlpha.animateTo(0f, tween(800))
+            }
+            scope.launch {
+                // Icon scale pop (1.0 -> 1.3 -> 1.0)
+                successPopScale.animateTo(
+                    targetValue = 1f,
+                    initialVelocity = 15f,
+                    animationSpec = spring(
+                        dampingRatio = Spring.DampingRatioMediumBouncy,
+                        stiffness = Spring.StiffnessLow
+                    )
+                )
+            }
+            // Fade out the entire button after 1 second
+            delay(1000)
+            isVisible = false
+        }
+    }
+
+    val componentAlpha by animateFloatAsState(
+        targetValue = if (isVisible) 1f else 0f,
+        animationSpec = tween(800),
+        label = "ComponentAlpha"
     )
+
+    // Press feedback scale
+    val buttonScale by animateFloatAsState(
+        targetValue = if (isUnlocked) 1f else if (isPressed) 0.92f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "ButtonScale"
+    )
+
+    val density = LocalDensity.current
+    val arcStrokeWidth = with(density) { 3.dp.toPx() }
+    val borderStrokeWidth = with(density) { 0.5.dp.toPx() }
 
     Box(
         modifier = modifier
-            .size(64.dp)
+            .size(96.dp) // Generous hit area for thumb zone
             .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
+                alpha = componentAlpha
+                scaleX = buttonScale
+                scaleY = buttonScale
             }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        isPressed = true
-                        try {
-                            awaitRelease()
-                        } finally {
-                            isPressed = false
-                        }
-                    }
-                )
-            },
-        contentAlignment = Alignment.Center
-    ) {
-        // Main Surface with Glassmorphism
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            shape = unlockShape,
-            color = if (isUnlocked) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-            } else {
-                MaterialTheme.colorScheme.surface.copy(alpha = 0.45f)
-            },
-            border = glassBorder,
-            tonalElevation = 0.dp
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                // Icon - Switch to Outlined for modern feel
-                Icon(
-                    imageVector = if (isUnlocked) Icons.Outlined.LockOpen else Icons.Outlined.Lock,
-                    contentDescription = "Unlock",
-                    tint = if (isUnlocked) Color.White else controlColor,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
-
-        // Custom Squircle Progress Border
-        if (progress.value > 0f && !isUnlocked) {
-            val primaryColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(1.25.dp) // Offset to align with the physical border
-            ) {
-                val strokeWidthPx = 2.5.dp.toPx()
-                val cornerRadiusPx = cornerRadius.toPx()
+            .drawBehind {
+                val circleRadius = 36.dp.toPx() // Visible container radius (72dp diameter)
                 
-                // Create the squircle path
-                val squirclePath = Path().apply {
-                    addRoundRect(
-                        RoundRect(
-                            rect = Rect(Offset.Zero, size),
-                            cornerRadius = CornerRadius(cornerRadiusPx)
-                        )
+                // Anchor the visual elements to the bottom-right corner of the hit area
+                // This makes the button flush with the screen edges if the parent is aligned to BottomEnd.
+                val visualCenter = Offset(size.width - circleRadius, size.height - circleRadius)
+
+                // 1. Atmospheric Aura Glow
+                // Radiates inward from the absolute corner for a light bleed effect
+                val baseAuraAlpha = if (isUnlocked) auraFlashAlpha.value else (progress.value * 0.12f)
+                if (baseAuraAlpha > 0f) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                primaryColor.copy(alpha = baseAuraAlpha),
+                                primaryColor.copy(alpha = baseAuraAlpha * 0.2f),
+                                Color.Transparent
+                            ),
+                            center = Offset(size.width, size.height), // Edge of the device
+                            radius = circleRadius * 2.5f
+                        ),
+                        radius = circleRadius * 2.5f,
+                        center = visualCenter
                     )
                 }
 
-                // Measure the path and get the segment
-                val pathMeasure = PathMeasure()
-                pathMeasure.setPath(squirclePath, false)
-                
-                val drawPath = Path()
-                // PathMeasure starts from the right side by default in Android for addRoundRect.
-                // For a natural look, we draw the segment based on progress.
-                pathMeasure.getSegment(
-                    startDistance = 0f,
-                    stopDistance = progress.value * pathMeasure.length,
-                    destination = drawPath
+                // 2. Glass Background Circle
+                drawCircle(
+                    color = glassColor,
+                    radius = circleRadius,
+                    center = visualCenter
                 )
 
-                drawPath(
-                    path = drawPath,
-                    color = primaryColor,
-                    style = Stroke(
-                        width = strokeWidthPx,
-                        cap = StrokeCap.Round
+                // 3. Subtle Glass Border
+                drawCircle(
+                    color = glassBorderColor,
+                    radius = circleRadius,
+                    center = visualCenter,
+                    style = Stroke(width = borderStrokeWidth)
+                )
+
+                // 4. Progress Arc (Primary Hold Feedback)
+                // Sweeps counter-clockwise away from the corner towards screen center
+                if (progress.value > 0f && !isUnlocked) {
+                    drawArc(
+                        color = primaryColor,
+                        startAngle = 0f,
+                        sweepAngle = progress.value * -360f,
+                        useCenter = false,
+                        topLeft = Offset(visualCenter.x - circleRadius, visualCenter.y - circleRadius),
+                        size = Size(circleRadius * 2, circleRadius * 2),
+                        style = Stroke(width = arcStrokeWidth)
                     )
+                }
+            }
+            .pointerInput(isUnlocked) {
+                if (!isUnlocked) {
+                    detectTapGestures(
+                        onPress = {
+                            isPressed = true
+                            try {
+                                awaitRelease()
+                            } finally {
+                                isPressed = false
+                            }
+                        }
+                    )
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        // Offset the icon container to match the shifted visual center
+        // (96dp box center is 48, 48. Visual center is 60, 60. Offset is +12, +12)
+        Box(
+            modifier = Modifier.offset(x = 12.dp, y = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            AnimatedContent(
+                targetState = isUnlocked,
+                transitionSpec = {
+                    (fadeIn(animationSpec = tween(200, delayMillis = 50)) + 
+                     scaleIn(initialScale = 0.8f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)))
+                        .togetherWith(fadeOut(animationSpec = tween(100)))
+                },
+                label = "LockIconTransition"
+            ) { unlocked ->
+                Icon(
+                    imageVector = if (unlocked) Icons.Outlined.LockOpen else Icons.Outlined.Lock,
+                    contentDescription = null,
+                    tint = if (unlocked) Color.White else controlColor.copy(alpha = 0.8f),
+                    modifier = Modifier
+                        .size(28.dp)
+                        .graphicsLayer {
+                            scaleX = successPopScale.value
+                            scaleY = successPopScale.value
+                        }
                 )
             }
         }

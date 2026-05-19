@@ -1,71 +1,42 @@
 package app.marlboroadvance.mpvex.ui.browser.networkstreaming
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SignalWifiConnectedNoInternet4
 import androidx.compose.material.icons.rounded.SignalWifiStatusbarConnectedNoInternet4
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.marlboroadvance.mpvex.domain.network.NetworkConnection
 import app.marlboroadvance.mpvex.presentation.Screen
+import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.cards.NetworkConnectionCard
 import app.marlboroadvance.mpvex.ui.browser.dialogs.AddConnectionSheet
 import app.marlboroadvance.mpvex.ui.browser.dialogs.EditConnectionSheet
-import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
-import app.marlboroadvance.mpvex.preferences.FolderViewMode
 
 @Serializable
 object NetworkStreamingScreen : Screen {
@@ -79,36 +50,25 @@ object NetworkStreamingScreen : Screen {
 
     val connections by viewModel.connections.collectAsState()
     val connectionStatuses by viewModel.connectionStatuses.collectAsState()
-    val browserPreferences = koinInject<app.marlboroadvance.mpvex.preferences.BrowserPreferences>()
     var showAddSheet by remember { mutableStateOf(false) }
     var editingConnection by remember { mutableStateOf<NetworkConnection?>(null) }
-    val navigationBarHeight = app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight.current
+    val navigationBarHeight = LocalNavigationBarHeight.current
 
-    // LazyList state for scroll tracking
-    val listState = LazyListState()
-
-    // Track scroll direction to show/hide FAB
+    val listState = remember { LazyListState() }
+    
     var previousFirstVisibleItemIndex by remember { mutableIntStateOf(0) }
     var previousFirstVisibleItemScrollOffset by remember { mutableIntStateOf(0) }
-    
-    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     
     val isFabVisible by remember {
       derivedStateOf {
         val currentIndex = listState.firstVisibleItemIndex
         val currentOffset = listState.firstVisibleItemScrollOffset
-
-        // Show FAB when at the top
-        if (currentIndex == 0 && currentOffset == 0) {
-          true
-        } else {
-          // Show when scrolling up, hide when scrolling down
+        if (currentIndex == 0 && currentOffset == 0) true
+        else {
           val isScrollingUp = currentIndex < previousFirstVisibleItemIndex ||
             (currentIndex == previousFirstVisibleItemIndex && currentOffset < previousFirstVisibleItemScrollOffset)
-
           previousFirstVisibleItemIndex = currentIndex
           previousFirstVisibleItemScrollOffset = currentOffset
-
           isScrollingUp
         }
       }
@@ -121,101 +81,81 @@ object NetworkStreamingScreen : Screen {
             isInSelectionMode = false,
             selectedCount = 0,
             totalCount = 0,
-            onBackClick = null, // No back button for network screen (root tab)
+            onBackClick = null,
             onCancelSelection = { },
-          onSortClick = null,
-          onSettingsClick = {
-            backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
-          },
-          onDeleteClick = null,
-          onRenameClick = null,
-          isSingleSelection = false,
-          onInfoClick = null,
-          onShareClick = null,
-          onPlayClick = null,
-          onSelectAll = null,
-          onInvertSelection = null,
-          onDeselectAll = null,
-        )
+            onSettingsClick = { backstack.add(PreferencesScreen) },
+          )
       },
       floatingActionButton = {
-        val navigationBarHeight = app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight.current
         if (isFabVisible) {
+          val fabScale by animateFloatAsState(
+              targetValue = 1f,
+              animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+              label = "fab_scale"
+          )
           ExtendedFloatingActionButton(
             onClick = { showAddSheet = true },
-            icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-            text = { Text("Add Connection") },
-            modifier = Modifier.padding(bottom = navigationBarHeight)
+            icon = { Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(24.dp)) },
+            text = { Text("Add Connection", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold) },
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier.padding(bottom = navigationBarHeight).scale(fabScale)
           )
         }
       },
     ) { padding ->
       LazyColumn(
         state = listState,
-        modifier = Modifier
-          .fillMaxSize()
-          .padding(padding),
-        contentPadding = PaddingValues(
-          start = 16.dp, 
-          end = 16.dp, 
-          top = 16.dp, 
-          bottom = navigationBarHeight
-        ),
+        modifier = Modifier.fillMaxSize().padding(padding),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = navigationBarHeight + 32.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
       ) {
-          // Section 1: Stream Link
           item {
             StreamLinkSection(
-              onPlayLink = { url ->
-                MediaUtils.playFile(url, context, "network_stream")
-              },
+              onPlayLink = { url -> MediaUtils.playFile(url, context, "network_stream") },
             )
           }
 
-          // Section 2: Local Network header
           item {
-            Spacer(modifier = Modifier.height(24.dp))
             Text(
-              text = "Local Network",
-              style = MaterialTheme.typography.titleLarge,
+              text = "Saved Connections",
+              style = MaterialTheme.typography.titleLarge.copy(letterSpacing = (-0.3).sp),
               fontWeight = FontWeight.Bold,
               color = MaterialTheme.colorScheme.primary,
-              modifier = Modifier.padding(vertical = 8.dp),
+              modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
             )
           }
 
-          // Show empty state or connection list
           if (connections.isEmpty()) {
             item {
-              Card(
+              Surface(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                  containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                ),
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                tonalElevation = 1.dp
               ) {
                 Column(
-                  modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
+                  modifier = Modifier.fillMaxWidth().padding(32.dp),
                   horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                   Icon(
                     imageVector = Icons.Rounded.SignalWifiStatusbarConnectedNoInternet4,
                     contentDescription = null,
-                    modifier = Modifier.size(48.dp),
-                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
                   )
                   Spacer(modifier = Modifier.height(16.dp))
                   Text(
-                    text = "No network connections",
+                    text = "No connections",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface, // a
+                    color = MaterialTheme.colorScheme.onSurface,
                   )
-                  Spacer(modifier = Modifier.height(8.dp))
                   Text(
-                    text = "Add SMB, FTP, or WebDAV connections to browse network files",
+                    text = "Add SMB, FTP, or WebDAV to browse files",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
                   )
                 }
@@ -226,56 +166,36 @@ object NetworkStreamingScreen : Screen {
               val status = connectionStatuses[connection.id]
               NetworkConnectionCard(
                 connection = connection,
-                onConnect = { conn ->
-                  viewModel.connect(conn)
-                },
-                onDisconnect = { conn -> viewModel.disconnect(conn) },
-                onEdit = { conn -> editingConnection = conn },
-                onDelete = { conn -> viewModel.deleteConnection(conn) },
+                onConnect = { viewModel.connect(it) },
+                onDisconnect = { viewModel.disconnect(it) },
+                onEdit = { editingConnection = it },
+                onDelete = { viewModel.deleteConnection(it) },
                 onBrowse = { conn ->
-                  // Navigate to browser screen if connected
                   if (status?.isConnected == true) {
-                    backstack.add(
-                      NetworkBrowserScreen(
-                        connectionId = conn.id,
-                        connectionName = conn.name,
-                        currentPath = "/",  // Always start at root - conn.path is already included in connection
-                      ),
-                    )
+                    backstack.add(NetworkBrowserScreen(connectionId = conn.id, connectionName = conn.name, currentPath = "/"))
                   }
                 },
-                onAutoConnectChange = { conn, autoConnect ->
-                  viewModel.updateConnection(conn.copy(autoConnect = autoConnect))
-                },
+                onAutoConnectChange = { conn, autoConnect -> viewModel.updateConnection(conn.copy(autoConnect = autoConnect)) },
                 isConnected = status?.isConnected ?: false,
                 isConnecting = status?.isConnecting ?: false,
                 error = status?.error,
-                modifier = Modifier.padding(bottom = 16.dp),
               )
             }
           }
         }
 
-      // Add Connection Sheet
       AddConnectionSheet(
         isOpen = showAddSheet,
         onDismiss = { showAddSheet = false },
-        onSave = { connection ->
-          viewModel.addConnection(connection)
-          showAddSheet = false
-        },
+        onSave = { connection -> viewModel.addConnection(connection); showAddSheet = false },
       )
 
-      // Edit Connection Sheet
       editingConnection?.let { connection ->
         EditConnectionSheet(
           connection = connection,
           isOpen = true,
           onDismiss = { editingConnection = null },
-          onSave = { updatedConnection ->
-            viewModel.updateConnection(updatedConnection)
-            editingConnection = null
-          },
+          onSave = { updatedConnection -> viewModel.updateConnection(updatedConnection); editingConnection = null },
         )
       }
     }
@@ -289,101 +209,55 @@ private fun StreamLinkSection(
   val context = LocalContext.current
   var linkUrl by rememberSaveable { mutableStateOf("") }
 
-  Column(
-    modifier = Modifier.fillMaxWidth(),
-  ) {
+  Column(modifier = Modifier.fillMaxWidth()) {
     Text(
       text = "Stream Link",
-      style = MaterialTheme.typography.titleLarge,
+      style = MaterialTheme.typography.titleLarge.copy(letterSpacing = (-0.3).sp),
       fontWeight = FontWeight.Bold,
       color = MaterialTheme.colorScheme.primary,
-      modifier = Modifier.padding(vertical = 8.dp),
+      modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp),
     )
-    Card(
+    Surface(
       modifier = Modifier.fillMaxWidth(),
-      colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
-      ),
+      shape = MaterialTheme.shapes.extraLarge,
+      color = MaterialTheme.colorScheme.surfaceContainerLow,
+      tonalElevation = 1.dp
     ) {
-      Column(
-        modifier = Modifier.padding(16.dp),
-      ) {
+      Column(modifier = Modifier.padding(16.dp)) {
         OutlinedTextField(
           value = linkUrl,
           onValueChange = { linkUrl = it },
           label = { Text("Video URL") },
-          placeholder = {
-            Text(
-              text = "https://example.com/video.mp4",
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          },
-          leadingIcon = {
-            Icon(
-              imageVector = Icons.Filled.Link,
-              contentDescription = null,
-              tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          },
+          placeholder = { Text("https://example.com/video.mp4") },
+          leadingIcon = { Icon(Icons.Filled.Link, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
           modifier = Modifier.fillMaxWidth(),
           singleLine = true,
+          shape = MaterialTheme.shapes.large
         )
         Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp),
-          horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+          modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+          horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
         ) {
           FilledTonalButton(
             onClick = {
-              val clipboardManager =
-                context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-              val clipData = clipboardManager?.primaryClip
-              if (clipData != null && clipData.itemCount > 0) {
-                val text = clipData.getItemAt(0).text?.toString() ?: ""
-                if (text.isNotBlank()) {
-                  linkUrl = text
-                }
-              }
+              val clipboardManager = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+              clipboardManager?.primaryClip?.let { if (it.itemCount > 0) linkUrl = it.getItemAt(0).text?.toString() ?: "" }
             },
-            colors = ButtonDefaults.filledTonalButtonColors(
-              containerColor = MaterialTheme.colorScheme.secondaryContainer,
-              contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ),
+            shape = MaterialTheme.shapes.medium
           ) {
-            Icon(
-              imageVector = Icons.Filled.ContentPaste,
-              contentDescription = null,
-              modifier = Modifier.padding(end = 8.dp),
-            )
-            Text(
-              text = "Paste",
-              fontWeight = FontWeight.Bold,
-            )
+            Icon(Icons.Filled.ContentPaste, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Paste", fontWeight = FontWeight.Bold)
           }
 
-          FilledTonalButton(
-            onClick = {
-              if (linkUrl.isNotBlank()) {
-                onPlayLink(linkUrl)
-                linkUrl = ""
-              }
-            },
+          Button(
+            onClick = { if (linkUrl.isNotBlank()) { onPlayLink(linkUrl); linkUrl = "" } },
             enabled = linkUrl.isNotBlank(),
-            colors = ButtonDefaults.filledTonalButtonColors(
-              containerColor = MaterialTheme.colorScheme.primaryContainer,
-              contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            ),
+            shape = MaterialTheme.shapes.medium
           ) {
-            Icon(
-              imageVector = Icons.Filled.PlayArrow,
-              contentDescription = null,
-              modifier = Modifier.padding(end = 8.dp),
-            )
-            Text(
-              text = "Play",
-              fontWeight = FontWeight.Bold,
-            )
+            Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Play", fontWeight = FontWeight.Bold)
           }
         }
       }

@@ -1,11 +1,5 @@
 package app.marlboroadvance.mpvex.ui.browser.states
 
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,11 +14,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -38,30 +29,6 @@ fun EmptyState(
   modifier: Modifier = Modifier,
   action: (@Composable () -> Unit)? = null,
 ) {
-  val infiniteTransition = rememberInfiniteTransition(label = "empty_state")
-
-  // Combined scale + alpha for a more alive, M3-compliant motion feel
-  val animatedScale by infiniteTransition.animateFloat(
-    initialValue = 0.97f,
-    targetValue = 1.00f,
-    animationSpec =
-      infiniteRepeatable(
-        animation = tween(2500, easing = FastOutSlowInEasing),
-        repeatMode = RepeatMode.Reverse,
-      ),
-    label = "icon_scale",
-  )
-  val animatedAlpha by infiniteTransition.animateFloat(
-    initialValue = 0.6f,
-    targetValue = 1f,
-    animationSpec =
-      infiniteRepeatable(
-        animation = tween(2500, easing = FastOutSlowInEasing),
-        repeatMode = RepeatMode.Reverse,
-      ),
-    label = "icon_alpha",
-  )
-
   Column(
     modifier = modifier
       .fillMaxSize()
@@ -73,9 +40,6 @@ fun EmptyState(
     // Layered icon container: decorative ring behind the main surface
     Box(
       contentAlignment = Alignment.Center,
-      modifier = Modifier
-        .scale(animatedScale)
-        .alpha(animatedAlpha),
     ) {
       // Outer decorative ring
       Surface(

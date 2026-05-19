@@ -15,7 +15,9 @@ class ProxyLifecycleObserver : DefaultLifecycleObserver {
 
   override fun onStop(owner: LifecycleOwner) {
     super.onStop(owner)
-    // When the app goes to background, keep the proxy running
+    // Shut down proxy to save battery when app is in background
+    Log.d(TAG, "Stopping proxy due to app entering background")
+    NetworkStreamingProxy.stopInstance()
   }
 
   override fun onDestroy(owner: LifecycleOwner) {

@@ -1,14 +1,15 @@
 package app.marlboroadvance.mpvex.ui.player.controls
 
+import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,8 +23,6 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import android.content.res.Configuration.ORIENTATION_PORTRAIT
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -48,7 +47,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
@@ -68,25 +66,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -99,8 +99,8 @@ import app.marlboroadvance.mpvex.preferences.AudioPreferences
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.preferences.preference.deleteAndGet
-import app.marlboroadvance.mpvex.preferences.preference.plusAssign
 import app.marlboroadvance.mpvex.preferences.preference.minusAssign
+import app.marlboroadvance.mpvex.preferences.preference.plusAssign
 import app.marlboroadvance.mpvex.ui.player.Decoder.Companion.getDecoderFromValue
 import app.marlboroadvance.mpvex.ui.player.Panels
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
@@ -109,20 +109,19 @@ import app.marlboroadvance.mpvex.ui.player.PlayerViewModel
 import app.marlboroadvance.mpvex.ui.player.Sheets
 import app.marlboroadvance.mpvex.ui.player.controls.components.BrightnessSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.CompactSpeedIndicator
-import app.marlboroadvance.mpvex.ui.player.controls.components.MultipleSpeedPlayerUpdate
-import app.marlboroadvance.mpvex.ui.player.controls.components.SeekPlayerUpdate
-import app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarWithTimers
-import app.marlboroadvance.mpvex.ui.player.controls.components.ThumbZoneUnlock
-import app.marlboroadvance.mpvex.ui.player.controls.components.SpeedControlSlider
-import app.marlboroadvance.mpvex.ui.player.controls.components.TextPlayerUpdate
-import app.marlboroadvance.mpvex.ui.player.controls.components.VolumeSlider
-import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
 import app.marlboroadvance.mpvex.ui.player.controls.components.ControlsButton
 import app.marlboroadvance.mpvex.ui.player.controls.components.ControlsButtonType
+import app.marlboroadvance.mpvex.ui.player.controls.components.MultipleSpeedPlayerUpdate
+import app.marlboroadvance.mpvex.ui.player.controls.components.SpeedControlSlider
+import app.marlboroadvance.mpvex.ui.player.controls.components.TextPlayerUpdate
+import app.marlboroadvance.mpvex.ui.player.controls.components.ThumbZoneUnlock
+import app.marlboroadvance.mpvex.ui.player.controls.components.VolumeSlider
+import app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarWithTimers
+import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
+import app.marlboroadvance.mpvex.ui.theme.MpvexTheme
 import app.marlboroadvance.mpvex.ui.theme.controlColor
 import app.marlboroadvance.mpvex.ui.theme.playerRippleConfiguration
 import app.marlboroadvance.mpvex.ui.theme.spacing
-import app.marlboroadvance.mpvex.ui.theme.MpvexTheme
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -130,9 +129,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import androidx.compose.ui.tooling.preview.Preview
 
 @Suppress("CompositionLocalAllowlist")
 val LocalPlayerButtonsClickEvent = staticCompositionLocalOf { {} }
@@ -172,11 +171,9 @@ fun PlayerControls(
   val interactionSource = remember { MutableInteractionSource() }
   val controlsShown by viewModel.controlsShown.collectAsState()
   val areControlsLocked by viewModel.areControlsLocked.collectAsState()
-  val seekBarShown by viewModel.seekBarShown.collectAsState()
   val pausedForCache by MPVLib.propBoolean["paused-for-cache"].collectAsState()
   val paused by MPVLib.propBoolean["pause"].collectAsState()
   val duration by MPVLib.propInt["duration"].collectAsState()
-  val position by MPVLib.propInt["time-pos"].collectAsState()
   val precisePosition by viewModel.precisePosition.collectAsState()
   val preciseDuration by viewModel.preciseDuration.collectAsState()
   val playbackSpeed by MPVLib.propFloat["speed"].collectAsState()
@@ -184,7 +181,7 @@ fun PlayerControls(
   val showDoubleTapOvals by playerPreferences.showDoubleTapOvals.collectAsState()
   val showSeekTime by playerPreferences.showSeekTimeWhileSeeking.collectAsState()
   var isSeeking by remember { mutableStateOf(false) }
-  var resetControlsTimestamp by remember { mutableStateOf(0L) }
+  var resetControlsTimestamp by remember { mutableLongStateOf(0L) }
   val seekText by viewModel.seekText.collectAsState()
   val currentChapter by MPVLib.propInt["chapter"].collectAsState()
   val mpvDecoder by MPVLib.propString["hwdec-current"].collectAsState()
@@ -195,7 +192,6 @@ fun PlayerControls(
   val playerTimeToDisappear by playerPreferences.playerTimeToDisappear.collectAsState()
   val chapters by viewModel.chapters.collectAsState(persistentListOf())
   val playlistMode by playerPreferences.playlistMode.collectAsState()
-    val haptic = LocalHapticFeedback.current
     
   val abLoopA by viewModel.abLoopA.collectAsState()
   val abLoopB by viewModel.abLoopB.collectAsState()
@@ -273,6 +269,7 @@ fun PlayerControls(
 
   DoubleTapToSeekOvals(
     amount = doubleTapSeekAmount,
+    text = seekText,
     showOvals = showDoubleTapOvals,
     showSeekIcon = showSeekTime,
     showSeekTime = showSeekTime,
@@ -323,8 +320,9 @@ fun PlayerControls(
         val swapVolumeAndBrightness by playerPreferences.swapVolumeAndBrightness.collectAsState()
         val reduceMotion by playerPreferences.reduceMotion.collectAsState()
 
-        val aspect by viewModel.videoAspect.collectAsState()
-        val currentZoom by viewModel.videoZoom.collectAsState()
+        val aspectRatio by viewModel.videoAspect.collectAsState()
+        val currentAspectRatio by viewModel.currentAspectRatio.collectAsState()
+        val videoZoom by viewModel.videoZoom.collectAsState()
 
         val rawMediaTitle by MPVLib.propString["media-title"].collectAsState()
         val mediaTitle by remember(rawMediaTitle, activity) {
@@ -433,9 +431,6 @@ fun PlayerControls(
 
         val holdForMultipleSpeed by playerPreferences.holdForMultipleSpeed.collectAsState()
         val currentPlayerUpdate by viewModel.playerUpdate.collectAsState()
-        val aspectRatio by viewModel.videoAspect.collectAsState()
-        val currentAspectRatio by viewModel.currentAspectRatio.collectAsState()
-        val videoZoom by viewModel.videoZoom.collectAsState()
 
         LaunchedEffect(currentPlayerUpdate, aspectRatio, videoZoom) {
           if (currentPlayerUpdate is PlayerUpdates.MultipleSpeed ||
@@ -453,17 +448,9 @@ fun PlayerControls(
           enter = fadeIn(playerControlsEnterAnimationSpec()),
           exit = fadeOut(playerControlsExitAnimationSpec()),
           modifier =
-            Modifier
-              .then(
-                if (showSystemStatusBar) {
-                  Modifier.windowInsetsPadding(WindowInsets.statusBars)
-                } else {
-                  Modifier
-                }
-              )
-              .constrainAs(playerUpdates) {
+            Modifier.constrainAs(playerUpdates) {
                 linkTo(parent.start, parent.end)
-                top.linkTo(parent.top, if (isPortrait) 104.dp else 64.dp)
+                linkTo(parent.top, parent.bottom, bias = 0.25f)
               },
         ) {
           when (currentPlayerUpdate) {
@@ -506,7 +493,7 @@ fun PlayerControls(
                   val parts = str.split("|")
                   if (parts.size == 2) {
                     val savedRatio = parts[1].toDoubleOrNull()
-                    if (savedRatio != null && kotlin.math.abs(savedRatio - currentAspectRatio) < 0.01) {
+                    if (savedRatio != null && abs(savedRatio - currentAspectRatio) < 0.01) {
                       parts[0] // Return the label
                     } else null
                   } else null
@@ -516,15 +503,15 @@ fun PlayerControls(
                   // No custom label found, use preset names or format as ratio
                   val ratio = currentAspectRatio
                   when {
-                    kotlin.math.abs(ratio - 16.0/9.0) < 0.01 -> "16:9"
-                    kotlin.math.abs(ratio - 4.0/3.0) < 0.01 -> "4:3"
-                    kotlin.math.abs(ratio - 16.0/10.0) < 0.01 -> "16:10"
-                    kotlin.math.abs(ratio - 21.0/9.0) < 0.01 -> "21:9"
-                    kotlin.math.abs(ratio - 32.0/9.0) < 0.01 -> "32:9"
-                    kotlin.math.abs(ratio - 1.0) < 0.01 -> "1:1"
-                    kotlin.math.abs(ratio - 2.35) < 0.01 -> "2.35:1"
-                    kotlin.math.abs(ratio - 2.39) < 0.01 -> "2.39:1"
-                    else -> String.format("%.2f:1", ratio)
+                    abs(ratio - 16.0 / 9.0) < 0.01 -> "16:9"
+                    abs(ratio - 4.0 / 3.0) < 0.01 -> "4:3"
+                    abs(ratio - 16.0 / 10.0) < 0.01 -> "16:10"
+                    abs(ratio - 21.0 / 9.0) < 0.01 -> "21:9"
+                    abs(ratio - 32.0 / 9.0) < 0.01 -> "32:9"
+                    abs(ratio - 1.0) < 0.01 -> "1:1"
+                    abs(ratio - 2.35) < 0.01 -> "2.35:1"
+                    abs(ratio - 2.39) < 0.01 -> "2.39:1"
+                    else -> String.format(Locale.US, "%.2f:1", ratio)
                   }
                 }
               } else {
@@ -536,24 +523,16 @@ fun PlayerControls(
             is PlayerUpdates.ShowText ->
               TextPlayerUpdate(
                 (currentPlayerUpdate as PlayerUpdates.ShowText).value,
-                modifier = Modifier.widthIn(min = 120.dp),
               )
 
             is PlayerUpdates.VideoZoom -> {
               val zoomPercentage = (videoZoom * 100).toInt()
-              TextPlayerUpdate(
-                text = String.format("Zoom:%3d%%", zoomPercentage), 
-                modifier = Modifier, // Let content size determine width
-              )
+              TextPlayerUpdate("Zoom: $zoomPercentage%")
             }
 
             is PlayerUpdates.HorizontalSeek -> {
               val seekUpdate = currentPlayerUpdate as PlayerUpdates.HorizontalSeek
-              SeekPlayerUpdate(
-                currentTime = seekUpdate.currentTime,
-                seekDelta = "[${seekUpdate.seekDelta}]",
-                modifier = Modifier, // Let content size determine width
-              )
+              TextPlayerUpdate("${seekUpdate.currentTime} [ ${seekUpdate.seekDelta} ]")
             }
 
             is PlayerUpdates.RepeatMode -> {
@@ -599,8 +578,6 @@ fun PlayerControls(
             else -> {}
           }
         }
-
-        val areButtonsVisible = controlsShown && !areControlsLocked && !areSlidersShown
 
         AnimatedVisibility(
           visible = controlsShown && areControlsLocked,
@@ -767,8 +744,8 @@ fun PlayerControls(
                 if (showSystemNavigationBar) {
                   val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
                   Modifier.padding(
-                    start = navBarPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
-                    end = navBarPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+                    start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                    end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
                   )
                 } else {
                   Modifier
@@ -872,8 +849,8 @@ fun PlayerControls(
                 if (showSystemNavigationBar) {
                   val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
                   Modifier.padding(
-                    start = navBarPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
-                    end = navBarPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+                    start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                    end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
                   )
                 } else {
                   Modifier
@@ -941,8 +918,8 @@ fun PlayerControls(
                 if (showSystemNavigationBar) {
                   val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
                   Modifier.padding(
-                    start = navBarPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
-                    end = navBarPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+                    start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                    end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
                   )
                 } else {
                   Modifier
@@ -958,22 +935,20 @@ fun PlayerControls(
             chapters = chapters,
             currentChapter = currentChapter,
             isSpeedNonOne = isSpeedNonOne,
-            currentZoom = currentZoom,
-            aspect = aspect,
+            currentZoom = videoZoom,
             mediaTitle = mediaTitle,
             hideBackground = hideBackground,
             decoder = decoder,
             playbackSpeed = playbackSpeed ?: 1f,
             onBackPress = onBackPress,
             onOpenSheet = onOpenSheet,
-            onOpenPanel = onOpenPanel,
             viewModel = viewModel,
             activity = activity,
           )
         }
 
         AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked && !areSlidersShown,
+          visible = controlsShown && !areControlsLocked && (isPortrait || !areSlidersShown),
           enter =
             if (!reduceMotion) {
               slideInHorizontally(playerControlsEnterAnimationSpec()) { it } +
@@ -994,8 +969,8 @@ fun PlayerControls(
                 if (showSystemNavigationBar) {
                   val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
                   Modifier.padding(
-                    start = navBarPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
-                    end = navBarPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+                    start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                    end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
                   )
                 } else {
                   Modifier
@@ -1019,15 +994,13 @@ fun PlayerControls(
               chapters = chapters,
               currentChapter = currentChapter,
               isSpeedNonOne = isSpeedNonOne,
-              currentZoom = currentZoom,
-              aspect = aspect,
+              currentZoom = videoZoom,
               mediaTitle = mediaTitle,
               hideBackground = hideBackground,
               decoder = decoder,
               playbackSpeed = playbackSpeed ?: 1f,
               onBackPress = onBackPress,
               onOpenSheet = onOpenSheet,
-              onOpenPanel = onOpenPanel,
               viewModel = viewModel,
               activity = activity,
             )
@@ -1037,15 +1010,13 @@ fun PlayerControls(
               chapters = chapters,
               currentChapter = currentChapter,
               isSpeedNonOne = isSpeedNonOne,
-              currentZoom = currentZoom,
-              aspect = aspect,
+              currentZoom = videoZoom,
               mediaTitle = mediaTitle,
               hideBackground = hideBackground,
               decoder = decoder,
               playbackSpeed = playbackSpeed ?: 1f,
               onBackPress = onBackPress,
               onOpenSheet = onOpenSheet,
-              onOpenPanel = onOpenPanel,
               viewModel = viewModel,
               activity = activity,
             )
@@ -1074,8 +1045,8 @@ fun PlayerControls(
                 if (showSystemNavigationBar) {
                   val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
                   Modifier.padding(
-                    start = navBarPadding.calculateLeftPadding(androidx.compose.ui.unit.LayoutDirection.Ltr),
-                    end = navBarPadding.calculateRightPadding(androidx.compose.ui.unit.LayoutDirection.Ltr)
+                    start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                    end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
                   )
                 } else {
                   Modifier
@@ -1093,15 +1064,13 @@ fun PlayerControls(
             chapters = chapters,
             currentChapter = currentChapter,
             isSpeedNonOne = isSpeedNonOne,
-            currentZoom = currentZoom,
-            aspect = aspect,
+            currentZoom = videoZoom,
             mediaTitle = mediaTitle,
             hideBackground = hideBackground,
             decoder = decoder,
             playbackSpeed = playbackSpeed ?: 1f,
             onBackPress = onBackPress,
             onOpenSheet = onOpenSheet,
-            onOpenPanel = onOpenPanel,
             viewModel = viewModel,
             activity = activity,
           )

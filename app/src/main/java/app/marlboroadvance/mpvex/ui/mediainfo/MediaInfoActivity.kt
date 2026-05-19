@@ -90,7 +90,7 @@ class MediaInfoActivity : ComponentActivity() {
     var fileName by remember { mutableStateOf("Media File") }
     var mediaInfo by remember { mutableStateOf<MediaInfoOps.MediaInfoData?>(null) }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     LaunchedEffect(Unit) {
       val uri = when (intent?.action) {
@@ -146,17 +146,24 @@ class MediaInfoActivity : ComponentActivity() {
       modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
       containerColor = MaterialTheme.colorScheme.surface,
       topBar = {
-        LargeTopAppBar(
+        TopAppBar(
           title = {
             Text(
               text = fileName.substringBeforeLast('.'),
-              maxLines = 2,
+              style = MaterialTheme.typography.titleLarge,
+              fontWeight = FontWeight.ExtraBold,
+              color = MaterialTheme.colorScheme.primary,
+              maxLines = 1,
               overflow = TextOverflow.Ellipsis,
             )
           },
           navigationIcon = {
             IconButton(onClick = onBack) {
-              Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+              Icon(
+                Icons.AutoMirrored.Default.ArrowBack, 
+                contentDescription = "Back",
+                tint = MaterialTheme.colorScheme.secondary
+              )
             }
           },
           actions = {
@@ -171,8 +178,9 @@ class MediaInfoActivity : ComponentActivity() {
           },
           scrollBehavior = scrollBehavior,
           colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface,
+            containerColor = Color.Transparent,
             scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            titleContentColor = MaterialTheme.colorScheme.primary
           ),
         )
       },
@@ -745,7 +753,7 @@ class MediaInfoActivity : ComponentActivity() {
       modifier = Modifier.clickable {
         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         cm.setPrimaryClip(ClipData.newPlainText(label, value))
-        Toast.makeText(context, "Copied $label", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this@MediaInfoActivity, "Copied full report", Toast.LENGTH_SHORT).show()
       },
       colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )

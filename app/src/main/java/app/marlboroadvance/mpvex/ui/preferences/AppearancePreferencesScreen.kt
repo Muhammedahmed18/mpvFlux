@@ -2,27 +2,28 @@ package app.marlboroadvance.mpvex.ui.preferences
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,31 +60,27 @@ object AppearancePreferencesScreen : Screen {
         val darkMode by preferences.darkMode.collectAsState()
         val appTheme by preferences.appTheme.collectAsState()
 
-        // OLED Optimization: Pure black background in dark mode
         val isDarkMode = when (darkMode) {
             DarkMode.Dark -> true
             DarkMode.Light -> false
             DarkMode.System -> systemDarkTheme
         }
-        val backgroundColor = if (isDarkMode) Color.Black else MaterialTheme.colorScheme.background
+        val backgroundColor = if (isDarkMode) Color.Black else MaterialTheme.colorScheme.surface
+        val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = backgroundColor
         ) {
             Scaffold(
+                modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                 containerColor = Color.Transparent,
                 topBar = {
                     TopAppBar(
-                        modifier = Modifier.statusBarsPadding(),
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent,
-                            scrolledContainerColor = Color.Transparent
-                        ),
                         title = {
                             Text(
                                 text = stringResource(R.string.pref_appearance_title),
-                                style = MaterialTheme.typography.headlineSmall,
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = MaterialTheme.colorScheme.primary,
                             )
@@ -97,14 +94,24 @@ object AppearancePreferencesScreen : Screen {
                                 )
                             }
                         },
+                        scrollBehavior = scrollBehavior,
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                            titleContentColor = MaterialTheme.colorScheme.primary
+                        )
                     )
                 },
             ) { padding ->
                 ProvidePreferenceLocals {
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(padding),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            top = padding.calculateTopPadding(),
+                            bottom = padding.calculateBottomPadding() + 24.dp,
+                            start = 8.dp,
+                            end = 8.dp
+                        )
                     ) {
                         item {
                             PreferenceSectionHeader(title = stringResource(id = R.string.pref_appearance_category_theme))
@@ -112,8 +119,7 @@ object AppearancePreferencesScreen : Screen {
 
                         item {
                             PreferenceCard {
-                                Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)) {
-                                    // Dark mode selector (Modern Segmented Button)
+                                Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)) {
                                     MultiChoiceSegmentedButton(
                                         choices = DarkMode.entries.map { stringResource(it.titleRes) }.toImmutableList(),
                                         selectedIndices = persistentListOf(DarkMode.entries.indexOf(darkMode)),
@@ -123,10 +129,8 @@ object AppearancePreferencesScreen : Screen {
 
                                 Spacer(modifier = Modifier.height(8.dp))
 
-                                // AMOLED mode state - need it before theme picker
                                 val amoledMode by preferences.amoledMode.collectAsState()
 
-                                // Theme picker
                                 ThemePicker(
                                     currentTheme = appTheme,
                                     isDarkMode = isDarkMode,
@@ -136,7 +140,6 @@ object AppearancePreferencesScreen : Screen {
 
                                 PreferenceDivider()
 
-                                // AMOLED mode toggle
                                 SwitchPreference(
                                     value = amoledMode,
                                     onValueChange = { newValue ->
@@ -152,9 +155,8 @@ object AppearancePreferencesScreen : Screen {
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_amoled_mode_summary),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Light,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                     enabled = darkMode != DarkMode.Light
@@ -182,9 +184,8 @@ object AppearancePreferencesScreen : Screen {
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_unlimited_name_lines_summary),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Light,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
@@ -205,9 +206,8 @@ object AppearancePreferencesScreen : Screen {
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_show_unplayed_old_video_label_summary),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Light,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
@@ -232,9 +232,8 @@ object AppearancePreferencesScreen : Screen {
                                                 id = R.string.pref_appearance_unplayed_old_video_days_summary,
                                                 unplayedOldVideoDays,
                                             ),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Light,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                     onSliderValueChange = { preferences.unplayedOldVideoDays.set(it.roundToInt()) },
@@ -258,9 +257,8 @@ object AppearancePreferencesScreen : Screen {
                                     summary = {
                                         Text(
                                             text = stringResource(R.string.pref_appearance_auto_scroll_summary),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Light,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
@@ -288,9 +286,8 @@ object AppearancePreferencesScreen : Screen {
                                                 id = R.string.pref_appearance_watched_threshold_summary,
                                                 watchedThreshold,
                                             ),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Light,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                 )
@@ -311,9 +308,8 @@ object AppearancePreferencesScreen : Screen {
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_gesture_tap_thumbnail_to_select_summary),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Light,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
@@ -334,9 +330,8 @@ object AppearancePreferencesScreen : Screen {
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_show_network_thumbnails_summary),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            fontWeight = FontWeight.Light,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )

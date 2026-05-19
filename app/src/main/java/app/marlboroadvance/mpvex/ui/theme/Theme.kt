@@ -5,14 +5,7 @@ import android.os.Build
 import android.view.View
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.ripple.RippleAlpha
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -23,27 +16,16 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.ClipOp
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asAndroidPath
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.clipPath
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.core.view.drawToBitmap
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
@@ -54,10 +36,6 @@ import kotlin.math.hypot
 // ============================================================================
 // Theme Transition Animation State & Components
 // ============================================================================
-/**
- * State for managing theme transition animations.
- * This class holds the animation state and provides methods to trigger transitions.
- */
 class ThemeTransitionState {
     var isAnimating by mutableStateOf(false)
         private set
@@ -74,24 +52,16 @@ class ThemeTransitionState {
         captureView = view
     }
     
-    /**
-     * Start a theme transition animation from the given position.
-     * Captures the current screen and begins the reveal animation.
-     * Will NOT start a new animation if one is already in progress.
-     */
     fun startTransition(position: Offset) {
-        // Don't allow new animation while one is in progress
         if (isAnimating) return
         
         captureView?.let { view ->
             try {
-                // Capture before setting isAnimating to ensure we get the current state
                 val bitmap = view.drawToBitmap()
                 screenshotBitmap = bitmap
                 clickPosition = position
                 isAnimating = true
             } catch (e: Exception) {
-                // If capture fails, just skip the animation
                 screenshotBitmap = null
                 isAnimating = false
             }
@@ -103,7 +73,6 @@ class ThemeTransitionState {
         screenshotBitmap = null
         clickPosition = Offset.Zero
         isAnimating = false
-        // Recycle after state is cleared
         oldBitmap?.recycle()
     }
     
@@ -112,9 +81,6 @@ class ThemeTransitionState {
     }
 }
 
-/**
- * CompositionLocal to provide ThemeTransitionState down the composition tree
- */
 val LocalThemeTransitionState = staticCompositionLocalOf<ThemeTransitionState?> { null }
 
 @Composable
@@ -122,23 +88,14 @@ fun rememberThemeTransitionState(): ThemeTransitionState {
     return remember { ThemeTransitionState() }
 }
 
-/**
- * Overlay composable that handles the circular reveal animation.
- * Uses Shape-based clipping for smooth Telegram-like rendering.
- */
 @Composable
 private fun ThemeTransitionOverlay(
     state: ThemeTransitionState,
     content: @Composable () -> Unit
 ) {
-    // Animation disabled - just render content immediately
     content()
 }
 
-/**
- * Custom Shape that creates an inverse circular reveal effect.
- * The circle expands from center, and the shape clips TO THE AREA OUTSIDE the circle.
- */
 private class CircularRevealShape(
     private val progress: Float,
     private val center: Offset,
@@ -155,15 +112,11 @@ private class CircularRevealShape(
             center
         }
         
-        // Calculate the maximum radius needed to cover entire screen from center point
         val maxRadius = longestDistanceToCorner(size, actualCenter) * 1.1f
         val currentRadius = maxRadius * progress
         
-        // Create a path that represents the area OUTSIDE the circle (inverse clip)
         val path = android.graphics.Path().apply {
-            // Add the entire rectangle
             addRect(0f, 0f, size.width, size.height, android.graphics.Path.Direction.CW)
-            // Subtract the circle (creates hole in the middle)
             addCircle(actualCenter.x, actualCenter.y, currentRadius, android.graphics.Path.Direction.CCW)
         }
         
@@ -181,9 +134,6 @@ private class CircularRevealShape(
     }
 }
 
-/**
- * Extension to convert Android Path to Compose Path
- */
 private fun android.graphics.Path.asComposePath(): androidx.compose.ui.graphics.Path {
     val composePath = androidx.compose.ui.graphics.Path()
     composePath.asAndroidPath().set(this)
@@ -246,7 +196,6 @@ fun MpvexTheme(content: @Composable () -> Unit) {
         else -> appTheme.getLightColorScheme()
     }
 
-    // Provide theme transition state first, OUTSIDE MaterialTheme
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
         LocalThemeTransitionState provides rememberThemeTransitionState(),
@@ -255,8 +204,9 @@ fun MpvexTheme(content: @Composable () -> Unit) {
             MaterialTheme(
                 colorScheme = colorScheme,
                 typography = AppTypography,
+                shapes = AppShapes, // Apply M3 Expressive Shapes
+                motionScheme = MotionScheme.expressive(), // Already using expressive motion
                 content = content,
-                motionScheme = MotionScheme.expressive(),
             )
         }
     }
