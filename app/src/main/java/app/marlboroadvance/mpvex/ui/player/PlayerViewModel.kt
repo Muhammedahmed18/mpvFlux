@@ -169,6 +169,17 @@ class PlayerViewModel(
   private val _preciseDuration = MutableStateFlow(0f)
   val preciseDuration = _preciseDuration.asStateFlow()
 
+  /**
+   * Smart Duration Pipe: Always provides a valid finish line.
+   * Fallback logic: If precise duration is 0, use standard MPV duration.
+   */
+  val effectiveDuration: StateFlow<Float> = combine(
+    _preciseDuration,
+    MPVLib.propInt["duration"]
+  ) { precise, standard ->
+    if (precise > 0f) precise else (standard?.toFloat() ?: 0f)
+  }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+
   // Audio state
   val currentVolume = MutableStateFlow(host.audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
   private val volumeBoostCap by MPVLib.propInt["volume-max"].collectAsState(viewModelScope)

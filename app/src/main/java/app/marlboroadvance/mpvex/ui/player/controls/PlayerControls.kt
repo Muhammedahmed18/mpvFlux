@@ -174,8 +174,10 @@ fun PlayerControls(
   val pausedForCache by MPVLib.propBoolean["paused-for-cache"].collectAsState()
   val paused by MPVLib.propBoolean["pause"].collectAsState()
   val duration by MPVLib.propInt["duration"].collectAsState()
-  val precisePosition by viewModel.precisePosition.collectAsState()
-  val preciseDuration by viewModel.preciseDuration.collectAsState()
+
+  // OPTIMIZATION: Precise position/duration are no longer collected here.
+  // Instead, we pass flows to the Seekbar to avoid root recomposition.
+
   val playbackSpeed by MPVLib.propFloat["speed"].collectAsState()
   val doubleTapSeekAmount by viewModel.doubleTapSeekAmount.collectAsState()
   val showDoubleTapOvals by playerPreferences.showDoubleTapOvals.collectAsState()
@@ -250,7 +252,6 @@ fun PlayerControls(
     areControlsLocked,
   ) {
     if (controlsShown && paused == false && !isSeeking) {
-      // Use 2 second delay when controls are locked, otherwise use user preference
       val delayTime = if (areControlsLocked) 2000L else playerTimeToDisappear.toLong()
       delay(delayTime)
       viewModel.hideControls()
@@ -289,793 +290,387 @@ fun PlayerControls(
         derivedStateOf { configuration.orientation == ORIENTATION_PORTRAIT }
       }
 
-      ConstraintLayout(
-        modifier =
-          modifier
-            .fillMaxSize()
-            .background(
-              Brush.verticalGradient(
-                0.0f to Color.Black.copy(alpha = 0.55f),
-                0.15f to Color.Transparent,
-                0.85f to Color.Transparent,
-                1.0f to Color.Black.copy(alpha = 0.55f),
-              ),
-              alpha = scrimAlpha,
-            ),
-      ) {
-        val (topLeftControls, topRightControls) = createRefs()
-        val (volumeSlider, brightnessSlider) = createRefs()
-        val unlockControlsButton = createRef()
-        val (bottomRightControls, bottomLeftControls) = createRefs()
-        val playerPauseButton = createRef()
-        val seekbar = createRef()
-        val (playerUpdates) = createRefs()
-        val nextUpPill = createRef()
+      Box(modifier = modifier.fillMaxSize()) {
+        // OPTIMIZATION: Scrim is now isolated in a dedicated layer to avoid layout-wide redraws
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = scrimAlpha }
+                .background(
+                    Brush.verticalGradient(
+                        0.0f to Color.Black.copy(alpha = 0.55f),
+                        0.15f to Color.Transparent,
+                        0.85f to Color.Transparent,
+                        1.0f to Color.Black.copy(alpha = 0.55f),
+                    )
+                )
+        )
 
-        val isBrightnessSliderShown by viewModel.isBrightnessSliderShown.collectAsState()
-        val isVolumeSliderShown by viewModel.isVolumeSliderShown.collectAsState()
-        val brightness by viewModel.currentBrightness.collectAsState()
-        val volume by viewModel.currentVolume.collectAsState()
-        val mpvVolume by MPVLib.propInt["volume"].collectAsState()
-        val swapVolumeAndBrightness by playerPreferences.swapVolumeAndBrightness.collectAsState()
-        val reduceMotion by playerPreferences.reduceMotion.collectAsState()
+        ConstraintLayout(modifier = Modifier.fillMaxSize()) {
+          val (topLeftControls, topRightControls) = createRefs()
+          val (volumeSlider, brightnessSlider) = createRefs()
+          val unlockControlsButton = createRef()
+          val (bottomRightControls, bottomLeftControls) = createRefs()
+          val playerPauseButton = createRef()
+          val seekbar = createRef()
+          val (playerUpdates) = createRefs()
+          val nextUpPill = createRef()
 
-        val aspectRatio by viewModel.videoAspect.collectAsState()
-        val currentAspectRatio by viewModel.currentAspectRatio.collectAsState()
-        val videoZoom by viewModel.videoZoom.collectAsState()
+          val isBrightnessSliderShown by viewModel.isBrightnessSliderShown.collectAsState()
+          val isVolumeSliderShown by viewModel.isVolumeSliderShown.collectAsState()
+          val brightness by viewModel.currentBrightness.collectAsState()
+          val volume by viewModel.currentVolume.collectAsState()
+          val mpvVolume by MPVLib.propInt["volume"].collectAsState()
+          val swapVolumeAndBrightness by playerPreferences.swapVolumeAndBrightness.collectAsState()
+          val reduceMotion by playerPreferences.reduceMotion.collectAsState()
 
-        val rawMediaTitle by MPVLib.propString["media-title"].collectAsState()
-        val mediaTitle by remember(rawMediaTitle, activity) {
-          derivedStateOf {
-            rawMediaTitle?.takeIf { it.isNotBlank() }
-              ?: activity.getTitleForControls()
-          }
-        }
+          val aspectRatio by viewModel.videoAspect.collectAsState()
+          val currentAspectRatio by viewModel.currentAspectRatio.collectAsState()
+          val videoZoom by viewModel.videoZoom.collectAsState()
 
-        // Slider display duration: 1000ms shown + 300ms exit animation = 1300ms total
-        val sliderDisplayDuration = 1000L
-
-        val volumeSliderTimestamp by viewModel.volumeSliderTimestamp.collectAsState()
-        val brightnessSliderTimestamp by viewModel.brightnessSliderTimestamp.collectAsState()
-
-        // Track timestamp to restart timer on every gesture event
-        LaunchedEffect(volumeSliderTimestamp) {
-          if (isVolumeSliderShown && volumeSliderTimestamp > 0) {
-            delay(sliderDisplayDuration)
-            viewModel.isVolumeSliderShown.update { false }
-          }
-        }
-
-        LaunchedEffect(brightnessSliderTimestamp) {
-          if (isBrightnessSliderShown && brightnessSliderTimestamp > 0) {
-            delay(sliderDisplayDuration)
-            viewModel.isBrightnessSliderShown.update { false }
-          }
-        }
-
-        val areSlidersShown = isBrightnessSliderShown || isVolumeSliderShown
-
-        AnimatedVisibility(
-          isBrightnessSliderShown,
-          enter =
-            if (!reduceMotion) {
-              slideInHorizontally(playerControlsEnterAnimationSpec()) {
-                if (swapVolumeAndBrightness) -it else it
-              } + fadeIn(playerControlsEnterAnimationSpec())
-            } else {
-              fadeIn(playerControlsEnterAnimationSpec())
-            },
-          exit =
-            if (!reduceMotion) {
-              slideOutHorizontally(playerControlsExitAnimationSpec()) {
-                if (swapVolumeAndBrightness) -it else it
-              } + fadeOut(playerControlsExitAnimationSpec())
-            } else {
-              fadeOut(playerControlsExitAnimationSpec())
-            },
-          modifier =
-            Modifier.constrainAs(brightnessSlider) {
-              if (swapVolumeAndBrightness) {
-                start.linkTo(parent.start, if (isPortrait) spacing.large else spacing.extraLarge)
-              } else {
-                end.linkTo(parent.end, if (isPortrait) spacing.large else spacing.extraLarge)
-              }
-              top.linkTo(parent.top, spacing.larger)
-              bottom.linkTo(parent.bottom, spacing.extraLarge)
-            },
-        ) { BrightnessSlider(brightness, 0f..1f) }
-
-        AnimatedVisibility(
-          isVolumeSliderShown,
-          enter =
-            if (!reduceMotion) {
-              slideInHorizontally(playerControlsEnterAnimationSpec()) {
-                if (swapVolumeAndBrightness) it else -it
-              } + fadeIn(playerControlsEnterAnimationSpec())
-            } else {
-              fadeIn(playerControlsEnterAnimationSpec())
-            },
-          exit =
-            if (!reduceMotion) {
-              slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec())
-            } else {
-              fadeOut(playerControlsExitAnimationSpec())
-            },
-          modifier =
-            Modifier.constrainAs(volumeSlider) {
-              if (swapVolumeAndBrightness) {
-                end.linkTo(parent.end, if (isPortrait) spacing.large else spacing.extraLarge)
-              } else {
-                start.linkTo(parent.start, if (isPortrait) spacing.large else spacing.extraLarge)
-              }
-              top.linkTo(parent.top, spacing.larger)
-              bottom.linkTo(parent.bottom, spacing.extraLarge)
-            },
-        ) {
-          val boostCap by audioPreferences.volumeBoostCap.collectAsState()
-          val displayVolumeAsPercentage by playerPreferences.displayVolumeAsPercentage.collectAsState()
-          
-          // Show if boost is allowed (boostCap > 0) OR if we are currently boosted (> 100)
-          val currentBoost = (mpvVolume ?: 100) - 100
-          val showBoost = boostCap > 0 || currentBoost > 0
-          val effBoostCap = maxOf(boostCap, currentBoost)
-          
-          VolumeSlider(
-            volume,
-            mpvVolume = mpvVolume ?: 100,
-            range = 0..viewModel.maxVolume,
-            boostRange = if (showBoost) 0..effBoostCap else null,
-            displayAsPercentage = displayVolumeAsPercentage,
-          )
-        }
-
-        val holdForMultipleSpeed by playerPreferences.holdForMultipleSpeed.collectAsState()
-        val currentPlayerUpdate by viewModel.playerUpdate.collectAsState()
-
-        LaunchedEffect(currentPlayerUpdate, aspectRatio, videoZoom) {
-          if (currentPlayerUpdate is PlayerUpdates.MultipleSpeed ||
-            currentPlayerUpdate is PlayerUpdates.DynamicSpeedControl ||
-            currentPlayerUpdate is PlayerUpdates.None
-          ) {
-            return@LaunchedEffect
-          }
-          delay(2000)
-          viewModel.playerUpdate.update { PlayerUpdates.None }
-        }
-
-        AnimatedVisibility(
-          currentPlayerUpdate !is PlayerUpdates.None,
-          enter = fadeIn(playerControlsEnterAnimationSpec()),
-          exit = fadeOut(playerControlsExitAnimationSpec()),
-          modifier =
-            Modifier.constrainAs(playerUpdates) {
-                linkTo(parent.start, parent.end)
-                linkTo(parent.top, parent.bottom, bias = 0.25f)
-              },
-        ) {
-          when (currentPlayerUpdate) {
-            is PlayerUpdates.MultipleSpeed -> MultipleSpeedPlayerUpdate(currentSpeed = holdForMultipleSpeed)
-            is PlayerUpdates.DynamicSpeedControl -> {
-              val speedUpdate = currentPlayerUpdate as PlayerUpdates.DynamicSpeedControl
-              val currentSpeed = speedUpdate.speed
-              val showDynamicSpeedOverlay by playerPreferences.showDynamicSpeedOverlay.collectAsState()
-              val shouldShowFull = speedUpdate.showFullOverlay
-              var isCollapsed by remember { mutableStateOf(false) }
-              
-              LaunchedEffect(currentSpeed, shouldShowFull) {
-                if (shouldShowFull) {
-                  isCollapsed = false
-                  delay(1500)
-                  isCollapsed = true
-                } else {
-                  isCollapsed = true
-                }
-              }
-              
-              if (showDynamicSpeedOverlay) {
-                if (isCollapsed) {
-                  // Simple compact indicator
-                  CompactSpeedIndicator(currentSpeed = currentSpeed)
-                } else {
-                  // Full speed control slider
-                  SpeedControlSlider(currentSpeed = currentSpeed)
-                }
-              } else {
-                // fallback, simple indicator
-                CompactSpeedIndicator(currentSpeed = currentSpeed)
-              }
+          val rawMediaTitle by MPVLib.propString["media-title"].collectAsState()
+          val mediaTitle by remember(rawMediaTitle, activity) {
+            derivedStateOf {
+              rawMediaTitle?.takeIf { it.isNotBlank() }
+                ?: activity.getTitleForControls()
             }
-            is PlayerUpdates.AspectRatio -> {
-              val customRatiosSet by playerPreferences.customAspectRatios.collectAsState()
-              val displayText = if (currentAspectRatio > 0) {
-                // Custom aspect ratio - try to find its label first
-                val customLabel = customRatiosSet.firstNotNullOfOrNull { str ->
-                  val parts = str.split("|")
-                  if (parts.size == 2) {
-                    val savedRatio = parts[1].toDoubleOrNull()
-                    if (savedRatio != null && abs(savedRatio - currentAspectRatio) < 0.01) {
-                      parts[0] // Return the label
-                    } else null
-                  } else null
+          }
+
+          val sliderDisplayDuration = 1000L
+          val volumeSliderTimestamp by viewModel.volumeSliderTimestamp.collectAsState()
+          val brightnessSliderTimestamp by viewModel.brightnessSliderTimestamp.collectAsState()
+
+          LaunchedEffect(volumeSliderTimestamp) {
+            if (isVolumeSliderShown && volumeSliderTimestamp > 0) {
+              delay(sliderDisplayDuration)
+              viewModel.isVolumeSliderShown.update { false }
+            }
+          }
+
+          LaunchedEffect(brightnessSliderTimestamp) {
+            if (isBrightnessSliderShown && brightnessSliderTimestamp > 0) {
+              delay(sliderDisplayDuration)
+              viewModel.isBrightnessSliderShown.update { false }
+            }
+          }
+
+          val areSlidersShown = isBrightnessSliderShown || isVolumeSliderShown
+
+          AnimatedVisibility(
+            isBrightnessSliderShown,
+            enter =
+              if (!reduceMotion) {
+                slideInHorizontally(playerControlsEnterAnimationSpec()) {
+                  if (swapVolumeAndBrightness) -it else it
+                } + fadeIn(playerControlsEnterAnimationSpec())
+              } else {
+                fadeIn(playerControlsEnterAnimationSpec())
+              },
+            exit =
+              if (!reduceMotion) {
+                slideOutHorizontally(playerControlsExitAnimationSpec()) {
+                  if (swapVolumeAndBrightness) -it else it
+                } + fadeOut(playerControlsExitAnimationSpec())
+              } else {
+                fadeOut(playerControlsExitAnimationSpec())
+              },
+            modifier =
+              Modifier.constrainAs(brightnessSlider) {
+                if (swapVolumeAndBrightness) {
+                  start.linkTo(parent.start, if (isPortrait) spacing.large else spacing.extraLarge)
+                } else {
+                  end.linkTo(parent.end, if (isPortrait) spacing.large else spacing.extraLarge)
+                }
+                top.linkTo(parent.top, spacing.larger)
+                bottom.linkTo(parent.bottom, spacing.extraLarge)
+              },
+          ) { BrightnessSlider(brightness, 0f..1f) }
+
+          AnimatedVisibility(
+            isVolumeSliderShown,
+            enter =
+              if (!reduceMotion) {
+                slideInHorizontally(playerControlsEnterAnimationSpec()) {
+                  if (swapVolumeAndBrightness) it else -it
+                } + fadeIn(playerControlsEnterAnimationSpec())
+              } else {
+                fadeIn(playerControlsEnterAnimationSpec())
+              },
+            exit =
+              if (!reduceMotion) {
+                slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec())
+              } else {
+                fadeOut(playerControlsExitAnimationSpec())
+              },
+            modifier =
+              Modifier.constrainAs(volumeSlider) {
+                if (swapVolumeAndBrightness) {
+                  end.linkTo(parent.end, if (isPortrait) spacing.large else spacing.extraLarge)
+                } else {
+                  start.linkTo(parent.start, if (isPortrait) spacing.large else spacing.extraLarge)
+                }
+                top.linkTo(parent.top, spacing.larger)
+                bottom.linkTo(parent.bottom, spacing.extraLarge)
+              },
+          ) {
+            val boostCap by audioPreferences.volumeBoostCap.collectAsState()
+            val displayVolumeAsPercentage by playerPreferences.displayVolumeAsPercentage.collectAsState()
+            val currentBoost = (mpvVolume ?: 100) - 100
+            val showBoost = boostCap > 0 || currentBoost > 0
+            val effBoostCap = maxOf(boostCap, currentBoost)
+            
+            VolumeSlider(
+              volume,
+              mpvVolume = mpvVolume ?: 100,
+              range = 0..viewModel.maxVolume,
+              boostRange = if (showBoost) 0..effBoostCap else null,
+              displayAsPercentage = displayVolumeAsPercentage,
+            )
+          }
+
+          val holdForMultipleSpeed by playerPreferences.holdForMultipleSpeed.collectAsState()
+          val currentPlayerUpdate by viewModel.playerUpdate.collectAsState()
+
+          LaunchedEffect(currentPlayerUpdate, aspectRatio, videoZoom) {
+            if (currentPlayerUpdate is PlayerUpdates.MultipleSpeed ||
+              currentPlayerUpdate is PlayerUpdates.DynamicSpeedControl ||
+              currentPlayerUpdate is PlayerUpdates.None
+            ) {
+              return@LaunchedEffect
+            }
+            delay(2000)
+            viewModel.playerUpdate.update { PlayerUpdates.None }
+          }
+
+          AnimatedVisibility(
+            currentPlayerUpdate !is PlayerUpdates.None,
+            enter = fadeIn(playerControlsEnterAnimationSpec()),
+            exit = fadeOut(playerControlsExitAnimationSpec()),
+            modifier =
+              Modifier.constrainAs(playerUpdates) {
+                  linkTo(parent.start, parent.end)
+                  linkTo(parent.top, parent.bottom, bias = 0.25f)
+                },
+          ) {
+            when (currentPlayerUpdate) {
+              is PlayerUpdates.MultipleSpeed -> MultipleSpeedPlayerUpdate(currentSpeed = holdForMultipleSpeed)
+              is PlayerUpdates.DynamicSpeedControl -> {
+                val speedUpdate = currentPlayerUpdate as PlayerUpdates.DynamicSpeedControl
+                val currentSpeed = speedUpdate.speed
+                val showDynamicSpeedOverlay by playerPreferences.showDynamicSpeedOverlay.collectAsState()
+                val shouldShowFull = speedUpdate.showFullOverlay
+                var isCollapsed by remember { mutableStateOf(false) }
+                
+                LaunchedEffect(currentSpeed, shouldShowFull) {
+                  if (shouldShowFull) {
+                    isCollapsed = false
+                    delay(1500)
+                    isCollapsed = true
+                  } else {
+                    isCollapsed = true
+                  }
                 }
                 
-                customLabel ?: run {
-                  // No custom label found, use preset names or format as ratio
-                  val ratio = currentAspectRatio
-                  when {
-                    abs(ratio - 16.0 / 9.0) < 0.01 -> "16:9"
-                    abs(ratio - 4.0 / 3.0) < 0.01 -> "4:3"
-                    abs(ratio - 16.0 / 10.0) < 0.01 -> "16:10"
-                    abs(ratio - 21.0 / 9.0) < 0.01 -> "21:9"
-                    abs(ratio - 32.0 / 9.0) < 0.01 -> "32:9"
-                    abs(ratio - 1.0) < 0.01 -> "1:1"
-                    abs(ratio - 2.35) < 0.01 -> "2.35:1"
-                    abs(ratio - 2.39) < 0.01 -> "2.39:1"
-                    else -> String.format(Locale.US, "%.2f:1", ratio)
-                  }
-                }
-              } else {
-                // Standard mode (Fit/Crop/Stretch)
-                stringResource(aspectRatio.titleRes)
-              }
-              TextPlayerUpdate(displayText)
-            }
-            is PlayerUpdates.ShowText ->
-              TextPlayerUpdate(
-                (currentPlayerUpdate as PlayerUpdates.ShowText).value,
-              )
-
-            is PlayerUpdates.VideoZoom -> {
-              val zoomPercentage = (videoZoom * 100).toInt()
-              TextPlayerUpdate("Zoom: $zoomPercentage%")
-            }
-
-            is PlayerUpdates.HorizontalSeek -> {
-              val seekUpdate = currentPlayerUpdate as PlayerUpdates.HorizontalSeek
-              TextPlayerUpdate("${seekUpdate.currentTime} [ ${seekUpdate.seekDelta} ]")
-            }
-
-            is PlayerUpdates.RepeatMode -> {
-              val mode = (currentPlayerUpdate as PlayerUpdates.RepeatMode).mode
-              val text = when (mode) {
-                app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> "Repeat: Off"
-                app.marlboroadvance.mpvex.ui.player.RepeatMode.ONE -> "Repeat: Current file"
-                app.marlboroadvance.mpvex.ui.player.RepeatMode.ALL -> {
-                  if (playlistMode && viewModel.hasPlaylistSupport()) {
-                    "Repeat: All playlist"
-                  } else {
-                    "Repeat: Current file"
-                  }
-                }
-              }
-              TextPlayerUpdate(text)
-            }
-
-            is PlayerUpdates.Shuffle -> {
-              val enabled = (currentPlayerUpdate as PlayerUpdates.Shuffle).enabled
-              val text = if (enabled) {
-                if (playlistMode && viewModel.hasPlaylistSupport()) {
-                  "Shuffle: On"
+                if (showDynamicSpeedOverlay) {
+                  if (isCollapsed) CompactSpeedIndicator(currentSpeed = currentSpeed)
+                  else SpeedControlSlider(currentSpeed = currentSpeed)
                 } else {
-                  "Shuffle: Not available"
+                  CompactSpeedIndicator(currentSpeed = currentSpeed)
                 }
-              } else {
-                "Shuffle: Off"
               }
-              TextPlayerUpdate(text)
-            }
-
-            is PlayerUpdates.FrameInfo -> {
-              val frameInfo = (currentPlayerUpdate as PlayerUpdates.FrameInfo)
-              val text = if (frameInfo.totalFrames > 0) {
-                "Frame: ${frameInfo.currentFrame}/${frameInfo.totalFrames}"
-              } else {
-                "Frame: ${frameInfo.currentFrame}"
-              }
-              TextPlayerUpdate(text)
-            }
-
-            else -> {}
-          }
-        }
-
-        AnimatedVisibility(
-          visible = controlsShown && areControlsLocked,
-          enter = fadeIn(),
-          exit = fadeOut(),
-          modifier =
-            Modifier
-              .then(
-                if (showSystemStatusBar) {
-                  Modifier.windowInsetsPadding(WindowInsets.statusBars)
-                } else {
-                  Modifier
-                }
-              )
-              .constrainAs(unlockControlsButton) {
-                top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.small)
-                end.linkTo(parent.end, spacing.large)
-              },
-        ) {
-          ThumbZoneUnlock(
-            onUnlock = { viewModel.unlockControls() }
-          )
-        }
-
-        AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked,
-          enter = fadeIn(playerControlsEnterAnimationSpec()),
-          exit = fadeOut(playerControlsExitAnimationSpec()),
-          modifier =
-            Modifier.constrainAs(playerPauseButton) {
-              end.linkTo(parent.absoluteRight)
-              start.linkTo(parent.absoluteLeft)
-              if (isPortrait) {
-                bottom.linkTo(bottomRightControls.top, spacing.large)
-              } else {
-                top.linkTo(parent.top)
-                bottom.linkTo(parent.bottom)
-              }
-            },
-        ) {
-          val showLoadingCircle by playerPreferences.showLoadingCircle.collectAsState()
-          val icon = AnimatedImageVector.animatedVectorResource(R.drawable.anim_play_to_pause)
-          val interaction = remember { MutableInteractionSource() }
-          val isPressed by interaction.collectIsPressedAsState()
-          
-          val scale by animateFloatAsState(
-            targetValue = if (isPressed) 0.95f else 1f,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioLowBouncy,
-                stiffness = Spring.StiffnessLow
-            ),
-            label = "play_button_scale"
-          )
-
-          when {
-            pausedForCache == true && showLoadingCircle -> {
-              LoadingIndicator(
-                modifier = Modifier.size(96.dp),
-              )
-            }
-
-            else -> {
-              val buttonShadow = Brush.radialGradient(
-                  0.0f to Color.Black.copy(alpha = 0.35f),
-                  0.85f to Color.Transparent,
-              )
-
-              Row(
-                modifier = Modifier,
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-              ) {
-                if (playlistMode && viewModel.hasPlaylistSupport()) {
-                  // Previous Button
-                  val prevEnabled = viewModel.hasPrevious()
-                  ControlsButton(
-                    icon = Icons.Outlined.SkipPrevious,
-                    onClick = { viewModel.playPrevious() },
-                    enabled = prevEnabled,
-                    modifier = Modifier
-                      .size(56.dp)
-                      .then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier),
-                    shape = CircleShape,
-                    iconSize = 32.dp,
-                    type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal,
-                    color = controlColor
-                  )
-                }
-
-                // Main Play/Pause Hero Button
-                val playContentColor = MaterialTheme.colorScheme.onSurface
-                val playContainerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                val heroBorder = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f))
-
-                Surface(
-                  modifier = Modifier
-                    .size(92.dp)
-                    .graphicsLayer {
-                      scaleX = scale
-                      scaleY = scale
+              is PlayerUpdates.AspectRatio -> {
+                val customRatiosSet by playerPreferences.customAspectRatios.collectAsState()
+                val displayText = if (currentAspectRatio > 0) {
+                  val customLabel = customRatiosSet.firstNotNullOfOrNull { str ->
+                    val parts = str.split("|")
+                    if (parts.size == 2) {
+                      val savedRatio = parts[1].toDoubleOrNull()
+                      if (savedRatio != null && abs(savedRatio - currentAspectRatio) < 0.01) parts[0] else null
+                    } else null
+                  }
+                  customLabel ?: run {
+                    val ratio = currentAspectRatio
+                    when {
+                      abs(ratio - 16.0 / 9.0) < 0.01 -> "16:9"
+                      abs(ratio - 4.0 / 3.0) < 0.01 -> "4:3"
+                      abs(ratio - 16.0 / 10.0) < 0.01 -> "16:10"
+                      abs(ratio - 21.0 / 9.0) < 0.01 -> "21:9"
+                      abs(ratio - 32.0 / 9.0) < 0.01 -> "32:9"
+                      abs(ratio - 1.0) < 0.01 -> "1:1"
+                      abs(ratio - 2.35) < 0.01 -> "2.35:1"
+                      abs(ratio - 2.39) < 0.01 -> "2.39:1"
+                      else -> String.format(Locale.US, "%.2f:1", ratio)
                     }
-                    .then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier)
-                    .clip(CircleShape)
-                    .clickable(interaction, ripple(color = Color.White)) {
-                      resetControlsTimestamp = System.currentTimeMillis()
-                      viewModel.pauseUnpause()
-                    },
-                  shape = CircleShape,
-                  color = playContainerColor,
-                  contentColor = playContentColor,
-                  border = if (hideBackground) null else heroBorder,
-                  tonalElevation = 0.dp
-                ) {
-                  Image(
-                    painter = rememberAnimatedVectorPainter(icon, paused == false),
-                    modifier = Modifier
-                      .fillMaxSize()
-                      .padding(28.dp),
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(playContentColor),
-                  )
+                  }
+                } else {
+                  stringResource(aspectRatio.titleRes)
                 }
+                TextPlayerUpdate(displayText)
+              }
+              is PlayerUpdates.ShowText -> TextPlayerUpdate((currentPlayerUpdate as PlayerUpdates.ShowText).value)
+              is PlayerUpdates.VideoZoom -> TextPlayerUpdate("Zoom: ${(videoZoom * 100).toInt()}%")
+              is PlayerUpdates.HorizontalSeek -> {
+                val seekUpdate = currentPlayerUpdate as PlayerUpdates.HorizontalSeek
+                TextPlayerUpdate("${seekUpdate.currentTime} [ ${seekUpdate.seekDelta} ]")
+              }
+              is PlayerUpdates.RepeatMode -> {
+                val mode = (currentPlayerUpdate as PlayerUpdates.RepeatMode).mode
+                val text = when (mode) {
+                  app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> "Repeat: Off"
+                  app.marlboroadvance.mpvex.ui.player.RepeatMode.ONE -> "Repeat: Current file"
+                  app.marlboroadvance.mpvex.ui.player.RepeatMode.ALL -> if (playlistMode && viewModel.hasPlaylistSupport()) "Repeat: All playlist" else "Repeat: Current file"
+                }
+                TextPlayerUpdate(text)
+              }
+              is PlayerUpdates.Shuffle -> {
+                val enabled = (currentPlayerUpdate as PlayerUpdates.Shuffle).enabled
+                val text = if (enabled) (if (playlistMode && viewModel.hasPlaylistSupport()) "Shuffle: On" else "Shuffle: Not available") else "Shuffle: Off"
+                TextPlayerUpdate(text)
+              }
+              is PlayerUpdates.FrameInfo -> {
+                val frameInfo = (currentPlayerUpdate as PlayerUpdates.FrameInfo)
+                val text = if (frameInfo.totalFrames > 0) "Frame: ${frameInfo.currentFrame}/${frameInfo.totalFrames}" else "Frame: ${frameInfo.currentFrame}"
+                TextPlayerUpdate(text)
+              }
+              else -> {}
+            }
+          }
 
-                if (playlistMode && viewModel.hasPlaylistSupport()) {
-                  // Next Button
-                  val nextEnabled = viewModel.hasNext()
-                  ControlsButton(
-                    icon = Icons.Outlined.SkipNext,
-                    onClick = { viewModel.playNext() },
-                    enabled = nextEnabled,
-                    modifier = Modifier
-                      .size(56.dp)
-                      .then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier),
-                    shape = CircleShape,
-                    iconSize = 32.dp,
-                    type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal,
-                    color = controlColor
-                  )
+          AnimatedVisibility(
+            visible = controlsShown && areControlsLocked,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.then(if (showSystemStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier).constrainAs(unlockControlsButton) {
+                top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.small)
+                end.linkTo(parent.end, spacing.large)
+            },
+          ) { ThumbZoneUnlock(onUnlock = { viewModel.unlockControls() }) }
+
+          AnimatedVisibility(
+            visible = controlsShown && !areControlsLocked,
+            enter = fadeIn(playerControlsEnterAnimationSpec()),
+            exit = fadeOut(playerControlsExitAnimationSpec()),
+            modifier = Modifier.constrainAs(playerPauseButton) {
+                end.linkTo(parent.absoluteRight)
+                start.linkTo(parent.absoluteLeft)
+                if (isPortrait) bottom.linkTo(bottomRightControls.top, spacing.large)
+                else { top.linkTo(parent.top); bottom.linkTo(parent.bottom) }
+            },
+          ) {
+            val showLoadingCircle by playerPreferences.showLoadingCircle.collectAsState()
+            val icon = AnimatedImageVector.animatedVectorResource(R.drawable.anim_play_to_pause)
+            val interaction = remember { MutableInteractionSource() }
+            val isPressed by interaction.collectIsPressedAsState()
+            val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow), label = "play_button_scale")
+
+            when {
+              pausedForCache == true && showLoadingCircle -> LoadingIndicator(modifier = Modifier.size(96.dp))
+              else -> {
+                val buttonShadow = Brush.radialGradient(0.0f to Color.Black.copy(alpha = 0.35f), 0.85f to Color.Transparent)
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+                  if (playlistMode && viewModel.hasPlaylistSupport()) {
+                    ControlsButton(icon = Icons.Outlined.SkipPrevious, onClick = { viewModel.playPrevious() }, enabled = viewModel.hasPrevious(), modifier = Modifier.size(56.dp).then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier), shape = CircleShape, iconSize = 32.dp, type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal, color = controlColor)
+                  }
+                  val playContentColor = MaterialTheme.colorScheme.onSurface
+                  val playContainerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
+                  Surface(modifier = Modifier.size(92.dp).graphicsLayer { scaleX = scale; scaleY = scale }.then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier).clip(CircleShape).clickable(interaction, ripple(color = Color.White)) { resetControlsTimestamp = System.currentTimeMillis(); viewModel.pauseUnpause() }, shape = CircleShape, color = playContainerColor, contentColor = playContentColor, border = if (hideBackground) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)), tonalElevation = 0.dp) {
+                    Image(painter = rememberAnimatedVectorPainter(icon, paused == false), modifier = Modifier.fillMaxSize().padding(28.dp), contentDescription = null, colorFilter = ColorFilter.tint(playContentColor))
+                  }
+                  if (playlistMode && viewModel.hasPlaylistSupport()) {
+                    ControlsButton(icon = Icons.Outlined.SkipNext, onClick = { viewModel.playNext() }, enabled = viewModel.hasNext(), modifier = Modifier.size(56.dp).then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier), shape = CircleShape, iconSize = 32.dp, type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal, color = controlColor)
+                  }
                 }
               }
             }
           }
-        }
 
-        AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked,
-          enter =
-            if (!reduceMotion) {
-              slideInVertically(playerControlsEnterAnimationSpec()) { it } +
-                fadeIn(playerControlsEnterAnimationSpec())
-            } else {
-              fadeIn(playerControlsEnterAnimationSpec())
+          AnimatedVisibility(
+            visible = controlsShown && !areControlsLocked,
+            enter = if (!reduceMotion) slideInVertically(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
+            exit = if (!reduceMotion) slideOutVertically(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
+            modifier = Modifier.then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(seekbar) {
+                if (isPortrait) bottom.linkTo(playerPauseButton.top, spacing.medium) else bottom.linkTo(parent.bottom, spacing.medium)
+                start.linkTo(parent.start, 24.dp); end.linkTo(parent.end, 24.dp); width = Dimension.fillToConstraints
             },
-          exit =
-            if (!reduceMotion) {
-              slideOutVertically(playerControlsExitAnimationSpec()) { it } +
-                fadeOut(playerControlsExitAnimationSpec())
-            } else {
-              fadeOut(playerControlsExitAnimationSpec())
-            },
-          modifier =
-            Modifier
-              .then(
-                if (showSystemNavigationBar) {
-                  val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-                  Modifier.padding(
-                    start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
-                  )
-                } else {
-                  Modifier
+          ) {
+            val invertDuration by playerPreferences.invertDuration.collectAsState()
+            val seekbarStyle by appearancePreferences.seekbarStyle.collectAsState()
+            var wasPlayerAlreadyPaused by remember { mutableStateOf(false) }
+
+            SeekbarWithTimers(
+              positionFlow = viewModel.precisePosition,
+              durationFlow = viewModel.effectiveDuration,
+              onValueChange = {
+                if (!isSeeking) {
+                  wasPlayerAlreadyPaused = paused ?: false
+                  if (!wasPlayerAlreadyPaused) viewModel.pause()
                 }
-              )
-              .constrainAs(seekbar) {
-                if (isPortrait) {
-                  bottom.linkTo(playerPauseButton.top, spacing.medium)
-                } else {
-                  bottom.linkTo(parent.bottom, spacing.medium)
-                }
-                start.linkTo(parent.start, 24.dp)
-                end.linkTo(parent.end, 24.dp)
-                width = Dimension.fillToConstraints
+                isSeeking = true
+                resetControlsTimestamp = System.currentTimeMillis()
+                viewModel.seekTo(it.toInt())
               },
-        ) {
-          val invertDuration by playerPreferences.invertDuration.collectAsState()
-          val seekbarStyle by appearancePreferences.seekbarStyle.collectAsState()
-          var wasPlayerAlreadyPaused by remember { mutableStateOf(false) }
-
-          SeekbarWithTimers(
-            position = precisePosition,
-            duration = if (preciseDuration > 0) preciseDuration else duration?.toFloat() ?: 0f,
-            onValueChange = {
-              if (!isSeeking) {
-                // First drag frame - pause playback
-                wasPlayerAlreadyPaused = paused ?: false
-                if (!wasPlayerAlreadyPaused) {
-                  viewModel.pause()
-                }
-              }
-              isSeeking = true
-              resetControlsTimestamp = System.currentTimeMillis()
-              viewModel.seekTo(it.toInt())
-            },
-            onValueChangeFinished = {
-              isSeeking = false
-              resetControlsTimestamp = System.currentTimeMillis()
-              // Unpause if it wasn't paused before seeking
-              if (!wasPlayerAlreadyPaused) {
-                viewModel.unpause()
-              }
-              viewModel.showControls()
-            },
-            timersInverted = Pair(false, invertDuration),
-            durationTimerOnCLick = {
-              resetControlsTimestamp = System.currentTimeMillis()
-              playerPreferences.invertDuration.set(!invertDuration)
-            },
-            positionTimerOnClick = {},
-            chapters = chapters.toImmutableList(),
-            paused = paused ?: false,
-            seekbarStyle = seekbarStyle,
-            loopStart = abLoopA?.toFloat(),
-            loopEnd = abLoopB?.toFloat(),
-          )
-        }
-
-        AnimatedVisibility(
-            visible = showNextUp,
-            enter = slideInHorizontally { it } + fadeIn(),
-            exit = slideOutHorizontally { it } + fadeOut(),
-            modifier = Modifier.constrainAs(nextUpPill) {
-                bottom.linkTo(parent.bottom, 100.dp)
-                end.linkTo(parent.end, spacing.large)
-            }
-        ) {
-            NextUpPill(
-                title = nextItemTitle ?: "",
-                onClick = { viewModel.playNext() },
-                onDismiss = { viewModel.dismissNextUp() }
+              onValueChangeFinished = {
+                isSeeking = false
+                resetControlsTimestamp = System.currentTimeMillis()
+                if (!wasPlayerAlreadyPaused) viewModel.unpause()
+                viewModel.showControls()
+              },
+              timersInverted = Pair(false, invertDuration),
+              durationTimerOnCLick = {
+                resetControlsTimestamp = System.currentTimeMillis()
+                playerPreferences.invertDuration.set(!invertDuration)
+              },
+              positionTimerOnClick = {},
+              chapters = chapters.toImmutableList(),
+              paused = paused ?: false,
+              seekbarStyle = seekbarStyle,
+              loopStart = abLoopA?.toFloat(),
+              loopEnd = abLoopB?.toFloat(),
             )
-        }
+          }
 
-        AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked,
-          enter =
-            if (!reduceMotion) {
-              slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } +
-                fadeIn(playerControlsEnterAnimationSpec())
-            } else {
-              fadeIn(playerControlsEnterAnimationSpec())
-            },
-          exit =
-            if (!reduceMotion) {
-              slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } +
-                fadeOut(playerControlsExitAnimationSpec())
-            } else {
-              fadeOut(playerControlsExitAnimationSpec())
-            },
-          modifier =
-            Modifier
-              .then(
-                if (showSystemStatusBar) {
-                  Modifier.windowInsetsPadding(WindowInsets.statusBars)
-                } else {
-                  Modifier
-                }
-              )
-              .then(
-                if (showSystemNavigationBar) {
-                  val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-                  Modifier.padding(
-                    start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
-                  )
-                } else {
-                  Modifier
-                }
-              )
-              .constrainAs(topLeftControls) {
+          AnimatedVisibility(visible = showNextUp, enter = slideInHorizontally { it } + fadeIn(), exit = slideOutHorizontally { it } + fadeOut(), modifier = Modifier.constrainAs(nextUpPill) { bottom.linkTo(parent.bottom, 100.dp); end.linkTo(parent.end, spacing.large) }) {
+              NextUpPill(title = nextItemTitle ?: "", onClick = { viewModel.playNext() }, onDismiss = { viewModel.dismissNextUp() })
+          }
+
+          AnimatedVisibility(
+            visible = controlsShown && !areControlsLocked,
+            enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
+            exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
+            modifier = Modifier.then(if (showSystemStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier).then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(topLeftControls) {
                 top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.small)
                 start.linkTo(parent.start, spacing.large)
-                if (isPortrait) {
-                  width = Dimension.fillToConstraints
-                  end.linkTo(parent.end, spacing.large)
-                } else {
-                  width = Dimension.fillToConstraints
-                  end.linkTo(topRightControls.start, spacing.extraSmall)
-                }
-              },
-        ) {
-          if (isPortrait) {
-            TopPlayerControlsPortrait(
-              mediaTitle = mediaTitle,
-              hideBackground = hideBackground,
-              onBackPress = onBackPress,
-              onOpenSheet = onOpenSheet,
-              viewModel = viewModel,
-              activity = activity,
-            )
-          } else {
-            TopLeftPlayerControlsLandscape(
-              mediaTitle = mediaTitle,
-              hideBackground = hideBackground,
-              onBackPress = onBackPress,
-              onOpenSheet = onOpenSheet,
-              viewModel = viewModel,
-              activity = activity,
-            )
+                if (isPortrait) { width = Dimension.fillToConstraints; end.linkTo(parent.end, spacing.large) } else { width = Dimension.fillToConstraints; end.linkTo(topRightControls.start, spacing.extraSmall) }
+            },
+          ) {
+            if (isPortrait) TopPlayerControlsPortrait(mediaTitle = mediaTitle, hideBackground = hideBackground, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
+            else TopLeftPlayerControlsLandscape(mediaTitle = mediaTitle, hideBackground = hideBackground, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
           }
-        }
 
-        AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked && !isPortrait,
-          enter =
-            if (!reduceMotion) {
-              slideInHorizontally(playerControlsEnterAnimationSpec()) { it } +
-                fadeIn(playerControlsEnterAnimationSpec())
-            } else {
-              fadeIn(playerControlsEnterAnimationSpec())
-            },
-          exit =
-            if (!reduceMotion) {
-              slideOutHorizontally(playerControlsExitAnimationSpec()) { it } +
-                fadeOut(playerControlsExitAnimationSpec())
-            } else {
-              fadeOut(playerControlsExitAnimationSpec())
-            },
-          modifier =
-            Modifier
-              .then(
-                if (showSystemStatusBar) {
-                  Modifier.windowInsetsPadding(WindowInsets.statusBars)
-                } else {
-                  Modifier
-                }
-              )
-              .then(
-                if (showSystemNavigationBar) {
-                  val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-                  Modifier.padding(
-                    start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
-                  )
-                } else {
-                  Modifier
-                }
-              )
-              .constrainAs(topRightControls) {
-                top.linkTo(parent.top, spacing.small)
-                end.linkTo(parent.end, spacing.large)
-              },
-        ) {
-          TopRightPlayerControlsLandscape(
-            buttons = topRightButtons,
-            chapters = chapters,
-            currentChapter = currentChapter,
-            isSpeedNonOne = isSpeedNonOne,
-            currentZoom = videoZoom,
-            mediaTitle = mediaTitle,
-            hideBackground = hideBackground,
-            decoder = decoder,
-            playbackSpeed = playbackSpeed ?: 1f,
-            onBackPress = onBackPress,
-            onOpenSheet = onOpenSheet,
-            viewModel = viewModel,
-            activity = activity,
-          )
-        }
+          AnimatedVisibility(
+            visible = controlsShown && !areControlsLocked && !isPortrait,
+            enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
+            exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
+            modifier = Modifier.then(if (showSystemStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier).then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(topRightControls) { top.linkTo(parent.top, spacing.small); end.linkTo(parent.end, spacing.large) },
+          ) { TopRightPlayerControlsLandscape(buttons = topRightButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity) }
 
-        AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked && (isPortrait || !areSlidersShown),
-          enter =
-            if (!reduceMotion) {
-              slideInHorizontally(playerControlsEnterAnimationSpec()) { it } +
-                fadeIn(playerControlsEnterAnimationSpec())
-            } else {
-              fadeIn(playerControlsEnterAnimationSpec())
-            },
-          exit =
-            if (!reduceMotion) {
-              slideOutHorizontally(playerControlsExitAnimationSpec()) { it } +
-                fadeOut(playerControlsExitAnimationSpec())
-            } else {
-              fadeOut(playerControlsExitAnimationSpec())
-            },
-          modifier =
-            Modifier
-              .then(
-                if (showSystemNavigationBar) {
-                  val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-                  Modifier.padding(
-                    start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
-                  )
-                } else {
-                  Modifier
-                }
-              )
-              .constrainAs(bottomRightControls) {
-                if (isPortrait) {
-                  bottom.linkTo(parent.bottom, spacing.extraLarge)
-                  start.linkTo(parent.start, spacing.large)
-                  end.linkTo(parent.end, spacing.large)
-                  width = Dimension.fillToConstraints
-                } else {
-                  bottom.linkTo(seekbar.top, spacing.small)
-                  end.linkTo(parent.end, spacing.large)
-                }
-              },
-        ) {
-          if (isPortrait) {
-            BottomPlayerControlsPortrait(
-              buttons = portraitBottomButtons,
-              chapters = chapters,
-              currentChapter = currentChapter,
-              isSpeedNonOne = isSpeedNonOne,
-              currentZoom = videoZoom,
-              mediaTitle = mediaTitle,
-              hideBackground = hideBackground,
-              decoder = decoder,
-              playbackSpeed = playbackSpeed ?: 1f,
-              onBackPress = onBackPress,
-              onOpenSheet = onOpenSheet,
-              viewModel = viewModel,
-              activity = activity,
-            )
-          } else {
-            BottomRightPlayerControlsLandscape(
-              buttons = bottomRightButtons,
-              chapters = chapters,
-              currentChapter = currentChapter,
-              isSpeedNonOne = isSpeedNonOne,
-              currentZoom = videoZoom,
-              mediaTitle = mediaTitle,
-              hideBackground = hideBackground,
-              decoder = decoder,
-              playbackSpeed = playbackSpeed ?: 1f,
-              onBackPress = onBackPress,
-              onOpenSheet = onOpenSheet,
-              viewModel = viewModel,
-              activity = activity,
-            )
+          AnimatedVisibility(
+            visible = controlsShown && !areControlsLocked && (isPortrait || !areSlidersShown),
+            enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
+            exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
+            modifier = Modifier.then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(bottomRightControls) { if (isPortrait) { bottom.linkTo(parent.bottom, spacing.extraLarge); start.linkTo(parent.start, spacing.large); end.linkTo(parent.end, spacing.large); width = Dimension.fillToConstraints } else { bottom.linkTo(seekbar.top, spacing.small); end.linkTo(parent.end, spacing.large) } },
+          ) {
+            if (isPortrait) BottomPlayerControlsPortrait(buttons = portraitBottomButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
+            else BottomRightPlayerControlsLandscape(buttons = bottomRightButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
           }
-        }
 
-        AnimatedVisibility(
-          visible = controlsShown && !areControlsLocked && !isPortrait && !areSlidersShown,
-          enter =
-            if (!reduceMotion) {
-              slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } +
-                fadeIn(playerControlsEnterAnimationSpec())
-            } else {
-              fadeIn(playerControlsEnterAnimationSpec())
-            },
-          exit =
-            if (!reduceMotion) {
-              slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } +
-                fadeOut(playerControlsExitAnimationSpec())
-            } else {
-              fadeOut(playerControlsExitAnimationSpec())
-            },
-          modifier =
-            Modifier
-              .then(
-                if (showSystemNavigationBar) {
-                  val navBarPadding = WindowInsets.navigationBars.asPaddingValues()
-                  Modifier.padding(
-                    start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)
-                  )
-                } else {
-                  Modifier
-                }
-              )
-              .constrainAs(bottomLeftControls) {
-                bottom.linkTo(seekbar.top, spacing.small)
-                start.linkTo(parent.start, spacing.large)
-                width = Dimension.fillToConstraints
-                end.linkTo(bottomRightControls.start, spacing.small)
-              },
-        ) {
-          BottomLeftPlayerControlsLandscape(
-            buttons = bottomLeftButtons,
-            chapters = chapters,
-            currentChapter = currentChapter,
-            isSpeedNonOne = isSpeedNonOne,
-            currentZoom = videoZoom,
-            mediaTitle = mediaTitle,
-            hideBackground = hideBackground,
-            decoder = decoder,
-            playbackSpeed = playbackSpeed ?: 1f,
-            onBackPress = onBackPress,
-            onOpenSheet = onOpenSheet,
-            viewModel = viewModel,
-            activity = activity,
-          )
+          AnimatedVisibility(
+            visible = controlsShown && !areControlsLocked && !isPortrait && !areSlidersShown,
+            enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
+            exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
+            modifier = Modifier.then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(bottomLeftControls) { bottom.linkTo(seekbar.top, spacing.small); start.linkTo(parent.start, spacing.large); width = Dimension.fillToConstraints; end.linkTo(bottomRightControls.start, spacing.small) },
+          ) { BottomLeftPlayerControlsLandscape(buttons = bottomLeftButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity) }
         }
-
       }
     }
 
@@ -1085,68 +680,12 @@ fun PlayerControls(
     val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
     val speedPresets by playerPreferences.speedPresets.collectAsState()
 
-    // Smooth sheet enter/exit animation
-    AnimatedVisibility(
-      visible = sheetShown != Sheets.None,
-      enter = slideInVertically { it } + fadeIn(),
-      exit = slideOutVertically { it } + fadeOut()
-    ) {
-      PlayerSheets(
-        viewModel = viewModel,
-        sheetShown = sheetShown,
-        subtitles = subtitles.toImmutableList(),
-        onAddSubtitle = viewModel::addSubtitle,
-        onToggleSubtitle = { id ->
-          if (viewModel.isSubtitleSelected(id)) {
-            MPVLib.setPropertyString("sid", "no")
-            MPVLib.setPropertyString("secondary-sid", "no")
-          } else {
-            MPVLib.setPropertyInt("sid", id)
-            MPVLib.setPropertyString("secondary-sid", "no")
-          }
-        },
-        isSubtitleSelected = viewModel::isSubtitleSelected,
-        onRemoveSubtitle = viewModel::removeSubtitle,
-        audioTracks = audioTracks.toImmutableList(),
-        onAddAudio = viewModel::addAudio,
-        onSelectAudio = {
-          if (MPVLib.getPropertyInt("aid") == it.id) {
-            MPVLib.setPropertyString("aid", "no")
-          } else {
-            MPVLib.setPropertyInt("aid", it.id)
-          }
-        },
-        chapter = chapters.getOrNull(currentChapter ?: 0),
-        chapters = chapters.toImmutableList(),
-        onSeekToChapter = {
-          MPVLib.setPropertyInt("chapter", it)
-          viewModel.unpause()
-        },
-        decoder = decoder,
-        onUpdateDecoder = { MPVLib.setPropertyString("hwdec", it.value) },
-        speed = playbackSpeed ?: playerPreferences.defaultSpeed.get(),
-        onSpeedChange = { MPVLib.setPropertyFloat("speed", it.toFixed(2)) },
-        onMakeDefaultSpeed = { playerPreferences.defaultSpeed.set(it.toFixed(2)) },
-        onAddSpeedPreset = { playerPreferences.speedPresets += it.toFixed(2).toString() },
-        onRemoveSpeedPreset = { playerPreferences.speedPresets -= it.toFixed(2).toString() },
-        onResetSpeedPresets = playerPreferences.speedPresets::delete,
-        speedPresets = speedPresets.map { it.toFloat() }.sorted(),
-        onResetDefaultSpeed = {
-          MPVLib.setPropertyFloat("speed", playerPreferences.defaultSpeed.deleteAndGet().toFixed(2))
-        },
-        sleepTimerTimeRemaining = sleepTimerTimeRemaining,
-        onStartSleepTimer = viewModel::startTimer,
-        onOpenPanel = onOpenPanel,
-        onShowSheet = onOpenSheet,
-        onDismissRequest = { onOpenSheet(Sheets.None) },
-      )
+    AnimatedVisibility(visible = sheetShown != Sheets.None, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
+      PlayerSheets(viewModel = viewModel, sheetShown = sheetShown, subtitles = subtitles.toImmutableList(), onAddSubtitle = viewModel::addSubtitle, onToggleSubtitle = { id -> if (viewModel.isSubtitleSelected(id)) { MPVLib.setPropertyString("sid", "no"); MPVLib.setPropertyString("secondary-sid", "no") } else { MPVLib.setPropertyInt("sid", id); MPVLib.setPropertyString("secondary-sid", "no") } }, isSubtitleSelected = viewModel::isSubtitleSelected, onRemoveSubtitle = viewModel::removeSubtitle, audioTracks = audioTracks.toImmutableList(), onAddAudio = viewModel::addAudio, onSelectAudio = { if (MPVLib.getPropertyInt("aid") == it.id) MPVLib.setPropertyString("aid", "no") else MPVLib.setPropertyInt("aid", it.id) }, chapter = chapters.getOrNull(currentChapter ?: 0), chapters = chapters.toImmutableList(), onSeekToChapter = { MPVLib.setPropertyInt("chapter", it); viewModel.unpause() }, decoder = decoder, onUpdateDecoder = { MPVLib.setPropertyString("hwdec", it.value) }, speed = playbackSpeed ?: playerPreferences.defaultSpeed.get(), onSpeedChange = { MPVLib.setPropertyFloat("speed", it.toFixed(2)) }, onMakeDefaultSpeed = { playerPreferences.defaultSpeed.set(it.toFixed(2)) }, onAddSpeedPreset = { playerPreferences.speedPresets += it.toFixed(2).toString() }, onRemoveSpeedPreset = { playerPreferences.speedPresets -= it.toFixed(2).toString() }, onResetSpeedPresets = playerPreferences.speedPresets::delete, speedPresets = speedPresets.map { it.toFloat() }.sorted(), onResetDefaultSpeed = { MPVLib.setPropertyFloat("speed", playerPreferences.defaultSpeed.deleteAndGet().toFixed(2)) }, sleepTimerTimeRemaining = sleepTimerTimeRemaining, onStartSleepTimer = viewModel::startTimer, onOpenPanel = onOpenPanel, onShowSheet = onOpenSheet, onDismissRequest = { onOpenSheet(Sheets.None) })
     }
 
     val panel by viewModel.panelShown.collectAsState()
-    PlayerPanels(
-      panelShown = panel,
-      onDismissRequest = { onOpenPanel(Panels.None) },
-    )
+    PlayerPanels(panelShown = panel, onDismissRequest = { onOpenPanel(Panels.None) })
   }
 }
 
@@ -1163,101 +702,25 @@ fun NextUpPill(
     val offsetX = remember { Animatable(0f) }
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.96f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioLowBouncy,
-            stiffness = Spring.StiffnessLow
-        ),
-        label = "next_up_pill_scale"
-    )
+    val scale by animateFloatAsState(targetValue = if (isPressed) 0.96f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow), label = "next_up_pill_scale")
     
-    // Trigger haptic when appearing
-    LaunchedEffect(Unit) {
-        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-    }
+    LaunchedEffect(Unit) { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) }
 
     Surface(
-        modifier = modifier
-            .padding(spacing.small)
-            .offset { IntOffset(offsetX.value.roundToInt(), 0) }
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-            }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        if (offsetX.value > 100f) {
-                            scope.launch {
-                                offsetX.animateTo(500f)
-                                onDismiss()
-                            }
-                        } else {
-                            scope.launch {
-                                offsetX.animateTo(0f)
-                            }
-                        }
-                    },
-                    onHorizontalDrag = { change, dragAmount ->
-                        change.consume()
-                        // Only allow dragging to the right
-                        if (dragAmount > 0 || offsetX.value > 0) {
-                            scope.launch {
-                                offsetX.snapTo((offsetX.value + dragAmount).coerceAtLeast(0f))
-                            }
-                        }
-                    }
-                )
-            }
-            .height(64.dp)
-            .widthIn(min = 180.dp, max = 300.dp),
+        modifier = modifier.padding(spacing.small).offset { IntOffset(offsetX.value.roundToInt(), 0) }.graphicsLayer { scaleX = scale; scaleY = scale }.pointerInput(Unit) {
+                detectHorizontalDragGestures(onDragEnd = { if (offsetX.value > 100f) scope.launch { offsetX.animateTo(500f); onDismiss() } else scope.launch { offsetX.animateTo(0f) } }, onHorizontalDrag = { change, dragAmount -> change.consume(); if (dragAmount > 0 || offsetX.value > 0) scope.launch { offsetX.snapTo((offsetX.value + dragAmount).coerceAtLeast(0f)) } })
+            }.height(64.dp).widthIn(min = 180.dp, max = 300.dp),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.secondaryContainer,
         tonalElevation = 3.dp,
         shadowElevation = 4.dp
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = ripple(),
-                    onClick = onClick
-                )
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.SkipNext,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.size(28.dp)
-            )
-            
+        Row(modifier = Modifier.fillMaxSize().clickable(interactionSource = interactionSource, indication = ripple(), onClick = onClick).padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
+            Icon(imageVector = Icons.Outlined.SkipNext, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(28.dp))
             Spacer(modifier = Modifier.width(16.dp))
-            
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = "NEXT UP",
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 1.2.sp
-                )
-                Text(
-                    text = title,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+                Text(text = "NEXT UP", color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
+                Text(text = title, color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -1267,28 +730,9 @@ fun NextUpPill(
 @Composable
 fun PreviewNextUpPill() {
     MpvexTheme {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            // Gradient background to see the look better
-            Box(
-                modifier = Modifier
-                    .size(400.dp, 200.dp)
-                    .background(
-                        Brush.linearGradient(
-                            colors = listOf(Color(0xFF6200EE), Color(0xFF03DAC6))
-                        )
-                    )
-            )
-            
-            NextUpPill(
-                title = "S01 E05 - The Final Stand",
-                onClick = {},
-                onDismiss = {}
-            )
+        Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(400.dp, 200.dp).background(Brush.linearGradient(colors = listOf(Color(0xFF6200EE), Color(0xFF03DAC6)))))
+            NextUpPill(title = "S01 E05 - The Final Stand", onClick = {}, onDismiss = {})
         }
     }
 }
