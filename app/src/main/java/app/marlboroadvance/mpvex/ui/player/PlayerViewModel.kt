@@ -180,6 +180,20 @@ class PlayerViewModel(
     if (precise > 0f) precise else (standard?.toFloat() ?: 0f)
   }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
 
+  // Audio delay — exposed as a deduplicated StateFlow so composables never read MPV directly
+  val audioDelay: StateFlow<Float> = MPVLib.propDouble["audio-delay"]
+    .map { it?.toFloat() ?: 0f }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+
+  // Subtitle delay and speed — same pattern, avoids 2 hot MPV flows at composable scope
+  val subDelay: StateFlow<Float> = MPVLib.propDouble["sub-delay"]
+    .map { it?.toFloat() ?: 0f }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0f)
+
+  val subSpeed: StateFlow<Float> = MPVLib.propDouble["sub-speed"]
+    .map { it?.toFloat() ?: 1f }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1f)
+
   // Audio state
   val currentVolume = MutableStateFlow(host.audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
   private val volumeBoostCap by MPVLib.propInt["volume-max"].collectAsState(viewModelScope)

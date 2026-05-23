@@ -48,6 +48,9 @@ import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import kotlinx.coroutines.delay
 
+// Speed presets from 0.25x to 4x — constant, never changes at runtime
+private val speedControlPresets = listOf(0.25f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 4.0f)
+
 /**
  * A compact speed control display that shows available speed options (0.25x to 4x)
  * with an indicator showing the current speed. Styled to match the zoom overlay.
@@ -60,13 +63,13 @@ fun SpeedControlSlider(
   currentSpeed: Float,
   modifier: Modifier = Modifier,
 ) {
-  // Speed presets from 0.25x to 4x
-  val speedPresets = listOf(0.25f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 4.0f)
-  
-  // Find the index of current speed in presets
-  val currentIndex = speedPresets.indexOfFirst { 
-    kotlin.math.abs(it - currentSpeed) < 0.05f 
-  }.coerceIn(0, speedPresets.size - 1)
+  val speedPresets = speedControlPresets
+
+  // Linear search only re-runs when currentSpeed changes, not on every recomposition
+  val currentIndex = remember(currentSpeed) {
+    speedPresets.indexOfFirst { kotlin.math.abs(it - currentSpeed) < 0.05f }
+      .coerceIn(0, speedPresets.size - 1)
+  }
   
   val primaryColor = MaterialTheme.colorScheme.primary
   val onSurfaceColor = MaterialTheme.colorScheme.onSurface

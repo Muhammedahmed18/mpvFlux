@@ -5,149 +5,86 @@ import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.drop
 
-/**
- * Common helper functions for FAB visibility based on scroll state
- */
 object FabScrollHelper {
-    /**
-     * Sets up scroll tracking for both list and grid views to control FAB visibility
-     */
     @Composable
     fun trackScrollForFabVisibility(
         listState: LazyListState,
         gridState: LazyGridState?,
         isFabVisible: MutableState<Boolean>,
         expanded: Boolean,
-        onExpandedChange: (Boolean) -> Unit
+        onExpandedChange: (Boolean) -> Unit,
     ) {
-        // Track scroll position to determine direction (for list state)
-        val previousListIndex = remember { mutableIntStateOf(0) }
-        val previousListScrollOffset = remember { mutableIntStateOf(0) }
-        
-        // Track scroll position to determine direction (for grid state)
-        val previousGridIndex = remember { mutableIntStateOf(0) }
-        val previousGridScrollOffset = remember { mutableIntStateOf(0) }
-        
-        // Remember if we've just seen a change in states/tabs
-        val justChangedStates = remember { mutableIntStateOf(0) }
-        
-        // When the listState object reference changes (tab switch), ensure FAB is visible
-        LaunchedEffect(listState) {
-            // Make FAB visible when switching tabs
+        val currentExpanded by rememberUpdatedState<Boolean>(expanded)
+        val currentOnExpandedChange by rememberUpdatedState<(Boolean) -> Unit>(onExpandedChange)
+
+        // Show FAB on tab switch and track scroll direction to update visibility.
+        // Previous positions are plain coroutine-local vars — they are implementation
+        // details and must not be Compose state (which would itself trigger recompositions).
+        LaunchedEffect(listState, gridState) {
             isFabVisible.value = true
-            
-            // Mark that we just changed states
-            justChangedStates.intValue++
-        }
-        
-        if (gridState != null) {
-            // When the gridState object reference changes (tab switch), ensure FAB is visible
-            LaunchedEffect(gridState) {
-                // Make FAB visible when switching tabs
-                isFabVisible.value = true
-                
-                // Mark that we just changed states
-                justChangedStates.intValue++
-            }
-        }
-        
-        // Update FAB visibility based on list scroll direction
-        LaunchedEffect(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset, justChangedStates.intValue) {
-            // Only process scroll events (not state changes) after a brief delay
-            // This prevents the FAB from hiding when switching tabs
-            if (justChangedStates.intValue > 0) {
-                // Update previous values without changing visibility
-                previousListIndex.intValue = listState.firstVisibleItemIndex
-                previousListScrollOffset.intValue = listState.firstVisibleItemScrollOffset
-                return@LaunchedEffect
-            }
-            
-            updateFabVisibility(
-                isFabVisible, 
-                listState.firstVisibleItemIndex,
-                listState.firstVisibleItemScrollOffset,
-                previousListIndex.intValue,
-                previousListScrollOffset.intValue
-            )
-            
-            previousListIndex.intValue = listState.firstVisibleItemIndex
-            previousListScrollOffset.intValue = listState.firstVisibleItemScrollOffset
-        }
-        
-        // Reset the state change counter after a short delay
-        LaunchedEffect(justChangedStates.intValue) {
-            if (justChangedStates.intValue > 0) {
-                kotlinx.coroutines.delay(300) // Wait for tab switch animations
-                justChangedStates.intValue = 0
-            }
-        }
-        
-        // Update FAB visibility based on grid scroll direction (if grid state is provided)
-        if (gridState != null) {
-            LaunchedEffect(gridState.firstVisibleItemIndex, gridState.firstVisibleItemScrollOffset, justChangedStates.intValue) {
-                // Skip processing during tab changes
-                if (justChangedStates.intValue > 0) {
-                    // Update previous values without changing visibility
-                    previousGridIndex.intValue = gridState.firstVisibleItemIndex
-                    previousGridScrollOffset.intValue = gridState.firstVisibleItemScrollOffset
-                    return@LaunchedEffect
-                }
-                
-                updateFabVisibility(
-                    isFabVisible,
-                    gridState.firstVisibleItemIndex,
-                    gridState.firstVisibleItemScrollOffset,
-                    previousGridIndex.intValue,
-                    previousGridScrollOffset.intValue
+
+            var prevListIndex = listState.firstVisibleItemIndex
+            var prevListOffset = listState.firstVisibleItemScrollOffset
+            var prevGridIndex = gridState?.firstVisibleItemIndex ?: 0
+            var prevGridOffset = gridState?.firstVisibleItemScrollOffset ?: 0
+
+            snapshotFlow {
+                Pair(
+                    listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset,
+                    gridState?.let { it.firstVisibleItemIndex to it.firstVisibleItemScrollOffset },
                 )
-                
-                previousGridIndex.intValue = gridState.firstVisibleItemIndex
-                previousGridScrollOffset.intValue = gridState.firstVisibleItemScrollOffset
+            }
+            .drop(1) // Skip the initial emission — prev values already match current state
+            .collect { (list, grid) ->
+                val (listIndex, listOffset) = list
+                updateFabVisibility(isFabVisible, listIndex, listOffset, prevListIndex, prevListOffset)
+                prevListIndex = listIndex
+                prevListOffset = listOffset
+
+                if (grid != null) {
+                    val (gridIndex, gridOffset) = grid
+                    updateFabVisibility(isFabVisible, gridIndex, gridOffset, prevGridIndex, prevGridOffset)
+                    prevGridIndex = gridIndex
+                    prevGridOffset = gridOffset
+                }
             }
         }
-        
-        // Auto-collapse menu when list scrolling
-        LaunchedEffect(listState.isScrollInProgress) {
-            if (expanded && listState.isScrollInProgress) {
-                onExpandedChange(false)
-            }
-        }
-        
-        // Auto-collapse menu when grid scrolling
-        gridState?.let { grid ->
-            LaunchedEffect(grid.isScrollInProgress) {
-                if (expanded && grid.isScrollInProgress) {
-                    onExpandedChange(false)
+
+        // Collapse the FAB menu whenever a scroll begins.
+        // Uses rememberUpdatedState so the latest `expanded` and `onExpandedChange`
+        // are always read without restarting the effect on every recomposition.
+        LaunchedEffect(listState, gridState) {
+            snapshotFlow {
+                listState.isScrollInProgress || (gridState?.isScrollInProgress ?: false)
+            }.collect { isScrolling ->
+                if (isScrolling && currentExpanded) {
+                    currentOnExpandedChange(false)
                 }
             }
         }
     }
-    
-    /**
-     * Helper function to update FAB visibility based on scroll position
-     */
+
     private fun updateFabVisibility(
         isFabVisible: MutableState<Boolean>,
         currentIndex: Int,
         currentScrollOffset: Int,
         previousIndex: Int,
-        previousScrollOffset: Int
+        previousScrollOffset: Int,
     ) {
-        // Always show at top
         if (currentIndex == 0 && currentScrollOffset == 0) {
             isFabVisible.value = true
         } else {
-            // Calculate if scrolling down or up
             val isScrollingDown = if (currentIndex != previousIndex) {
                 currentIndex > previousIndex
             } else {
                 currentScrollOffset > previousScrollOffset
             }
-            
-            // Hide when scrolling down, show when scrolling up
             isFabVisible.value = !isScrollingDown
         }
     }

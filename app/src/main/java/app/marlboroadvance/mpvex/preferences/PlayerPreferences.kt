@@ -57,8 +57,6 @@ class PlayerPreferences(
   val playlistMode = preferenceStore.getBoolean("playlist_mode", true)
   val playlistViewMode = preferenceStore.getBoolean("playlist_view_mode_list", true) // true = list, false = grid
 
-  val useWavySeekbar = preferenceStore.getBoolean("use_wavy_seekbar", true)
-
   val customSkipDuration = preferenceStore.getInt("custom_skip_duration", 90)
 
   val repeatMode = preferenceStore.getEnum("repeat_mode", RepeatMode.OFF)

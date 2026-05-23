@@ -1,6 +1,5 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.panels
 
-import android.annotation.SuppressLint
 import androidx.annotation.StringRes
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,14 +63,13 @@ import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import me.zhanghai.compose.preference.preferenceTheme
 import org.koin.compose.koinInject
 
-@SuppressLint("MutableCollectionMutableState")
 @Composable
 fun SubtitleSettingsTypographyCard(modifier: Modifier = Modifier) {
   val context = LocalContext.current
   val preferences = koinInject<SubtitlesPreferences>()
   val fileManager = koinInject<FileManager>()
   var isExpanded by remember { mutableStateOf(true) }
-  val fonts by remember { mutableStateOf(mutableListOf<String>("Default")) }
+  val fonts = remember { mutableStateListOf("Default") }
   var fontsLoadingIndicator: (@Composable () -> Unit)? by remember {
     val indicator: (@Composable () -> Unit) = {
       CircularProgressIndicator(Modifier.size(32.dp))
@@ -78,22 +77,23 @@ fun SubtitleSettingsTypographyCard(modifier: Modifier = Modifier) {
     mutableStateOf(indicator)
   }
   LaunchedEffect(Unit) {
-    withContext(Dispatchers.IO) {
+    val loadedFonts = withContext(Dispatchers.IO) {
       val fontsDir = fileManager.fromPath(context.filesDir.path + "/fonts")
       if (fileManager.exists(fontsDir)) {
-        fonts.addAll(
-          fileManager
-            .listFiles(fontsDir)
-            .filter { fileManager.isFile(it) && fileManager.getName(it).lowercase().matches(".*\\.[ot]tf$".toRegex()) }
-            .mapNotNull {
-              runCatching {
-                TTFFile.open(fileManager.getInputStream(it) ?: return@mapNotNull null).families.values.first()
-              }.getOrNull()
-            }.distinct()
-        )
+        fileManager
+          .listFiles(fontsDir)
+          .filter { fileManager.isFile(it) && fileManager.getName(it).lowercase().matches(".*\\.[ot]tf$".toRegex()) }
+          .mapNotNull {
+            runCatching {
+              TTFFile.open(fileManager.getInputStream(it) ?: return@mapNotNull null).families.values.first()
+            }.getOrNull()
+          }.distinct()
+      } else {
+        emptyList()
       }
-      fontsLoadingIndicator = null
     }
+    fonts.addAll(loadedFonts)
+    fontsLoadingIndicator = null
   }
 
   ExpandableCard(

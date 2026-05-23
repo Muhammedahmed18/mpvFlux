@@ -25,7 +25,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,13 +51,6 @@ fun PlayLinkSheet(
   var linkInputUrl by remember { mutableStateOf("") }
   var isLinkInputUrlValid by remember { mutableStateOf(true) }
   val coroutineScope = rememberCoroutineScope()
-
-  LaunchedEffect(true) {
-    if (isOpen) {
-      linkInputUrl = ""
-      isLinkInputUrlValid = true
-    }
-  }
 
   val handleDismiss = {
     onDismiss()

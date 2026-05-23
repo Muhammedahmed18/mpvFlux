@@ -64,6 +64,8 @@ import app.marlboroadvance.mpvex.presentation.components.RepeatingIconButton
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
+private val defaultPresets = listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f)
+
 @Composable
 fun PlaybackSpeedSheet(
   speed: Float,
@@ -177,10 +179,6 @@ fun PlaybackSpeedSheet(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small)
       ) {
-          val defaultPresets = remember {
-            listOf(0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f)
-          }
-
           LazyRow(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(end = MaterialTheme.spacing.small),
@@ -211,8 +209,8 @@ fun PlaybackSpeedSheet(
                 .height(32.dp)
                 .width(110.dp)
             
-            val isCurrentSpeedSaved = speedPresets.any { kotlin.math.abs(it - speed) < 0.001f }
-            val isDefaultPreset = defaultPresets.any { kotlin.math.abs(it - speed) < 0.001f }
+            val isCurrentSpeedSaved = remember(speed, speedPresets) { speedPresets.any { kotlin.math.abs(it - speed) < 0.001f } }
+            val isDefaultPreset = remember(speed) { defaultPresets.any { kotlin.math.abs(it - speed) < 0.001f } }
 
             if (isCurrentSpeedSaved) {
                 if (!isDefaultPreset) {

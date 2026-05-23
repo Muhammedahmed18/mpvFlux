@@ -39,6 +39,8 @@ import app.marlboroadvance.mpvex.presentation.components.PlayerSheet
 import app.marlboroadvance.mpvex.presentation.components.SliderItem
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import `is`.xyz.mpv.MPVLib
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 
 @Composable
@@ -56,13 +58,14 @@ fun VideoZoomSheet(
 
   val currentOnSetVideoZoom by rememberUpdatedState(onSetVideoZoom)
 
+  // Sync local zoom with the actual MPV property on open. The ViewModel only tracks
+  // values set by the app — pan & zoom gestures can change video-zoom independently.
+  // The blocking MPV read is dispatched to IO to keep the main thread clear.
   LaunchedEffect(Unit) {
-    val mpvZoom = MPVLib.getPropertyDouble("video-zoom")?.toFloat() ?: videoZoom
+    val mpvZoom = withContext(Dispatchers.IO) {
+      MPVLib.getPropertyDouble("video-zoom")?.toFloat()
+    } ?: videoZoom
     zoom = mpvZoom
-  }
-
-  LaunchedEffect(zoom) {
-    currentOnSetVideoZoom(zoom)
   }
 
   PlayerSheet(onDismissRequest = onDismissRequest) {
@@ -70,12 +73,16 @@ fun VideoZoomSheet(
       zoom = zoom,
       defaultZoom = defaultZoom,
       panAndZoomEnabled = panAndZoomEnabled,
-      onZoomChange = { newZoom -> zoom = newZoom },
+      onZoomChange = { newZoom ->
+        zoom = newZoom
+        currentOnSetVideoZoom(newZoom)
+      },
       onSetAsDefault = {
         playerPreferences.defaultVideoZoom.set(zoom)
       },
       onReset = {
         zoom = 0f
+        currentOnSetVideoZoom(0f)
         playerPreferences.defaultVideoZoom.set(0f)
         onResetVideoPan()
       },

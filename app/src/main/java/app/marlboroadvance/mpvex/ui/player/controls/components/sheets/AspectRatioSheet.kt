@@ -42,6 +42,19 @@ data class AspectRatio(
   val isCustom: Boolean = false,
 )
 
+private val presetRatios =
+  listOf(
+    AspectRatio("Default", -1.0),
+    AspectRatio("4:3", 4.0 / 3.0),
+    AspectRatio("16:9", 16.0 / 9.0),
+    AspectRatio("16:10", 16.0 / 10.0),
+    AspectRatio("21:9", 21.0 / 9.0),
+    AspectRatio("32:9", 32.0 / 9.0),
+    AspectRatio("1:1", 1.0),
+    AspectRatio("2.35:1", 2.35),
+    AspectRatio("2.39:1", 2.39),
+  )
+
 @Composable
 fun AspectRatioSheet(
   currentRatio: Double?,
@@ -52,19 +65,6 @@ fun AspectRatioSheet(
   onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val presetRatios =
-    listOf(
-      AspectRatio("Default", -1.0),
-      AspectRatio("4:3", 4.0 / 3.0),
-      AspectRatio("16:9", 16.0 / 9.0),
-      AspectRatio("16:10", 16.0 / 10.0),
-      AspectRatio("21:9", 21.0 / 9.0),
-      AspectRatio("32:9", 32.0 / 9.0),
-      AspectRatio("1:1", 1.0),
-      AspectRatio("2.35:1", 2.35),
-      AspectRatio("2.39:1", 2.39),
-    )
-
   PlayerSheet(onDismissRequest) {
     Column(
       modifier =

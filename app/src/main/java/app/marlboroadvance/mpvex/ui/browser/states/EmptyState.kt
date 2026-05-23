@@ -1,9 +1,5 @@
 package app.marlboroadvance.mpvex.ui.browser.states
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,11 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -42,75 +33,67 @@ fun EmptyState(
   modifier: Modifier = Modifier,
   action: (@Composable () -> Unit)? = null,
 ) {
-  var visible by remember { mutableStateOf(false) }
-  LaunchedEffect(Unit) { visible = true }
-
   val glowColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
 
-  AnimatedVisibility(
-    visible = visible,
-    enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 6 },
+  Column(
+    modifier = modifier
+      .fillMaxSize()
+      .padding(horizontal = 48.dp),
+    verticalArrangement = Arrangement.Center,
+    horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    Column(
-      modifier = modifier
-        .fillMaxSize()
-        .padding(horizontal = 48.dp),
-      verticalArrangement = Arrangement.Center,
-      horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
 
-      Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-          .size(160.dp)
-          .drawBehind {
-            drawCircle(
-              brush = Brush.radialGradient(
-                colors = listOf(glowColor, Color.Transparent),
-                center = Offset(size.width / 2f, size.height / 2f),
-                radius = size.width / 2f,
-              ),
-            )
-          },
-      ) {
-        Surface(
-          modifier = Modifier.size(88.dp),
-          shape = CircleShape,
-          color = MaterialTheme.colorScheme.primaryContainer,
-          tonalElevation = 0.dp,
-        ) {
-          Icon(
-            imageVector = icon,
-            contentDescription = title,
-            modifier = Modifier.padding(22.dp),
-            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+    Box(
+      contentAlignment = Alignment.Center,
+      modifier = Modifier
+        .size(160.dp)
+        .drawBehind {
+          drawCircle(
+            brush = Brush.radialGradient(
+              colors = listOf(glowColor, Color.Transparent),
+              center = Offset(size.width / 2f, size.height / 2f),
+              radius = size.width / 2f,
+            ),
           )
-        }
+        },
+    ) {
+      Surface(
+        modifier = Modifier.size(88.dp),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        tonalElevation = 0.dp,
+      ) {
+        Icon(
+          imageVector = icon,
+          contentDescription = title,
+          modifier = Modifier.padding(22.dp),
+          tint = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
       }
+    }
 
-      Spacer(modifier = Modifier.height(40.dp))
+    Spacer(modifier = Modifier.height(40.dp))
 
-      Text(
-        text = title,
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.SemiBold,
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurface,
-      )
+    Text(
+      text = title,
+      style = MaterialTheme.typography.headlineSmall,
+      fontWeight = FontWeight.SemiBold,
+      textAlign = TextAlign.Center,
+      color = MaterialTheme.colorScheme.onSurface,
+    )
 
-      Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(12.dp))
 
-      Text(
-        text = message,
-        style = MaterialTheme.typography.bodyLarge,
-        textAlign = TextAlign.Center,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
+    Text(
+      text = message,
+      style = MaterialTheme.typography.bodyLarge,
+      textAlign = TextAlign.Center,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 
-      if (action != null) {
-        Spacer(modifier = Modifier.height(28.dp))
-        action()
-      }
+    if (action != null) {
+      Spacer(modifier = Modifier.height(28.dp))
+      action()
     }
   }
 }

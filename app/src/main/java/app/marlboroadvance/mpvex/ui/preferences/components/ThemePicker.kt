@@ -33,7 +33,7 @@ fun ThemePicker(
 ) {
     val listState = rememberLazyListState()
     
-    LaunchedEffect(Unit) {
+    LaunchedEffect(currentTheme) {
         val index = AppTheme.entries.indexOf(currentTheme)
         if (index >= 0) {
             listState.animateScrollToItem(maxOf(0, index - 1))

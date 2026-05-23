@@ -27,9 +27,11 @@ fun BreadcrumbNavigation(
 ) {
   val scrollState = rememberScrollState()
 
-  // Auto-scroll to end when breadcrumbs change
+  // Auto-scroll to end when breadcrumbs change (skip at root — nothing to scroll)
   LaunchedEffect(breadcrumbs) {
-    scrollState.animateScrollTo(scrollState.maxValue)
+    if (breadcrumbs.size > 1) {
+      scrollState.animateScrollTo(scrollState.maxValue)
+    }
   }
 
   Row(

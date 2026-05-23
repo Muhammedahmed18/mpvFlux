@@ -24,9 +24,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,8 +45,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -117,17 +116,11 @@ fun FrameNavigationSheet(
       String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds)
     }
 
-  // Pause playback when the sheet opens
+  // Pause playback and fetch initial frame info when the sheet opens
   LaunchedEffect(Unit) {
     currentOnPause()
-  }
-
-  // Continuously update frame info as video plays
-  LaunchedEffect(Unit) {
-    while (true) {
-      currentOnUpdateFrameInfo()
-      delay(100L)
-    }
+    delay(50)
+    currentOnUpdateFrameInfo()
   }
 
   // Only resume playback when closing if it wasn't paused initially
@@ -192,7 +185,15 @@ fun FrameNavigationSheet(
       timestamp = timestamp,
       duration = dur.toFloat(),
       pos = pos.toFloat(),
-      onSeekTo = onSeekTo,
+      onSeekTo = { seekPos, committed ->
+        onSeekTo(seekPos, committed)
+        if (committed) {
+          coroutineScope.launch {
+            delay(50)
+            currentOnUpdateFrameInfo()
+          }
+        }
+      },
       title = {
         Column {
           FrameNavigationCardTitle(onClose = onDismissRequest)
@@ -230,16 +231,13 @@ private fun FrameNavigationCard(
   title: @Composable () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val panelCardsColors: @Composable () -> CardColors = {
-    val colors = CardDefaults.cardColors()
-    colors.copy(
-      containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.6f),
-      disabledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.6f),
-    )
-  }
+  val panelCardsColors = CardDefaults.cardColors(
+    containerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.6f),
+    disabledContainerColor = MaterialTheme.colorScheme.background.copy(alpha = 0.6f),
+  )
 
-  val configuration = LocalConfiguration.current
-  val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+  val windowInfo = LocalWindowInfo.current
+  val isLandscape = windowInfo.containerSize.width > windowInfo.containerSize.height
 
   // Seekbar state management
   var userSliderPosition by remember { mutableFloatStateOf(0f) }
@@ -262,7 +260,7 @@ private fun FrameNavigationCard(
       modifier
         .widthIn(max = 520.dp)
         .animateContentSize(),
-    colors = panelCardsColors(),
+    colors = panelCardsColors,
   ) {
     Column(
       Modifier
@@ -526,9 +524,8 @@ private fun ControlButtons(
       contentPadding = PaddingValues(0.dp),
     ) {
       if (isSnapshotLoading) {
-        CircularProgressIndicator(
+        LoadingIndicator(
           modifier = Modifier.size(32.dp),
-          strokeWidth = 2.dp,
           color = MaterialTheme.colorScheme.onPrimary,
         )
       } else {

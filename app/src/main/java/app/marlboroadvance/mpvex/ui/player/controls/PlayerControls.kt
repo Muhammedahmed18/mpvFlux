@@ -171,12 +171,12 @@ fun PlayerControls(
   val interactionSource = remember { MutableInteractionSource() }
   val controlsShown by viewModel.controlsShown.collectAsState()
   val areControlsLocked by viewModel.areControlsLocked.collectAsState()
-  val pausedForCache by MPVLib.propBoolean["paused-for-cache"].collectAsState()
   val paused by MPVLib.propBoolean["pause"].collectAsState()
-  val duration by MPVLib.propInt["duration"].collectAsState()
 
-  // OPTIMIZATION: Precise position/duration are no longer collected here.
-  // Instead, we pass flows to the Seekbar to avoid root recomposition.
+  // OPTIMIZATION: position/duration/decoder are NOT collected at this scope.
+  // Position and duration flow directly to SeekbarWithTimers.
+  // pausedForCache and decoder are read inside their consuming AnimatedVisibility
+  // so they only recompose the content that actually needs them.
 
   val playbackSpeed by MPVLib.propFloat["speed"].collectAsState()
   val doubleTapSeekAmount by viewModel.doubleTapSeekAmount.collectAsState()
@@ -186,8 +186,6 @@ fun PlayerControls(
   var resetControlsTimestamp by remember { mutableLongStateOf(0L) }
   val seekText by viewModel.seekText.collectAsState()
   val currentChapter by MPVLib.propInt["chapter"].collectAsState()
-  val mpvDecoder by MPVLib.propString["hwdec-current"].collectAsState()
-  val decoder by remember { derivedStateOf { getDecoderFromValue(mpvDecoder ?: "auto") } }
   val isSpeedNonOne by remember(playbackSpeed) {
     derivedStateOf { abs((playbackSpeed ?: 1f) - 1f) > 0.001f }
   }
@@ -277,6 +275,12 @@ fun PlayerControls(
     interactionSource = interactionSource,
   )
 
+  // decoder is defined here (not inside ConstraintLayout) so it is accessible both
+  // to the ConstraintLayout control blocks and to PlayerSheets, which is called
+  // outside the ConstraintLayout scope. Decoder changes only on explicit user action.
+  val mpvDecoder by MPVLib.propString["hwdec-current"].collectAsState()
+  val decoder by remember { derivedStateOf { getDecoderFromValue(mpvDecoder ?: "auto") } }
+
   CompositionLocalProvider(
     LocalRippleConfiguration provides playerRippleConfiguration,
     LocalPlayerButtonsClickEvent provides { resetControlsTimestamp = System.currentTimeMillis() },
@@ -318,14 +322,9 @@ fun PlayerControls(
 
           val isBrightnessSliderShown by viewModel.isBrightnessSliderShown.collectAsState()
           val isVolumeSliderShown by viewModel.isVolumeSliderShown.collectAsState()
-          val brightness by viewModel.currentBrightness.collectAsState()
-          val volume by viewModel.currentVolume.collectAsState()
-          val mpvVolume by MPVLib.propInt["volume"].collectAsState()
           val swapVolumeAndBrightness by playerPreferences.swapVolumeAndBrightness.collectAsState()
           val reduceMotion by playerPreferences.reduceMotion.collectAsState()
 
-          val aspectRatio by viewModel.videoAspect.collectAsState()
-          val currentAspectRatio by viewModel.currentAspectRatio.collectAsState()
           val videoZoom by viewModel.videoZoom.collectAsState()
 
           val rawMediaTitle by MPVLib.propString["media-title"].collectAsState()
@@ -336,205 +335,52 @@ fun PlayerControls(
             }
           }
 
-          val sliderDisplayDuration = 1000L
-          val volumeSliderTimestamp by viewModel.volumeSliderTimestamp.collectAsState()
-          val brightnessSliderTimestamp by viewModel.brightnessSliderTimestamp.collectAsState()
-
-          LaunchedEffect(volumeSliderTimestamp) {
-            if (isVolumeSliderShown && volumeSliderTimestamp > 0) {
-              delay(sliderDisplayDuration)
-              viewModel.isVolumeSliderShown.update { false }
-            }
-          }
-
-          LaunchedEffect(brightnessSliderTimestamp) {
-            if (isBrightnessSliderShown && brightnessSliderTimestamp > 0) {
-              delay(sliderDisplayDuration)
-              viewModel.isBrightnessSliderShown.update { false }
-            }
-          }
-
           val areSlidersShown = isBrightnessSliderShown || isVolumeSliderShown
 
-          AnimatedVisibility(
-            isBrightnessSliderShown,
-            enter =
-              if (!reduceMotion) {
-                slideInHorizontally(playerControlsEnterAnimationSpec()) {
-                  if (swapVolumeAndBrightness) -it else it
-                } + fadeIn(playerControlsEnterAnimationSpec())
+          BrightnessSliderSection(
+            viewModel = viewModel,
+            isVisible = isBrightnessSliderShown,
+            reduceMotion = reduceMotion,
+            swapVolumeAndBrightness = swapVolumeAndBrightness,
+            modifier = Modifier.constrainAs(brightnessSlider) {
+              if (swapVolumeAndBrightness) {
+                start.linkTo(parent.start, if (isPortrait) spacing.large else spacing.extraLarge)
               } else {
-                fadeIn(playerControlsEnterAnimationSpec())
-              },
-            exit =
-              if (!reduceMotion) {
-                slideOutHorizontally(playerControlsExitAnimationSpec()) {
-                  if (swapVolumeAndBrightness) -it else it
-                } + fadeOut(playerControlsExitAnimationSpec())
+                end.linkTo(parent.end, if (isPortrait) spacing.large else spacing.extraLarge)
+              }
+              top.linkTo(parent.top, spacing.larger)
+              bottom.linkTo(parent.bottom, spacing.extraLarge)
+            },
+          )
+
+          VolumeSliderSection(
+            viewModel = viewModel,
+            audioPreferences = audioPreferences,
+            playerPreferences = playerPreferences,
+            isVisible = isVolumeSliderShown,
+            reduceMotion = reduceMotion,
+            swapVolumeAndBrightness = swapVolumeAndBrightness,
+            modifier = Modifier.constrainAs(volumeSlider) {
+              if (swapVolumeAndBrightness) {
+                end.linkTo(parent.end, if (isPortrait) spacing.large else spacing.extraLarge)
               } else {
-                fadeOut(playerControlsExitAnimationSpec())
-              },
-            modifier =
-              Modifier.constrainAs(brightnessSlider) {
-                if (swapVolumeAndBrightness) {
-                  start.linkTo(parent.start, if (isPortrait) spacing.large else spacing.extraLarge)
-                } else {
-                  end.linkTo(parent.end, if (isPortrait) spacing.large else spacing.extraLarge)
-                }
-                top.linkTo(parent.top, spacing.larger)
-                bottom.linkTo(parent.bottom, spacing.extraLarge)
-              },
-          ) { BrightnessSlider(brightness, 0f..1f) }
+                start.linkTo(parent.start, if (isPortrait) spacing.large else spacing.extraLarge)
+              }
+              top.linkTo(parent.top, spacing.larger)
+              bottom.linkTo(parent.bottom, spacing.extraLarge)
+            },
+          )
 
-          AnimatedVisibility(
-            isVolumeSliderShown,
-            enter =
-              if (!reduceMotion) {
-                slideInHorizontally(playerControlsEnterAnimationSpec()) {
-                  if (swapVolumeAndBrightness) it else -it
-                } + fadeIn(playerControlsEnterAnimationSpec())
-              } else {
-                fadeIn(playerControlsEnterAnimationSpec())
-              },
-            exit =
-              if (!reduceMotion) {
-                slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec())
-              } else {
-                fadeOut(playerControlsExitAnimationSpec())
-              },
-            modifier =
-              Modifier.constrainAs(volumeSlider) {
-                if (swapVolumeAndBrightness) {
-                  end.linkTo(parent.end, if (isPortrait) spacing.large else spacing.extraLarge)
-                } else {
-                  start.linkTo(parent.start, if (isPortrait) spacing.large else spacing.extraLarge)
-                }
-                top.linkTo(parent.top, spacing.larger)
-                bottom.linkTo(parent.bottom, spacing.extraLarge)
-              },
-          ) {
-            val boostCap by audioPreferences.volumeBoostCap.collectAsState()
-            val displayVolumeAsPercentage by playerPreferences.displayVolumeAsPercentage.collectAsState()
-            val currentBoost = (mpvVolume ?: 100) - 100
-            val showBoost = boostCap > 0 || currentBoost > 0
-            val effBoostCap = maxOf(boostCap, currentBoost)
-            
-            VolumeSlider(
-              volume,
-              mpvVolume = mpvVolume ?: 100,
-              range = 0..viewModel.maxVolume,
-              boostRange = if (showBoost) 0..effBoostCap else null,
-              displayAsPercentage = displayVolumeAsPercentage,
-            )
-          }
-
-          val holdForMultipleSpeed by playerPreferences.holdForMultipleSpeed.collectAsState()
-          val currentPlayerUpdate by viewModel.playerUpdate.collectAsState()
-
-          LaunchedEffect(currentPlayerUpdate, aspectRatio, videoZoom) {
-            if (currentPlayerUpdate is PlayerUpdates.MultipleSpeed ||
-              currentPlayerUpdate is PlayerUpdates.DynamicSpeedControl ||
-              currentPlayerUpdate is PlayerUpdates.None
-            ) {
-              return@LaunchedEffect
-            }
-            delay(2000)
-            viewModel.playerUpdate.update { PlayerUpdates.None }
-          }
-
-          AnimatedVisibility(
-            currentPlayerUpdate !is PlayerUpdates.None,
-            enter = fadeIn(playerControlsEnterAnimationSpec()),
-            exit = fadeOut(playerControlsExitAnimationSpec()),
-            modifier =
-              Modifier.constrainAs(playerUpdates) {
-                  linkTo(parent.start, parent.end)
-                  linkTo(parent.top, parent.bottom, bias = 0.25f)
-                },
-          ) {
-            when (currentPlayerUpdate) {
-              is PlayerUpdates.MultipleSpeed -> MultipleSpeedPlayerUpdate(currentSpeed = holdForMultipleSpeed)
-              is PlayerUpdates.DynamicSpeedControl -> {
-                val speedUpdate = currentPlayerUpdate as PlayerUpdates.DynamicSpeedControl
-                val currentSpeed = speedUpdate.speed
-                val showDynamicSpeedOverlay by playerPreferences.showDynamicSpeedOverlay.collectAsState()
-                val shouldShowFull = speedUpdate.showFullOverlay
-                var isCollapsed by remember { mutableStateOf(false) }
-                
-                LaunchedEffect(currentSpeed, shouldShowFull) {
-                  if (shouldShowFull) {
-                    isCollapsed = false
-                    delay(1500)
-                    isCollapsed = true
-                  } else {
-                    isCollapsed = true
-                  }
-                }
-                
-                if (showDynamicSpeedOverlay) {
-                  if (isCollapsed) CompactSpeedIndicator(currentSpeed = currentSpeed)
-                  else SpeedControlSlider(currentSpeed = currentSpeed)
-                } else {
-                  CompactSpeedIndicator(currentSpeed = currentSpeed)
-                }
-              }
-              is PlayerUpdates.AspectRatio -> {
-                val customRatiosSet by playerPreferences.customAspectRatios.collectAsState()
-                val displayText = if (currentAspectRatio > 0) {
-                  val customLabel = customRatiosSet.firstNotNullOfOrNull { str ->
-                    val parts = str.split("|")
-                    if (parts.size == 2) {
-                      val savedRatio = parts[1].toDoubleOrNull()
-                      if (savedRatio != null && abs(savedRatio - currentAspectRatio) < 0.01) parts[0] else null
-                    } else null
-                  }
-                  customLabel ?: run {
-                    val ratio = currentAspectRatio
-                    when {
-                      abs(ratio - 16.0 / 9.0) < 0.01 -> "16:9"
-                      abs(ratio - 4.0 / 3.0) < 0.01 -> "4:3"
-                      abs(ratio - 16.0 / 10.0) < 0.01 -> "16:10"
-                      abs(ratio - 21.0 / 9.0) < 0.01 -> "21:9"
-                      abs(ratio - 32.0 / 9.0) < 0.01 -> "32:9"
-                      abs(ratio - 1.0) < 0.01 -> "1:1"
-                      abs(ratio - 2.35) < 0.01 -> "2.35:1"
-                      abs(ratio - 2.39) < 0.01 -> "2.39:1"
-                      else -> String.format(Locale.US, "%.2f:1", ratio)
-                    }
-                  }
-                } else {
-                  stringResource(aspectRatio.titleRes)
-                }
-                TextPlayerUpdate(displayText)
-              }
-              is PlayerUpdates.ShowText -> TextPlayerUpdate((currentPlayerUpdate as PlayerUpdates.ShowText).value)
-              is PlayerUpdates.VideoZoom -> TextPlayerUpdate("Zoom: ${(videoZoom * 100).toInt()}%")
-              is PlayerUpdates.HorizontalSeek -> {
-                val seekUpdate = currentPlayerUpdate as PlayerUpdates.HorizontalSeek
-                TextPlayerUpdate("${seekUpdate.currentTime} [ ${seekUpdate.seekDelta} ]")
-              }
-              is PlayerUpdates.RepeatMode -> {
-                val mode = (currentPlayerUpdate as PlayerUpdates.RepeatMode).mode
-                val text = when (mode) {
-                  app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> "Repeat: Off"
-                  app.marlboroadvance.mpvex.ui.player.RepeatMode.ONE -> "Repeat: Current file"
-                  app.marlboroadvance.mpvex.ui.player.RepeatMode.ALL -> if (playlistMode && viewModel.hasPlaylistSupport()) "Repeat: All playlist" else "Repeat: Current file"
-                }
-                TextPlayerUpdate(text)
-              }
-              is PlayerUpdates.Shuffle -> {
-                val enabled = (currentPlayerUpdate as PlayerUpdates.Shuffle).enabled
-                val text = if (enabled) (if (playlistMode && viewModel.hasPlaylistSupport()) "Shuffle: On" else "Shuffle: Not available") else "Shuffle: Off"
-                TextPlayerUpdate(text)
-              }
-              is PlayerUpdates.FrameInfo -> {
-                val frameInfo = (currentPlayerUpdate as PlayerUpdates.FrameInfo)
-                val text = if (frameInfo.totalFrames > 0) "Frame: ${frameInfo.currentFrame}/${frameInfo.totalFrames}" else "Frame: ${frameInfo.currentFrame}"
-                TextPlayerUpdate(text)
-              }
-              else -> {}
-            }
-          }
+          PlayerUpdatesSection(
+            viewModel = viewModel,
+            playerPreferences = playerPreferences,
+            videoZoom = videoZoom,
+            playlistMode = playlistMode,
+            modifier = Modifier.constrainAs(playerUpdates) {
+              linkTo(parent.start, parent.end)
+              linkTo(parent.top, parent.bottom, bias = 0.25f)
+            },
+          )
 
           AnimatedVisibility(
             visible = controlsShown && areControlsLocked,
@@ -557,6 +403,9 @@ fun PlayerControls(
                 else { top.linkTo(parent.top); bottom.linkTo(parent.bottom) }
             },
           ) {
+            // pausedForCache is read here (not at PlayerControls root) so buffering
+            // events only recompose this small content block, not the entire tree.
+            val pausedForCache by MPVLib.propBoolean["paused-for-cache"].collectAsState()
             val showLoadingCircle by playerPreferences.showLoadingCircle.collectAsState()
             val icon = AnimatedImageVector.animatedVectorResource(R.drawable.anim_play_to_pause)
             val interaction = remember { MutableInteractionSource() }
@@ -685,7 +534,227 @@ fun PlayerControls(
     }
 
     val panel by viewModel.panelShown.collectAsState()
-    PlayerPanels(panelShown = panel, onDismissRequest = { onOpenPanel(Panels.None) })
+    PlayerPanels(panelShown = panel, onDismissRequest = { onOpenPanel(Panels.None) }, viewModel = viewModel)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Isolated recomposition scopes — each composable below only recomposes when
+// its own state changes, not when other gesture-driven state in the outer
+// ConstraintLayout changes.
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun BrightnessSliderSection(
+  viewModel: PlayerViewModel,
+  isVisible: Boolean,
+  reduceMotion: Boolean,
+  swapVolumeAndBrightness: Boolean,
+  modifier: Modifier = Modifier,
+) {
+  val brightness by viewModel.currentBrightness.collectAsState()
+  val brightnessSliderTimestamp by viewModel.brightnessSliderTimestamp.collectAsState()
+  LaunchedEffect(brightnessSliderTimestamp) {
+    if (isVisible && brightnessSliderTimestamp > 0) {
+      delay(1000L)
+      viewModel.isBrightnessSliderShown.update { false }
+    }
+  }
+  AnimatedVisibility(
+    isVisible,
+    enter =
+      if (!reduceMotion) {
+        slideInHorizontally(playerControlsEnterAnimationSpec()) {
+          if (swapVolumeAndBrightness) -it else it
+        } + fadeIn(playerControlsEnterAnimationSpec())
+      } else {
+        fadeIn(playerControlsEnterAnimationSpec())
+      },
+    exit =
+      if (!reduceMotion) {
+        slideOutHorizontally(playerControlsExitAnimationSpec()) {
+          if (swapVolumeAndBrightness) -it else it
+        } + fadeOut(playerControlsExitAnimationSpec())
+      } else {
+        fadeOut(playerControlsExitAnimationSpec())
+      },
+    modifier = modifier,
+  ) { BrightnessSlider(brightness, 0f..1f) }
+}
+
+@Composable
+private fun VolumeSliderSection(
+  viewModel: PlayerViewModel,
+  audioPreferences: AudioPreferences,
+  playerPreferences: PlayerPreferences,
+  isVisible: Boolean,
+  reduceMotion: Boolean,
+  swapVolumeAndBrightness: Boolean,
+  modifier: Modifier = Modifier,
+) {
+  val volume by viewModel.currentVolume.collectAsState()
+  val mpvVolume by MPVLib.propInt["volume"].collectAsState()
+  val volumeSliderTimestamp by viewModel.volumeSliderTimestamp.collectAsState()
+  val boostCap by audioPreferences.volumeBoostCap.collectAsState()
+  val displayVolumeAsPercentage by playerPreferences.displayVolumeAsPercentage.collectAsState()
+  LaunchedEffect(volumeSliderTimestamp) {
+    if (isVisible && volumeSliderTimestamp > 0) {
+      delay(1000L)
+      viewModel.isVolumeSliderShown.update { false }
+    }
+  }
+  AnimatedVisibility(
+    isVisible,
+    enter =
+      if (!reduceMotion) {
+        slideInHorizontally(playerControlsEnterAnimationSpec()) {
+          if (swapVolumeAndBrightness) it else -it
+        } + fadeIn(playerControlsEnterAnimationSpec())
+      } else {
+        fadeIn(playerControlsEnterAnimationSpec())
+      },
+    exit =
+      if (!reduceMotion) {
+        slideOutHorizontally(playerControlsExitAnimationSpec()) { it } +
+          fadeOut(playerControlsExitAnimationSpec())
+      } else {
+        fadeOut(playerControlsExitAnimationSpec())
+      },
+    modifier = modifier,
+  ) {
+    val currentBoost = (mpvVolume ?: 100) - 100
+    val showBoost = boostCap > 0 || currentBoost > 0
+    val effBoostCap = maxOf(boostCap, currentBoost)
+    VolumeSlider(
+      volume,
+      mpvVolume = mpvVolume ?: 100,
+      range = 0..viewModel.maxVolume,
+      boostRange = if (showBoost) 0..effBoostCap else null,
+      displayAsPercentage = displayVolumeAsPercentage,
+    )
+  }
+}
+
+@Composable
+private fun PlayerUpdatesSection(
+  viewModel: PlayerViewModel,
+  playerPreferences: PlayerPreferences,
+  videoZoom: Float,
+  playlistMode: Boolean,
+  modifier: Modifier = Modifier,
+) {
+  val currentPlayerUpdate by viewModel.playerUpdate.collectAsState()
+  val holdForMultipleSpeed by playerPreferences.holdForMultipleSpeed.collectAsState()
+  val aspectRatio by viewModel.videoAspect.collectAsState()
+  val currentAspectRatio by viewModel.currentAspectRatio.collectAsState()
+
+  LaunchedEffect(currentPlayerUpdate, aspectRatio, videoZoom) {
+    if (currentPlayerUpdate is PlayerUpdates.MultipleSpeed ||
+      currentPlayerUpdate is PlayerUpdates.DynamicSpeedControl ||
+      currentPlayerUpdate is PlayerUpdates.None
+    ) {
+      return@LaunchedEffect
+    }
+    delay(2000)
+    viewModel.playerUpdate.update { PlayerUpdates.None }
+  }
+
+  AnimatedVisibility(
+    currentPlayerUpdate !is PlayerUpdates.None,
+    enter = fadeIn(playerControlsEnterAnimationSpec()),
+    exit = fadeOut(playerControlsExitAnimationSpec()),
+    modifier = modifier,
+  ) {
+    when (currentPlayerUpdate) {
+      is PlayerUpdates.MultipleSpeed -> MultipleSpeedPlayerUpdate(currentSpeed = holdForMultipleSpeed)
+      is PlayerUpdates.DynamicSpeedControl -> {
+        val speedUpdate = currentPlayerUpdate as PlayerUpdates.DynamicSpeedControl
+        val currentSpeed = speedUpdate.speed
+        val showDynamicSpeedOverlay by playerPreferences.showDynamicSpeedOverlay.collectAsState()
+        val shouldShowFull = speedUpdate.showFullOverlay
+        var isCollapsed by remember { mutableStateOf(false) }
+        LaunchedEffect(currentSpeed, shouldShowFull) {
+          if (shouldShowFull) {
+            isCollapsed = false
+            delay(1500)
+            isCollapsed = true
+          } else {
+            isCollapsed = true
+          }
+        }
+        if (showDynamicSpeedOverlay) {
+          if (isCollapsed) CompactSpeedIndicator(currentSpeed = currentSpeed)
+          else SpeedControlSlider(currentSpeed = currentSpeed)
+        } else {
+          CompactSpeedIndicator(currentSpeed = currentSpeed)
+        }
+      }
+      is PlayerUpdates.AspectRatio -> {
+        val customRatiosSet by playerPreferences.customAspectRatios.collectAsState()
+        val displayText = if (currentAspectRatio > 0) {
+          val customLabel = customRatiosSet.firstNotNullOfOrNull { str ->
+            val parts = str.split("|")
+            if (parts.size == 2) {
+              val savedRatio = parts[1].toDoubleOrNull()
+              if (savedRatio != null && abs(savedRatio - currentAspectRatio) < 0.01) parts[0] else null
+            } else null
+          }
+          customLabel ?: run {
+            val ratio = currentAspectRatio
+            when {
+              abs(ratio - 16.0 / 9.0) < 0.01 -> "16:9"
+              abs(ratio - 4.0 / 3.0) < 0.01 -> "4:3"
+              abs(ratio - 16.0 / 10.0) < 0.01 -> "16:10"
+              abs(ratio - 21.0 / 9.0) < 0.01 -> "21:9"
+              abs(ratio - 32.0 / 9.0) < 0.01 -> "32:9"
+              abs(ratio - 1.0) < 0.01 -> "1:1"
+              abs(ratio - 2.35) < 0.01 -> "2.35:1"
+              abs(ratio - 2.39) < 0.01 -> "2.39:1"
+              else -> String.format(Locale.US, "%.2f:1", ratio)
+            }
+          }
+        } else {
+          stringResource(aspectRatio.titleRes)
+        }
+        TextPlayerUpdate(displayText)
+      }
+      is PlayerUpdates.ShowText -> TextPlayerUpdate((currentPlayerUpdate as PlayerUpdates.ShowText).value)
+      is PlayerUpdates.VideoZoom -> TextPlayerUpdate("Zoom: ${(videoZoom * 100).toInt()}%")
+      is PlayerUpdates.HorizontalSeek -> {
+        val seekUpdate = currentPlayerUpdate as PlayerUpdates.HorizontalSeek
+        TextPlayerUpdate("${seekUpdate.currentTime} [ ${seekUpdate.seekDelta} ]")
+      }
+      is PlayerUpdates.RepeatMode -> {
+        val mode = (currentPlayerUpdate as PlayerUpdates.RepeatMode).mode
+        val text = when (mode) {
+          app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> "Repeat: Off"
+          app.marlboroadvance.mpvex.ui.player.RepeatMode.ONE -> "Repeat: Current file"
+          app.marlboroadvance.mpvex.ui.player.RepeatMode.ALL ->
+            if (playlistMode && viewModel.hasPlaylistSupport()) "Repeat: All playlist"
+            else "Repeat: Current file"
+        }
+        TextPlayerUpdate(text)
+      }
+      is PlayerUpdates.Shuffle -> {
+        val enabled = (currentPlayerUpdate as PlayerUpdates.Shuffle).enabled
+        val text =
+          if (enabled) {
+            if (playlistMode && viewModel.hasPlaylistSupport()) "Shuffle: On"
+            else "Shuffle: Not available"
+          } else {
+            "Shuffle: Off"
+          }
+        TextPlayerUpdate(text)
+      }
+      is PlayerUpdates.FrameInfo -> {
+        val frameInfo = currentPlayerUpdate as PlayerUpdates.FrameInfo
+        val text =
+          if (frameInfo.totalFrames > 0) "Frame: ${frameInfo.currentFrame}/${frameInfo.totalFrames}"
+          else "Frame: ${frameInfo.currentFrame}"
+        TextPlayerUpdate(text)
+      }
+      else -> {}
+    }
   }
 }
 

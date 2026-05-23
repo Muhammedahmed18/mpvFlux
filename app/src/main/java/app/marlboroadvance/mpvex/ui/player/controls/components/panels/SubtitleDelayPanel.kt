@@ -33,9 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,13 +50,15 @@ import app.marlboroadvance.mpvex.ui.player.controls.panelCardsColors
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import `is`.xyz.mpv.MPVLib
 import kotlinx.coroutines.delay
-import org.koin.compose.koinInject
+import kotlinx.coroutines.flow.StateFlow
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
 @Composable
 fun SubtitleDelayPanel(
   onDismissRequest: () -> Unit,
+  subDelay: StateFlow<Float>,
+  subSpeed: StateFlow<Float>,
   modifier: Modifier = Modifier,
 ) {
   val preferences = koinInject<SubtitlesPreferences>()
@@ -69,23 +69,17 @@ fun SubtitleDelayPanel(
       SubtitleDelayTitle(onClose = onDismissRequest)
     }
   ) {
-    val delay by MPVLib.propDouble["sub-delay"].collectAsState()
-    val delayFloat by remember { derivedStateOf { (delay ?: 0.0).toFloat() } }
-    val speed by MPVLib.propDouble["sub-speed"].collectAsState()
-    val speedFloat by remember { derivedStateOf { (speed ?: 1.0).toFloat() } }
-    
-    // We unwrap the card content here because DraggablePanel already provides the card
+    val delayFloat by subDelay.collectAsState()
+    val speedFloat by subSpeed.collectAsState()
+
     SubtitleDelayCardContent(
       delay = delayFloat,
-      onDelayChange = {
-        MPVLib.setPropertyDouble("sub-delay", it.toDouble())
-      },
+      onDelayChange = { MPVLib.setPropertyDouble("sub-delay", it.toDouble()) },
       speed = speedFloat,
       onSpeedChange = { MPVLib.setPropertyDouble("sub-speed", it.toDouble()) },
       onApply = {
         preferences.defaultSubDelay.set((delayFloat * 1000).roundToInt())
-        val currentSpeed = speed ?: 1.0
-        if (currentSpeed in 0.1..10.0) preferences.defaultSubSpeed.set(currentSpeed.toFloat())
+        if (speedFloat in 0.1f..10f) preferences.defaultSubSpeed.set(speedFloat)
       },
       onReset = {
         MPVLib.setPropertyDouble("sub-delay", preferences.defaultSubDelay.get() / 1000.0)

@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
@@ -23,6 +24,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.ui.theme.spacing
+import kotlin.math.abs
 
 @Composable
 fun SliderItem(
@@ -86,6 +88,9 @@ fun SliderItem(
   icon: @Composable () -> Unit = {},
 ) {
   val haptic = LocalHapticFeedback.current
+  // Non-state mutable holder: writes don't trigger recomposition.
+  // Tracks the last value at which haptic fired so we can throttle to one pulse per tick.
+  val lastHapticValue = remember { floatArrayOf(value) }
 
   Row(
     modifier =
@@ -110,10 +115,16 @@ fun SliderItem(
     Slider(
       value = value,
       onValueChange = {
-        val newValue = it
-        if (newValue != value) {
-          onChange(newValue)
-          haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+        if (it != value) {
+          onChange(it)
+          // For stepped sliders fire at each step crossing; for continuous sliders
+          // fire at most once per 1% of range to avoid ~60 Hz haptic pulses.
+          val range = max - min
+          val threshold = if (steps > 0) range / (steps + 1) else range * 0.01f
+          if (abs(it - lastHapticValue[0]) >= threshold) {
+            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            lastHapticValue[0] = it
+          }
         }
       },
       modifier = Modifier.weight(1.5f),
@@ -135,6 +146,10 @@ fun VerticalSliderItem(
   icon: @Composable () -> Unit = {},
 ) {
   val haptic = LocalHapticFeedback.current
+  // Tracks the last int value that fired haptic; updated immediately on each tick
+  // so repeated callbacks with the same int (while float hovers near a boundary)
+  // don't produce extra pulses before the parent state catches up.
+  val lastHapticInt = remember { intArrayOf(value) }
 
   Column(
     modifier =
@@ -152,9 +167,12 @@ fun VerticalSliderItem(
       value = value,
       min = min,
       max = max,
-      onValueChange = {
-        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        onChange(it)
+      onValueChange = { newValue ->
+        if (newValue != lastHapticInt[0]) {
+          lastHapticInt[0] = newValue
+          haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+          onChange(newValue)
+        }
       },
       modifier = Modifier.weight(1f),
     )

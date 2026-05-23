@@ -47,17 +47,7 @@ fun EditConnectionSheet(
 ) {
   if (!isOpen) return
 
-  var name by remember(connection.id) { mutableStateOf(connection.name) }
-  var protocol by remember(connection.id) { mutableStateOf(connection.protocol) }
-  var host by remember(connection.id) { mutableStateOf(connection.host) }
-  var port by remember(connection.id) { mutableStateOf(connection.port.toString()) }
-  var username by remember(connection.id) { mutableStateOf(connection.username) }
-  var password by remember(connection.id) { mutableStateOf(connection.password) }
-  var path by remember(connection.id) { mutableStateOf(connection.path) }
-  var isAnonymous by remember(connection.id) { mutableStateOf(connection.isAnonymous) }
-  var useHttps by remember(connection.id) { mutableStateOf(connection.useHttps) }
-  var passwordVisible by remember { mutableStateOf(false) }
-  var protocolMenuExpanded by remember { mutableStateOf(false) }
+  val state = remember(connection.id) { ConnectionFormState(connection) }
 
   val handleDismiss = {
     onDismiss()
@@ -66,15 +56,15 @@ fun EditConnectionSheet(
   val handleSave = {
     val updatedConnection =
       connection.copy(
-        name = name,
-        protocol = protocol,
-        host = host,
-        port = port.toIntOrNull() ?: protocol.defaultPort,
-        username = if (isAnonymous) "" else username,
-        password = if (isAnonymous) "" else password,
-        path = path.ifBlank { "/" },
-        isAnonymous = isAnonymous,
-        useHttps = useHttps,
+        name = state.name,
+        protocol = state.protocol,
+        host = state.host,
+        port = state.port.toIntOrNull() ?: state.protocol.defaultPort,
+        username = if (state.isAnonymous) "" else state.username,
+        password = if (state.isAnonymous) "" else state.password,
+        path = state.path.ifBlank { "/" },
+        isAnonymous = state.isAnonymous,
+        useHttps = state.useHttps,
       )
     onSave(updatedConnection)
   }
@@ -96,149 +86,149 @@ fun EditConnectionSheet(
           .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
       ) {
-            // Name and Protocol in one row
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-              // Connection Name
-              OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Name", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                modifier = Modifier.weight(0.60f),
-                singleLine = true,
-              )
+        // Name and Protocol in one row
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          // Connection Name
+          OutlinedTextField(
+            value = state.name,
+            onValueChange = { state.name = it },
+            label = { Text("Name", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            modifier = Modifier.weight(0.60f),
+            singleLine = true,
+          )
 
-              // Protocol Dropdown
-              ExposedDropdownMenuBox(
-                expanded = protocolMenuExpanded,
-                onExpandedChange = { protocolMenuExpanded = it },
-                modifier = Modifier.weight(0.40f),
-              ) {
-                OutlinedTextField(
-                  value = protocol.displayName,
-                  onValueChange = { },
-                  readOnly = true,
-                  label = { Text("Protocol", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                  trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = protocolMenuExpanded) },
-                  modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
-                )
-                ExposedDropdownMenu(
-                  expanded = protocolMenuExpanded,
-                  onDismissRequest = { protocolMenuExpanded = false },
-                ) {
-                  NetworkProtocol.entries.forEach { proto ->
-                    DropdownMenuItem(
-                      text = { Text(proto.displayName) },
-                      onClick = {
-                        protocol = proto
-                        port = proto.defaultPort.toString()
-                        protocolMenuExpanded = false
-                      },
-                    )
-                  }
-                }
-              }
-            }
-
-            // Host
+          // Protocol Dropdown
+          ExposedDropdownMenuBox(
+            expanded = state.protocolMenuExpanded,
+            onExpandedChange = { state.protocolMenuExpanded = it },
+            modifier = Modifier.weight(0.40f),
+          ) {
             OutlinedTextField(
-              value = host,
-              onValueChange = { host = it },
-              label = { Text("Host/IP Address", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-              modifier = Modifier.fillMaxWidth(),
-              singleLine = true,
-              placeholder = { Text("192.168.1.100", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+              value = state.protocol.displayName,
+              onValueChange = { },
+              readOnly = true,
+              label = { Text("Protocol", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+              trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = state.protocolMenuExpanded) },
+              modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
             )
-
-            // Port and Path in one row
-            Row(
-              modifier = Modifier.fillMaxWidth(),
-              horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ExposedDropdownMenu(
+              expanded = state.protocolMenuExpanded,
+              onDismissRequest = { state.protocolMenuExpanded = false },
             ) {
-              // Port
-              OutlinedTextField(
-                value = port,
-                onValueChange = { port = it },
-                label = { Text("Port", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                modifier = Modifier.weight(0.3f),
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-              )
-
-              // Path
-              OutlinedTextField(
-                value = path,
-                onValueChange = { path = it },
-                label = { Text("Path", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                modifier = Modifier.weight(0.7f),
-                singleLine = true,
-                placeholder = { Text("/", maxLines = 1, overflow = TextOverflow.Ellipsis) },
-              )
-            }
-
-            // Anonymous checkbox
-            Row(
-              verticalAlignment = Alignment.CenterVertically,
-              modifier = Modifier.fillMaxWidth(),
-            ) {
-              Checkbox(
-                checked = isAnonymous,
-                onCheckedChange = { isAnonymous = it },
-              )
-              Spacer(modifier = Modifier.width(8.dp))
-              Text("Anonymous/Guest Access")
-            }
-            
-            // HTTPS checkbox (only for WebDAV)
-            if (protocol == NetworkProtocol.WEBDAV) {
-              Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-              ) {
-                Checkbox(
-                  checked = useHttps,
-                  onCheckedChange = { 
-                    useHttps = it
-                    // Auto-update port when toggling HTTPS
-                    if (it && port == "80") {
-                      port = "443"
-                    } else if (!it && port == "443") {
-                      port = "80"
-                    }
+              NetworkProtocol.entries.forEach { proto ->
+                DropdownMenuItem(
+                  text = { Text(proto.displayName) },
+                  onClick = {
+                    state.protocol = proto
+                    state.port = proto.defaultPort.toString()
+                    state.protocolMenuExpanded = false
                   },
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Use HTTPS (Secure Connection)")
               }
             }
+          }
+        }
 
-            // Username and Password in one row
+        // Host
+        OutlinedTextField(
+          value = state.host,
+          onValueChange = { state.host = it },
+          label = { Text("Host/IP Address", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+          modifier = Modifier.fillMaxWidth(),
+          singleLine = true,
+          placeholder = { Text("192.168.1.100", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        )
+
+        // Port and Path in one row
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          // Port
+          OutlinedTextField(
+            value = state.port,
+            onValueChange = { state.port = it },
+            label = { Text("Port", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            modifier = Modifier.weight(0.3f),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+          )
+
+          // Path
+          OutlinedTextField(
+            value = state.path,
+            onValueChange = { state.path = it },
+            label = { Text("Path", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            modifier = Modifier.weight(0.7f),
+            singleLine = true,
+            placeholder = { Text("/", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+          )
+        }
+
+        // Anonymous checkbox
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          modifier = Modifier.fillMaxWidth(),
+        ) {
+          Checkbox(
+            checked = state.isAnonymous,
+            onCheckedChange = { state.isAnonymous = it },
+          )
+          Spacer(modifier = Modifier.width(8.dp))
+          Text("Anonymous/Guest Access")
+        }
+
+        // HTTPS checkbox (only for WebDAV)
+        if (state.protocol == NetworkProtocol.WEBDAV) {
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth(),
+          ) {
+            Checkbox(
+              checked = state.useHttps,
+              onCheckedChange = {
+                state.useHttps = it
+                // Auto-update port when toggling HTTPS
+                if (it && state.port == "80") {
+                  state.port = "443"
+                } else if (!it && state.port == "443") {
+                  state.port = "80"
+                }
+              },
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Use HTTPS (Secure Connection)")
+          }
+        }
+
+        // Username and Password in one row
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
           // Username
           OutlinedTextField(
-            value = username,
-            onValueChange = { username = it },
+            value = state.username,
+            onValueChange = { state.username = it },
             label = { Text("Username", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             modifier = Modifier.weight(0.50f),
             singleLine = true,
-            enabled = !isAnonymous,
+            enabled = !state.isAnonymous,
           )
 
           // Password
           OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
+            value = state.password,
+            onValueChange = { state.password = it },
             label = { Text("Password", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             modifier = Modifier.weight(0.50f),
             singleLine = true,
-            enabled = !isAnonymous,
+            enabled = !state.isAnonymous,
           )
         }
       }
@@ -246,7 +236,7 @@ fun EditConnectionSheet(
     confirmButton = {
       Button(
         onClick = handleSave,
-        enabled = host.isNotBlank() && (isAnonymous || username.isNotBlank()),
+        enabled = state.host.isNotBlank() && (state.isAnonymous || state.username.isNotBlank()),
       ) {
         Text(
           text = "Save",
@@ -266,4 +256,24 @@ fun EditConnectionSheet(
     tonalElevation = 6.dp,
     shape = MaterialTheme.shapes.extraLarge,
   )
+}
+
+/**
+ * Holds all mutable form state for [EditConnectionSheet].
+ * Each field is an individually observable [mutableStateOf] so Compose scopes
+ * recompositions to only the composables that read each specific field.
+ * Keyed on [NetworkConnection.id] so state resets when a different connection is opened.
+ */
+private class ConnectionFormState(connection: NetworkConnection) {
+  var name by mutableStateOf(connection.name)
+  var protocol by mutableStateOf(connection.protocol)
+  var host by mutableStateOf(connection.host)
+  var port by mutableStateOf(connection.port.toString())
+  var username by mutableStateOf(connection.username)
+  var password by mutableStateOf(connection.password)
+  var path by mutableStateOf(connection.path)
+  var isAnonymous by mutableStateOf(connection.isAnonymous)
+  var useHttps by mutableStateOf(connection.useHttps)
+  var passwordVisible by mutableStateOf(false)
+  var protocolMenuExpanded by mutableStateOf(false)
 }

@@ -19,9 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -31,31 +29,29 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import `is`.xyz.mpv.MPVLib
+import kotlinx.coroutines.flow.StateFlow
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
 @Composable
 fun AudioDelayPanel(
   onDismissRequest: () -> Unit,
+  audioDelay: StateFlow<Float>,
   modifier: Modifier = Modifier,
 ) {
   val preferences = koinInject<AudioPreferences>()
-  
+
   DraggablePanel(
     modifier = modifier,
     header = {
       AudioDelayCardTitle(onClose = onDismissRequest)
     }
   ) {
-    val delay by MPVLib.propDouble["audio-delay"].collectAsState()
-    val delayFloat by remember { derivedStateOf { (delay ?: 0.0).toFloat() } }
+    val delayFloat by audioDelay.collectAsState()
 
     DelayCard(
       delay = delayFloat,
-      onDelayChange = {
-        val delayInSeconds = it.toDouble()
-        MPVLib.setPropertyDouble("audio-delay", delayInSeconds)
-      },
+      onDelayChange = { MPVLib.setPropertyDouble("audio-delay", it.toDouble()) },
       onApply = { preferences.defaultAudioDelay.set((delayFloat * 1000).roundToInt()) },
       onReset = { MPVLib.setPropertyDouble("audio-delay", 0.0) },
       delayType = DelayType.Audio,

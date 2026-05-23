@@ -12,7 +12,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,10 +49,13 @@ fun OutlinedNumericChooser(
     ) {
       Icon(decreaseIcon, null)
     }
-    var valueString by remember { mutableStateOf("$value") }
-    LaunchedEffect(value) {
-      if (valueString.isBlank() && value == 0) return@LaunchedEffect
-      valueString = valueFormatter?.invoke(value) ?: value.toString()
+    var valueString by remember { mutableStateOf(valueFormatter?.invoke(value) ?: value.toString()) }
+    var previousIntValue by remember { mutableStateOf(value) }
+    if (previousIntValue != value) {
+      previousIntValue = value
+      if (!(valueString.isBlank() && value == 0)) {
+        valueString = valueFormatter?.invoke(value) ?: value.toString()
+      }
     }
     OutlinedTextField(
       label = label,
@@ -113,10 +115,13 @@ fun OutlinedNumericChooser(
     ) {
       Icon(decreaseIcon, null)
     }
-    var valueString by remember { mutableStateOf("$value") }
-    LaunchedEffect(value) {
-      if (valueString.isBlank() && value == 0f) return@LaunchedEffect
-      valueString = valueFormatter?.invoke(value) ?: value.toString().dropLastWhile { it == '0' }.dropLastWhile { it == '.' }
+    var valueString by remember { mutableStateOf(valueFormatter?.invoke(value) ?: value.toString().dropLastWhile { it == '0' }.dropLastWhile { it == '.' }) }
+    var previousFloatValue by remember { mutableStateOf(value) }
+    if (previousFloatValue != value) {
+      previousFloatValue = value
+      if (!(valueString.isBlank() && value == 0f)) {
+        valueString = valueFormatter?.invoke(value) ?: value.toString().dropLastWhile { it == '0' }.dropLastWhile { it == '.' }
+      }
     }
     OutlinedTextField(
       value = valueString,

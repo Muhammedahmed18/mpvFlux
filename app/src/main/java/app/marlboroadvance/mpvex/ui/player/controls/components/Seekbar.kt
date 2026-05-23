@@ -33,7 +33,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -41,8 +40,6 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -54,7 +51,6 @@ import `is`.xyz.mpv.Utils
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 @Composable
@@ -68,7 +64,7 @@ fun SeekbarWithTimers(
     durationTimerOnCLick: () -> Unit,
     chapters: ImmutableList<Segment>,
     paused: Boolean,
-    seekbarStyle: SeekbarStyle = SeekbarStyle.Wavy,
+    seekbarStyle: SeekbarStyle = SeekbarStyle.Thick,
     loopStart: Float? = null,
     loopEnd: Float? = null,
     modifier: Modifier = Modifier,
@@ -154,7 +150,6 @@ fun SeekbarWithTimers(
             
             when (seekbarStyle) {
                 SeekbarStyle.Standard -> StandardSeekbar(position = currentPos, duration = duration, chapters = chapters, isPaused = paused, isScrubbing = isUserInteracting, seekbarStyle = SeekbarStyle.Standard, onSeek = { newPos -> if (!isUserInteracting) isUserInteracting = true; userPosition = newPos; onValueChange(newPos) }, onSeekFinished = { scope.launch { animatedPosition.snapTo(userPosition) }; isUserInteracting = false; onValueChangeFinished() }, loopStart = loopStart, loopEnd = loopEnd)
-                SeekbarStyle.Wavy -> SquigglySeekbar(position = currentPos, duration = duration, chapters = chapters, isPaused = paused, isScrubbing = isUserInteracting, useWavySeekbar = true, seekbarStyle = SeekbarStyle.Wavy, onSeek = { }, onSeekFinished = { }, loopStart = loopStart, loopEnd = loopEnd)
                 SeekbarStyle.Thick -> StandardSeekbar(position = currentPos, duration = duration, chapters = chapters, isPaused = paused, isScrubbing = isUserInteracting, seekbarStyle = SeekbarStyle.Thick, onSeek = { newPos -> if (!isUserInteracting) isUserInteracting = true; userPosition = newPos; onValueChange(newPos) }, onSeekFinished = { scope.launch { animatedPosition.snapTo(userPosition) }; isUserInteracting = false; onValueChangeFinished() }, loopStart = loopStart, loopEnd = loopEnd)
             }
         }
@@ -188,7 +183,7 @@ fun VideoTimer(
 }
 
 @Composable
-fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Segment>, isPaused: Boolean = false, isScrubbing: Boolean = false, useWavySeekbar: Boolean = false, seekbarStyle: SeekbarStyle = SeekbarStyle.Standard, onSeek: (Float) -> Unit, onSeekFinished: () -> Unit, loopStart: Float? = null, loopEnd: Float? = null, modifier: Modifier = Modifier) {
+fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Segment>, isPaused: Boolean = false, isScrubbing: Boolean = false, seekbarStyle: SeekbarStyle = SeekbarStyle.Standard, onSeek: (Float) -> Unit, onSeekFinished: () -> Unit, loopStart: Float? = null, loopEnd: Float? = null, modifier: Modifier = Modifier) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val interactionSource = remember { MutableInteractionSource() }
     var heightFraction by remember { mutableFloatStateOf(1f) }
@@ -234,56 +229,3 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
     )
 }
 
-@Composable
-private fun SquigglySeekbar(position: Float, duration: Float, chapters: ImmutableList<Segment>, isPaused: Boolean, isScrubbing: Boolean, useWavySeekbar: Boolean, seekbarStyle: SeekbarStyle, onSeek: (Float) -> Unit, onSeekFinished: () -> Unit, loopStart: Float? = null, loopEnd: Float? = null, modifier: Modifier = Modifier) {
-    val primaryColor = MaterialTheme.colorScheme.primary
-    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
-    var phaseOffset by remember { mutableFloatStateOf(0f) }
-    var heightFraction by remember { mutableFloatStateOf(1f) }
-    LaunchedEffect(isPaused, isScrubbing, useWavySeekbar) {
-        if (!useWavySeekbar) { heightFraction = 0f; return@LaunchedEffect }
-        val shouldFlatten = isPaused || isScrubbing
-        delay(if (shouldFlatten) 0L else 60L)
-        val animator = Animatable(heightFraction)
-        animator.animateTo(targetValue = if (shouldFlatten) 0f else 1f, animationSpec = tween(durationMillis = if (shouldFlatten) 550 else 800, easing = LinearEasing)) { heightFraction = value }
-    }
-    LaunchedEffect(isPaused, useWavySeekbar) {
-        if (isPaused || !useWavySeekbar) return@LaunchedEffect
-        var lastFrameTime = withFrameMillis { it }
-        while (isActive) { withFrameMillis { frameTimeMillis -> val deltaTime = (frameTimeMillis - lastFrameTime) / 1000f; phaseOffset += deltaTime * 10f; phaseOffset %= 80f; lastFrameTime = frameTimeMillis } }
-    }
-    Canvas(modifier = modifier.fillMaxWidth().height(48.dp)) {
-        val strokeWidth = 5.dp.toPx()
-        val progress = if (duration > 0f) (position / duration).coerceIn(0f, 1f) else 0f
-        val totalProgressPx = size.width * progress
-        val centerY = size.height / 2f
-        val waveProgressPx = if (progress > 1f) size.width * progress else size.width * (0f + (1f - 0f) * (progress / 1f).coerceIn(0f, 1f))
-        fun computeAmp(x: Float, sign: Float): Float = sign * heightFraction * 6f * ((waveProgressPx + 60f - x) / 120f).coerceIn(0f, 1f)
-        val path = Path()
-        val waveStart = -phaseOffset - 40f
-        path.moveTo(waveStart, centerY)
-        var currentX = waveStart
-        var waveSign = 1f
-        var currentAmp = computeAmp(currentX, waveSign)
-        while (currentX < size.width) {
-            waveSign = -waveSign
-            val nextX = currentX + 40f
-            val midX = currentX + 20f
-            val nextAmp = computeAmp(nextX, waveSign)
-            path.cubicTo(midX, centerY + currentAmp, midX, centerY + nextAmp, nextX, centerY + nextAmp)
-            currentAmp = nextAmp; currentX = nextX
-        }
-        val clipTop = 6f + strokeWidth
-        fun drawWavy(startX: Float, endX: Float, color: Color) { if (endX <= startX) return; clipRect(left = startX, top = centerY - clipTop, right = endX, bottom = centerY + clipTop) { drawPath(path = path, color = color, style = Stroke(width = strokeWidth, cap = StrokeCap.Round)) } }
-        drawWavy(0f, totalProgressPx, primaryColor)
-        drawWavy(totalProgressPx, size.width, primaryColor.copy(alpha = 0.3f))
-        drawCircle(color = primaryColor, radius = strokeWidth / 2f, center = Offset(0f, centerY + kotlin.math.cos(kotlin.math.abs(waveStart) / 80f * (2f * kotlin.math.PI.toFloat())) * 6f * heightFraction))
-        if (heightFraction * 6f + strokeWidth > 0.5f) drawLine(color = primaryColor, start = Offset(totalProgressPx, centerY - (6f * heightFraction + strokeWidth)), end = Offset(totalProgressPx, centerY + (6f * heightFraction + strokeWidth)), strokeWidth = 5.dp.toPx(), cap = StrokeCap.Round)
-        if (loopStart != null || loopEnd != null) {
-            val loopColor = Color(0xFFFFB300)
-            if (loopStart != null) { val startPx = (loopStart / duration).coerceIn(0f, 1f) * size.width; drawLine(color = loopColor, start = Offset(startPx, centerY - 6f - strokeWidth), end = Offset(startPx, centerY + 6f + strokeWidth), strokeWidth = 2.dp.toPx()) }
-            if (loopEnd != null) { val endPx = (loopEnd / duration).coerceIn(0f, 1f) * size.width; drawLine(color = loopColor, start = Offset(endPx, centerY - 6f - strokeWidth), end = Offset(endPx, centerY + 6f + strokeWidth), strokeWidth = 2.dp.toPx()) }
-            if (loopStart != null && loopEnd != null) { val minPx = (minOf(loopStart, loopEnd) / duration).coerceIn(0f, 1f) * size.width; val maxPx = (maxOf(loopStart, loopEnd) / duration).coerceIn(0f, 1f) * size.width; drawRect(color = loopColor.copy(alpha = 0.2f), topLeft = Offset(minPx, centerY - 6f - strokeWidth), size = Size(maxPx - minPx, (6f + strokeWidth) * 2)) }
-        }
-    }
-}
