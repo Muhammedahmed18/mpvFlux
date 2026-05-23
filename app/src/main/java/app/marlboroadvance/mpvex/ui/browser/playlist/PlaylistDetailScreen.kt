@@ -343,7 +343,7 @@ private fun PlaylistVideoListContent(
 
   if (isLoading) {
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-      CircularProgressIndicator(modifier = Modifier.size(48.dp), color = MaterialTheme.colorScheme.primary)
+      LoadingIndicator(modifier = Modifier.size(64.dp), color = MaterialTheme.colorScheme.primary)
     }
   } else if (videoItems.isEmpty()) {
     EmptyState(icon = Icons.AutoMirrored.Outlined.PlaylistAdd, title = "Empty Playlist", message = "Add some videos to this playlist", modifier = modifier.fillMaxSize())

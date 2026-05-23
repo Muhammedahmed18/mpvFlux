@@ -198,7 +198,7 @@ class MediaInfoActivity : ComponentActivity() {
   @Composable
   private fun LoadingContent() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-      CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.size(42.dp))
+      LoadingIndicator(modifier = Modifier.size(56.dp))
     }
   }
 

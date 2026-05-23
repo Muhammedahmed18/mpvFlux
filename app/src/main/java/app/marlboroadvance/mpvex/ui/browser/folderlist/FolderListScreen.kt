@@ -335,7 +335,6 @@ private fun FolderListContent(
     if (showFullScreenLoading || showEmpty) {
       if (showFullScreenLoading) {
         LoadingState(
-          icon = Icons.Rounded.Folder,
           title = "Scanning for videos...",
           message = scanStatus ?: "Please wait",
           modifier = Modifier.fillMaxSize(),
