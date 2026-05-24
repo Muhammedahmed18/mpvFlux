@@ -2,7 +2,6 @@ package app.marlboroadvance.mpvex.ui.browser.sheets
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -18,8 +17,6 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,12 +32,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 
 /**
  * SortBottomSheet — M3 Expressive
- * Grouped tonal Cards + ToggleButtons with built-in shape morphing.
+ * ToggleButtons with built-in shape morphing, arranged in a grid.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +78,7 @@ fun SortBottomSheet(
         .verticalScroll(rememberScrollState())
         .padding(horizontal = 24.dp)
         .padding(bottom = 32.dp),
-      verticalArrangement = Arrangement.spacedBy(16.dp),
+      verticalArrangement = Arrangement.spacedBy(24.dp),
     ) {
       // ── Header ──
       Row(
@@ -150,24 +148,17 @@ private fun SectionCard(
   title: String,
   content: @Composable () -> Unit,
 ) {
-  Card(
+  Column(
     modifier = Modifier.fillMaxWidth(),
-    colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceVariant,
-    ),
+    verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
-    Column(
-      modifier = Modifier.padding(20.dp),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-      Text(
-        text = title,
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-      )
-      content()
-    }
+    Text(
+      text = title,
+      style = MaterialTheme.typography.titleSmall,
+      fontWeight = FontWeight.Bold,
+      color = MaterialTheme.colorScheme.primary,
+    )
+    content()
   }
 }
 
@@ -179,30 +170,40 @@ private fun SortByCard(
   icons: List<ImageVector>,
 ) {
   SectionCard(title = "Sort by") {
-    FlowRow(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
-      verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-      types.forEachIndexed { index, type ->
-        val selected = type == sortType
-        ToggleButton(
-          checked = selected,
-          onCheckedChange = { if (it) onSortTypeChange(type) },
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      types.chunked(2).forEach { rowTypes ->
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          if (index < icons.size) {
-            Icon(
-              imageVector = icons[index],
-              contentDescription = null,
-              modifier = Modifier.size(ToggleButtonDefaults.IconSize),
-            )
-            Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
+          rowTypes.forEach { type ->
+            val index = types.indexOf(type)
+            val selected = type == sortType
+            ToggleButton(
+              checked = selected,
+              onCheckedChange = { if (it) onSortTypeChange(type) },
+              modifier = Modifier.weight(1f)
+            ) {
+              if (index < icons.size) {
+                Icon(
+                  imageVector = icons[index],
+                  contentDescription = null,
+                  modifier = Modifier.size(ToggleButtonDefaults.IconSize),
+                )
+                Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
+              }
+              Text(
+                text = type,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+              )
+            }
           }
-          Text(
-            text = type,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-          )
+          if (rowTypes.size == 1) {
+            Spacer(modifier = Modifier.weight(1f))
+          }
         }
       }
     }
@@ -261,6 +262,8 @@ private fun OrderToggle(
     Text(
       text = label,
       style = MaterialTheme.typography.labelLarge,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
       fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
     )
   }
@@ -271,22 +274,31 @@ private fun ViewOptionsCard(
   toggles: List<VisibilityToggle>,
 ) {
   SectionCard(title = "View options") {
-    FlowRow(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
-      verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-      toggles.forEach { toggle ->
-        val selected = toggle.checked
-        ToggleButton(
-          checked = selected,
-          onCheckedChange = { toggle.onCheckedChange(it) },
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      toggles.chunked(2).forEach { rowToggles ->
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          Text(
-            text = toggle.label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-          )
+          rowToggles.forEach { toggle ->
+            val selected = toggle.checked
+            ToggleButton(
+              checked = selected,
+              onCheckedChange = { toggle.onCheckedChange(it) },
+              modifier = Modifier.weight(1f)
+            ) {
+              Text(
+                text = toggle.label,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+              )
+            }
+          }
+          if (rowToggles.size == 1) {
+            Spacer(modifier = Modifier.weight(1f))
+          }
         }
       }
     }

@@ -1,9 +1,7 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -98,24 +96,15 @@ fun FolderCard(
     label = "folder_card_scale"
   )
 
-  val tonalElevation by animateDpAsState(
-    targetValue = if (isPressed) 4.dp else 1.dp,
-    label = "folder_card_elevation"
-  )
+  val tonalElevation = if (isPressed) 4.dp else 1.dp
 
-  val selectionBorderWidth by animateDpAsState(
-    targetValue = if (isSelected) 1.dp else 0.dp,
-    label = "folder_card_border"
-  )
+  val selectionBorderWidth = if (isSelected) 1.dp else 0.dp
 
-  val containerColor by animateColorAsState(
-    targetValue = if (isSelected) {
-      MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
-    } else {
-      MaterialTheme.colorScheme.surfaceContainerLow
-    },
-    label = "folder_card_container"
-  )
+  val containerColor = if (isSelected) {
+    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
+  } else {
+    MaterialTheme.colorScheme.surfaceContainerLow
+  }
 
   Surface(
     modifier = modifier
@@ -138,7 +127,7 @@ fun FolderCard(
       modifier = Modifier
         .fillMaxWidth()
         .padding(16.dp),
-      verticalAlignment = Alignment.CenterVertically,
+      verticalAlignment = Alignment.Top,
     ) {
       FolderIconContainer(
         isSelected = isSelected,
@@ -166,7 +155,7 @@ fun FolderCard(
             text = displayPath,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
           )
         }
