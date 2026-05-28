@@ -1,11 +1,20 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -43,8 +52,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -120,48 +131,85 @@ fun VideoCard(
 
   val showSizeChip = overrideShowSizeChip ?: settings.showSizeChip
   val showResolutionChip = overrideShowResolutionChip ?: settings.showResolutionChip
+  
   val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
 
-  Row(
+  val cardScale by animateFloatAsState(
+    targetValue = when {
+      isPressed -> 0.96f
+      isSelected -> 0.98f
+      else -> 1f
+    },
+    animationSpec = spring(
+      dampingRatio = Spring.DampingRatioLowBouncy,
+      stiffness = Spring.StiffnessMediumLow
+    ),
+    label = "video_card_scale"
+  )
+
+  val tonalElevation = if (isPressed) 4.dp else 1.dp
+  val selectionBorderWidth = if (isSelected) 1.dp else 0.dp
+
+  val containerColor = if (isSelected) {
+    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
+  } else {
+    MaterialTheme.colorScheme.surfaceContainerLow
+  }
+
+  Surface(
     modifier = modifier
       .fillMaxWidth()
+      .scale(cardScale)
       .combinedClickable(
         interactionSource = interactionSource,
         indication = ripple(color = MaterialTheme.colorScheme.primary),
         onClick = onClick,
         onLongClick = onLongClick,
-      )
-      .padding(horizontal = 16.dp, vertical = 12.dp),
-    verticalAlignment = Alignment.Top,
+      ),
+    shape = MaterialTheme.shapes.extraLarge,
+    color = containerColor,
+    tonalElevation = tonalElevation,
+    border = if (isSelected) {
+      BorderStroke(selectionBorderWidth, MaterialTheme.colorScheme.outlineVariant)
+    } else null,
   ) {
-    VideoThumbnail(
-      video = video,
-      isNew = isNew,
-      isSelected = isSelected,
-      isWatched = isWatched,
-      progressPercentage = progressPercentage,
-      showThumbnails = settings.showThumbnails,
-      showProgressBar = settings.showProgressBar,
-      allowThumbnailGeneration = allowThumbnailGeneration,
-      onThumbClick = onThumbClick,
-      onLongClick = onLongClick,
-      modifier = Modifier.requiredSize(width = 172.dp, height = 97.dp)
-    )
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(16.dp),
+      verticalAlignment = Alignment.Top,
+    ) {
+      VideoThumbnail(
+        video = video,
+        isNew = isNew,
+        isSelected = isSelected,
+        isWatched = isWatched,
+        progressPercentage = progressPercentage,
+        showThumbnails = settings.showThumbnails,
+        showProgressBar = settings.showProgressBar,
+        allowThumbnailGeneration = allowThumbnailGeneration,
+        onThumbClick = onThumbClick,
+        onLongClick = onLongClick,
+        modifier = Modifier.requiredSize(width = 172.dp, height = 97.dp)
+      )
 
-    Spacer(modifier = Modifier.width(14.dp))
+      Spacer(modifier = Modifier.width(16.dp))
 
-    VideoInfoPanel(
-      displayTitle = displayTitle,
-      isSelected = isSelected,
-      isWatched = isWatched,
-      isRecentlyPlayed = isRecentlyPlayed,
-      video = video,
-      showSubtitleIndicator = showSubtitleIndicator,
-      showSizeChip = showSizeChip,
-      showResolutionChip = showResolutionChip,
-      showDateChip = settings.showDateChip,
-      modifier = Modifier.weight(1f),
-    )
+      VideoInfoPanel(
+        displayTitle = displayTitle,
+        isSelected = isSelected,
+        isWatched = isWatched,
+        isRecentlyPlayed = isRecentlyPlayed,
+        video = video,
+        showSubtitleIndicator = showSubtitleIndicator,
+        showSizeChip = showSizeChip,
+        showResolutionChip = showResolutionChip,
+        showFramerate = settings.showFramerateInResolution,
+        showDateChip = settings.showDateChip,
+        modifier = Modifier.weight(1f),
+      )
+    }
   }
 }
 
@@ -175,6 +223,7 @@ private fun VideoInfoPanel(
   showSubtitleIndicator: Boolean,
   showSizeChip: Boolean,
   showResolutionChip: Boolean,
+  showFramerate: Boolean,
   showDateChip: Boolean,
   modifier: Modifier = Modifier
 ) {
@@ -202,6 +251,7 @@ private fun VideoInfoPanel(
       showSubtitleIndicator = showSubtitleIndicator,
       showSizeChip = showSizeChip,
       showResolutionChip = showResolutionChip,
+      showFramerate = showFramerate,
       showDateChip = showDateChip
     )
   }
@@ -288,15 +338,6 @@ fun VideoThumbnail(
         )
       }
 
-      // Selection scrim overlay
-      if (isSelected) {
-        Box(
-          modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.20f))
-        )
-      }
-
       // Duration pill
       Surface(
         color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.75f),
@@ -366,19 +407,30 @@ fun VideoThumbnail(
     }
 
     // Selection Check Badge (Bottom End)
-    if (isSelected) {
+    AnimatedVisibility(
+      visible = isSelected,
+      enter = fadeIn(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleIn(
+        spring(dampingRatio = Spring.DampingRatioNoBouncy),
+        transformOrigin = TransformOrigin(1f, 1f)
+      ),
+      exit = fadeOut(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleOut(
+        spring(dampingRatio = Spring.DampingRatioNoBouncy),
+        transformOrigin = TransformOrigin(1f, 1f)
+      ),
+      modifier = Modifier
+        .align(Alignment.BottomEnd)
+        .padding(bottom = 8.dp, end = 8.dp),
+    ) {
       Surface(
         color = MaterialTheme.colorScheme.primaryContainer,
         shape = CircleShape,
-        modifier = Modifier
-          .align(Alignment.BottomEnd)
-          .padding(bottom = 8.dp, end = 8.dp)
-          .size(22.dp),
+        modifier = Modifier.size(22.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
       ) {
         Icon(
           imageVector = Icons.Filled.Check,
           contentDescription = "Selected",
-          modifier = Modifier.padding(4.dp),
+          modifier = Modifier.padding(3.dp),
           tint = MaterialTheme.colorScheme.onPrimaryContainer,
         )
       }
@@ -393,6 +445,7 @@ fun VideoMetadataChips(
   showSubtitleIndicator: Boolean,
   showSizeChip: Boolean,
   showResolutionChip: Boolean,
+  showFramerate: Boolean,
   showDateChip: Boolean,
   modifier: Modifier = Modifier
 ) {
@@ -408,13 +461,18 @@ fun VideoMetadataChips(
     }
 
     if (showResolutionChip && video.height > 0) {
-      val resText = when {
+      val baseRes = when {
         video.width >= 3840 || video.height >= 2160 -> "4K"
         video.width >= 2560 || video.height >= 1440 -> "1440p"
         video.width >= 1920 || video.height >= 1080 -> "1080p"
         video.width >= 1280 || video.height >= 720 -> "720p"
         video.width >= 854 || video.height >= 480 -> "480p"
         else -> "${video.height}p"
+      }
+      val resText = if (showFramerate && video.fps > 0) {
+        "$baseRes@${video.fps.roundToInt()}"
+      } else {
+        baseRes
       }
       UnifiedChip(text = resText, compact = true)
     }
