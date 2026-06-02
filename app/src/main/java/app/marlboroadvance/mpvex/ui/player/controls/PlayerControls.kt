@@ -2,8 +2,8 @@ package app.marlboroadvance.mpvex.ui.player.controls
 
 import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -14,21 +14,17 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.graphics.ExperimentalAnimationGraphicsApi
-import androidx.compose.animation.graphics.res.animatedVectorResource
-import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
-import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,7 +35,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -50,15 +45,23 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
+import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -69,17 +72,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -87,13 +87,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
-import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
@@ -109,8 +106,6 @@ import app.marlboroadvance.mpvex.ui.player.PlayerViewModel
 import app.marlboroadvance.mpvex.ui.player.Sheets
 import app.marlboroadvance.mpvex.ui.player.controls.components.BrightnessSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.CompactSpeedIndicator
-import app.marlboroadvance.mpvex.ui.player.controls.components.ControlsButton
-import app.marlboroadvance.mpvex.ui.player.controls.components.ControlsButtonType
 import app.marlboroadvance.mpvex.ui.player.controls.components.MultipleSpeedPlayerUpdate
 import app.marlboroadvance.mpvex.ui.player.controls.components.SpeedControlSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.TextPlayerUpdate
@@ -119,7 +114,6 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.VolumeSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarWithTimers
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
 import app.marlboroadvance.mpvex.ui.theme.MpvexTheme
-import app.marlboroadvance.mpvex.ui.theme.controlColor
 import app.marlboroadvance.mpvex.ui.theme.playerRippleConfiguration
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import `is`.xyz.mpv.MPVLib
@@ -127,24 +121,26 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 @Suppress("CompositionLocalAllowlist")
 val LocalPlayerButtonsClickEvent = staticCompositionLocalOf { {} }
 
+// Exit: 350ms with FastOutSlowIn — M3 motion standard for elements leaving the screen.
+// Slightly longer than before (300ms → 350ms) so the fade feels smooth rather than abrupt.
 fun <T> playerControlsExitAnimationSpec(): FiniteAnimationSpec<T> =
   tween(
-    durationMillis = 300,
+    durationMillis = 350,
     easing = FastOutSlowInEasing,
   )
 
+// Enter: 200ms with LinearOutSlowIn — M3 motion standard for elements entering the screen.
+// Extended from 100ms → 200ms so the controls arrive deliberately rather than snapping in.
 fun <T> playerControlsEnterAnimationSpec(): FiniteAnimationSpec<T> =
   tween(
-    durationMillis = 100,
+    durationMillis = 200,
     easing = LinearOutSlowInEasing,
   )
 
@@ -192,7 +188,7 @@ fun PlayerControls(
   val playerTimeToDisappear by playerPreferences.playerTimeToDisappear.collectAsState()
   val chapters by viewModel.chapters.collectAsState(persistentListOf())
   val playlistMode by playerPreferences.playlistMode.collectAsState()
-    
+
   val abLoopA by viewModel.abLoopA.collectAsState()
   val abLoopB by viewModel.abLoopB.collectAsState()
   val showNextUp by viewModel.showNextUp.collectAsState()
@@ -295,19 +291,21 @@ fun PlayerControls(
       }
 
       Box(modifier = modifier.fillMaxSize()) {
-        // OPTIMIZATION: Scrim is now isolated in a dedicated layer to avoid layout-wide redraws
+        // OPTIMIZATION: Scrim is isolated in a dedicated layer to avoid layout-wide redraws.
+        // M3 scrim token replaces hardcoded Color.Black — adapts to any dynamic color scheme.
+        val scrimColor = MaterialTheme.colorScheme.scrim
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { alpha = scrimAlpha }
-                .background(
-                    Brush.verticalGradient(
-                        0.0f to Color.Black.copy(alpha = 0.55f),
-                        0.15f to Color.Transparent,
-                        0.85f to Color.Transparent,
-                        1.0f to Color.Black.copy(alpha = 0.55f),
-                    )
-                )
+          modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { alpha = scrimAlpha }
+            .background(
+              Brush.verticalGradient(
+                0.0f to scrimColor.copy(alpha = 0.55f),
+                0.15f to Color.Transparent,
+                0.85f to Color.Transparent,
+                1.0f to scrimColor.copy(alpha = 0.55f),
+              )
+            )
         )
 
         ConstraintLayout(modifier = Modifier.fillMaxSize()) {
@@ -387,8 +385,8 @@ fun PlayerControls(
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.then(if (showSystemStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier).constrainAs(unlockControlsButton) {
-                top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.small)
-                end.linkTo(parent.end, spacing.large)
+              top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.small)
+              end.linkTo(parent.end, spacing.large)
             },
           ) { ThumbZoneUnlock(onUnlock = { viewModel.unlockControls() }) }
 
@@ -397,38 +395,129 @@ fun PlayerControls(
             enter = fadeIn(playerControlsEnterAnimationSpec()),
             exit = fadeOut(playerControlsExitAnimationSpec()),
             modifier = Modifier.constrainAs(playerPauseButton) {
-                end.linkTo(parent.absoluteRight)
-                start.linkTo(parent.absoluteLeft)
-                if (isPortrait) bottom.linkTo(bottomRightControls.top, spacing.large)
-                else { top.linkTo(parent.top); bottom.linkTo(parent.bottom) }
+              end.linkTo(parent.absoluteRight)
+              start.linkTo(parent.absoluteLeft)
+              if (isPortrait) bottom.linkTo(bottomRightControls.top, spacing.large)
+              else { top.linkTo(parent.top); bottom.linkTo(parent.bottom) }
             },
           ) {
             // pausedForCache is read here (not at PlayerControls root) so buffering
             // events only recompose this small content block, not the entire tree.
             val pausedForCache by MPVLib.propBoolean["paused-for-cache"].collectAsState()
             val showLoadingCircle by playerPreferences.showLoadingCircle.collectAsState()
-            val icon = AnimatedImageVector.animatedVectorResource(R.drawable.anim_play_to_pause)
-            val interaction = remember { MutableInteractionSource() }
-            val isPressed by interaction.collectIsPressedAsState()
-            val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow), label = "play_button_scale")
 
-            when {
-              pausedForCache == true && showLoadingCircle -> LoadingIndicator(modifier = Modifier.size(96.dp))
-              else -> {
-                val buttonShadow = Brush.radialGradient(0.0f to Color.Black.copy(alpha = 0.35f), 0.85f to Color.Transparent)
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                  if (playlistMode && viewModel.hasPlaylistSupport()) {
-                    ControlsButton(icon = Icons.Outlined.SkipPrevious, onClick = { viewModel.playPrevious() }, enabled = viewModel.hasPrevious(), modifier = Modifier.size(56.dp).then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier), shape = CircleShape, iconSize = 32.dp, type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal, color = controlColor)
+            val isBuffering = pausedForCache == true && showLoadingCircle
+            val showSkip = playlistMode && viewModel.hasPlaylistSupport()
+
+            // M3 Expressive shape-morphing for skip buttons
+            val skipButtonShapes = IconButtonDefaults.shapes()
+            val prevInteraction = remember { MutableInteractionSource() }
+            val nextInteraction = remember { MutableInteractionSource() }
+
+            // Connected ButtonGroup: pressing a skip button expands it and compresses
+            // its neighbours. Play/pause is a circular ghost button whose M3 icon
+            // morphs between play and pause; buffering swaps it for a LoadingIndicator
+            // in the same footprint so the row never shifts.
+            ButtonGroup(
+              overflowIndicator = {},
+              horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              // ── Skip Previous ──────────────────────────────────────────
+              if (showSkip) {
+                customItem(
+                  buttonGroupContent = {
+                    FilledTonalIconButton(
+                      onClick           = { viewModel.playPrevious() },
+                      enabled           = viewModel.hasPrevious(),
+                      shapes            = skipButtonShapes,
+                      interactionSource = prevInteraction,
+                      colors            = glassIconButtonColors(hideBackground),
+                      modifier          = Modifier
+                        .size(56.dp)
+                        .alpha(if (isBuffering) 0.5f else 1f)
+                        .animateWidth(prevInteraction),
+                    ) {
+                      Icon(
+                        imageVector        = Icons.Outlined.SkipPrevious,
+                        contentDescription = null,
+                        modifier           = Modifier.size(32.dp),
+                      )
+                    }
+                  },
+                  menuContent = {},
+                )
+              }
+
+              // ── Play / Pause — ToggleFloatingActionButton / buffering ────
+              customItem(
+                buttonGroupContent = {
+                  if (isBuffering) {
+                    Box(modifier = Modifier.size(92.dp), contentAlignment = Alignment.Center) {
+                      LoadingIndicator(
+                        modifier = Modifier.size(72.dp),
+                        color    = MaterialTheme.colorScheme.primary,
+                      )
+                    }
+                  } else {
+                    Box(
+                      modifier = Modifier
+                        .size(92.dp)
+                        .glassPanel(CircleShape, hideBackground)
+                        .clickable(
+                          interactionSource = remember { MutableInteractionSource() },
+                          indication        = ripple(bounded = true, radius = 46.dp),
+                        ) {
+                          resetControlsTimestamp = System.currentTimeMillis()
+                          viewModel.pauseUnpause()
+                        },
+                      contentAlignment = Alignment.Center,
+                    ) {
+                      AnimatedContent(
+                        targetState    = paused == false,
+                        transitionSpec = {
+                          (scaleIn(spring(stiffness = Spring.StiffnessMedium), initialScale = 0.6f) + fadeIn()) togetherWith
+                            (scaleOut(tween(120), targetScale = 0.6f) + fadeOut(tween(120)))
+                        },
+                        label = "play_pause_morph",
+                      ) { isPlaying ->
+                        Icon(
+                          imageVector        = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                          contentDescription = null,
+                          tint               = MaterialTheme.colorScheme.primary,
+                          modifier           = Modifier.size(52.dp),
+                        )
+                      }
+                    }
                   }
-                  val playContentColor = MaterialTheme.colorScheme.onSurface
-                  val playContainerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.surface.copy(alpha = 0.5f)
-                  Surface(modifier = Modifier.size(92.dp).graphicsLayer { scaleX = scale; scaleY = scale }.then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier).clip(CircleShape).clickable(interaction, ripple(color = Color.White)) { resetControlsTimestamp = System.currentTimeMillis(); viewModel.pauseUnpause() }, shape = CircleShape, color = playContainerColor, contentColor = playContentColor, border = if (hideBackground) null else BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)), tonalElevation = 0.dp) {
-                    Image(painter = rememberAnimatedVectorPainter(icon, paused == false), modifier = Modifier.fillMaxSize().padding(28.dp), contentDescription = null, colorFilter = ColorFilter.tint(playContentColor))
-                  }
-                  if (playlistMode && viewModel.hasPlaylistSupport()) {
-                    ControlsButton(icon = Icons.Outlined.SkipNext, onClick = { viewModel.playNext() }, enabled = viewModel.hasNext(), modifier = Modifier.size(56.dp).then(if (hideBackground) Modifier.background(buttonShadow, CircleShape) else Modifier), shape = CircleShape, iconSize = 32.dp, type = if (hideBackground) ControlsButtonType.Transparent else ControlsButtonType.Tonal, color = controlColor)
-                  }
-                }
+                },
+                menuContent = {},
+              )
+
+              // ── Skip Next ───────────────────────────────────────────────
+              if (showSkip) {
+                customItem(
+                  buttonGroupContent = {
+                    FilledTonalIconButton(
+                      onClick           = { viewModel.playNext() },
+                      enabled           = viewModel.hasNext(),
+                      shapes            = skipButtonShapes,
+                      interactionSource = nextInteraction,
+                      colors            = glassIconButtonColors(hideBackground),
+                      modifier          = Modifier
+                        .size(56.dp)
+                        .alpha(if (isBuffering) 0.5f else 1f)
+                        .animateWidth(nextInteraction),
+                    ) {
+                      Icon(
+                        imageVector        = Icons.Outlined.SkipNext,
+                        contentDescription = null,
+                        modifier           = Modifier.size(32.dp),
+                      )
+                    }
+                  },
+                  menuContent = {},
+                )
               }
             }
           }
@@ -438,8 +527,8 @@ fun PlayerControls(
             enter = if (!reduceMotion) slideInVertically(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutVertically(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
             modifier = Modifier.then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(seekbar) {
-                if (isPortrait) bottom.linkTo(playerPauseButton.top, spacing.medium) else bottom.linkTo(parent.bottom, spacing.medium)
-                start.linkTo(parent.start, 24.dp); end.linkTo(parent.end, 24.dp); width = Dimension.fillToConstraints
+              if (isPortrait) bottom.linkTo(playerPauseButton.top, spacing.medium) else bottom.linkTo(parent.bottom, spacing.medium)
+              start.linkTo(parent.start, 24.dp); end.linkTo(parent.end, 24.dp); width = Dimension.fillToConstraints
             },
           ) {
             val invertDuration by playerPreferences.invertDuration.collectAsState()
@@ -479,7 +568,7 @@ fun PlayerControls(
           }
 
           AnimatedVisibility(visible = showNextUp, enter = slideInHorizontally { it } + fadeIn(), exit = slideOutHorizontally { it } + fadeOut(), modifier = Modifier.constrainAs(nextUpPill) { bottom.linkTo(parent.bottom, 100.dp); end.linkTo(parent.end, spacing.large) }) {
-              NextUpPill(title = nextItemTitle ?: "", onClick = { viewModel.playNext() }, onDismiss = { viewModel.dismissNextUp() })
+            NextUpPill(title = nextItemTitle ?: "", onClick = { viewModel.playNext() }, onDismiss = { viewModel.dismissNextUp() })
           }
 
           AnimatedVisibility(
@@ -487,9 +576,9 @@ fun PlayerControls(
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
             modifier = Modifier.then(if (showSystemStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier).then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(topLeftControls) {
-                top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.small)
-                start.linkTo(parent.start, spacing.large)
-                if (isPortrait) { width = Dimension.fillToConstraints; end.linkTo(parent.end, spacing.large) } else { width = Dimension.fillToConstraints; end.linkTo(topRightControls.start, spacing.extraSmall) }
+              top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.small)
+              start.linkTo(parent.start, spacing.large)
+              if (isPortrait) { width = Dimension.fillToConstraints; end.linkTo(parent.end, spacing.large) } else { width = Dimension.fillToConstraints; end.linkTo(topRightControls.start, spacing.extraSmall) }
             },
           ) {
             if (isPortrait) TopPlayerControlsPortrait(mediaTitle = mediaTitle, hideBackground = hideBackground, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
@@ -760,48 +849,109 @@ private fun PlayerUpdatesSection(
 
 @Composable
 fun NextUpPill(
-    title: String,
-    onClick: () -> Unit,
-    onDismiss: () -> Unit,
-    modifier: Modifier = Modifier
+  title: String,
+  onClick: () -> Unit,
+  onDismiss: () -> Unit,
+  modifier: Modifier = Modifier,
 ) {
-    val haptic = LocalHapticFeedback.current
-    val spacing = MaterialTheme.spacing
-    val scope = rememberCoroutineScope()
-    val offsetX = remember { Animatable(0f) }
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(targetValue = if (isPressed) 0.96f else 1f, animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow), label = "next_up_pill_scale")
-    
-    LaunchedEffect(Unit) { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress) }
+  val haptic   = LocalHapticFeedback.current
+  val spacing  = MaterialTheme.spacing
 
+  // Fire haptic once when the pill appears
+  LaunchedEffect(Unit) {
+    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+  }
+
+  // SwipeToDismissBox replaces the manual Animatable + detectHorizontalDragGestures block.
+  // EndToStart = swipe left-to-right to dismiss (matches the original right-swipe logic).
+  val dismissState = rememberSwipeToDismissBoxState(
+    confirmValueChange = { value ->
+      if (value == SwipeToDismissBoxValue.StartToEnd) {
+        onDismiss()
+        true
+      } else {
+        false
+      }
+    },
+    positionalThreshold = { totalDistance -> totalDistance * 0.35f },
+  )
+
+  SwipeToDismissBox(
+    state            = dismissState,
+    // No background layer needed — the pill slides away cleanly
+    backgroundContent = {},
+    modifier          = modifier.padding(spacing.small),
+    enableDismissFromStartToEnd = true,
+    enableDismissFromEndToStart = false,
+  ) {
     Surface(
-        modifier = modifier.padding(spacing.small).offset { IntOffset(offsetX.value.roundToInt(), 0) }.graphicsLayer { scaleX = scale; scaleY = scale }.pointerInput(Unit) {
-                detectHorizontalDragGestures(onDragEnd = { if (offsetX.value > 100f) scope.launch { offsetX.animateTo(500f); onDismiss() } else scope.launch { offsetX.animateTo(0f) } }, onHorizontalDrag = { change, dragAmount -> change.consume(); if (dragAmount > 0 || offsetX.value > 0) scope.launch { offsetX.snapTo((offsetX.value + dragAmount).coerceAtLeast(0f)) } })
-            }.height(64.dp).widthIn(min = 180.dp, max = 300.dp),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        tonalElevation = 3.dp,
-        shadowElevation = 4.dp
+      modifier = Modifier
+        .height(64.dp)
+        .widthIn(min = 180.dp, max = 300.dp),
+      shape          = CircleShape,
+      color          = MaterialTheme.colorScheme.secondaryContainer,
+      tonalElevation = 3.dp,
+      shadowElevation = 4.dp,
     ) {
-        Row(modifier = Modifier.fillMaxSize().clickable(interactionSource = interactionSource, indication = ripple(), onClick = onClick).padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) {
-            Icon(imageVector = Icons.Outlined.SkipNext, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(28.dp))
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
-                Text(text = "NEXT UP", color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.2.sp)
-                Text(text = title, color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+      Row(
+        modifier = Modifier
+          .fillMaxSize()
+          .clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication        = ripple(),
+            onClick           = onClick,
+          )
+          .padding(horizontal = 20.dp),
+        verticalAlignment   = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Start,
+      ) {
+        Icon(
+          imageVector        = Icons.Outlined.SkipNext,
+          contentDescription = null,
+          tint               = MaterialTheme.colorScheme.onSecondaryContainer,
+          modifier           = Modifier.size(28.dp),
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(
+          modifier              = Modifier.weight(1f),
+          verticalArrangement   = Arrangement.Center,
+        ) {
+          // "NEXT UP" label aligned to M3 labelSmall role —
+          // removes the manual ExtraBold + 1.2sp tracking overrides
+          Text(
+            text  = "NEXT UP",
+            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+            style = MaterialTheme.typography.labelSmall,
+          )
+          Text(
+            text     = title,
+            color    = MaterialTheme.colorScheme.onSecondaryContainer,
+            style    = MaterialTheme.typography.titleMedium.copy(
+              fontWeight = FontWeight.Bold,
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
         }
+      }
     }
+  }
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)
 @Composable
 fun PreviewNextUpPill() {
-    MpvexTheme {
-        Box(modifier = Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
-            Box(modifier = Modifier.size(400.dp, 200.dp).background(Brush.linearGradient(colors = listOf(Color(0xFF6200EE), Color(0xFF03DAC6)))))
-            NextUpPill(title = "S01 E05 - The Final Stand", onClick = {}, onDismiss = {})
-        }
+  MpvexTheme {
+    Box(
+      modifier        = Modifier.fillMaxSize().padding(16.dp),
+      contentAlignment = Alignment.Center,
+    ) {
+      Box(
+        modifier = Modifier
+          .size(400.dp, 200.dp)
+          .background(Brush.linearGradient(colors = listOf(Color(0xFF6200EE), Color(0xFF03DAC6)))),
+      )
+      NextUpPill(title = "S01 E05 - The Final Stand", onClick = {}, onDismiss = {})
     }
+  }
 }

@@ -2,6 +2,7 @@ package app.marlboroadvance.mpvex.ui.player.controls
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -10,6 +11,7 @@ import app.marlboroadvance.mpvex.preferences.PlayerButton
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
 import app.marlboroadvance.mpvex.ui.player.PlayerViewModel
 import app.marlboroadvance.mpvex.ui.player.Sheets
+import app.marlboroadvance.mpvex.ui.theme.spacing
 import dev.vivvvek.seeker.Segment
 
 @Composable
@@ -21,9 +23,10 @@ fun TopLeftPlayerControlsLandscape(
   viewModel: PlayerViewModel,
   activity: PlayerActivity,
 ) {
+  // spacing.medium (16dp) between back arrow and title chip — consistent with all other rows
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(20.dp), // Increased spacing for Expressive UI
+    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
   ) {
     RenderPlayerButton(
       button = PlayerButton.BACK_ARROW,
@@ -55,7 +58,7 @@ fun TopLeftPlayerControlsLandscape(
       onOpenSheet = onOpenSheet,
       viewModel = viewModel,
       activity = activity,
-      modifier = Modifier.weight(1f, fill = false)
+      modifier = Modifier.weight(1f, fill = false),
     )
   }
 }
@@ -78,7 +81,7 @@ fun TopRightPlayerControlsLandscape(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(16.dp), // Increased spacing
+    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
   ) {
     buttons.forEach { button ->
       RenderPlayerButton(
@@ -119,7 +122,7 @@ fun BottomRightPlayerControlsLandscape(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(16.dp), // Increased spacing
+    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
   ) {
     buttons.forEach { button ->
       RenderPlayerButton(
@@ -160,7 +163,7 @@ fun BottomLeftPlayerControlsLandscape(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(16.dp), // Increased spacing
+    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
   ) {
     buttons.forEach { button ->
       RenderPlayerButton(
