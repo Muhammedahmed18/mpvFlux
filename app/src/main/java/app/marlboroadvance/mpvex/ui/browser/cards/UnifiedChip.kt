@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @Composable
 fun UnifiedChip(
@@ -47,6 +48,7 @@ fun UnifiedChip(
     contentColor = labelColor,
     shape = MaterialTheme.shapes.extraLarge,
     border = border,
+    tonalElevation = if (isOutlined) 0.dp else 1.dp,
   ) {
     Text(
       text = text,
@@ -59,13 +61,17 @@ fun UnifiedChip(
 @Composable
 fun SubtitleChip(text: String) {
   Surface(
-    color = MaterialTheme.colorScheme.primary,
-    contentColor = MaterialTheme.colorScheme.onPrimary,
+    color = Color.Transparent,
+    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
     shape = MaterialTheme.shapes.extraLarge,
+    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
   ) {
     Text(
-      text = text.uppercase(),
-      style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+      text = text,
+      style = MaterialTheme.typography.labelSmall.copy(
+        fontWeight = FontWeight.Medium,
+        letterSpacing = 0.8.sp
+      ),
       modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
     )
   }
