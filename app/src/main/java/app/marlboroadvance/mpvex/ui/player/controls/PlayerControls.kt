@@ -4,9 +4,8 @@ import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -24,6 +23,9 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +44,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.SkipPrevious
@@ -77,9 +80,13 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -128,21 +135,40 @@ import kotlin.math.abs
 @Suppress("CompositionLocalAllowlist")
 val LocalPlayerButtonsClickEvent = staticCompositionLocalOf { {} }
 
-// Exit: 350ms with FastOutSlowIn — M3 motion standard for elements leaving the screen.
-// Slightly longer than before (300ms → 350ms) so the fade feels smooth rather than abrupt.
+// Exit: 250ms FastOutLinearIn — elements leaving accelerate out. Snappier than the
+// previous 350ms ease-in-out so the controls disappear without lingering.
 fun <T> playerControlsExitAnimationSpec(): FiniteAnimationSpec<T> =
   tween(
-    durationMillis = 350,
-    easing = FastOutSlowInEasing,
+    durationMillis = 250,
+    easing = FastOutLinearInEasing,
   )
 
-// Enter: 200ms with LinearOutSlowIn — M3 motion standard for elements entering the screen.
-// Extended from 100ms → 200ms so the controls arrive deliberately rather than snapping in.
+// Enter: OxygenOS-style fluid spring driving translation + fade as one physics curve.
+// dampingRatio 0.8 gives a barely-perceptible overshoot; StiffnessMediumLow lands the
+// animation in ~220ms perceived without the abrupt stop a tween produces.
 fun <T> playerControlsEnterAnimationSpec(): FiniteAnimationSpec<T> =
-  tween(
-    durationMillis = 200,
-    easing = LinearOutSlowInEasing,
+  spring(
+    dampingRatio = 0.8f,
+    stiffness    = Spring.StiffnessMediumLow,
   )
+
+// Long-press detector that does NOT swallow normal taps. The underlying button's
+// clickable still fires on quick taps; once the long-press timeout elapses we
+// consume the up event so the click handler doesn't double-fire.
+private fun Modifier.onLongPressNoConsume(onLongPress: () -> Unit): Modifier =
+  this.pointerInput(Unit) {
+    awaitEachGesture {
+      awaitFirstDown(requireUnconsumed = false)
+      try {
+        withTimeout(viewConfiguration.longPressTimeoutMillis) {
+          waitForUpOrCancellation()
+        }
+      } catch (_: PointerEventTimeoutCancellationException) {
+        onLongPress()
+        waitForUpOrCancellation()?.consume()
+      }
+    }
+  }
 
 @OptIn(
   ExperimentalAnimationGraphicsApi::class,
@@ -238,6 +264,13 @@ fun PlayerControls(
     appearancePreferences.parseButtons(portraitBottomControlsPref, mutableSetOf())
   }
 
+  // Show chapter markers in the seekbar only when the user has opted in by adding
+  // the BOOKMARKS_CHAPTERS button to any of their layout slots.
+  val showChapterMarkers = remember(topRightButtons, bottomRightButtons, bottomLeftButtons, portraitBottomButtons) {
+    app.marlboroadvance.mpvex.preferences.PlayerButton.BOOKMARKS_CHAPTERS in
+      (topRightButtons + bottomRightButtons + bottomLeftButtons + portraitBottomButtons)
+  }
+
   LaunchedEffect(
     controlsShown,
     paused,
@@ -245,7 +278,8 @@ fun PlayerControls(
     resetControlsTimestamp,
     areControlsLocked,
   ) {
-    if (controlsShown && paused == false && !isSeeking) {
+    // Read the timestamp to ensure it's considered "used" and correctly triggers re-execution
+    if (resetControlsTimestamp >= 0 && controlsShown && paused == false && !isSeeking) {
       val delayTime = if (areControlsLocked) 2000L else playerTimeToDisappear.toLong()
       delay(delayTime)
       viewModel.hideControls()
@@ -293,20 +327,39 @@ fun PlayerControls(
       Box(modifier = modifier.fillMaxSize()) {
         // OPTIMIZATION: Scrim is isolated in a dedicated layer to avoid layout-wide redraws.
         // M3 scrim token replaces hardcoded Color.Black — adapts to any dynamic color scheme.
+        // Two-pass scrim: a vertical top/bottom darkening for control legibility, plus a
+        // soft radial "focus light" centered behind the play button (One UI focal emphasis).
         val scrimColor = MaterialTheme.colorScheme.scrim
         Box(
           modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer { alpha = scrimAlpha }
-            .background(
-              Brush.verticalGradient(
-                0.0f to scrimColor.copy(alpha = 0.55f),
-                0.15f to Color.Transparent,
-                0.85f to Color.Transparent,
-                1.0f to scrimColor.copy(alpha = 0.55f),
+            .graphicsLayer { alpha = scrimAlpha },
+        ) {
+          Box(
+            modifier = Modifier
+              .fillMaxSize()
+              .background(
+                Brush.verticalGradient(
+                  0.0f to scrimColor.copy(alpha = 0.55f),
+                  0.15f to Color.Transparent,
+                  0.85f to Color.Transparent,
+                  1.0f to scrimColor.copy(alpha = 0.55f),
+                )
               )
-            )
-        )
+          )
+          Box(
+            modifier = Modifier
+              .fillMaxSize()
+              .background(
+                Brush.radialGradient(
+                  colors = listOf(
+                    scrimColor.copy(alpha = 0.20f),
+                    Color.Transparent,
+                  ),
+                )
+              )
+          )
+        }
 
         ConstraintLayout(modifier = Modifier.fillMaxSize()) {
           val (topLeftControls, topRightControls) = createRefs()
@@ -409,118 +462,191 @@ fun PlayerControls(
             val isBuffering = pausedForCache == true && showLoadingCircle
             val showSkip = playlistMode && viewModel.hasPlaylistSupport()
 
-            // M3 Expressive shape-morphing for skip buttons
-            val skipButtonShapes = IconButtonDefaults.shapes()
+            // Skip buttons morph from a 20dp-rounded square at rest to a full circle
+            // on press — reverses the default round→squircle for One UI "softening" feel.
+            val skipButtonShapes = IconButtonDefaults.shapes(
+              shape        = RoundedCornerShape(20.dp),
+              pressedShape = CircleShape,
+            )
             val prevInteraction = remember { MutableInteractionSource() }
             val nextInteraction = remember { MutableInteractionSource() }
 
-            // Connected ButtonGroup: pressing a skip button expands it and compresses
-            // its neighbours. Play/pause is a circular ghost button whose M3 icon
-            // morphs between play and pause; buffering swaps it for a LoadingIndicator
-            // in the same footprint so the row never shifts.
+            // Haptic + helpers captured in composition scope so they're available
+            // to pointer-input handlers below.
+            val haptic = LocalHapticFeedback.current
+
+            // Each button (Prev / Play / Next) carries its own background — no outer
+            // toolbar pill. The ButtonGroup still handles the connected press-expand
+            // animation between neighbours; the visual is three separate chips.
             ButtonGroup(
               overflowIndicator = {},
-              horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
+              horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
               verticalAlignment = Alignment.CenterVertically,
             ) {
-              // ── Skip Previous ──────────────────────────────────────────
-              if (showSkip) {
-                customItem(
-                  buttonGroupContent = {
-                    FilledTonalIconButton(
-                      onClick           = { viewModel.playPrevious() },
-                      enabled           = viewModel.hasPrevious(),
-                      shapes            = skipButtonShapes,
-                      interactionSource = prevInteraction,
-                      colors            = glassIconButtonColors(hideBackground),
-                      modifier          = Modifier
-                        .size(56.dp)
-                        .alpha(if (isBuffering) 0.5f else 1f)
-                        .animateWidth(prevInteraction),
-                    ) {
-                      Icon(
-                        imageVector        = Icons.Outlined.SkipPrevious,
-                        contentDescription = null,
-                        modifier           = Modifier.size(32.dp),
-                      )
-                    }
-                  },
-                  menuContent = {},
-                )
-              }
-
-              // ── Play / Pause — ToggleFloatingActionButton / buffering ────
-              customItem(
-                buttonGroupContent = {
-                  if (isBuffering) {
-                    Box(modifier = Modifier.size(92.dp), contentAlignment = Alignment.Center) {
-                      LoadingIndicator(
-                        modifier = Modifier.size(72.dp),
-                        color    = MaterialTheme.colorScheme.primary,
-                      )
-                    }
-                  } else {
-                    Box(
-                      modifier = Modifier
-                        .size(92.dp)
-                        .glassPanel(CircleShape, hideBackground)
-                        .clickable(
-                          interactionSource = remember { MutableInteractionSource() },
-                          indication        = ripple(bounded = true, radius = 46.dp),
-                        ) {
-                          resetControlsTimestamp = System.currentTimeMillis()
-                          viewModel.pauseUnpause()
+                // ── Skip Previous ──────────────────────────────────────────
+                if (showSkip) {
+                  customItem(
+                    buttonGroupContent = {
+                      FilledTonalIconButton(
+                        onClick           = {
+                          haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                          viewModel.playPrevious()
                         },
-                      contentAlignment = Alignment.Center,
-                    ) {
-                      AnimatedContent(
-                        targetState    = paused == false,
-                        transitionSpec = {
-                          (scaleIn(spring(stiffness = Spring.StiffnessMedium), initialScale = 0.6f) + fadeIn()) togetherWith
-                            (scaleOut(tween(120), targetScale = 0.6f) + fadeOut(tween(120)))
-                        },
-                        label = "play_pause_morph",
-                      ) { isPlaying ->
+                        enabled           = viewModel.hasPrevious(),
+                        shapes            = skipButtonShapes,
+                        interactionSource = prevInteraction,
+                        colors            = glassIconButtonColors(hideBackground),
+                        modifier          = Modifier
+                          .size(56.dp)
+                          .alpha(if (isBuffering) 0.5f else 1f)
+                          .animateWidth(prevInteraction)
+                          .onLongPressNoConsume {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val newPos = (viewModel.precisePosition.value - 10f)
+                              .coerceAtLeast(0f)
+                              .toInt()
+                            resetControlsTimestamp = System.currentTimeMillis()
+                            viewModel.seekTo(newPos)
+                          },
+                      ) {
                         Icon(
-                          imageVector        = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                          imageVector        = Icons.Outlined.SkipPrevious,
                           contentDescription = null,
-                          tint               = MaterialTheme.colorScheme.primary,
-                          modifier           = Modifier.size(52.dp),
+                          modifier           = Modifier.size(32.dp),
                         )
                       }
-                    }
-                  }
-                },
-                menuContent = {},
-              )
+                    },
+                    menuContent = {},
+                  )
+                }
 
-              // ── Skip Next ───────────────────────────────────────────────
-              if (showSkip) {
+                // ── Play / Pause — primaryContainer focal · unified spring morph ──
                 customItem(
                   buttonGroupContent = {
-                    FilledTonalIconButton(
-                      onClick           = { viewModel.playNext() },
-                      enabled           = viewModel.hasNext(),
-                      shapes            = skipButtonShapes,
-                      interactionSource = nextInteraction,
-                      colors            = glassIconButtonColors(hideBackground),
-                      modifier          = Modifier
-                        .size(56.dp)
-                        .alpha(if (isBuffering) 0.5f else 1f)
-                        .animateWidth(nextInteraction),
-                    ) {
-                      Icon(
-                        imageVector        = Icons.Outlined.SkipNext,
-                        contentDescription = null,
-                        modifier           = Modifier.size(32.dp),
-                      )
+                    if (isBuffering) {
+                      // Soft radial halo glow behind the loading indicator
+                      Box(modifier = Modifier.size(88.dp), contentAlignment = Alignment.Center) {
+                        Box(
+                          modifier = Modifier
+                            .size(88.dp)
+                            .clip(CircleShape)
+                            .background(
+                              brush = Brush.radialGradient(
+                                colors = listOf(
+                                  MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                  Color.Transparent,
+                                ),
+                              ),
+                            ),
+                        )
+                        LoadingIndicator(
+                          modifier = Modifier.size(72.dp),
+                          color    = MaterialTheme.colorScheme.primary,
+                        )
+                      }
+                    } else {
+                      Box(
+                        modifier = Modifier
+                          .size(88.dp)
+                          .clip(CircleShape)
+                          .then(
+                            if (hideBackground) {
+                              Modifier
+                            } else {
+                              Modifier.background(MaterialTheme.colorScheme.primaryContainer)
+                            },
+                          )
+                          .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication        = ripple(bounded = true, radius = 44.dp),
+                          ) {
+                            haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                            resetControlsTimestamp = System.currentTimeMillis()
+                            viewModel.pauseUnpause()
+                          },
+                        contentAlignment = Alignment.Center,
+                      ) {
+                        AnimatedContent(
+                          targetState    = paused == false,
+                          transitionSpec = {
+                            // Unified spring for in + out — OxygenOS-style continuity
+                            (scaleIn(
+                              animationSpec = spring(
+                                dampingRatio = 0.7f,
+                                stiffness    = Spring.StiffnessMediumLow,
+                              ),
+                              initialScale = 0.7f,
+                            ) + fadeIn(
+                              animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                            )) togetherWith
+                              (scaleOut(
+                                animationSpec = spring(
+                                  dampingRatio = 0.7f,
+                                  stiffness    = Spring.StiffnessMediumLow,
+                                ),
+                                targetScale = 0.7f,
+                              ) + fadeOut(
+                                animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+                              ))
+                          },
+                          label = "play_pause_morph",
+                        ) { isPlaying ->
+                          Icon(
+                            imageVector        = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                            contentDescription = null,
+                            tint               = if (hideBackground) {
+                              MaterialTheme.colorScheme.primary
+                            } else {
+                              MaterialTheme.colorScheme.onPrimaryContainer
+                            },
+                            modifier           = Modifier.size(52.dp),
+                          )
+                        }
+                      }
                     }
                   },
                   menuContent = {},
                 )
+
+                // ── Skip Next ───────────────────────────────────────────────
+                if (showSkip) {
+                  customItem(
+                    buttonGroupContent = {
+                      FilledTonalIconButton(
+                        onClick           = {
+                          haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                          viewModel.playNext()
+                        },
+                        enabled           = viewModel.hasNext(),
+                        shapes            = skipButtonShapes,
+                        interactionSource = nextInteraction,
+                        colors            = glassIconButtonColors(hideBackground),
+                        modifier          = Modifier
+                          .size(56.dp)
+                          .alpha(if (isBuffering) 0.5f else 1f)
+                          .animateWidth(nextInteraction)
+                          .onLongPressNoConsume {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            val maxPos = viewModel.effectiveDuration.value
+                            val newPos = (viewModel.precisePosition.value + 10f)
+                              .coerceAtMost(maxPos)
+                              .toInt()
+                            resetControlsTimestamp = System.currentTimeMillis()
+                            viewModel.seekTo(newPos)
+                          },
+                      ) {
+                        Icon(
+                          imageVector        = Icons.Outlined.SkipNext,
+                          contentDescription = null,
+                          modifier           = Modifier.size(32.dp),
+                        )
+                      }
+                    },
+                    menuContent = {},
+                  )
+                }
               }
             }
-          }
 
           AnimatedVisibility(
             visible = controlsShown && !areControlsLocked,
@@ -559,7 +685,7 @@ fun PlayerControls(
                 playerPreferences.invertDuration.set(!invertDuration)
               },
               positionTimerOnClick = {},
-              chapters = chapters.toImmutableList(),
+              chapters = if (showChapterMarkers) chapters.toImmutableList() else persistentListOf(),
               paused = paused ?: false,
               seekbarStyle = seekbarStyle,
               loopStart = abLoopA?.toFloat(),
@@ -859,22 +985,18 @@ fun NextUpPill(
 
   // Fire haptic once when the pill appears
   LaunchedEffect(Unit) {
-    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
   }
 
   // SwipeToDismissBox replaces the manual Animatable + detectHorizontalDragGestures block.
   // EndToStart = swipe left-to-right to dismiss (matches the original right-swipe logic).
-  val dismissState = rememberSwipeToDismissBoxState(
-    confirmValueChange = { value ->
-      if (value == SwipeToDismissBoxValue.StartToEnd) {
-        onDismiss()
-        true
-      } else {
-        false
-      }
-    },
-    positionalThreshold = { totalDistance -> totalDistance * 0.35f },
-  )
+  val dismissState = rememberSwipeToDismissBoxState()
+
+  LaunchedEffect(dismissState.currentValue) {
+    if (dismissState.currentValue == SwipeToDismissBoxValue.StartToEnd) {
+      onDismiss()
+    }
+  }
 
   SwipeToDismissBox(
     state            = dismissState,
@@ -946,11 +1068,6 @@ fun PreviewNextUpPill() {
       modifier        = Modifier.fillMaxSize().padding(16.dp),
       contentAlignment = Alignment.Center,
     ) {
-      Box(
-        modifier = Modifier
-          .size(400.dp, 200.dp)
-          .background(Brush.linearGradient(colors = listOf(Color(0xFF6200EE), Color(0xFF03DAC6)))),
-      )
       NextUpPill(title = "S01 E05 - The Final Stand", onClick = {}, onDismiss = {})
     }
   }
