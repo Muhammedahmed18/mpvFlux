@@ -2,9 +2,15 @@ package app.marlboroadvance.mpvex.ui.browser.cards
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -15,6 +21,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,7 +34,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -53,6 +59,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -69,7 +77,6 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
 import java.text.SimpleDateFormat
@@ -131,7 +138,7 @@ fun VideoCard(
 
   val showSizeChip = overrideShowSizeChip ?: settings.showSizeChip
   val showResolutionChip = overrideShowResolutionChip ?: settings.showResolutionChip
-  
+
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -149,10 +156,10 @@ fun VideoCard(
   )
 
   val tonalElevation = if (isPressed) 4.dp else 1.dp
-  val selectionBorderWidth = if (isSelected) 1.dp else 0.dp
+  val selectionBorderWidth = if (isSelected) 2.dp else 0.dp
 
   val containerColor = if (isSelected) {
-    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.12f)
+    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.16f)
   } else {
     MaterialTheme.colorScheme.surfaceContainerLow
   }
@@ -171,14 +178,14 @@ fun VideoCard(
     color = containerColor,
     tonalElevation = tonalElevation,
     border = if (isSelected) {
-      BorderStroke(selectionBorderWidth, MaterialTheme.colorScheme.outlineVariant)
+      BorderStroke(selectionBorderWidth, MaterialTheme.colorScheme.primary)
     } else null,
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(16.dp),
-      verticalAlignment = Alignment.Top,
+        .padding(12.dp),
+      verticalAlignment = Alignment.CenterVertically,
     ) {
       VideoThumbnail(
         video = video,
@@ -191,7 +198,9 @@ fun VideoCard(
         allowThumbnailGeneration = allowThumbnailGeneration,
         onThumbClick = onThumbClick,
         onLongClick = onLongClick,
-        modifier = Modifier.requiredSize(width = 172.dp, height = 97.dp)
+        modifier = Modifier
+          .weight(1f)
+          .aspectRatio(16f / 9f)
       )
 
       Spacer(modifier = Modifier.width(16.dp))
@@ -207,7 +216,8 @@ fun VideoCard(
         showResolutionChip = showResolutionChip,
         showFramerate = settings.showFramerateInResolution,
         showDateChip = settings.showDateChip,
-        modifier = Modifier.weight(1f),
+        unlimitedNameLines = settings.unlimitedNameLines,
+        modifier = Modifier.weight(1.3f),
       )
     }
   }
@@ -225,25 +235,23 @@ private fun VideoInfoPanel(
   showResolutionChip: Boolean,
   showFramerate: Boolean,
   showDateChip: Boolean,
+  unlimitedNameLines: Boolean,
   modifier: Modifier = Modifier
 ) {
   Column(
-    modifier = modifier,
+    modifier = if (isWatched) modifier.alpha(0.55f) else modifier,
     verticalArrangement = Arrangement.spacedBy(8.dp)
   ) {
     Text(
       text = displayTitle,
-      style = MaterialTheme.typography.titleMedium,
-      fontWeight = FontWeight.SemiBold,
+      style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
       color = when {
         isSelected -> MaterialTheme.colorScheme.primary
-        isRecentlyPlayed -> MaterialTheme.colorScheme.primary
-        isWatched -> MaterialTheme.colorScheme.onSurfaceVariant
+        isRecentlyPlayed -> MaterialTheme.colorScheme.tertiary
         else -> MaterialTheme.colorScheme.onSurface
       },
-      maxLines = 2,
+      maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2,
       overflow = TextOverflow.Ellipsis,
-      modifier = if (isWatched) Modifier.alpha(0.6f) else Modifier
     )
 
     VideoMetadataChips(
@@ -275,7 +283,7 @@ fun VideoThumbnail(
   val isInspection = LocalInspectionMode.current
   val thumbnailRepository = if (isInspection) null else koinInject<ThumbnailRepository>()
   val density = LocalDensity.current
-  val shape = RoundedCornerShape(8.dp)
+  val shape = MaterialTheme.shapes.medium
 
   Box(modifier = modifier) {
     BoxWithConstraints(
@@ -292,64 +300,85 @@ fun VideoThumbnail(
       val thumbWidthPx = with(density) { maxWidth.roundToPx() }
       val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
 
-      val thumbnailKey = remember(video.id, video.dateModified, video.size, thumbWidthPx, thumbHeightPx) {
-        thumbnailRepository?.thumbnailKey(video, thumbWidthPx, thumbHeightPx) ?: ""
+      val thumbnailKey = remember(video.id, video.dateModified, video.size) {
+        thumbnailRepository?.thumbnailKey(video) ?: ""
       }
 
       var thumbnail by remember(thumbnailKey) {
-        mutableStateOf(thumbnailRepository?.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx))
+        mutableStateOf(thumbnailRepository?.getThumbnailFromMemory(video))
       }
 
-      LaunchedEffect(thumbnailKey) {
-        thumbnailRepository?.thumbnailReadyKeys
-          ?.filter { it == thumbnailKey }
-          ?.collect {
-            thumbnail = thumbnailRepository.getThumbnailFromMemory(video, thumbWidthPx, thumbHeightPx)
-          }
+      var isLoading by remember(thumbnailKey) {
+        mutableStateOf(thumbnail == null && showThumbnails && thumbnailRepository != null)
       }
 
+      var loadFailed by remember(thumbnailKey) { mutableStateOf(false) }
+
+      // Step 3.1 — Add a stable thumbnailVisible boolean state
+      var thumbnailVisible by remember(thumbnailKey) { mutableStateOf(false) }
+
+      // Step 3.2 — Animate alpha on the Image
+      val imageAlpha by animateFloatAsState(
+        targetValue = if (thumbnailVisible) 1f else 0f,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "thumbnail_fade"
+      )
+
+      // Single effect replaces two competing ones
       LaunchedEffect(thumbnailKey, allowThumbnailGeneration, showThumbnails) {
         if (thumbnail == null && showThumbnails && thumbnailRepository != null) {
-          thumbnail = withContext(Dispatchers.IO) {
+          isLoading = true
+          loadFailed = false
+          val result = withContext(Dispatchers.IO) {
             if (allowThumbnailGeneration) {
               thumbnailRepository.getThumbnail(video, thumbWidthPx, thumbHeightPx)
             } else {
               thumbnailRepository.getCachedThumbnail(video, thumbWidthPx, thumbHeightPx)
             }
           }
+          thumbnail = result
+          isLoading = false
+          if (thumbnail == null) {
+            loadFailed = true
+          }
+        }
+        // Guarantees Compose sees false -> true transition
+        if (thumbnail != null) {
+          thumbnailVisible = true
         }
       }
 
-      if (showThumbnails && thumbnail != null) {
-        Image(
-          bitmap = thumbnail!!.asImageBitmap(),
-          contentDescription = null,
-          modifier = Modifier
-            .matchParentSize()
-            .alpha(if (isWatched) 0.4f else 1f),
-          contentScale = ContentScale.Crop,
-        )
+      if (showThumbnails) {
+        // Step 3.3 — Ensure shimmer exits cleanly
+        // Shimmer stays as long as we're loading OR the fade is in progress.
+        // We also check !loadFailed and thumbnail != null to avoid indefinite shimmer if loading never starts or fails.
+        if ((isLoading || (thumbnail != null && imageAlpha < 1f)) && !loadFailed) {
+          ThumbnailShimmer(modifier = Modifier.matchParentSize())
+        }
+
+        if (thumbnail != null) {
+          Image(
+            bitmap = thumbnail!!.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier
+              .matchParentSize()
+              .alpha(imageAlpha * (if (isWatched) 0.4f else 1f)),
+            contentScale = ContentScale.Crop,
+          )
+        } else if (!isLoading || loadFailed) {
+          Icon(
+            imageVector = Icons.Filled.PlayArrow,
+            contentDescription = null,
+            modifier = Modifier.size(40.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
       } else {
         Icon(
           imageVector = Icons.Filled.PlayArrow,
           contentDescription = null,
           modifier = Modifier.size(40.dp),
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
-
-      // Duration pill
-      Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.75f),
-        shape = MaterialTheme.shapes.small,
-        modifier = Modifier
-          .align(Alignment.BottomStart)
-          .padding(8.dp)
-      ) {
-        Text(
-          text = video.durationFormatted,
-          style = MaterialTheme.typography.labelMedium,
-          modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
         )
       }
 
@@ -361,20 +390,21 @@ fun VideoThumbnail(
       ) {
         if (isWatched) {
           Surface(
-            shape = CircleShape,
+            shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.secondaryContainer,
-            modifier = Modifier.size(22.dp)
           ) {
             Icon(
               imageVector = Icons.Filled.Check,
               contentDescription = "Watched",
-              modifier = Modifier.padding(4.dp),
+              modifier = Modifier
+                .padding(horizontal = 6.dp, vertical = 4.dp)
+                .size(12.dp),
               tint = MaterialTheme.colorScheme.onSecondaryContainer,
             )
           }
         } else if (isNew) {
           Surface(
-            shape = RoundedCornerShape(8.dp),
+            shape = MaterialTheme.shapes.small,
             color = MaterialTheme.colorScheme.secondaryContainer,
           ) {
             Text(
@@ -387,22 +417,41 @@ fun VideoThumbnail(
         }
       }
 
-      // Progress Bar
-      if (progressPercentage != null && showProgressBar && !isWatched) {
-        val animatedProgress by animateFloatAsState(
-          targetValue = progressPercentage,
-          label = "VideoProgressAnimation"
-        )
-        LinearProgressIndicator(
-          progress = { animatedProgress },
-          modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .fillMaxWidth()
-            .height(4.dp),
-          color = MaterialTheme.colorScheme.primary,
-          trackColor = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f),
-          strokeCap = StrokeCap.Round,
-        )
+      // Duration pill + progress bar stacked so they never overlap
+      Column(
+        modifier = Modifier
+          .align(Alignment.BottomCenter)
+          .fillMaxWidth()
+      ) {
+        if (video.durationFormatted.isNotBlank()) {
+          Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
+          ) {
+            Text(
+              text = video.durationFormatted,
+              style = MaterialTheme.typography.labelMedium,
+              modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+          }
+        }
+
+        if (progressPercentage != null && showProgressBar && !isWatched) {
+          val animatedProgress by animateFloatAsState(
+            targetValue = progressPercentage,
+            label = "VideoProgressAnimation"
+          )
+          LinearProgressIndicator(
+            progress = { animatedProgress },
+            modifier = Modifier
+              .fillMaxWidth()
+              .height(4.dp),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            strokeCap = StrokeCap.Round,
+          )
+        }
       }
     }
 
@@ -425,7 +474,7 @@ fun VideoThumbnail(
         color = MaterialTheme.colorScheme.primaryContainer,
         shape = CircleShape,
         modifier = Modifier.size(22.dp),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
       ) {
         Icon(
           imageVector = Icons.Filled.Check,
@@ -435,6 +484,43 @@ fun VideoThumbnail(
         )
       }
     }
+  }
+}
+
+@Composable
+private fun ThumbnailShimmer(modifier: Modifier = Modifier) {
+  val infiniteTransition = rememberInfiniteTransition(label = "shimmer_transition")
+  val xOffset by infiniteTransition.animateFloat(
+    initialValue = 0f,
+    targetValue = 2f,
+    animationSpec = infiniteRepeatable(
+      animation = tween(1200, easing = FastOutSlowInEasing),
+      repeatMode = RepeatMode.Restart
+    ),
+    label = "shimmer_offset"
+  )
+
+  val colors = listOf(
+    MaterialTheme.colorScheme.surfaceContainerLow,
+    MaterialTheme.colorScheme.surfaceContainerHighest,
+    MaterialTheme.colorScheme.surfaceContainerLow,
+  )
+
+  BoxWithConstraints(modifier = modifier) {
+    val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
+    val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
+
+    val brush = Brush.linearGradient(
+      colors = colors,
+      start = Offset(xOffset * widthPx - widthPx, 0f),
+      end = Offset(xOffset * widthPx, heightPx)
+    )
+
+    Box(
+      modifier = Modifier
+        .fillMaxSize()
+        .background(brush)
+    )
   }
 }
 
@@ -454,12 +540,6 @@ fun VideoMetadataChips(
     horizontalArrangement = Arrangement.spacedBy(8.dp),
     verticalArrangement = Arrangement.spacedBy(4.dp)
   ) {
-    if (showSubtitleIndicator && video.hasEmbeddedSubtitles && video.subtitleCodec.isNotBlank()) {
-      video.subtitleCodec.split(" ").forEach { codec ->
-        SubtitleChip(text = codec)
-      }
-    }
-
     if (showResolutionChip && video.height > 0) {
       val baseRes = when {
         video.width >= 3840 || video.height >= 2160 -> "4K"
@@ -477,12 +557,18 @@ fun VideoMetadataChips(
       UnifiedChip(text = resText, compact = true)
     }
 
-    if (showSizeChip && video.sizeFormatted != "0 B" && video.sizeFormatted != "--") {
+    if (showSizeChip && video.size > 0) {
       UnifiedChip(text = video.sizeFormatted, compact = true)
     }
 
     if (showDateChip && video.dateModified > 0) {
       UnifiedChip(text = formatDate(video.dateModified), compact = true)
+    }
+
+    if (showSubtitleIndicator && video.hasEmbeddedSubtitles && video.subtitleCodec.isNotBlank()) {
+      video.subtitleCodec.split(" ").forEach { codec ->
+        SubtitleChip(text = codec)
+      }
     }
   }
 }
