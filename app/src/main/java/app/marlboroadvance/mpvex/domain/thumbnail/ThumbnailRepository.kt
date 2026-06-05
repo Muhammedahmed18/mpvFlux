@@ -29,10 +29,10 @@ import kotlin.math.max
 class ThumbnailRepository(
   private val context: Context,
 ) {
-  private val appearancePreferences by lazy { 
+  private val appearancePreferences by lazy {
     org.koin.java.KoinJavaComponent.get<app.marlboroadvance.mpvex.preferences.AppearancePreferences>(
       app.marlboroadvance.mpvex.preferences.AppearancePreferences::class.java
-    ) 
+    )
   }
   private val diskCacheDimension = 1024
   private val diskJpegQuality = 100
@@ -42,7 +42,7 @@ class ThumbnailRepository(
 
   private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val maxconcurrentfolders = 3
-  
+
   // Global limit: only allow 2 thumbnails to be generated at a time to save battery and CPU
   private val generationSemaphore = Semaphore(2)
 
@@ -59,7 +59,7 @@ class ThumbnailRepository(
 
   private val folderStates = ConcurrentHashMap<String, FolderState>()
   private val folderJobs = ConcurrentHashMap<String, Job>()
-  
+
   private val useMediaStoreForVideo = ConcurrentHashMap<String, Boolean>()
 
   init {
@@ -80,7 +80,7 @@ class ThumbnailRepository(
     heightPx: Int,
   ): Bitmap? =
     withContext(Dispatchers.IO) {
-      val key = thumbnailKey(video, widthPx, heightPx)
+      val key = thumbnailKey(video)
 
       if (isNetworkUrl(video.path) && !appearancePreferences.showNetworkThumbnails.get()) {
         return@withContext null
@@ -88,11 +88,17 @@ class ThumbnailRepository(
 
       memoryCache.get(key)?.let { return@withContext it }
 
-      ongoingOperations[key]?.let {
-        return@withContext it.await()
+      // Remove any stale cancelled Deferred before computing — a cancelled Deferred
+      // will never complete, so any awaiter on it would suspend forever.
+      ongoingOperations[key]?.let { existing ->
+        if (existing.isCancelled) ongoingOperations.remove(key, existing)
       }
 
-      val deferred =
+      // computeIfAbsent is atomic on ConcurrentHashMap: the lambda only runs if no
+      // entry exists for this key. Any second coroutine arriving concurrently finds
+      // the already-stored Deferred and awaits it, closing the race window that
+      // existed between the old null-check and the separate store below.
+      val deferred = ongoingOperations.computeIfAbsent(key) {
         async {
           try {
             loadFromDisk(video)?.let { thumbnail ->
@@ -112,7 +118,7 @@ class ThumbnailRepository(
               } else {
                 16f / 9f
               }
-              
+
               val targetWidth = diskCacheDimension
               val targetHeight = (targetWidth / aspect).toInt()
 
@@ -143,8 +149,8 @@ class ThumbnailRepository(
             ongoingOperations.remove(key)
           }
         }
+      }
 
-      ongoingOperations[key] = deferred
       return@withContext deferred.await()
     }
 
@@ -157,8 +163,8 @@ class ThumbnailRepository(
       if (isNetworkUrl(video.path) && !appearancePreferences.showNetworkThumbnails.get()) {
         return@withContext null
       }
-      
-      val key = thumbnailKey(video, widthPx, heightPx)
+
+      val key = thumbnailKey(video)
       synchronized(memoryCache) { memoryCache.get(key) }?.let { return@withContext it }
       loadFromDisk(video)?.let { thumbnail ->
         synchronized(memoryCache) { memoryCache.put(key, thumbnail) }
@@ -167,16 +173,11 @@ class ThumbnailRepository(
       null
     }
 
-  fun getThumbnailFromMemory(
-    video: Video,
-    widthPx: Int,
-    heightPx: Int,
-  ): Bitmap? {
+  fun getThumbnailFromMemory(video: Video): Bitmap? {
     if (isNetworkUrl(video.path) && !appearancePreferences.showNetworkThumbnails.get()) {
       return null
     }
-    
-    val key = thumbnailKey(video, widthPx, heightPx)
+    val key = thumbnailKey(video)
     return synchronized(memoryCache) { memoryCache.get(key) }
   }
 
@@ -209,11 +210,11 @@ class ThumbnailRepository(
     } else {
       videos.filterNot { isNetworkUrl(it.path) }
     }
-    
+
     if (filteredVideos.isEmpty()) return
-    
+
     folderJobs.entries.removeAll { !it.value.isActive }
-    
+
     if (folderJobs.size >= maxconcurrentfolders && !folderJobs.containsKey(folderId)) {
       folderJobs.entries.firstOrNull()?.let { (oldestId, job) ->
         job.cancel()
@@ -221,7 +222,7 @@ class ThumbnailRepository(
         folderStates.remove(oldestId)
       }
     }
-    
+
     val signature = folderSignature(filteredVideos, widthPx, heightPx)
     val state =
       folderStates.compute(folderId) { _, existing ->
@@ -245,21 +246,14 @@ class ThumbnailRepository(
       }
   }
 
-  fun thumbnailKey(
-    video: Video,
-    width: Int,
-    height: Int,
-  ): String {
-    val base = videoBaseKey(video)
-    return "$base|$width|$height"
-  }
+  fun thumbnailKey(video: Video): String = videoBaseKey(video)
 
   private fun videoBaseKey(video: Video): String {
     if (isNetworkUrl(video.path)) {
       val base = video.path.ifBlank { video.uri.toString() }
       return "$base|network"
     }
-    
+
     return if (video.path.isNotBlank()) {
       "${video.path}|local"
     } else {
@@ -325,12 +319,12 @@ class ThumbnailRepository(
       val positionSec = preferredPositionSeconds(video)
       val dimension = maxOf(width, height)
       val bmp = FastThumbnails.generateAsync(
-          video.path.ifBlank { video.uri.toString() },
-          positionSec,
-          dimension,
-          useHwDec = false
+        video.path.ifBlank { video.uri.toString() },
+        positionSec,
+        dimension,
+        useHwDec = false
       ) ?: return@runCatching null
-      
+
       rotateIfNeeded(video, bmp)
     }.getOrNull()
   }
@@ -343,7 +337,7 @@ class ThumbnailRepository(
     if (isNetworkUrl(video.path)) {
       return null
     }
-    
+
     return withContext(Dispatchers.IO) {
       val mediaStoreThumbnail = runCatching {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
@@ -380,17 +374,17 @@ class ThumbnailRepository(
           }
         }
       }.getOrNull()
-      
+
       if (mediaStoreThumbnail != null) {
         return@withContext mediaStoreThumbnail
       }
-      
+
       runCatching {
         val file = java.io.File(video.path)
         if (!file.exists()) {
           return@runCatching null
         }
-        
+
         val thumbnail = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
           android.media.ThumbnailUtils.createVideoThumbnail(
             file,
@@ -413,12 +407,12 @@ class ThumbnailRepository(
             }
           }
         }
-        
+
         if (thumbnail != null) {
           if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-             thumbnail
+            thumbnail
           } else {
-             rotateIfNeeded(video, thumbnail)
+            rotateIfNeeded(video, thumbnail)
           }
         } else {
           null
@@ -429,7 +423,7 @@ class ThumbnailRepository(
 
   private fun preferredPositionSeconds(video: Video): Double {
     val isNetworkUrl = isNetworkUrl(video.path)
-    
+
     if (isNetworkUrl) {
       val durationSec = video.duration / 1000.0
       if (durationSec > 0.0) {
@@ -437,13 +431,13 @@ class ThumbnailRepository(
       }
       return 2.0
     }
-    
+
     val durationSec = video.duration / 1000.0
     if (durationSec <= 0.0 || durationSec < 20.0) return 0.0
     val candidate = 3.0
     return candidate.coerceIn(0.0, max(0.0, durationSec - 0.1))
   }
-  
+
   private fun isNetworkUrl(path: String): Boolean {
     return path.startsWith("http://", ignoreCase = true) ||
       path.startsWith("https://", ignoreCase = true) ||
