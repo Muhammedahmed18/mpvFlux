@@ -1,22 +1,26 @@
 package app.marlboroadvance.mpvex.ui.player.controls
 
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -50,21 +54,30 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.os.ConfigurationCompat
 import app.marlboroadvance.mpvex.preferences.PlayerButton
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
@@ -82,6 +95,14 @@ private fun pressSpec() = spring<Float>(
   dampingRatio = Spring.DampingRatioMediumBouncy,
   stiffness    = Spring.StiffnessLow,
 )
+
+// ---------------------------------------------------------------------------
+// Shared text style for value-display chips (Playback Speed, Decoder, Video Zoom)
+// — centralizes the `labelLarge.copy(fontWeight = ExtraBold)` triplet
+// ---------------------------------------------------------------------------
+@Composable
+private fun chipValueLabelStyle() =
+  MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold)
 
 // ---------------------------------------------------------------------------
 // One UI–style translucent "glass" for controls layered over video. MPV draws
@@ -118,53 +139,6 @@ internal fun glassIconButtonColors(hideBackground: Boolean) =
     },
     contentColor = MaterialTheme.colorScheme.onSurface,
   )
-
-// Playlist progress — segmented bar for ≤12 items, otherwise a thin progress bar.
-// Always followed by an "Episode N of M" label in dim foreground.
-@Composable
-private fun PlaylistProgress(current: Int, total: Int, modifier: Modifier = Modifier) {
-  val activeColor   = MaterialTheme.colorScheme.primary
-  val inactiveColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-  Row(
-    modifier              = modifier,
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    verticalAlignment     = Alignment.CenterVertically,
-  ) {
-    if (total <= 12) {
-      Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        repeat(total) { index ->
-          Box(
-            modifier = Modifier
-              .size(width = 10.dp, height = 4.dp)
-              .clip(RoundedCornerShape(2.dp))
-              .background(if (index < current) activeColor else inactiveColor),
-          )
-        }
-      }
-    } else {
-      Box(
-        modifier = Modifier
-          .width(80.dp)
-          .height(4.dp)
-          .clip(RoundedCornerShape(2.dp))
-          .background(inactiveColor),
-      ) {
-        Box(
-          modifier = Modifier
-            .fillMaxHeight()
-            .fillMaxWidth((current.toFloat() / total).coerceIn(0f, 1f))
-            .background(activeColor),
-        )
-      }
-    }
-    Text(
-      text     = "Episode $current of $total",
-      style    = MaterialTheme.typography.labelMedium,
-      color    = MaterialTheme.colorScheme.onSurfaceVariant,
-      maxLines = 1,
-    )
-  }
-}
 
 @OptIn(
   ExperimentalMaterial3Api::class,
@@ -219,14 +193,16 @@ fun RenderPlayerButton(
     }
 
     // ------------------------------------------------------------------
-    // VIDEO TITLE — One UI glass header: bold title + segmented progress
-    //   no leading icon · glass panel (marquee title + progress) · no chevron
+    // VIDEO TITLE — Capsule Header
+    //   28dp pill · NOW PLAYING label + counter pill · ExtraBold title
+    //   with fade-edge marquee · single rounded mini-bar progress
+    //   soft bottom shadow · spring press-scale 0.97x
     // ------------------------------------------------------------------
     PlayerButton.VIDEO_TITLE -> {
       val playlistModeEnabled = viewModel.hasPlaylistSupport()
       val playlistInfo = viewModel.getPlaylistInfo()
 
-      // "current/total" → Pair<Int, Int> for the progress strip; null when no playlist.
+      // "current/total" → Pair<Int, Int> for the counter pill / mini-bar; null when no playlist.
       val playlistCounter = remember(playlistInfo) {
         playlistInfo
           ?.split("/")
@@ -238,45 +214,145 @@ fun RenderPlayerButton(
           }
       }
 
+      val capsuleShape = RoundedCornerShape(28.dp)
+      val interactionSource = remember { MutableInteractionSource() }
+      val isPressed by interactionSource.collectIsPressedAsState()
+      // OxygenOS-style "soft squish": spring scale, MediumBouncy damping
+      val pressScale by animateFloatAsState(
+        targetValue   = if (isPressed) 0.97f else 1f,
+        animationSpec = spring(
+          dampingRatio = Spring.DampingRatioMediumBouncy,
+          stiffness    = Spring.StiffnessLow,
+        ),
+        label = "video_title_press_scale",
+      )
+
       Row(
-        modifier = modifier
-          .then(
-            if (playlistModeEnabled) {
-              Modifier.clickable {
-                clickEvent()
-                onOpenSheet(Sheets.Playlist)
-              }
-            } else {
-              Modifier
-            },
-          ),
+        modifier              = modifier.wrapContentWidth(Alignment.Start),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
       ) {
-        // Title + playlist progress on a translucent glass panel that hugs the text.
-        // Long titles auto-scroll via basicMarquee within the panel's allotted width.
         Column(
           modifier = Modifier
             .weight(1f, fill = false)
-            .glassPanel(RoundedCornerShape(22.dp), hideBackground)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-          verticalArrangement = Arrangement.spacedBy(4.dp),
+            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
+            .then(
+              if (hideBackground) {
+                Modifier
+              } else {
+                Modifier.shadow(elevation = 6.dp, shape = capsuleShape, clip = false)
+              },
+            )
+            .clip(capsuleShape)
+            .then(
+              if (hideBackground) {
+                Modifier
+              } else {
+                Modifier
+                  .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f))
+                  .border(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                      listOf(
+                        Color.White.copy(alpha = 0.25f),
+                        Color.White.copy(alpha = 0.05f),
+                      ),
+                    ),
+                    shape = capsuleShape,
+                  )
+              },
+            )
+            .then(
+              if (playlistModeEnabled) {
+                Modifier.clickable(
+                  interactionSource = interactionSource,
+                  indication        = ripple(),
+                ) {
+                  clickEvent()
+                  onOpenSheet(Sheets.Playlist)
+                }
+              } else {
+                Modifier
+              },
+            )
+            .heightIn(min = 56.dp)
+            .padding(horizontal = 18.dp, vertical = 10.dp),
+          verticalArrangement = Arrangement.Center,
         ) {
-          Text(
-            text     = mediaTitle ?: "",
-            style    = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color    = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            modifier = Modifier.basicMarquee(
-              iterations         = Int.MAX_VALUE,
-              initialDelayMillis = 1500,
-              repeatDelayMillis  = 1500,
-              spacing            = MarqueeSpacing(48.dp),
-            ),
-          )
-          playlistCounter?.let { (current, total) ->
-            PlaylistProgress(current = current, total = total)
+          // Header row: "NOW PLAYING" label (dim) + optional counter pill — sit snug
+          // next to each other, no fillMaxWidth + weight Spacer stretching them apart.
+          Row(
+            verticalAlignment     = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+          ) {
+            Text(
+              text  = "NOW PLAYING",
+              style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
+              color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+              maxLines = 1,
+            )
+            playlistCounter?.let { (current, total) ->
+              Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primaryContainer,
+              ) {
+                Text(
+                  text  = "$current / $total",
+                  style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                  color = MaterialTheme.colorScheme.onPrimaryContainer,
+                  modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+                )
+              }
+            }
           }
+
+          Spacer(modifier = Modifier.height(2.dp))
+
+          var isTitleOverflowing by remember { mutableStateOf(false) }
+
+          Text(
+            text  = mediaTitle ?: "",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            onTextLayout = { isTitleOverflowing = it.hasVisualOverflow },
+            modifier = Modifier
+              .widthIn(max = 280.dp)
+              .then(
+                if (isTitleOverflowing) {
+                  Modifier
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                      drawContent()
+                      val fadeWidth = 10.dp.toPx().coerceAtMost(size.width / 2f)
+                      drawRect(
+                        brush = Brush.horizontalGradient(
+                          colors = listOf(Color.Transparent, Color.Black),
+                          startX = 0f,
+                          endX   = fadeWidth,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                      )
+                      drawRect(
+                        brush = Brush.horizontalGradient(
+                          colors = listOf(Color.Black, Color.Transparent),
+                          startX = size.width - fadeWidth,
+                          endX   = size.width,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                      )
+                    }
+                } else {
+                  Modifier
+                },
+              )
+              .basicMarquee(
+                iterations         = Int.MAX_VALUE,
+                initialDelayMillis = 1500,
+                repeatDelayMillis  = 1500,
+                spacing            = MarqueeSpacing(48.dp),
+              ),
+          )
         }
       }
     }
@@ -337,9 +413,7 @@ fun RenderPlayerButton(
           label   = {
             Text(
               text  = speedText,
-              style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = FontWeight.ExtraBold,
-              ),
+              style = chipValueLabelStyle(),
             )
           },
           modifier    = modifier,
@@ -449,9 +523,7 @@ fun RenderPlayerButton(
         label   = {
           Text(
             text  = decoderName,
-            style = MaterialTheme.typography.labelLarge.copy(
-              fontWeight = FontWeight.ExtraBold,
-            ),
+            style = chipValueLabelStyle(),
           )
         },
         modifier = modifier,
@@ -560,9 +632,7 @@ fun RenderPlayerButton(
         label   = {
           Text(
             text  = zoomText,
-            style = MaterialTheme.typography.labelLarge.copy(
-              fontWeight = FontWeight.ExtraBold,
-            ),
+            style = chipValueLabelStyle(),
           )
         },
         modifier = modifier,

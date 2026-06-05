@@ -67,7 +67,7 @@ fun TopPlayerControlsPortrait(
         onOpenSheet = onOpenSheet,
         viewModel = viewModel,
         activity = activity,
-        modifier = Modifier.weight(1f),
+        modifier = Modifier.weight(1f, fill = false),
       )
     }
   }
@@ -89,9 +89,9 @@ fun BottomPlayerControlsPortrait(
   viewModel: PlayerViewModel,
   activity: PlayerActivity,
 ) {
-  // LazyRow replaces horizontalScroll(Row) — only composes visible buttons,
-  // handles edge-to-edge content padding correctly, and centres items when
-  // fewer buttons than the available width.
+  if (buttons.isEmpty()) return
+  // Per-button backgrounds — each button carries its own glass chip via
+  // glassIconButtonColors(hideBackground). LazyRow keeps lazy composition.
   LazyRow(
     modifier = Modifier
       .fillMaxWidth()
@@ -101,12 +101,10 @@ fun BottomPlayerControlsPortrait(
       alignment = Alignment.CenterHorizontally,
     ),
     verticalAlignment  = Alignment.CenterVertically,
-    // Edge padding mirrors the horizontal margin used throughout the player
     contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.large),
   ) {
     items(
       items = buttons,
-      // PlayerButton enum name is stable — safe as a key
       key   = { button -> button.name },
     ) { button ->
       RenderPlayerButton(

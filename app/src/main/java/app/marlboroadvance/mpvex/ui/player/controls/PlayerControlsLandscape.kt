@@ -79,6 +79,9 @@ fun TopRightPlayerControlsLandscape(
   viewModel: PlayerViewModel,
   activity: PlayerActivity,
 ) {
+  if (buttons.isEmpty()) return
+  // Per-button backgrounds — each button carries its own glass chip via
+  // glassIconButtonColors(hideBackground). No outer toolbar wrapper.
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
@@ -120,6 +123,7 @@ fun BottomRightPlayerControlsLandscape(
   viewModel: PlayerViewModel,
   activity: PlayerActivity,
 ) {
+  if (buttons.isEmpty()) return
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
@@ -161,6 +165,7 @@ fun BottomLeftPlayerControlsLandscape(
   viewModel: PlayerViewModel,
   activity: PlayerActivity,
 ) {
+  if (buttons.isEmpty()) return
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
