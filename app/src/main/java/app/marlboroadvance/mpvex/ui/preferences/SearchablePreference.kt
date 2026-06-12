@@ -437,12 +437,6 @@ object SearchablePreferences {
                 category = "Subtitles",
                 screen = SubtitlesPreferencesScreen,
             ))
-            add(SearchablePreference(
-                titleRes = R.string.pref_subtitles_fonts_dir,
-                keywords = listOf("fonts", "directory", "subtitle", "custom", "folder"),
-                category = "Subtitles",
-                screen = SubtitlesPreferencesScreen,
-            ))
 
             // Audio preferences
             add(SearchablePreference(
@@ -544,25 +538,40 @@ object SearchablePreferences {
                 category = "Advanced",
                 screen = AdvancedPreferencesScreen,
             ))
+            // Storage
             add(SearchablePreference(
-                titleRes = R.string.pref_clear_config_cache_title,
-                summaryRes = R.string.pref_clear_config_cache_summary,
-                keywords = listOf("clear", "config", "cache", "mpv", "settings"),
-                category = "Advanced",
-                screen = AdvancedPreferencesScreen,
+                title = "Storage",
+                summary = "Manage cached thumbnails, fonts and temporary files",
+                keywords = listOf("storage", "cache", "space", "size", "disk", "clear", "usage"),
+                category = "Storage",
+                screen = StorageScreen,
             ))
             add(SearchablePreference(
                 titleRes = R.string.pref_clear_thumbnail_cache_title,
                 summaryRes = R.string.pref_clear_thumbnail_cache_summary,
-                keywords = listOf("clear", "thumbnail", "cache", "preview", "images"),
-                category = "Advanced",
-                screen = AdvancedPreferencesScreen,
+                keywords = listOf("clear", "thumbnail", "cache", "preview", "images", "storage"),
+                category = "Storage",
+                screen = StorageScreen,
+            ))
+            add(SearchablePreference(
+                titleRes = R.string.pref_clear_config_cache_title,
+                summaryRes = R.string.pref_clear_config_cache_summary,
+                keywords = listOf("clear", "config", "cache", "mpv", "settings", "storage"),
+                category = "Storage",
+                screen = StorageScreen,
             ))
             add(SearchablePreference(
                 titleRes = R.string.pref_advanced_clear_fonts_cache,
-                keywords = listOf("clear", "fonts", "cache", "reset"),
-                category = "Advanced",
-                screen = AdvancedPreferencesScreen,
+                keywords = listOf("clear", "fonts", "cache", "reset", "subtitle", "storage"),
+                category = "Storage",
+                screen = StorageScreen,
+            ))
+            add(SearchablePreference(
+                title = "Clear temporary files",
+                summary = "Delete scratch files in the cache directory",
+                keywords = listOf("clear", "temporary", "temp", "cache", "files", "storage"),
+                category = "Storage",
+                screen = StorageScreen,
             ))
             add(SearchablePreference(
                 titleRes = R.string.pref_advanced_verbose_logging_title,

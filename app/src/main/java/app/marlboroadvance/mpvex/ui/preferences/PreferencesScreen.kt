@@ -170,6 +170,12 @@ object PreferencesScreen : Screen {
                 item {
                     PreferenceCard {
                         PreferenceItem(
+                            title = stringResource(R.string.pref_storage_title),
+                            summary = stringResource(R.string.pref_storage_summary),
+                            icon = { PreferenceIcon(Icons.Rounded.Storage, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) },
+                            onClick = { backstack.add(StorageScreen) }
+                        )
+                        PreferenceItem(
                             title = stringResource(R.string.pref_advanced),
                             summary = stringResource(R.string.pref_advanced_summary),
                             icon = { PreferenceIcon(Icons.Rounded.Code, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) },

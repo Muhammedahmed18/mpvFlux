@@ -34,10 +34,10 @@ import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.database.MpvExDatabase
-import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.SettingsManager
+import app.marlboroadvance.mpvex.preferences.SubtitlesPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.ConfirmDialog
@@ -54,7 +54,6 @@ import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import me.zhanghai.compose.preference.SwitchPreference
 import me.zhanghai.compose.preference.TwoTargetIconButtonPreference
 import org.koin.compose.koinInject
-import java.io.File
 
 @Serializable
 object AdvancedPreferencesScreen : Screen {
@@ -64,6 +63,7 @@ object AdvancedPreferencesScreen : Screen {
     val context = LocalContext.current
     val backStack = LocalBackStack.current
     val preferences = koinInject<AdvancedPreferences>()
+    val subtitlesPreferences = koinInject<SubtitlesPreferences>()
     val appPreferences = koinInject<AppearancePreferences>()
     val settingsManager = koinInject<SettingsManager>()
     val scope = rememberCoroutineScope()
@@ -73,7 +73,6 @@ object AdvancedPreferencesScreen : Screen {
     var exportStats by remember { mutableStateOf<SettingsManager.ExportStats?>(null) }
     
     val clearedHistoryMsg = stringResource(R.string.pref_advanced_cleared_playback_history)
-    val clearedFontsMsg = stringResource(R.string.pref_advanced_cleared_fonts_cache)
 
     val darkMode by appPreferences.darkMode.collectAsState()
     val systemDarkTheme = isSystemInDarkTheme()
@@ -176,12 +175,13 @@ object AdvancedPreferencesScreen : Screen {
               val flags = Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION
               context.contentResolver.takePersistableUriPermission(uri, flags)
               preferences.mpvConfStorageUri.set(uri.toString())
+              subtitlesPreferences.subtitleSaveFolder.set("")
 
               scope.launch(Dispatchers.IO) {
                 runCatching {
                   val tree = DocumentFile.fromTreeUri(context, uri)
                   if (tree != null && tree.exists() && tree.canWrite()) {
-                    listOf("fonts", "script-opts", "scripts", "shaders").forEach { name ->
+                    listOf("fonts", "subtitles", "script-opts", "scripts", "shaders").forEach { name ->
                       if (tree.listFiles().none { it.isDirectory && it.name?.equals(name, ignoreCase = true) == true }) {
                         tree.createDirectory(name)
                       }
@@ -302,65 +302,6 @@ object AdvancedPreferencesScreen : Screen {
                     onCancel = { isConfirmDialogShown = false },
                   )
                 }
-              }
-            }
-            
-            item { PreferenceSectionHeader(title = "Cache") }
-            item {
-              PreferenceCard {
-                var isClearThumbsConfirmShown by remember { mutableStateOf(false) }
-                val thumbnailRepository = koinInject<ThumbnailRepository>()
-                
-                PreferenceItem(
-                  title = "Clear config cache",
-                  summary = "Clear the cached mpv.conf settings",
-                  onClick = {
-                    scope.launch(Dispatchers.IO) {
-                      File(context.filesDir, "mpv.conf").delete()
-                      preferences.mpvConf.delete()
-                      withContext(Dispatchers.Main) { Toast.makeText(context, "Config cache cleared", Toast.LENGTH_SHORT).show() }
-                    }
-                  },
-                )
-                
-                PreferenceDivider()
-
-                PreferenceItem(
-                  title = "Clear thumbnail cache",
-                  summary = "Delete all cached video thumbnails",
-                  onClick = { isClearThumbsConfirmShown = true },
-                )
-
-                if (isClearThumbsConfirmShown) {
-                  ConfirmDialog(
-                    title = "Clear thumbnail cache?",
-                    subtitle = "This will delete cached thumbnails from storage and memory.",
-                    onConfirm = {
-                      scope.launch(Dispatchers.IO) {
-                        runCatching { thumbnailRepository.clearThumbnailCache() }.onSuccess {
-                          withContext(Dispatchers.Main) {
-                            isClearThumbsConfirmShown = false
-                            Toast.makeText(context, "Thumbnail cache cleared", Toast.LENGTH_SHORT).show()
-                          }
-                        }
-                      }
-                    },
-                    onCancel = { isClearThumbsConfirmShown = false },
-                  )
-                }
-                
-                PreferenceDivider()
-                
-                PreferenceItem(
-                  title = stringResource(id = R.string.pref_advanced_clear_fonts_cache),
-                  summary = "Remove all cached subtitle fonts",
-                  onClick = {
-                    scope.launch(Dispatchers.IO) {
-                      File(context.filesDir.path + "/fonts").let { if (it.exists()) it.listFiles()?.forEach { f -> if (f.isFile && f.name.lowercase().matches(".*\\.[ot]tf$".toRegex())) f.delete() } }
-                      withContext(Dispatchers.Main) { Toast.makeText(context, clearedFontsMsg, Toast.LENGTH_SHORT).show() }
-                    }
-                  },
-                )
               }
             }
             
