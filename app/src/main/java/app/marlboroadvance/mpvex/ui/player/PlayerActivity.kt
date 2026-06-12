@@ -1173,7 +1173,7 @@ class PlayerActivity :
         val aspect = player.getVideoOutAspect()
         Log.d(TAG, "Video dimension changed: $property, aspect: $aspect")
         pipHelper.updatePictureInPictureParams()
-        if (playerPreferences.orientation.get() == PlayerOrientation.Video && aspect != null) {
+        if (playerPreferences.orientation.get() == PlayerOrientation.Video) {
           setOrientation()
         }
       }
@@ -1513,8 +1513,9 @@ class PlayerActivity :
   }
 
   private fun applySubtitlePreferences() {
-    MPVLib.setPropertyString("sub-font", subtitlesPreferences.font.get())
-    MPVLib.setPropertyString("secondary-sub-font", subtitlesPreferences.font.get())
+    val font = subtitlesPreferences.font.get()
+    MPVLib.setPropertyString("sub-font", font)
+    MPVLib.setPropertyString("secondary-sub-font", font)
     MPVLib.setPropertyInt("sub-font-size", subtitlesPreferences.fontSize.get())
     MPVLib.setPropertyBoolean("sub-bold", subtitlesPreferences.bold.get())
     MPVLib.setPropertyBoolean("sub-italic", subtitlesPreferences.italic.get())
@@ -2502,6 +2503,14 @@ class PlayerActivity :
     val uri = extractUriFromIntent(intent)
     return getMediaIdentifierFromUri(uri, fileName)
   }
+
+  /**
+   * Returns the persisted-playback-state identifier for an arbitrary playlist URI,
+   * mirroring how the currently-playing item's [mediaIdentifier] is derived so the
+   * playlist sheet can look up each item's watched state from the database.
+   */
+  internal fun getPlaylistItemMediaIdentifier(uri: Uri): String =
+    getMediaIdentifierFromUri(uri, getFileNameFromUri(uri))
 
   private fun getMediaIdentifierFromUri(uri: Uri?, fileName: String): String {
     if (uri == null) return fileName

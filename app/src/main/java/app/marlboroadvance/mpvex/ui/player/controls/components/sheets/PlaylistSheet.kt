@@ -38,6 +38,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -100,6 +101,7 @@ import app.marlboroadvance.mpvex.ui.theme.spacing
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
+import java.io.File
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import kotlinx.coroutines.delay
@@ -155,7 +157,11 @@ fun PlaylistSheet(
   val lazyGridState       = rememberLazyGridState()
 
   val currentItem = remember(playlist) { playlist.find { it.isPlaying } }
-  val queue       = remember(playlist) { playlist.filterNot { it.isPlaying }.toImmutableList() }
+  // Option B: completed videos are hidden entirely — "Up Next" only lists the
+  // items still ahead, excluding the now-playing item and anything watched.
+  val queue       = remember(playlist) {
+    playlist.filterNot { it.isPlaying || it.isWatched }.toImmutableList()
+  }
 
   val density    = LocalDensity.current
   val windowSize = LocalWindowInfo.current.containerSize
@@ -232,7 +238,7 @@ fun PlaylistSheet(
             .fillMaxHeight(),
         ) {
           PlaylistQueueHeader(
-            queue       = queue,
+            upNextCount = queue.size,
             currentItem = currentItem,
             isListMode  = isListMode,
             isPortrait  = false,
@@ -288,7 +294,7 @@ fun PlaylistSheet(
         }
 
         PlaylistQueueHeader(
-          queue       = queue,
+          upNextCount = queue.size,
           currentItem = currentItem,
           isListMode  = isListMode,
           isPortrait  = isPortrait,
@@ -317,7 +323,7 @@ fun PlaylistSheet(
 
 @Composable
 private fun PlaylistQueueHeader(
-  queue: ImmutableList<PlaylistItem>,
+  upNextCount: Int,
   currentItem: PlaylistItem?,
   isListMode: Boolean,
   isPortrait: Boolean,
@@ -344,7 +350,7 @@ private fun PlaylistQueueHeader(
         contentColor   = MaterialTheme.colorScheme.onSecondaryContainer,
       ) {
         Text(
-          text  = "${queue.size}",
+          text  = "$upNextCount",
           style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
         )
       }
@@ -415,6 +421,11 @@ private fun PlaylistQueueContent(
         state    = lazyListState,
         modifier = Modifier.fillMaxWidth(),
       ) {
+        if (queue.isEmpty()) {
+          item(key = "up-next-empty") {
+            AllCaughtUpHint(accentColor = accentColor, modifier = Modifier.animateItem())
+          }
+        }
         itemsIndexed(queue, key = { _, item -> item.index }) { position, item ->
           PlaylistTrackListItem(
             item                = item,
@@ -439,6 +450,11 @@ private fun PlaylistQueueContent(
         horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
         verticalArrangement   = Arrangement.spacedBy(MaterialTheme.spacing.small),
       ) {
+        if (queue.isEmpty()) {
+          item(key = "up-next-empty", span = { GridItemSpan(maxLineSpan) }) {
+            AllCaughtUpHint(accentColor = accentColor, modifier = Modifier.animateItem())
+          }
+        }
         itemsIndexed(queue, key = { _, item -> item.index }) { position, item ->
           PlaylistTrackGridItem(
             item                = item,
@@ -453,6 +469,36 @@ private fun PlaylistQueueContent(
         }
       }
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AllCaughtUpHint — shown when nothing is left in "Up Next"
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun AllCaughtUpHint(
+  accentColor: Color,
+  modifier: Modifier = Modifier,
+) {
+  Row(
+    modifier              = modifier
+      .fillMaxWidth()
+      .padding(horizontal = MaterialTheme.spacing.medium, vertical = MaterialTheme.spacing.small),
+    verticalAlignment     = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+  ) {
+    Icon(
+      imageVector        = Icons.Outlined.Check,
+      contentDescription = null,
+      tint               = accentColor,
+      modifier           = Modifier.size(18.dp),
+    )
+    Text(
+      text  = "You're all caught up",
+      style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
   }
 }
 
@@ -535,6 +581,34 @@ private fun WatchedCheckBadge(modifier: Modifier = Modifier) {
 }
 
 // ---------------------------------------------------------------------------
+// rememberPlaylistVideo — build a Video stub from a PlaylistItem
+// ---------------------------------------------------------------------------
+// Reads size + last-modified from the file at the item's path so the thumbnail key
+// (size|dateModified) matches the one the browser computes — restoring cross-screen
+// thumbnail reuse. Falls back to 0 for content URIs / network / missing files.
+@Composable
+private fun rememberPlaylistVideo(item: PlaylistItem): Video =
+  remember(item.uri, item.path, item.title, item.index) {
+    val cleanPath = run {
+      val withoutPrefix = item.path.removePrefix("file://")
+      try { URLDecoder.decode(withoutPrefix, StandardCharsets.UTF_8.toString()) }
+      catch (_: Exception) { withoutPrefix }
+    }
+    val file = runCatching { File(cleanPath) }.getOrNull()
+    val exists = file?.exists() == true
+    val size = if (exists) file!!.length() else 0L
+    val dateModified = if (exists) file!!.lastModified() / 1000 else 0L
+    Video(
+      id = item.index.toLong(), uri = item.uri, displayName = item.title,
+      title = item.title.substringBeforeLast("."), path = cleanPath,
+      duration = 0L, durationFormatted = item.duration, size = size, sizeFormatted = "",
+      dateModified = dateModified, dateAdded = 0L, mimeType = "", bucketId = "", bucketDisplayName = "",
+      width = 0, height = 0, fps = 0f, resolution = item.resolution,
+      subtitleCodec = "", hasEmbeddedSubtitles = false,
+    )
+  }
+
+// ---------------------------------------------------------------------------
 // PlaylistHeroCard — large "now playing" card pinned at the top / left panel
 // ---------------------------------------------------------------------------
 
@@ -547,21 +621,7 @@ private fun PlaylistHeroCard(
   accentColor: Color,
   skipThumbnail: Boolean,
 ) {
-  val cleanPath = remember(item.path) {
-    val withoutPrefix = item.path.removePrefix("file://")
-    try { URLDecoder.decode(withoutPrefix, StandardCharsets.UTF_8.toString()) }
-    catch (_: Exception) { withoutPrefix }
-  }
-  val video = remember(item.uri, cleanPath, item.title) {
-    Video(
-      id = item.index.toLong(), uri = item.uri, displayName = item.title,
-      title = item.title.substringBeforeLast("."), path = cleanPath,
-      duration = 0L, durationFormatted = item.duration, size = 0L, sizeFormatted = "",
-      dateModified = 0L, dateAdded = 0L, mimeType = "", bucketId = "", bucketDisplayName = "",
-      width = 0, height = 0, fps = 0f, resolution = item.resolution,
-      subtitleCodec = "", hasEmbeddedSubtitles = false,
-    )
-  }
+  val video = rememberPlaylistVideo(item)
 
   val thumbWidthPx  = with(LocalDensity.current) { 400.dp.roundToPx() }
   val thumbHeightPx = with(LocalDensity.current) { 225.dp.roundToPx() }
@@ -741,21 +801,7 @@ private fun PlaylistNowPlayingPanel(
   accentColor: Color,
   skipThumbnail: Boolean,
 ) {
-  val cleanPath = remember(item.path) {
-    val withoutPrefix = item.path.removePrefix("file://")
-    try { URLDecoder.decode(withoutPrefix, StandardCharsets.UTF_8.toString()) }
-    catch (_: Exception) { withoutPrefix }
-  }
-  val video = remember(item.uri, cleanPath, item.title) {
-    Video(
-      id = item.index.toLong(), uri = item.uri, displayName = item.title,
-      title = item.title.substringBeforeLast("."), path = cleanPath,
-      duration = 0L, durationFormatted = item.duration, size = 0L, sizeFormatted = "",
-      dateModified = 0L, dateAdded = 0L, mimeType = "", bucketId = "", bucketDisplayName = "",
-      width = 0, height = 0, fps = 0f, resolution = item.resolution,
-      subtitleCodec = "", hasEmbeddedSubtitles = false,
-    )
-  }
+  val video = rememberPlaylistVideo(item)
 
   val thumbWidthPx  = with(LocalDensity.current) { 300.dp.roundToPx() }
   val thumbHeightPx = with(LocalDensity.current) { 169.dp.roundToPx() }
@@ -936,21 +982,7 @@ fun PlaylistTrackListItem(
 ) {
   val itemAlpha = if (item.isWatched && !item.isPlaying) 0.7f else 1f
 
-  val cleanPath = remember(item.path) {
-    val withoutPrefix = item.path.removePrefix("file://")
-    try { URLDecoder.decode(withoutPrefix, StandardCharsets.UTF_8.toString()) }
-    catch (_: Exception) { withoutPrefix }
-  }
-  val video = remember(item.uri, cleanPath, item.title) {
-    Video(
-      id = item.index.toLong(), uri = item.uri, displayName = item.title,
-      title = item.title.substringBeforeLast("."), path = cleanPath,
-      duration = 0L, durationFormatted = item.duration, size = 0L, sizeFormatted = "",
-      dateModified = 0L, dateAdded = 0L, mimeType = "", bucketId = "", bucketDisplayName = "",
-      width = 0, height = 0, fps = 0f, resolution = item.resolution,
-      subtitleCodec = "", hasEmbeddedSubtitles = false,
-    )
-  }
+  val video = rememberPlaylistVideo(item)
 
   val thumbWidthPx  = with(LocalDensity.current) { 120.dp.roundToPx() }
   val thumbHeightPx = with(LocalDensity.current) { 68.dp.roundToPx() }
@@ -1196,21 +1228,7 @@ fun PlaylistTrackGridItem(
 ) {
   val itemAlpha = if (item.isWatched && !item.isPlaying) 0.7f else 1f
 
-  val cleanPath = remember(item.path) {
-    val withoutPrefix = item.path.removePrefix("file://")
-    try { URLDecoder.decode(withoutPrefix, StandardCharsets.UTF_8.toString()) }
-    catch (_: Exception) { withoutPrefix }
-  }
-  val video = remember(item.uri, cleanPath, item.title) {
-    Video(
-      id = item.index.toLong(), uri = item.uri, displayName = item.title,
-      title = item.title.substringBeforeLast("."), path = cleanPath,
-      duration = 0L, durationFormatted = item.duration, size = 0L, sizeFormatted = "",
-      dateModified = 0L, dateAdded = 0L, mimeType = "", bucketId = "", bucketDisplayName = "",
-      width = 0, height = 0, fps = 0f, resolution = item.resolution,
-      subtitleCodec = "", hasEmbeddedSubtitles = false,
-    )
-  }
+  val video = rememberPlaylistVideo(item)
 
   val thumbWidthPx  = with(LocalDensity.current) { 200.dp.roundToPx() }
   val thumbHeightPx = with(LocalDensity.current) { 112.dp.roundToPx() }

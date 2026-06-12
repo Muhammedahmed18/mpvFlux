@@ -91,7 +91,7 @@ class PlayerViewModel(
   private val subtitlesPreferences: SubtitlesPreferences by inject()
   private val advancedPreferences: AdvancedPreferences by inject()
   private val json: Json by inject()
-  private val playbackStateDao: app.marlboroadvance.mpvex.database.dao.PlaybackStateDao by inject()
+  private val playbackStateRepository: app.marlboroadvance.mpvex.domain.playbackstate.repository.PlaybackStateRepository by inject()
   private val wyzieRepository: WyzieSearchRepository by inject()
 
   // Playlist items for the playlist sheet
@@ -613,13 +613,18 @@ class PlayerViewModel(
   private fun scanLocalSubtitles(mediaTitle: String) {
     viewModelScope.launch(Dispatchers.IO) {
       val saveFolderUri = subtitlesPreferences.subtitleSaveFolder.get()
-      if (saveFolderUri.isBlank()) return@launch
-      
+      val parentDir: DocumentFile? = when {
+        saveFolderUri.isNotBlank() ->
+          DocumentFile.fromTreeUri(host.context, Uri.parse(saveFolderUri))
+        else ->
+          resolveSubfolder(host.context, advancedPreferences.mpvConfStorageUri.get(), "subtitles")
+      }
+
       try {
         val sanitizedTitle = MediaInfoParser.parse(mediaTitle).title
         val fullTitle = mediaTitle.substringBeforeLast(".")
         val checksumTitle = ChecksumUtils.getCRC32(mediaTitle)
-        val parentDir = DocumentFile.fromTreeUri(host.context, Uri.parse(saveFolderUri)) ?: return@launch
+        if (parentDir == null) return@launch
         
         // Scan potential folder names for compatibility: checksum, full, and sanitized
         listOf(checksumTitle, fullTitle, sanitizedTitle).distinct().forEach { folderName ->
@@ -1572,7 +1577,7 @@ class PlayerViewModel(
     return activity.playlist.size
   }
 
-  fun getPlaylistData(): List<app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaylistItem>? {
+  suspend fun getPlaylistData(): List<app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaylistItem>? {
     val activity = host as? PlayerActivity ?: return null
     if (activity.playlist.isEmpty()) return null
 
@@ -1582,6 +1587,9 @@ class PlayerViewModel(
     val currentProgress = if (currentDuration > 0) {
       ((currentPos.toFloat() / currentDuration.toFloat()) * 100f).coerceIn(0f, 100f)
     } else 0f
+
+    // Per-item watched state is meaningless for network/M3U streams, so skip the DB lookups there.
+    val supportsWatchedState = !activity.isCurrentPlaylistM3U()
 
     return activity.playlist.mapIndexed { index, uri ->
       val title = activity.getPlaylistItemTitle(uri)
@@ -1594,14 +1602,30 @@ class PlayerViewModel(
       val cacheKey = uri.toString()
       val (durationStr, resolutionStr) = synchronized(metadataCache) { metadataCache[cacheKey] } ?: ("" to "")
 
+      // Resolve watched state: live progress for the current item, persisted state for the rest.
+      var itemProgress = if (isCurrentlyPlaying) currentProgress else 0f
+      var itemWatched = isCurrentlyPlaying && currentProgress >= 95f
+      if (!isCurrentlyPlaying && supportsWatchedState) {
+        val state = playbackStateRepository.getVideoDataByTitle(activity.getPlaylistItemMediaIdentifier(uri))
+        if (state != null) {
+          itemWatched = state.hasBeenWatched
+          // timeRemaining is only meaningful when we knew the duration at save time;
+          // without it we can't place a resume bar, so leave progress at 0.
+          itemProgress = if (state.lastPosition > 0 && state.timeRemaining > 0) {
+            val total = state.lastPosition + state.timeRemaining
+            (state.lastPosition.toFloat() / total.toFloat() * 100f).coerceIn(0f, 100f)
+          } else 0f
+        }
+      }
+
       app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaylistItem(
         uri = uri,
         title = title,
         index = index,
         isPlaying = isCurrentlyPlaying,
         path = path,
-        progressPercent = if (isCurrentlyPlaying) currentProgress else 0f,
-        isWatched = isCurrentlyPlaying && currentProgress >= 95f,
+        progressPercent = itemProgress,
+        isWatched = itemWatched,
         duration = durationStr,
         resolution = resolutionStr,
       )
