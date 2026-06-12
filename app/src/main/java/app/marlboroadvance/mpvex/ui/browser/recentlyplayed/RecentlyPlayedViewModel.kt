@@ -15,6 +15,7 @@ import app.marlboroadvance.mpvex.database.repository.VideoMetadataCacheRepositor
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.playbackstate.repository.PlaybackStateRepository
 import app.marlboroadvance.mpvex.domain.recentlyplayed.repository.RecentlyPlayedRepository
+import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.utils.permission.PermissionUtils
 
@@ -33,6 +34,7 @@ class RecentlyPlayedViewModel(application: Application) : AndroidViewModel(appli
   private val metadataCache by inject<VideoMetadataCacheRepository>(VideoMetadataCacheRepository::class.java)
   private val playbackStateRepository by inject<PlaybackStateRepository>(PlaybackStateRepository::class.java)
   private val browserPreferences by inject<BrowserPreferences>(BrowserPreferences::class.java)
+  private val thumbnailRepository by inject<ThumbnailRepository>(ThumbnailRepository::class.java)
 
   private val _recentItems = MutableStateFlow<List<RecentlyPlayedItem>>(emptyList())
   val recentItems: StateFlow<List<RecentlyPlayedItem>> = _recentItems.asStateFlow()
@@ -370,6 +372,11 @@ class RecentlyPlayedViewModel(application: Application) : AndroidViewModel(appli
                 Log.w("RecentlyPlayedViewModel", "Failed to delete file: ${video.path}")
                 failCount++
               } else {
+                // Purge remaining traces to match the unified cleanup in
+                // BaseBrowserViewModel.purgeVideoTraces (history is already removed above).
+                metadataCache.invalidateVideos(listOf(video.path))
+                thumbnailRepository.removeThumbnail(video)
+                runCatching { playbackStateRepository.deleteByTitle(video.displayName) }
                 Log.d("RecentlyPlayedViewModel", "Deleted file: ${video.path}")
               }
             }

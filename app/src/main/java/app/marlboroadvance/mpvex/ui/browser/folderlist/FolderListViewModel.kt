@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
-import app.marlboroadvance.mpvex.domain.playbackstate.repository.PlaybackStateRepository
 import app.marlboroadvance.mpvex.repository.MediaFileRepository
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.FoldersPreferences
@@ -16,6 +15,7 @@ import app.marlboroadvance.mpvex.utils.media.MediaLibraryEvents
 import app.marlboroadvance.mpvex.utils.storage.FolderViewScanner
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -48,7 +48,6 @@ class FolderListViewModel(
   private val foldersPreferences: FoldersPreferences by inject()
   private val appearancePreferences: AppearancePreferences by inject()
   private val browserPreferences: app.marlboroadvance.mpvex.preferences.BrowserPreferences by inject()
-  private val playbackStateRepository: PlaybackStateRepository by inject()
 
   private val _allVideoFolders = MutableStateFlow<List<VideoFolder>>(emptyList())
   private val _videoFolders = MutableStateFlow<List<VideoFolder>>(emptyList())
@@ -91,10 +90,7 @@ class FolderListViewModel(
   init {
     loadCachedFolders()
 
-    MediaLibraryEvents.changes
-      .debounce(500L)
-      .onEach { loadVideoFolders() }
-      .launchIn(viewModelScope)
+    observeLibraryChanges()
 
     combine(_allVideoFolders, foldersPreferences.blacklistedFolders.changes()) { folders, blacklist ->
       Pair(folders, blacklist)
@@ -103,6 +99,15 @@ class FolderListViewModel(
       .onEach { (folders, blacklist) ->
         applyFiltersAndNotify(folders, blacklist)
       }
+      .launchIn(viewModelScope)
+  }
+
+  // debounce(Long) is a @FlowPreview API; opt in at the narrowest scope.
+  @OptIn(FlowPreview::class)
+  private fun observeLibraryChanges() {
+    MediaLibraryEvents.changes
+      .debounce(500L)
+      .onEach { loadVideoFolders() }
       .launchIn(viewModelScope)
   }
 
@@ -344,15 +349,20 @@ class FolderListViewModel(
 
     folders.forEach { folder ->
       try {
+        // Enumerate the folder's videos up-front: once the files are gone MediaStore
+        // can no longer list them, so we'd lose the keys needed to purge their traces.
+        val videos = runCatching {
+          MediaFileRepository.getVideosInFolder(getApplication(), folder.bucketId)
+        }.getOrDefault(emptyList())
+
         val dir = File(folder.path)
-        if (dir.exists()) {
-          if (dir.deleteRecursively()) {
-            successCount++
-          } else {
-            failureCount++
-          }
-        } else {
+        val deleted = if (dir.exists()) dir.deleteRecursively() else true
+
+        if (deleted) {
+          purgeVideoTraces(videos)
           successCount++
+        } else {
+          failureCount++
         }
       } catch (e: Exception) {
         failureCount++

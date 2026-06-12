@@ -5,6 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.marlboroadvance.mpvex.database.repository.VideoMetadataCacheRepository
 import app.marlboroadvance.mpvex.domain.media.model.Video
+import app.marlboroadvance.mpvex.domain.playbackstate.repository.PlaybackStateRepository
+import app.marlboroadvance.mpvex.domain.recentlyplayed.repository.RecentlyPlayedRepository
+import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
 import app.marlboroadvance.mpvex.utils.permission.PermissionUtils.StorageOps
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,6 +24,9 @@ abstract class BaseBrowserViewModel(
 ) : AndroidViewModel(application),
   KoinComponent {
   protected val metadataCache: VideoMetadataCacheRepository by inject()
+  protected val thumbnailRepository: ThumbnailRepository by inject()
+  protected val playbackStateRepository: PlaybackStateRepository by inject()
+  protected val recentlyPlayedRepository: RecentlyPlayedRepository by inject()
   /**
    * Observable recently played file path for highlighting
    * Automatically filters out non-existent files
@@ -43,12 +49,26 @@ abstract class BaseBrowserViewModel(
    */
   open suspend fun deleteVideos(videos: List<Video>): Pair<Int, Int> {
     val result = StorageOps.deleteVideos(getApplication(), videos)
-
-    // Invalidate cache for deleted videos
-    val paths = videos.map { it.path }
-    metadataCache.invalidateVideos(paths)
-
+    purgeVideoTraces(videos)
     return result
+  }
+
+  /**
+   * Remove every trace of the given videos so deletion leaves nothing behind:
+   * cached metadata, thumbnail caches (memory + disk), saved resume position, and
+   * recently-played history. Each removal is independent so one failure can't abort the rest.
+   * Call after the underlying files have been deleted.
+   */
+  protected suspend fun purgeVideoTraces(videos: List<Video>) {
+    if (videos.isEmpty()) return
+
+    metadataCache.invalidateVideos(videos.map { it.path })
+    thumbnailRepository.removeThumbnails(videos)
+
+    videos.forEach { video ->
+      runCatching { playbackStateRepository.deleteByTitle(video.displayName) }
+      runCatching { recentlyPlayedRepository.deleteByFilePath(video.path) }
+    }
   }
 
   /**

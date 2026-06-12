@@ -40,7 +40,7 @@ class FileSystemBrowserViewModel(
   initialPath: String? = null,
 ) : BaseBrowserViewModel(application),
   KoinComponent {
-  private val playbackStateRepository: PlaybackStateRepository by inject()
+  // playbackStateRepository is provided by BaseBrowserViewModel
   private val browserPreferences: BrowserPreferences by inject()
   private val appearancePreferences: app.marlboroadvance.mpvex.preferences.AppearancePreferences by inject()
 
