@@ -104,6 +104,39 @@
   <string name="pref_clear_config_cache_summary">Clear the cached mpv.conf settings</string>
   <string name="pref_clear_thumbnail_cache_title">Clear thumbnail cache</string>
   <string name="pref_clear_thumbnail_cache_summary">Delete all cached video thumbnails (will regenerate as you browse folders)</string>
+  <!-- Storage screen -->
+  <string name="pref_storage_title">Storage</string>
+  <string name="pref_storage_summary">Manage cached thumbnails, fonts and temporary files</string>
+  <string name="pref_storage_section_other">Other cached data</string>
+  <string name="pref_storage_thumbnails_title">Thumbnails</string>
+  <string name="pref_storage_thumbnails_used">%1$s of %2$s</string>
+  <string name="pref_storage_calculating">Calculating…</string>
+  <string name="pref_storage_thumbnails_caption">Auto-clears oldest first when full</string>
+  <string name="pref_storage_clear">Clear</string>
+  <string name="pref_storage_fonts_title">Subtitle fonts</string>
+  <string name="pref_storage_fonts_summary">Extracted fonts for subtitle rendering</string>
+  <string name="pref_storage_config_title">Player config</string>
+  <string name="pref_storage_config_summary">Cached mpv.conf settings</string>
+  <string name="pref_storage_temp_title">Temporary files</string>
+  <string name="pref_storage_temp_summary">Scratch files; cleared automatically by the system</string>
+  <string name="pref_storage_total_title">Total cached</string>
+  <string name="pref_storage_clear_all">Clear all data</string>
+  <string name="pref_storage_size_unknown">—</string>
+  <string name="pref_storage_clear_thumbnails_confirm_title">Clear thumbnail cache?</string>
+  <string name="pref_storage_clear_thumbnails_confirm_subtitle">This deletes all cached video thumbnails from storage and memory. They regenerate as you browse.</string>
+  <string name="pref_storage_clear_thumbnails_done">Thumbnail cache cleared</string>
+  <string name="pref_storage_clear_fonts_confirm_title">Clear fonts cache?</string>
+  <string name="pref_storage_clear_fonts_confirm_subtitle">Removes all cached subtitle fonts. They are re-extracted when needed.</string>
+  <string name="pref_storage_clear_fonts_done">Fonts cache cleared</string>
+  <string name="pref_storage_clear_config_confirm_title">Clear config cache?</string>
+  <string name="pref_storage_clear_config_confirm_subtitle">Deletes the cached mpv.conf settings.</string>
+  <string name="pref_storage_clear_config_done">Config cache cleared</string>
+  <string name="pref_storage_clear_temp_confirm_title">Clear temporary files?</string>
+  <string name="pref_storage_clear_temp_confirm_subtitle">Deletes scratch files in the cache directory.</string>
+  <string name="pref_storage_clear_temp_done">Temporary files cleared</string>
+  <string name="pref_storage_clear_all_confirm_title">Clear all cached data?</string>
+  <string name="pref_storage_clear_all_confirm_subtitle">Deletes thumbnails, subtitle fonts, the config cache, and temporary files. Nothing in your videos is affected.</string>
+  <string name="pref_storage_clear_all_done">All cached data cleared</string>
   <string name="pref_layout_title">Player Layout</string>
   <string name="pref_layout_summary">Customize player button layout</string>
   <string name="pref_layout_reset_default">Reset to default</string>
@@ -298,6 +331,9 @@
   <string name="player_sheets_audio_delay_card_title">Audio delay</string>
   <string name="player_sheets_sub_delay_audio_sound_heard">Sound heard</string>
   <string name="player_sheets_sub_delay_sound_sound_spotted">Sound spotted</string>
+  <string name="player_sheets_sub_select_font">Subtitle font</string>
+  <string name="player_sheets_sub_select_font_summary">Currently using: %s</string>
+  <string name="player_sheets_sub_no_fonts_found">No fonts found in directory</string>
   <string name="player_sheets_video_settings_title">Video settings</string>
   <string name="player_sheets_deband_title">Deband</string>
   <string name="player_sheets_deband_none">None</string>
@@ -356,6 +392,7 @@
   <string name="player_sheets_frame_navigation_title">Frame Navigation</string>
   <string name="player_sheets_frame_navigation_snapshot_saved" translatable="false">Saved to Pictures/mpvSnaps</string>
   <string name="player_sheets_frame_navigation_include_subtitles">Include subtitles in snapshot</string>
+  <string name="player_sheets_frame_navigation_include_subtitles_summary">Include subtitles in snapshots</string>
   <string name="player_sheets_zoom_slider_label">Video Zoom</string>
   <plurals name="seconds">
     <item quantity="one">%1$d second</item>
@@ -389,6 +426,7 @@
   <string name="clear_font_directory">Clear font directory</string>
   <string name="reset_to_default_font">Reset to default font</string>
   <string name="set_as_default">Set as default</string>
+  <string name="pref_subtitles_fonts_dir_summary">Folder containing .ttf or .otf files</string>
   <!-- Notification strings -->
   <string name="notification_channel_name">Media Playback</string>
   <string name="notification_channel_description">Media playback controls</string>

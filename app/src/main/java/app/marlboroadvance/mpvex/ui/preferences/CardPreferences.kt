@@ -99,6 +99,7 @@ fun PreferenceItem(
     title: String,
     summary: String? = null,
     icon: @Composable (() -> Unit)? = null,
+    enabled: Boolean = true,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -115,11 +116,12 @@ fun PreferenceItem(
                 Text(
                     text = it, 
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                 ) 
             } 
         },
         icon = icon,
+        enabled = enabled,
         onClick = onClick,
         modifier = modifier
     )

@@ -414,12 +414,27 @@ object PlayerPreferencesScreen : Screen {
                 )
                 
                 PreferenceDivider()
-                
+
+                val swapVolumeAndBrightness by preferences.swapVolumeAndBrightness.collectAsState()
+                SwitchPreference(
+                  value = swapVolumeAndBrightness,
+                  onValueChange = preferences.swapVolumeAndBrightness::set,
+                  title = {
+                    Text(
+                      text = stringResource(R.string.swap_the_volume_and_brightness_slider),
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold,
+                    )
+                  },
+                )
+
+                PreferenceDivider()
+
                 val pinchToZoomGesture by preferences.pinchToZoomGesture.collectAsState()
                 SwitchPreference(
                   value = pinchToZoomGesture,
                   onValueChange = preferences.pinchToZoomGesture::set,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_player_gestures_pinch_to_zoom),
                       style = MaterialTheme.typography.titleMedium,
