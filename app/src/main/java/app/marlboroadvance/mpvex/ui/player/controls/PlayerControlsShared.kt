@@ -1,7 +1,7 @@
 package app.marlboroadvance.mpvex.ui.player.controls
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.background
@@ -64,17 +64,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,15 +83,6 @@ import app.marlboroadvance.mpvex.ui.player.RepeatMode
 import app.marlboroadvance.mpvex.ui.player.Sheets
 import app.marlboroadvance.mpvex.ui.player.controls.components.CurrentChapter
 import dev.vivvvek.seeker.Segment
-
-// ---------------------------------------------------------------------------
-// Shared press-animation spec — replaces the 8+ duplicated spring blocks
-// ---------------------------------------------------------------------------
-@Composable
-private fun pressSpec() = spring<Float>(
-  dampingRatio = Spring.DampingRatioMediumBouncy,
-  stiffness    = Spring.StiffnessLow,
-)
 
 // ---------------------------------------------------------------------------
 // Shared text style for value-display chips (Playback Speed, Decoder, Video Zoom)
@@ -138,6 +126,84 @@ internal fun glassIconButtonColors(hideBackground: Boolean) =
       MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
     },
     contentColor = MaterialTheme.colorScheme.onSurface,
+  )
+
+// ---------------------------------------------------------------------------
+// Transport cluster (Prev / Play-Pause / Next) — "three separate glass buttons",
+// PURE glass with NO accent color. Hierarchy is carried by size + glass density
+// + light, not by a primary tint: Play/Pause is a larger circle of *thicker*
+// glass (stronger fill + brighter top edge) than its neutral siblings. Each
+// button carries its OWN glass circle: the translucent tonal fill comes from the
+// *Colors helpers below (so it morphs with the button's shape), the soft top-
+// highlight edge + low drop shadow come from this modifier. A moderate tonal
+// fill keeps every button legible over any video frame without going full-
+// opaque. `strong` brightens the edge for the Play focal. `hideBackground`
+// collapses every button to a bare icon over video.
+// ---------------------------------------------------------------------------
+@Composable
+internal fun Modifier.transportGlassButton(
+  shape: Shape,
+  hideBackground: Boolean,
+  strong: Boolean = false,
+): Modifier =
+  if (hideBackground) {
+    this
+  } else {
+    this
+      .shadow(elevation = 3.dp, shape = shape, clip = false)
+      .border(
+        width = 1.dp,
+        brush = Brush.verticalGradient(
+          if (strong) {
+            listOf(
+              Color.White.copy(alpha = 0.30f),
+              Color.White.copy(alpha = 0.06f),
+            )
+          } else {
+            listOf(
+              Color.White.copy(alpha = 0.25f),
+              Color.White.copy(alpha = 0.05f),
+            )
+          },
+        ),
+        shape = shape,
+      )
+  }
+
+// Prev / Next — the supporting tier. Proper solid tonal buttons: an opaque
+// `secondaryContainer` fill (no glass, no border, flat) so they read as real
+// tactile buttons that are subordinate, by color, to the accent `primaryContainer`
+// Play focal. When the background is hidden the fill collapses to transparent and
+// the glyph falls back to neutral `onSurface` (bare-icon mode).
+@Composable
+internal fun transportIconButtonColors(hideBackground: Boolean) =
+  IconButtonDefaults.filledTonalIconButtonColors(
+    containerColor = if (hideBackground) {
+      Color.Transparent
+    } else {
+      MaterialTheme.colorScheme.secondaryContainer
+    },
+    contentColor = if (hideBackground) {
+      MaterialTheme.colorScheme.onSurface
+    } else {
+      MaterialTheme.colorScheme.onSecondaryContainer
+    },
+  )
+
+// Play / Pause — the accent hero. A solid `primaryContainer` fill (no glass
+// translucency) so it reads as the unmistakable focal against the tonal skip
+// siblings; depth comes from the `strong` highlight edge + shadow that
+// transportGlassButton draws around the same morphing shape. State is signalled
+// by the icon + shape morph, not a color flip, so checked/unchecked share one
+// fill. When the background is hidden the fill drops and the glyph keeps a
+// visible `primary` accent so the hero still stands out over video.
+@Composable
+internal fun transportPlayButtonColors(hideBackground: Boolean) =
+  IconButtonDefaults.filledIconToggleButtonColors(
+    containerColor        = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer,
+    contentColor          = if (hideBackground) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
+    checkedContainerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer,
+    checkedContentColor   = if (hideBackground) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
   )
 
 @OptIn(
@@ -193,16 +259,22 @@ fun RenderPlayerButton(
     }
 
     // ------------------------------------------------------------------
-    // VIDEO TITLE — Capsule Header
-    //   28dp pill · NOW PLAYING label + counter pill · ExtraBold title
-    //   with fade-edge marquee · single rounded mini-bar progress
-    //   soft bottom shadow · spring press-scale 0.97x
+    // VIDEO TITLE — Stable "Now Playing" capsule
+    //   28dp pill · NOW PLAYING label (left) + counter pill (right) ·
+    //   ExtraBold single-line title (ellipsis by default, marquee only when
+    //   it actually overflows) · soft bottom shadow · layer-free press feedback
+    //
+    //   No always-on graphicsLayer / basicMarquee: MPV draws to a SurfaceView,
+    //   and any persistent hardware/offscreen layer composited over it leaks
+    //   its rectangular bounds as a faint "box" seam. In the common case this
+    //   block is now pure layout + inline draws — nothing for the Surface to
+    //   seam against.
     // ------------------------------------------------------------------
     PlayerButton.VIDEO_TITLE -> {
       val playlistModeEnabled = viewModel.hasPlaylistSupport()
       val playlistInfo = viewModel.getPlaylistInfo()
 
-      // "current/total" → Pair<Int, Int> for the counter pill / mini-bar; null when no playlist.
+      // "current/total" → Pair<Int, Int> for the counter pill; null when no playlist.
       val playlistCounter = remember(playlistInfo) {
         playlistInfo
           ?.split("/")
@@ -217,14 +289,21 @@ fun RenderPlayerButton(
       val capsuleShape = RoundedCornerShape(28.dp)
       val interactionSource = remember { MutableInteractionSource() }
       val isPressed by interactionSource.collectIsPressedAsState()
-      // OxygenOS-style "soft squish": spring scale, MediumBouncy damping
-      val pressScale by animateFloatAsState(
-        targetValue   = if (isPressed) 0.97f else 1f,
+      // Tonal press feedback: animate the opaque container tone between two M3
+      // surface steps (High at rest → Highest on press) instead of a graphicsLayer
+      // scale or alpha trick. A solid color is drawn inline by background(), so no
+      // hardware/offscreen layer is allocated that could seam over the SurfaceView.
+      val containerColor by animateColorAsState(
+        targetValue   = if (isPressed) {
+          MaterialTheme.colorScheme.surfaceContainerHighest
+        } else {
+          MaterialTheme.colorScheme.surfaceContainerHigh
+        },
         animationSpec = spring(
           dampingRatio = Spring.DampingRatioMediumBouncy,
           stiffness    = Spring.StiffnessLow,
         ),
-        label = "video_title_press_scale",
+        label = "video_title_container_tone",
       )
 
       Row(
@@ -235,12 +314,11 @@ fun RenderPlayerButton(
         Column(
           modifier = Modifier
             .weight(1f, fill = false)
-            .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
             .then(
               if (hideBackground) {
                 Modifier
               } else {
-                Modifier.shadow(elevation = 6.dp, shape = capsuleShape, clip = false)
+                Modifier.shadow(elevation = 3.dp, shape = capsuleShape, clip = false)
               },
             )
             .clip(capsuleShape)
@@ -249,15 +327,10 @@ fun RenderPlayerButton(
                 Modifier
               } else {
                 Modifier
-                  .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.6f))
+                  .background(containerColor)
                   .border(
                     width = 1.dp,
-                    brush = Brush.verticalGradient(
-                      listOf(
-                        Color.White.copy(alpha = 0.25f),
-                        Color.White.copy(alpha = 0.05f),
-                      ),
-                    ),
+                    color = MaterialTheme.colorScheme.outlineVariant,
                     shape = capsuleShape,
                   )
               },
@@ -279,8 +352,9 @@ fun RenderPlayerButton(
             .padding(horizontal = 18.dp, vertical = 10.dp),
           verticalArrangement = Arrangement.Center,
         ) {
-          // Header row: "NOW PLAYING" label (dim) + optional counter pill — sit snug
-          // next to each other, no fillMaxWidth + weight Spacer stretching them apart.
+          // Header row: "NOW PLAYING" label + optional counter pill, snug and
+          // left-grouped (no fillMaxWidth) so the capsule's width is driven by
+          // the title, not stretched to the full available width.
           Row(
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -308,49 +382,32 @@ fun RenderPlayerButton(
 
           Spacer(modifier = Modifier.height(2.dp))
 
-          var isTitleOverflowing by remember { mutableStateOf(false) }
+          // Latch overflow once per title: ellipsis first, then switch to
+          // marquee. Latch-only (never reset to false here) so the two layout
+          // passes can't oscillate; remember is keyed on the title so a new
+          // (possibly shorter) title re-evaluates from scratch.
+          var isTitleOverflowing by remember(mediaTitle) { mutableStateOf(false) }
 
           Text(
             text  = mediaTitle ?: "",
             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
-            onTextLayout = { isTitleOverflowing = it.hasVisualOverflow },
+            overflow = if (isTitleOverflowing) TextOverflow.Clip else TextOverflow.Ellipsis,
+            onTextLayout = { if (it.hasVisualOverflow) isTitleOverflowing = true },
             modifier = Modifier
               .widthIn(max = 280.dp)
               .then(
                 if (isTitleOverflowing) {
-                  Modifier
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                      drawContent()
-                      val fadeWidth = 10.dp.toPx().coerceAtMost(size.width / 2f)
-                      drawRect(
-                        brush = Brush.horizontalGradient(
-                          colors = listOf(Color.Transparent, Color.Black),
-                          startX = 0f,
-                          endX   = fadeWidth,
-                        ),
-                        blendMode = BlendMode.DstIn,
-                      )
-                      drawRect(
-                        brush = Brush.horizontalGradient(
-                          colors = listOf(Color.Black, Color.Transparent),
-                          startX = size.width - fadeWidth,
-                          endX   = size.width,
-                        ),
-                        blendMode = BlendMode.DstIn,
-                      )
-                    }
+                  Modifier.basicMarquee(
+                    iterations         = Int.MAX_VALUE,
+                    initialDelayMillis = 1500,
+                    repeatDelayMillis  = 1500,
+                    spacing            = MarqueeSpacing(48.dp),
+                  )
                 } else {
                   Modifier
                 },
-              )
-              .basicMarquee(
-                iterations         = Int.MAX_VALUE,
-                initialDelayMillis = 1500,
-                repeatDelayMillis  = 1500,
-                spacing            = MarqueeSpacing(48.dp),
               ),
           )
         }

@@ -1,8 +1,13 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +36,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -61,6 +69,7 @@ fun VerticalSlider(
   overflowValue: Float? = null,
   overflowRange: ClosedFloatingPointRange<Float>? = null,
   isBoost: Boolean = false,
+  isZero: Boolean = false,
 ) {
   val coercedValue = value.coerceIn(range)
   val currentPercentage = percentage(coercedValue, range)
@@ -130,16 +139,37 @@ fun VerticalSlider(
       }
 
       if (icon != null) {
-        Icon(
-          imageVector = icon,
-          contentDescription = null,
-          tint = if (currentPercentage > 0.12f) {
-            MaterialTheme.colorScheme.onPrimary
-          } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-          },
-          modifier = Modifier.size(20.dp),
-        )
+        val iconTint = if (currentPercentage > 0.12f) {
+          MaterialTheme.colorScheme.onPrimary
+        } else {
+          MaterialTheme.colorScheme.onSurfaceVariant
+        }
+        val crossColor = MaterialTheme.colorScheme.error
+        AnimatedContent(
+          targetState = icon,
+          transitionSpec = { fadeIn(tween(150)) togetherWith fadeOut(tween(150)) },
+          label = "iconanim",
+        ) { currentIcon ->
+          Icon(
+            imageVector = currentIcon,
+            contentDescription = null,
+            tint = iconTint,
+            modifier = Modifier
+              .size(20.dp)
+              .drawWithContent {
+                drawContent()
+                if (isZero) {
+                  drawLine(
+                    color = crossColor,
+                    start = Offset(size.width * 0.05f, size.height * 0.05f),
+                    end = Offset(size.width * 0.95f, size.height * 0.95f),
+                    strokeWidth = 2.5.dp.toPx(),
+                    cap = StrokeCap.Round,
+                  )
+                }
+              },
+          )
+        }
       }
     }
   }
@@ -155,6 +185,7 @@ fun VerticalSlider(
   overflowValue: Int? = null,
   overflowRange: ClosedRange<Int>? = null,
   isBoost: Boolean = false,
+  isZero: Boolean = false,
 ) {
   VerticalSlider(
     value = value.toFloat(),
@@ -165,6 +196,7 @@ fun VerticalSlider(
     overflowValue = overflowValue?.toFloat(),
     overflowRange = overflowRange?.let { it.start.toFloat()..it.endInclusive.toFloat() },
     isBoost = isBoost,
+    isZero = isZero,
   )
 }
 
@@ -188,6 +220,7 @@ fun BrightnessSlider(
       in 0.6f..1f -> Icons.Rounded.BrightnessHigh
       else -> Icons.Rounded.BrightnessMedium
     },
+    isZero = percentage == 0f,
   )
 }
 
@@ -219,6 +252,7 @@ fun VolumeSlider(
     overflowValue = if (mpvVolume > 100) boostVolume.toFloat() else null,
     overflowRange = boostRange?.let { it.start.toFloat()..it.endInclusive.toFloat() },
     isBoost = mpvVolume > 100,
+    isZero = mpvVolume == 0,
   )
 }
 
