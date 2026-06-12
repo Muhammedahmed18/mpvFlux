@@ -247,9 +247,6 @@ class MPVView(
     MPVLib.setOptionString("sub-file-paths", "")
     MPVLib.setOptionString("subs-fallback", "no")
 
-    val fontsDirPath = "${context.filesDir.path}/fonts/"
-    MPVLib.setOptionString("sub-fonts-dir", fontsDirPath)
-    
     // Delay and speed for both primary and secondary
     val subDelay = (subtitlesPreferences.defaultSubDelay.get() / 1000.0).toString()
     val subSpeed = subtitlesPreferences.defaultSubSpeed.get().toString()
@@ -258,12 +255,12 @@ class MPVView(
     MPVLib.setOptionString("secondary-sub-delay", subDelay)
     MPVLib.setOptionString("secondary-sub-speed", subSpeed)
 
-    val preferredFont = subtitlesPreferences.font.get()
-    if (preferredFont.isNotBlank()) {
-      MPVLib.setOptionString("sub-font", preferredFont)
-      MPVLib.setOptionString("secondary-sub-font", preferredFont)
-    }
-    // If blank, MPV uses its default font
+    val fontsDirPath = "${context.filesDir.path}/fonts/"
+    MPVLib.setOptionString("sub-fonts-dir", fontsDirPath)
+    
+    val font = subtitlesPreferences.font.get()
+    MPVLib.setOptionString("sub-font", font)
+    MPVLib.setOptionString("secondary-sub-font", font)
 
     if (subtitlesPreferences.overrideAssSubs.get()) {
       MPVLib.setOptionString("sub-ass-override", "force")
