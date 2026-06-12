@@ -14,5 +14,5 @@ val domainModule = module {
             .writeTimeout(30, TimeUnit.SECONDS)
             .build()
     }
-    single { WyzieSearchRepository(androidContext(), get(), get(), get()) }
+    single { WyzieSearchRepository(androidContext(), get(), get(), get(), get()) }
 }

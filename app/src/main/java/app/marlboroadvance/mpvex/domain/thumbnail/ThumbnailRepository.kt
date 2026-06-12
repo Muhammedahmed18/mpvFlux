@@ -36,6 +36,18 @@ class ThumbnailRepository(
   }
   private val diskCacheDimension = 1024
   private val diskJpegQuality = 100
+
+  // Disk cache schema version. Bump this whenever the key scheme or stored format
+  // changes so stale files are wiped once on the next launch (see migrateDiskCacheIfNeeded).
+  // v4 = content-identity keys (size|dateModified); v3 also included duration; v2 and
+  // earlier were path-based.
+  private val diskCacheSchema = 4
+
+  // Upper bound on the on-disk thumbnail cache. When exceeded, the least-recently-used
+  // files (by lastModified) are evicted until back under budget. This bounds growth and
+  // reaps any orphans (deleted/edited videos, rename stragglers) automatically.
+  private val maxDiskCacheBytes = 256L * 1024L * 1024L
+  private val diskTrimLock = Any()
   private val memoryCache: LruCache<String, Bitmap>
   private val diskDir: File = File(context.filesDir, "thumbnails").apply { mkdirs() }
   private val ongoingOperations = ConcurrentHashMap<String, Deferred<Bitmap?>>()
@@ -72,6 +84,27 @@ class ThumbnailRepository(
           value: Bitmap,
         ): Int = value.byteCount / 1024
       }
+
+    migrateDiskCacheIfNeeded()
+  }
+
+  /**
+   * One-time cleanup: if the on-disk schema version differs from the current one,
+   * wipe every cached file once and record the new version. This removes the orphaned
+   * path-keyed files left behind when the key scheme changed (v2 -> v3), without needing
+   * to inspect individual MD5-named files.
+   */
+  private fun migrateDiskCacheIfNeeded() {
+    runCatching {
+      val prefs = context.getSharedPreferences("thumbnail_cache", Context.MODE_PRIVATE)
+      val stored = prefs.getInt("disk_schema", 0)
+      if (stored != diskCacheSchema) {
+        if (diskDir.exists()) {
+          diskDir.listFiles()?.forEach { it.delete() }
+        }
+        prefs.edit().putInt("disk_schema", diskCacheSchema).apply()
+      }
+    }
   }
 
   suspend fun getThumbnail(
@@ -181,6 +214,44 @@ class ThumbnailRepository(
     return synchronized(memoryCache) { memoryCache.get(key) }
   }
 
+  /**
+   * Current on-disk size of the thumbnail cache in bytes. Walks [diskDir] the same way
+   * [trimDiskCacheIfNeeded] does. Call off the main thread — it touches the filesystem.
+   */
+  fun getDiskCacheBytes(): Long =
+    runCatching {
+      diskDir.listFiles()?.filter { it.isFile }?.sumOf { it.length() } ?: 0L
+    }.getOrDefault(0L)
+
+  /** Upper bound on the on-disk thumbnail cache in bytes (the budget LRU trims against). */
+  fun getMaxDiskCacheBytes(): Long = maxDiskCacheBytes
+
+  /**
+   * Remove a single video's thumbnail from every cache tier (in-flight generation,
+   * memory LRU, and disk) so deleting a video reaps its thumbnail immediately instead
+   * of leaving an orphan that lingers until the disk-budget LRU trim evicts it.
+   */
+  fun removeThumbnail(video: Video) {
+    val key = thumbnailKey(video)
+
+    ongoingOperations.remove(key)?.cancel()
+    useMediaStoreForVideo.remove(key)
+
+    synchronized(memoryCache) {
+      memoryCache.remove(key)
+    }
+
+    runCatching {
+      val diskFile = File(diskDir, keyToFileName(diskKey(video)))
+      if (diskFile.exists()) diskFile.delete()
+    }
+  }
+
+  /** Bulk variant of [removeThumbnail] for batch deletions. */
+  fun removeThumbnails(videos: List<Video>) {
+    videos.forEach { removeThumbnail(it) }
+  }
+
   fun clearThumbnailCache() {
     folderJobs.values.forEach { it.cancel() }
     folderJobs.clear()
@@ -254,11 +325,13 @@ class ThumbnailRepository(
       return "$base|network"
     }
 
-    return if (video.path.isNotBlank()) {
-      "${video.path}|local"
-    } else {
-      "${video.size}|${video.dateModified}|${video.duration}|${video.id}"
-    }
+    // Content-identity key: survives renames because size and mtime are unchanged by a
+    // rename, and it also matches the filesystem-fallback scan. Deliberately omits path
+    // and id — both change on rename in the direct (raw rename + media rescan) flow, which
+    // is what caused thumbnails to regenerate after renaming. Duration is intentionally
+    // excluded: callers like PlaylistSheet only have a rounded text duration and cannot
+    // reproduce the exact millisecond value, so including it would break cross-screen reuse.
+    return "${video.size}|${video.dateModified}|local"
   }
 
   private fun keyToFileName(key: String): String {
@@ -271,9 +344,9 @@ class ThumbnailRepository(
   private fun diskKey(video: Video): String {
     val baseKey = videoBaseKey(video)
     return if (isNetworkUrl(video.path)) {
-      "$baseKey|disk|d$diskCacheDimension|v2|pos3"
+      "$baseKey|disk|d$diskCacheDimension|v$diskCacheSchema|pos3"
     } else {
-      "$baseKey|disk|d$diskCacheDimension|v2"
+      "$baseKey|disk|d$diskCacheDimension|v$diskCacheSchema"
     }
   }
 
@@ -286,7 +359,10 @@ class ThumbnailRepository(
           inPreferredConfig = Bitmap.Config.ARGB_8888
         }
       BitmapFactory.decodeFile(diskFile.absolutePath, options)
-    }.getOrNull()
+    }.getOrNull()?.also {
+      // Mark as recently used so the LRU disk trim keeps hot thumbnails.
+      runCatching { diskFile.setLastModified(System.currentTimeMillis()) }
+    }
   }
 
   private fun writeToDisk(video: Video, bitmap: Bitmap) {
@@ -295,6 +371,27 @@ class ThumbnailRepository(
       FileOutputStream(diskFile).use { out ->
         bitmap.compress(Bitmap.CompressFormat.JPEG, diskJpegQuality, out)
         out.flush()
+      }
+    }
+    trimDiskCacheIfNeeded()
+  }
+
+  /**
+   * Enforce [maxDiskCacheBytes] by evicting least-recently-used files (oldest lastModified
+   * first) until the cache is back under budget. Serialized so concurrent writers don't
+   * race on the same eviction pass.
+   */
+  private fun trimDiskCacheIfNeeded() {
+    synchronized(diskTrimLock) {
+      runCatching {
+        val files = diskDir.listFiles()?.filter { it.isFile } ?: return
+        var total = files.sumOf { it.length() }
+        if (total <= maxDiskCacheBytes) return
+        for (file in files.sortedBy { it.lastModified() }) {
+          if (total <= maxDiskCacheBytes) break
+          val size = file.length()
+          if (file.delete()) total -= size
+        }
       }
     }
   }

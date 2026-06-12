@@ -4,7 +4,9 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
+import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
 import app.marlboroadvance.mpvex.preferences.SubtitlesPreferences
+import app.marlboroadvance.mpvex.ui.player.resolveSubfolder
 import app.marlboroadvance.mpvex.utils.media.ChecksumUtils
 import app.marlboroadvance.mpvex.utils.media.MediaInfoParser
 import kotlinx.coroutines.Dispatchers
@@ -205,7 +207,8 @@ class WyzieSearchRepository(
     private val context: Context,
     private val client: OkHttpClient,
     private val json: Json,
-    private val preferences: SubtitlesPreferences
+    private val preferences: SubtitlesPreferences,
+    private val advancedPreferences: AdvancedPreferences
 ) {
     private val baseUrl = "https://sub.wyzie.ru"
     private val wyzieApiKey = "wyzie-e7fc58625c54c89725589f5c67e6ffc3"
@@ -384,24 +387,27 @@ class WyzieSearchRepository(
             val urlExtension = subtitle.url.substringAfterLast("/", "").substringBefore("?").substringAfterLast(".", "")
             val extension = subtitle.format?.lowercase() ?: urlExtension.takeIf { it.isNotEmpty() } ?: "srt"
             
-            val saveFolderUri = preferences.subtitleSaveFolder.get()
             // Use CRC32 checksum of mediaTitle for the folder name
             val folderName = ChecksumUtils.getCRC32(mediaTitle)
             val fullTitle = mediaTitle.substringBeforeLast(".")
             val langCode = subtitle.language ?: "en"
             val subFileName = "${fullTitle}.${langCode}.$extension"
 
-            if (saveFolderUri.isNotBlank()) {
-                val parentDir = DocumentFile.fromTreeUri(context, Uri.parse(saveFolderUri))
-                if (parentDir?.exists() == true) {
-                    var movieDir = parentDir.findFile(folderName) ?: parentDir.createDirectory(folderName)
-                    if (movieDir != null) {
-                        // Check for existing file or create new one
-                        val subFile = movieDir.findFile(subFileName) ?: movieDir.createFile("application/octet-stream", subFileName)
-                        if (subFile != null) {
-                            context.contentResolver.openOutputStream(subFile.uri)?.use { it.write(bytes) }
-                            return@withContext Result.success(subFile.uri)
-                        }
+            val saveFolderUri = preferences.subtitleSaveFolder.get()
+            val parentDir: DocumentFile? = when {
+                saveFolderUri.isNotBlank() ->
+                    DocumentFile.fromTreeUri(context, Uri.parse(saveFolderUri))
+                else ->
+                    resolveSubfolder(context, advancedPreferences.mpvConfStorageUri.get(), "subtitles")
+            }
+
+            if (parentDir?.exists() == true) {
+                val movieDir = parentDir.findFile(folderName) ?: parentDir.createDirectory(folderName)
+                if (movieDir != null) {
+                    val subFile = movieDir.findFile(subFileName) ?: movieDir.createFile("application/octet-stream", subFileName)
+                    if (subFile != null) {
+                        context.contentResolver.openOutputStream(subFile.uri)?.use { it.write(bytes) }
+                        return@withContext Result.success(subFile.uri)
                     }
                 }
             }
@@ -472,7 +478,12 @@ class WyzieSearchRepository(
             if (file == null || !file.exists()) return@withContext false
             val deleted = file.delete()
             if (deleted) {
-                preferences.subtitleSaveFolder.get().takeIf { it.isNotBlank() }?.let { cleanupEmptyFolders(Uri.parse(it)) }
+                val saveFolder = preferences.subtitleSaveFolder.get()
+                val cleanupDir: DocumentFile? = when {
+                    saveFolder.isNotBlank() -> DocumentFile.fromTreeUri(context, Uri.parse(saveFolder))
+                    else -> resolveSubfolder(context, advancedPreferences.mpvConfStorageUri.get(), "subtitles")
+                }
+                cleanupDir?.let { cleanupEmptyFolders(it) }
             }
             deleted
         } catch (e: Exception) {
@@ -481,9 +492,8 @@ class WyzieSearchRepository(
         }
     }
 
-    private fun cleanupEmptyFolders(saveFolderUri: Uri) {
+    private fun cleanupEmptyFolders(root: DocumentFile) {
         try {
-            val root = DocumentFile.fromTreeUri(context, saveFolderUri) ?: return
             root.listFiles().forEach { if (it.isDirectory && it.listFiles()?.isEmpty() == true) it.delete() }
         } catch (e: Exception) {
             Log.e("WyzieSearchRepository", "Cleanup failed", e)
