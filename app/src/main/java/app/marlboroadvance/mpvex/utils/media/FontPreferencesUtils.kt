@@ -46,6 +46,26 @@ fun copyFontsFromDirectory(
   }
 }
 
+/** Copies a single font file selected via SAF to the app's internal fonts directory. */
+fun copyFontFromUri(context: Context, uri: Uri) {
+  runCatching {
+    val cursor = context.contentResolver.query(uri, null, null, null, null)
+    val name =
+      cursor?.use {
+        it.moveToFirst()
+        val idx = it.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+        if (idx >= 0) it.getString(idx) else null
+      } ?: return
+    if (!name.lowercase(Locale.ROOT).matches(".*\\.[ot]tf$".toRegex())) return
+    val destDir = File(context.filesDir, "fonts").also { it.mkdirs() }
+    context.contentResolver.openInputStream(uri)?.use { input ->
+      File(destDir, name).outputStream().use { input.copyTo(it) }
+    }
+  }.onFailure { e ->
+    Log.e("FontPreferencesUtils", "Error copying font file", e)
+  }
+}
+
 // getSimplifiedPathFromUri is defined in AdvancedPreferencesScreen.kt within this package.
 
 /** Represents a custom font discovered in the app's internal fonts directory. */
