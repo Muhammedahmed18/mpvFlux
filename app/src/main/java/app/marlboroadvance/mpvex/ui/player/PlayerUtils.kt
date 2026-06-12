@@ -6,11 +6,34 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.util.Log
+import androidx.documentfile.provider.DocumentFile
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity.Companion.TAG
 import `is`.xyz.mpv.MPVNode
 import `is`.xyz.mpv.Utils
 import kotlinx.serialization.json.Json
 import java.io.File
+
+/**
+ * Decodes a SAF tree URI into a human-readable storage path.
+ * e.g. content://...tree/primary%3AMovies%2FmpvFlux → "Movies/MpvFlux"
+ */
+fun safUriToDisplayPath(uriString: String): String {
+    if (uriString.isBlank()) return ""
+    val uri = Uri.parse(uriString)
+    val path = uri.path ?: return uriString
+    return if (path.contains(":")) path.substringAfterLast(":") else path
+}
+
+/**
+ * Opens the SAF tree and returns the named child directory, or null if not found.
+ * Does NOT require extra permissions — children of a granted tree are already accessible.
+ */
+fun resolveSubfolder(context: Context, treeUriString: String, name: String): DocumentFile? {
+    if (treeUriString.isBlank()) return null
+    return runCatching {
+        DocumentFile.fromTreeUri(context, Uri.parse(treeUriString))?.findFile(name)
+    }.getOrNull()
+}
 
 /**
  * Storage path constants for Android's various storage locations.
@@ -190,11 +213,11 @@ internal fun Uri.resolveUri(context: Context): String? {
 
 /**
  * Sanitizes JSON strings from MPV by fixing invalid escape sequences.
- * 
+ *
  * MPV's C library may generate JSON with unescaped backslashes (e.g., in file paths
  * like "Signs\Songs"). This function fixes invalid escape sequences by properly
  * escaping backslashes that aren't part of valid JSON escape sequences.
- * 
+ *
  * Valid JSON escape sequences: \" \\ \/ \b \f \n \r \t \uXXXX
  */
 fun sanitizeJsonString(jsonString: String): String {
@@ -215,7 +238,7 @@ fun sanitizeJsonString(jsonString: String): String {
       // Handle backslashes inside string literals
       char == '\\' && inString && i + 1 < jsonString.length -> {
         val nextChar = jsonString[i + 1]
-        
+
         // Check if this is a valid escape sequence
         val isValidEscape = when (nextChar) {
           '"', '\\', '/', 'b', 'f', 'n', 'r', 't' -> true
@@ -246,7 +269,7 @@ fun sanitizeJsonString(jsonString: String): String {
 /**
  * Deserializes MPV's native node structure to Kotlin data classes.
  * MPV uses C-style tree structures (MPVNode) which we convert to typed objects.
- * 
+ *
  * Sanitizes the JSON before parsing to handle invalid escape sequences from MPV.
  */
 inline fun <reified T> MPVNode.toObject(json: Json): T {
