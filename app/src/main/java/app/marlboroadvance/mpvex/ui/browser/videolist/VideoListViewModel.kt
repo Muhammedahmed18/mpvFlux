@@ -45,10 +45,9 @@ class VideoListViewModel(
   private val bucketId: String,
 ) : BaseBrowserViewModel(application),
   KoinComponent {
-  private val playbackStateRepository: PlaybackStateRepository by inject()
+  // playbackStateRepository and recentlyPlayedRepository are provided by BaseBrowserViewModel
   private val appearancePreferences: app.marlboroadvance.mpvex.preferences.AppearancePreferences by inject()
   private val browserPreferences: app.marlboroadvance.mpvex.preferences.BrowserPreferences by inject()
-  private val recentlyPlayedRepository: app.marlboroadvance.mpvex.domain.recentlyplayed.repository.RecentlyPlayedRepository by inject()
   // Using MediaFileRepository singleton directly
 
   private val _videos = MutableStateFlow<List<Video>>(emptyList())

@@ -30,19 +30,20 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -62,7 +63,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -199,7 +199,8 @@ fun VideoCard(
         onThumbClick = onThumbClick,
         onLongClick = onLongClick,
         modifier = Modifier
-          .weight(1f)
+          .weight(1.3f)
+          .widthIn(min = 170.dp)
           .aspectRatio(16f / 9f)
       )
 
@@ -217,7 +218,7 @@ fun VideoCard(
         showFramerate = settings.showFramerateInResolution,
         showDateChip = settings.showDateChip,
         unlimitedNameLines = settings.unlimitedNameLines,
-        modifier = Modifier.weight(1.3f),
+        modifier = Modifier.weight(1f),
       )
     }
   }
@@ -300,7 +301,7 @@ fun VideoThumbnail(
       val thumbWidthPx = with(density) { maxWidth.roundToPx() }
       val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
 
-      val thumbnailKey = remember(video.id, video.dateModified, video.size) {
+      val thumbnailKey = remember(video.size, video.dateModified) {
         thumbnailRepository?.thumbnailKey(video) ?: ""
       }
 
@@ -314,8 +315,11 @@ fun VideoThumbnail(
 
       var loadFailed by remember(thumbnailKey) { mutableStateOf(false) }
 
-      // Step 3.1 — Add a stable thumbnailVisible boolean state
-      var thumbnailVisible by remember(thumbnailKey) { mutableStateOf(false) }
+      // Start already-visible when the bitmap is present synchronously from the memory
+      // cache, so re-entering the folder (e.g. returning from the player) shows it
+      // instantly with no shimmer/fade replay. Only thumbnails that must be loaded or
+      // generated (thumbnail == null here) fade in.
+      var thumbnailVisible by remember(thumbnailKey) { mutableStateOf(thumbnail != null) }
 
       // Step 3.2 — Animate alpha on the Image
       val imageAlpha by animateFloatAsState(
@@ -442,15 +446,22 @@ fun VideoThumbnail(
             targetValue = progressPercentage,
             label = "VideoProgressAnimation"
           )
-          LinearProgressIndicator(
-            progress = { animatedProgress },
+          // Flush, full-bleed YouTube-style progress bar pinned to the thumbnail's
+          // bottom edge: a translucent scrim track with a solid primary fill, no
+          // rounded-cap gaps or stop indicator.
+          Box(
             modifier = Modifier
               .fillMaxWidth()
-              .height(4.dp),
-            color = MaterialTheme.colorScheme.primary,
-            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            strokeCap = StrokeCap.Round,
-          )
+              .height(4.dp)
+              .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.3f))
+          ) {
+            Box(
+              modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(animatedProgress)
+                .background(MaterialTheme.colorScheme.primary)
+            )
+          }
         }
       }
     }
@@ -535,39 +546,80 @@ fun VideoMetadataChips(
   showDateChip: Boolean,
   modifier: Modifier = Modifier
 ) {
-  FlowRow(
-    modifier = modifier,
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    verticalArrangement = Arrangement.spacedBy(4.dp)
+  // 4K is the only quality tier we can derive — Video carries no HDR/dynamic-range
+  // field, so HDR is intentionally out of scope until MediaStore provides it.
+  val is4K = video.width >= 3840 || video.height >= 2160
+
+  // Passive attributes collapse into a single muted, dot-separated line. Resolution
+  // joins this line only when it is NOT 4K, since 4K is promoted to its own badge below
+  // and would otherwise read twice.
+  val resolutionLabel = if (showResolutionChip && video.height > 0 && !is4K) {
+    val baseRes = when {
+      video.width >= 2560 || video.height >= 1440 -> "1440p"
+      video.width >= 1920 || video.height >= 1080 -> "1080p"
+      video.width >= 1280 || video.height >= 720 -> "720p"
+      video.width >= 854 || video.height >= 480 -> "480p"
+      else -> "${video.height}p"
+    }
+    if (showFramerate && video.fps > 0) "$baseRes@${video.fps.roundToInt()}" else baseRes
+  } else null
+
+  val attributeParts = buildList {
+    resolutionLabel?.let { add(it) }
+    if (showSizeChip && video.size > 0) add(video.sizeFormatted)
+    if (showDateChip && video.dateModified > 0) add(formatDate(video.dateModified))
+  }
+
+  // 4K becomes an emphasized "is this the version I want" badge, gated by the same
+  // resolution toggle. Framerate rides along when the user opts in.
+  val qualityLabel = if (showResolutionChip && is4K) {
+    if (showFramerate && video.fps > 0) "4K@${video.fps.roundToInt()}" else "4K"
+  } else null
+
+  val subtitleCodecs = if (
+    showSubtitleIndicator && video.hasEmbeddedSubtitles && video.subtitleCodec.isNotBlank()
   ) {
-    if (showResolutionChip && video.height > 0) {
-      val baseRes = when {
-        video.width >= 3840 || video.height >= 2160 -> "4K"
-        video.width >= 2560 || video.height >= 1440 -> "1440p"
-        video.width >= 1920 || video.height >= 1080 -> "1080p"
-        video.width >= 1280 || video.height >= 720 -> "720p"
-        video.width >= 854 || video.height >= 480 -> "480p"
-        else -> "${video.height}p"
+    video.subtitleCodec.split(" ").filter { it.isNotBlank() }
+  } else {
+    emptyList()
+  }
+
+  if (attributeParts.isEmpty() && qualityLabel == null && subtitleCodecs.isEmpty()) return
+
+  Column(
+    modifier = modifier,
+    verticalArrangement = Arrangement.spacedBy(8.dp)
+  ) {
+    if (attributeParts.isNotEmpty()) {
+      Text(
+        text = attributeParts.joinToString("  ·  "),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+    }
+
+    // Quality badge row — accent-colored, kept separate so it reads as status, not
+    // attribute. Stays a FlowRow so HDR and friends can slot in later.
+    if (qualityLabel != null) {
+      FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+      ) {
+        UnifiedChip(text = qualityLabel, isAccent = true, compact = true)
       }
-      val resText = if (showFramerate && video.fps > 0) {
-        "$baseRes@${video.fps.roundToInt()}"
-      } else {
-        baseRes
-      }
-      UnifiedChip(text = resText, compact = true)
     }
 
-    if (showSizeChip && video.size > 0) {
-      UnifiedChip(text = video.sizeFormatted, compact = true)
-    }
-
-    if (showDateChip && video.dateModified > 0) {
-      UnifiedChip(text = formatDate(video.dateModified), compact = true)
-    }
-
-    if (showSubtitleIndicator && video.hasEmbeddedSubtitles && video.subtitleCodec.isNotBlank()) {
-      video.subtitleCodec.split(" ").forEach { codec ->
-        SubtitleChip(text = codec)
+    // Subtitle chips get their own row — bold primaryContainer "available formats".
+    if (subtitleCodecs.isNotEmpty()) {
+      FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+      ) {
+        subtitleCodecs.forEach { codec ->
+          SubtitleChip(text = codec)
+        }
       }
     }
   }

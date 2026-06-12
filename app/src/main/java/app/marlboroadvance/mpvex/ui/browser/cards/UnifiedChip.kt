@@ -61,15 +61,15 @@ fun UnifiedChip(
 @Composable
 fun SubtitleChip(text: String) {
   Surface(
-    color = Color.Transparent,
-    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    color = MaterialTheme.colorScheme.primaryContainer,
+    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
     shape = MaterialTheme.shapes.extraLarge,
-    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+    tonalElevation = 1.dp,
   ) {
     Text(
       text = text,
       style = MaterialTheme.typography.labelSmall.copy(
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.SemiBold,
         letterSpacing = 0.8.sp
       ),
       modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
