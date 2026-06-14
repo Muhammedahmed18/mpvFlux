@@ -1,7 +1,7 @@
 package app.marlboroadvance.mpvex.ui.player.controls
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.MarqueeSpacing
 import androidx.compose.foundation.background
@@ -64,7 +64,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -128,84 +127,6 @@ internal fun glassIconButtonColors(hideBackground: Boolean) =
     contentColor = MaterialTheme.colorScheme.onSurface,
   )
 
-// ---------------------------------------------------------------------------
-// Transport cluster (Prev / Play-Pause / Next) — "three separate glass buttons",
-// PURE glass with NO accent color. Hierarchy is carried by size + glass density
-// + light, not by a primary tint: Play/Pause is a larger circle of *thicker*
-// glass (stronger fill + brighter top edge) than its neutral siblings. Each
-// button carries its OWN glass circle: the translucent tonal fill comes from the
-// *Colors helpers below (so it morphs with the button's shape), the soft top-
-// highlight edge + low drop shadow come from this modifier. A moderate tonal
-// fill keeps every button legible over any video frame without going full-
-// opaque. `strong` brightens the edge for the Play focal. `hideBackground`
-// collapses every button to a bare icon over video.
-// ---------------------------------------------------------------------------
-@Composable
-internal fun Modifier.transportGlassButton(
-  shape: Shape,
-  hideBackground: Boolean,
-  strong: Boolean = false,
-): Modifier =
-  if (hideBackground) {
-    this
-  } else {
-    this
-      .shadow(elevation = 3.dp, shape = shape, clip = false)
-      .border(
-        width = 1.dp,
-        brush = Brush.verticalGradient(
-          if (strong) {
-            listOf(
-              Color.White.copy(alpha = 0.30f),
-              Color.White.copy(alpha = 0.06f),
-            )
-          } else {
-            listOf(
-              Color.White.copy(alpha = 0.25f),
-              Color.White.copy(alpha = 0.05f),
-            )
-          },
-        ),
-        shape = shape,
-      )
-  }
-
-// Prev / Next — the supporting tier. Proper solid tonal buttons: an opaque
-// `secondaryContainer` fill (no glass, no border, flat) so they read as real
-// tactile buttons that are subordinate, by color, to the accent `primaryContainer`
-// Play focal. When the background is hidden the fill collapses to transparent and
-// the glyph falls back to neutral `onSurface` (bare-icon mode).
-@Composable
-internal fun transportIconButtonColors(hideBackground: Boolean) =
-  IconButtonDefaults.filledTonalIconButtonColors(
-    containerColor = if (hideBackground) {
-      Color.Transparent
-    } else {
-      MaterialTheme.colorScheme.secondaryContainer
-    },
-    contentColor = if (hideBackground) {
-      MaterialTheme.colorScheme.onSurface
-    } else {
-      MaterialTheme.colorScheme.onSecondaryContainer
-    },
-  )
-
-// Play / Pause — the accent hero. A solid `primaryContainer` fill (no glass
-// translucency) so it reads as the unmistakable focal against the tonal skip
-// siblings; depth comes from the `strong` highlight edge + shadow that
-// transportGlassButton draws around the same morphing shape. State is signalled
-// by the icon + shape morph, not a color flip, so checked/unchecked share one
-// fill. When the background is hidden the fill drops and the glyph keeps a
-// visible `primary` accent so the hero still stands out over video.
-@Composable
-internal fun transportPlayButtonColors(hideBackground: Boolean) =
-  IconButtonDefaults.filledIconToggleButtonColors(
-    containerColor        = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer,
-    contentColor          = if (hideBackground) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
-    checkedContainerColor = if (hideBackground) Color.Transparent else MaterialTheme.colorScheme.primaryContainer,
-    checkedContentColor   = if (hideBackground) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
-  )
-
 @OptIn(
   ExperimentalMaterial3Api::class,
   ExperimentalMaterial3ExpressiveApi::class,
@@ -260,9 +181,11 @@ fun RenderPlayerButton(
 
     // ------------------------------------------------------------------
     // VIDEO TITLE — Stable "Now Playing" capsule
-    //   28dp pill · NOW PLAYING label (left) + counter pill (right) ·
-    //   ExtraBold single-line title (ellipsis by default, marquee only when
-    //   it actually overflows) · soft bottom shadow · layer-free press feedback
+    //   28dp pill · neutral frosted glass (scrim + tint + rim) · NOW PLAYING label
+    //   (left) + accent counter pill (right) · ExtraBold single-line title (ellipsis
+    //   by default, marquee only when it actually overflows) · layer-free press
+    //   feedback · NO elevation shadow — hardware shadows show through translucent
+    //   fills as a dark rectangular core over the SurfaceView
     //
     //   No always-on graphicsLayer / basicMarquee: MPV draws to a SurfaceView,
     //   and any persistent hardware/offscreen layer composited over it leaks
@@ -289,21 +212,18 @@ fun RenderPlayerButton(
       val capsuleShape = RoundedCornerShape(28.dp)
       val interactionSource = remember { MutableInteractionSource() }
       val isPressed by interactionSource.collectIsPressedAsState()
-      // Tonal press feedback: animate the opaque container tone between two M3
-      // surface steps (High at rest → Highest on press) instead of a graphicsLayer
-      // scale or alpha trick. A solid color is drawn inline by background(), so no
-      // hardware/offscreen layer is allocated that could seam over the SurfaceView.
-      val containerColor by animateColorAsState(
-        targetValue   = if (isPressed) {
-          MaterialTheme.colorScheme.surfaceContainerHighest
-        } else {
-          MaterialTheme.colorScheme.surfaceContainerHigh
-        },
+      // Frosted-glass press feedback: animate only the translucent neutral tint's
+      // alpha (rest → brighter on press) via inline background() draws — no
+      // graphicsLayer scale/alpha trick. Nothing allocates a hardware/offscreen
+      // layer, so there's no rectangular seam over the SurfaceView. The dark scrim
+      // base underneath keeps the small title text legible over any video frame.
+      val tintAlpha by animateFloatAsState(
+        targetValue   = if (isPressed) 0.60f else 0.45f,
         animationSpec = spring(
           dampingRatio = Spring.DampingRatioMediumBouncy,
           stiffness    = Spring.StiffnessLow,
         ),
-        label = "video_title_container_tone",
+        label = "video_title_glass_tint",
       )
 
       Row(
@@ -314,23 +234,36 @@ fun RenderPlayerButton(
         Column(
           modifier = Modifier
             .weight(1f, fill = false)
-            .then(
-              if (hideBackground) {
-                Modifier
-              } else {
-                Modifier.shadow(elevation = 3.dp, shape = capsuleShape, clip = false)
-              },
-            )
             .clip(capsuleShape)
             .then(
               if (hideBackground) {
                 Modifier
               } else {
+                // Neutral frosted glass, same recipe as the rest of the chrome: a
+                // dark scrim base (legibility) + a translucent surface tint gradient
+                // (the glass, brightening on press via tintAlpha) + a white rim-light
+                // edge. The accent stays reserved for the counter pill and the play
+                // hero, so the capsule reads as supporting glass, not a second focal.
                 Modifier
-                  .background(containerColor)
+                  .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.40f))
+                  .background(
+                    Brush.verticalGradient(
+                      listOf(
+                        MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = tintAlpha),
+                        MaterialTheme.colorScheme.surfaceContainerHighest.copy(
+                          alpha = (tintAlpha - 0.13f).coerceAtLeast(0f),
+                        ),
+                      ),
+                    ),
+                  )
                   .border(
                     width = 1.dp,
-                    color = MaterialTheme.colorScheme.outlineVariant,
+                    brush = Brush.verticalGradient(
+                      listOf(
+                        Color.White.copy(alpha = 0.25f),
+                        Color.White.copy(alpha = 0.05f),
+                      ),
+                    ),
                     shape = capsuleShape,
                   )
               },
