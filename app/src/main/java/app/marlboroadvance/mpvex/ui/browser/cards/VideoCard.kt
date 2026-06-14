@@ -421,46 +421,66 @@ fun VideoThumbnail(
         }
       }
 
-      // Duration pill + progress bar stacked so they never overlap
-      Column(
-        modifier = Modifier
-          .align(Alignment.BottomCenter)
-          .fillMaxWidth()
-      ) {
-        if (video.durationFormatted.isNotBlank()) {
-          Surface(
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shape = MaterialTheme.shapes.small,
-            modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
-          ) {
-            Text(
-              text = video.durationFormatted,
-              style = MaterialTheme.typography.labelMedium,
-              modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
+      // Bottom overlay: a duration / remaining-time pill stacked above an inset,
+      // fully-rounded capsule progress bar. The pill reads "-12:32" while a video
+      // is partially watched and the total duration once completed or unwatched.
+      val showProgressFill =
+        progressPercentage != null && showProgressBar && !isWatched && video.duration > 0
+      if (showProgressFill || video.durationFormatted.isNotBlank()) {
+        val chipLabel = remember(video.duration, video.durationFormatted, progressPercentage, showProgressFill) {
+          if (showProgressFill) {
+            val remaining = (video.duration * (1f - progressPercentage)).toLong()
+            "-${formatRemaining(remaining)}"
+          } else {
+            // Completed / unwatched videos show total duration instead.
+            video.durationFormatted
           }
         }
 
-        if (progressPercentage != null && showProgressBar && !isWatched) {
-          val animatedProgress by animateFloatAsState(
-            targetValue = progressPercentage,
-            label = "VideoProgressAnimation"
-          )
-          // Flush, full-bleed YouTube-style progress bar pinned to the thumbnail's
-          // bottom edge: a translucent scrim track with a solid primary fill, no
-          // rounded-cap gaps or stop indicator.
-          Box(
-            modifier = Modifier
-              .fillMaxWidth()
-              .height(4.dp)
-              .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.3f))
-          ) {
+        Column(
+          modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth()
+        ) {
+          if (chipLabel.isNotBlank()) {
+            Surface(
+              color = MaterialTheme.colorScheme.surfaceContainerHigh,
+              shape = MaterialTheme.shapes.small,
+              modifier = Modifier.padding(start = 8.dp, bottom = 6.dp)
+            ) {
+              Text(
+                text = chipLabel,
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+              )
+            }
+          }
+
+          if (showProgressFill) {
+            val animatedProgress by animateFloatAsState(
+              targetValue = progressPercentage,
+              label = "VideoProgressAnimation"
+            )
+            // Inset, fully-rounded capsule bar floated off the thumbnail's bottom
+            // edge: a dimmed scrim track with a primary fill, both with circular
+            // caps so it reads as a polished pill rather than a flush strip.
             Box(
               modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth(animatedProgress)
-                .background(MaterialTheme.colorScheme.primary)
-            )
+                .fillMaxWidth()
+                .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
+                .height(5.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.25f))
+            ) {
+              Box(
+                modifier = Modifier
+                  .fillMaxHeight()
+                  .fillMaxWidth(animatedProgress)
+                  .clip(CircleShape)
+                  .background(MaterialTheme.colorScheme.primary)
+              )
+            }
           }
         }
       }
@@ -629,6 +649,20 @@ private fun formatDate(timestampSeconds: Long): String {
   return DATE_FORMATTER.format(Date(timestampSeconds * 1000))
 }
 
+// Compact clock format for the "continue watching" pill: H:MM:SS once an hour
+// remains, otherwise M:SS.
+private fun formatRemaining(remainingMs: Long): String {
+  val totalSeconds = (remainingMs / 1000).coerceAtLeast(0)
+  val hours = totalSeconds / 3600
+  val minutes = (totalSeconds % 3600) / 60
+  val seconds = totalSeconds % 60
+  return if (hours > 0) {
+    String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+  } else {
+    String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
+  }
+}
+
 @Preview(showBackground = true, name = "Video Card Default State")
 @Composable
 fun VideoCardDefaultPreview() {
@@ -663,6 +697,22 @@ fun VideoCardFullPreview() {
         onClick = {},
         isWatched = true,
         progressPercentage = 0.7f
+      )
+    }
+  }
+}
+
+@Preview(showBackground = true, name = "Video Card Continue Watching")
+@Composable
+fun VideoCardContinueWatchingPreview() {
+  val sampleVideo = getSampleVideo()
+  MaterialTheme {
+    Box(modifier = Modifier.padding(16.dp)) {
+      VideoCard(
+        video = sampleVideo,
+        settings = VideoCardSettings(),
+        onClick = {},
+        progressPercentage = 0.45f
       )
     }
   }
