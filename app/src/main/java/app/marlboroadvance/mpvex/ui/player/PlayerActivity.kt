@@ -188,12 +188,6 @@ class PlayerActivity :
   private var playlistId: Int? = null
 
   /**
-   * Cached pre-resolved URI for the next item in the playlist.
-   */
-  private var preResolvedNextUri: String? = null
-  private var preResolvedNextItemKey: Uri? = null
-
-  /**
    * Tracks the starting offset of the loaded playlist window in the full playlist.
    */
   private var playlistWindowOffset: Int = 0
@@ -1285,9 +1279,6 @@ class PlayerActivity :
     property: String,
     value: String,
   ) {
-    if (property == "user-data/mpvex/trigger_next_up" && value == "yes") {
-      viewModel.triggerNextUp()
-    }
   }
 
   internal fun onObserverEvent(_property: String) {}
@@ -1327,7 +1318,6 @@ class PlayerActivity :
     currentUri?.let { viewModel.calculateVideoHash(it) }
 
     viewModel.clearABLoop()
-    viewModel.dismissNextUp()
 
     progressSaveManager.resetTracking()
 
@@ -2290,18 +2280,8 @@ class PlayerActivity :
 
     lifecycleScope.launch(Dispatchers.Default) {
       // Step 1: Open content FD and load file as fast as possible
-      // Use pre-resolved URI if it matches the current request
-      val playableUri = if (preResolvedNextItemKey == uri && preResolvedNextUri != null) {
-        Log.d(TAG, "Using pre-resolved URI for $uri")
-        preResolvedNextUri!!
-      } else {
-        uri.openContentFd(this@PlayerActivity) ?: uri.toString()
-      }
+      val playableUri = uri.openContentFd(this@PlayerActivity) ?: uri.toString()
       MPVLib.command("loadfile", playableUri)
-
-      // Reset pre-resolved cache
-      preResolvedNextUri = null
-      preResolvedNextItemKey = null
 
       // Step 2: Handle heavy background tasks after engine has been poked
       setHttpHeadersForUri(uri)
@@ -2344,15 +2324,6 @@ class PlayerActivity :
         viewModel.refreshPlaylistItems()
       }
     }
-  }
-
-  fun preResolveNextItem(uri: Uri) {
-    if (preResolvedNextItemKey == uri) return
-
-    Log.d(TAG, "Pre-resolving next item: $uri")
-    val resolved = uri.openContentFd(this) ?: uri.toString()
-    preResolvedNextUri = resolved
-    preResolvedNextItemKey = uri
   }
 
   private fun formatTitle(title: String, isStream: Boolean = false): String {

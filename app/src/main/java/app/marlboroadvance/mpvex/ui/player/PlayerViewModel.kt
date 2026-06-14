@@ -198,13 +198,6 @@ class PlayerViewModel(
   val currentVolume = MutableStateFlow(host.audioManager.getStreamVolume(AudioManager.STREAM_MUSIC))
   private val volumeBoostCap by MPVLib.propInt["volume-max"].collectAsState(viewModelScope)
 
-  // Next Up logic
-  private val _showNextUp = MutableStateFlow(false)
-  val showNextUp: StateFlow<Boolean> = _showNextUp.asStateFlow()
-
-  private val _nextItemTitle = MutableStateFlow<String?>(null)
-  val nextItemTitle: StateFlow<String?> = _nextItemTitle.asStateFlow()
-
   init {
     // REMOVED: High-frequency polling loop for performance optimization
     // Position is now handled by MPV property observation via pos StateFlow
@@ -215,9 +208,6 @@ class PlayerViewModel(
       MPVLib.propDouble["time-pos"].collect { position ->
         val currentPos = position?.toFloat() ?: 0f
         _precisePosition.value = currentPos
-        
-        // Trigger "Next Up" prompt based on watched threshold
-        checkNextUpThreshold(currentPos)
       }
     }
     
@@ -230,50 +220,6 @@ class PlayerViewModel(
         }
       }
     }
-  }
-
-  private fun checkNextUpThreshold(currentPos: Float) {
-    if (!playerPreferences.showNextUpPrompt.get()) return
-
-    val totalDuration = _preciseDuration.value
-    if (totalDuration <= 0) return
-
-    // Use global watched threshold from BrowserPreferences (convert Int percentage to 0.0-1.0 float)
-    val threshold = browserPreferences.watchedThreshold.get() / 100f
-    val progress = currentPos / totalDuration
-
-    if (progress >= threshold && hasNext()) {
-      triggerNextUp()
-    } else if (_showNextUp.value) {
-      // Hide the prompt if we seek back before the threshold
-      _showNextUp.value = false
-      Log.d(TAG, "Backtracking detected. Hiding Next Up prompt.")
-    }
-  }
-
-  fun triggerNextUp() {
-    if (_showNextUp.value || !playerPreferences.showNextUpPrompt.get() || !hasNext()) return
-
-    val activity = host as? PlayerActivity
-    if (activity != null) {
-        val nextIndex = activity.playlistIndex + 1
-        if (nextIndex < activity.playlist.size) {
-            val nextUri = activity.playlist[nextIndex]
-            _nextItemTitle.value = activity.getPlaylistItemTitle(nextUri)
-            _showNextUp.value = true
-            Log.d(TAG, "Next Up triggered. Showing prompt for: ${_nextItemTitle.value}")
-
-            // Phase 5: Smart Pre-fetching
-            // Pre-resolve the URI in the background before the user clicks
-            viewModelScope.launch(Dispatchers.IO) {
-                activity.preResolveNextItem(nextUri)
-            }
-        }
-    }
-  }
-
-  fun dismissNextUp() {
-    _showNextUp.value = false
   }
 
   val maxVolume = host.audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
@@ -654,11 +600,7 @@ class PlayerViewModel(
       _externalSubtitles.clear()
       // Reset hash when media changes
       _videoHash.value = null
-      
-      // Reset Next Up state when media changes
-      _showNextUp.value = false
-      _nextItemTitle.value = null
-      
+
       // Scan for previously downloaded/added subtitles
       scanLocalSubtitles(mediaTitle)
 

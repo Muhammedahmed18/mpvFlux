@@ -39,6 +39,8 @@ class App : Application() {
 
     Thread.setDefaultUncaughtExceptionHandler(GlobalExceptionHandler(applicationContext, CrashActivity::class.java))
 
+    removeOrphanedPreferences()
+
     FastThumbnails.initialize(this)
 
     // Perform cache maintenance on app startup (non-blocking)
@@ -56,6 +58,21 @@ class App : Application() {
     }
   }
   
+  /**
+   * Remove preference keys whose features have been deleted, so their stored
+   * values don't linger in SharedPreferences on already-installed devices.
+   */
+  private fun removeOrphanedPreferences() {
+    try {
+      val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
+      if (prefs.contains("show_next_up_prompt")) {
+        prefs.edit().remove("show_next_up_prompt").apply()
+      }
+    } catch (e: Exception) {
+      android.util.Log.e("App", "Failed to remove orphaned preferences", e)
+    }
+  }
+
   /**
    * Trigger a media scan on app launch to ensure MediaStore is up-to-date
    * This helps detect videos added by external apps while the app was closed
