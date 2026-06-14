@@ -4,24 +4,27 @@ import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.graphics.ExperimentalAnimationGraphicsApi
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -47,27 +50,19 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconToggleButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -134,7 +129,6 @@ import kotlinx.coroutines.flow.update
 import org.koin.compose.koinInject
 import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 @Suppress("CompositionLocalAllowlist")
 val LocalPlayerButtonsClickEvent = staticCompositionLocalOf { {} }
@@ -174,8 +168,34 @@ private fun Modifier.onLongPressNoConsume(onLongPress: () -> Unit): Modifier =
     }
   }
 
+// Heavy "smoked glass" fill for a circular transport button. MPV draws to a
+// SurfaceView that can't be sampled for a real backdrop blur, so the glass is
+// approximated: a deep near-opaque dark `scrim` disc (one contrast strategy —
+// dark disc against any video frame, vivid accent glyph against the dark disc)
+// + a white vertical rim-light border, which on dark glass is the main specular
+// "glass" signal. No accent tint in the disc itself: the accent lives solely in
+// the glyph. `strong` is the heavier Play/Pause hero; Prev/Next sit lighter.
+// `rimBoost` (0..1) momentarily brightens the rim — light catching the glass
+// edge — and is pulsed by the hero on each play/pause toggle.
+private fun Modifier.transportGlass(
+  scrim: Color,
+  strong: Boolean,
+  rimBoost: Float = 0f,
+): Modifier =
+  this
+    .background(scrim.copy(alpha = if (strong) 0.58f else 0.48f))
+    .border(
+      width = 1.dp,
+      brush = Brush.verticalGradient(
+        listOf(
+          Color.White.copy(alpha = (if (strong) 0.30f else 0.22f) + 0.25f * rimBoost),
+          Color.White.copy(alpha = (if (strong) 0.05f else 0.04f) + 0.10f * rimBoost),
+        ),
+      ),
+      shape = CircleShape,
+    )
+
 @OptIn(
-  ExperimentalAnimationGraphicsApi::class,
   ExperimentalMaterial3Api::class,
   ExperimentalMaterial3ExpressiveApi::class,
   ExperimentalFoundationApi::class,
@@ -221,8 +241,6 @@ fun PlayerControls(
 
   val abLoopA by viewModel.abLoopA.collectAsState()
   val abLoopB by viewModel.abLoopB.collectAsState()
-  val showNextUp by viewModel.showNextUp.collectAsState()
-  val nextItemTitle by viewModel.nextItemTitle.collectAsState()
 
   val activity = LocalActivity.current as PlayerActivity
 
@@ -291,8 +309,8 @@ fun PlayerControls(
   }
 
   val scrimAlpha by animateFloatAsState(
-    targetValue = if ((controlsShown && !areControlsLocked) || showNextUp) 1f else 0f,
-    animationSpec = if (controlsShown || showNextUp) playerControlsEnterAnimationSpec() else playerControlsExitAnimationSpec(),
+    targetValue = if (controlsShown && !areControlsLocked) 1f else 0f,
+    animationSpec = if (controlsShown) playerControlsEnterAnimationSpec() else playerControlsExitAnimationSpec(),
     label = "scrim_alpha",
   )
 
@@ -373,7 +391,6 @@ fun PlayerControls(
           val playerPauseButton = createRef()
           val seekbar = createRef()
           val (playerUpdates) = createRefs()
-          val nextUpPill = createRef()
 
           val isBrightnessSliderShown by viewModel.isBrightnessSliderShown.collectAsState()
           val isVolumeSliderShown by viewModel.isVolumeSliderShown.collectAsState()
@@ -470,228 +487,230 @@ fun PlayerControls(
             val nextInteraction = remember { MutableInteractionSource() }
             val playInteraction = remember { MutableInteractionSource() }
 
-            // One Expressive motion model for the whole cluster: the theme's
-            // spatial spring drives every shape-corner + scale morph, the effects
-            // spring drives the play/pause icon fade. Pressing any button springs it
-            // the same way, so the connected group deforms like one elastic material.
-            // `reduceMotion` collapses the spatial channel to its rest target (static).
-            val spatialSpring = MaterialTheme.motionScheme.fastSpatialSpec<Float>()
-            val effectsSpring = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+            // One UI motion: a single soft, slightly slow spring drives the liquid
+            // play/pause path morph AND every press scale, so the whole transport
+            // cluster reacts as one calm, fluid material. reduceMotion snaps instead.
+            val oneUiSpring = spring<Float>(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)
 
             val playPressed by playInteraction.collectIsPressedAsState()
             val prevPressed by prevInteraction.collectIsPressedAsState()
             val nextPressed by nextInteraction.collectIsPressedAsState()
 
-            // State + press shape morph, expressed as an animated corner percent so
-            // the button fill AND its glass ring (transportGlassButton, fed the same
-            // shape) stay perfectly in sync — no angular "blob" inside a round ring.
-            // Play/Pause: circle when paused (50%) → squircle when playing (30%),
-            // squeezing a touch tighter on press. Skip buttons: round at rest,
-            // softening to a squircle on press to echo the hero.
             val isPlaying = paused == false
-            val heroCorner by animateFloatAsState(
-              targetValue   = (if (isPlaying) 30f else 50f) - (if (playPressed && !reduceMotion) 6f else 0f),
-              animationSpec = spatialSpring,
-              label         = "hero_corner",
-            )
             val heroScale by animateFloatAsState(
-              targetValue   = if (playPressed && !reduceMotion) 0.93f else 1f,
-              animationSpec = spatialSpring,
+              targetValue   = if (playPressed && !reduceMotion) 0.92f else 1f,
+              animationSpec = oneUiSpring,
               label         = "hero_scale",
             )
-            val heroShape = RoundedCornerShape(percent = heroCorner.roundToInt())
-
-            val prevCorner by animateFloatAsState(
-              targetValue   = if (prevPressed && !reduceMotion) 42f else 50f,
-              animationSpec = spatialSpring,
-              label         = "prev_corner",
+            val prevScale by animateFloatAsState(
+              targetValue   = if (prevPressed && !reduceMotion) 0.90f else 1f,
+              animationSpec = oneUiSpring,
+              label         = "prev_scale",
             )
-            val nextCorner by animateFloatAsState(
-              targetValue   = if (nextPressed && !reduceMotion) 42f else 50f,
-              animationSpec = spatialSpring,
-              label         = "next_corner",
+            val nextScale by animateFloatAsState(
+              targetValue   = if (nextPressed && !reduceMotion) 0.90f else 1f,
+              animationSpec = oneUiSpring,
+              label         = "next_scale",
             )
-            val prevShape = RoundedCornerShape(percent = prevCorner.roundToInt())
-            val nextShape = RoundedCornerShape(percent = nextCorner.roundToInt())
 
-            // Haptic + helpers captured in composition scope so they're available
-            // to pointer-input handlers below.
+            // Toggle "beat": a one-shot 0→1→0 envelope fired on each play/pause
+            // change, driving the hero's disc pulse (scale up to +6%) and rim-light
+            // flare together so the whole button reacts as one material on the same
+            // beat — fast spring up, the shared soft spring back down. lastPlaying
+            // is captured on (re)composition so controls reappearing doesn't pulse;
+            // reduceMotion skips the beat entirely.
+            val toggleBeat = remember { Animatable(0f) }
+            var lastPlaying by remember { mutableStateOf(isPlaying) }
+            LaunchedEffect(isPlaying) {
+              if (isPlaying == lastPlaying) return@LaunchedEffect
+              lastPlaying = isPlaying
+              if (!reduceMotion) {
+                toggleBeat.snapTo(0f)
+                toggleBeat.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMedium))
+                toggleBeat.animateTo(0f, oneUiSpring)
+              }
+            }
+
             val haptic = LocalHapticFeedback.current
 
-            // Connected ButtonGroup: an accent-filled Play/Pause hero flanked by
-            // tonal skip buttons. Hierarchy is carried by color (primary vs
-            // secondary) + size + the hero's state-driven shape morph.
-            ButtonGroup(
-              overflowIndicator = {},
-              horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
-              verticalAlignment = Alignment.CenterVertically,
+            val primaryColor   = MaterialTheme.colorScheme.primary
+            val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
+            val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+            val scrimColor     = MaterialTheme.colorScheme.scrim
+
+            // M3 Expressive transport: the hero is a bold SOLID `primary` button whose
+            // CONTAINER morphs shape on toggle — a full circle when paused, a rounded
+            // square (squircle) when playing — driven by an animated corner radius on
+            // the shared soft spring. The glyph rides in `onPrimary`. Prev/Next stay as
+            // recessed dark smoked-glass circles with white glyphs, so the filled hero
+            // is the unmistakable focal and the secondaries fall back. Hierarchy by
+            // size + fill weight; unified by one shared spring. hideBackground collapses
+            // every disc to a bare glyph over the video.
+            Row(
+              horizontalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterHorizontally),
+              verticalAlignment     = Alignment.CenterVertically,
             ) {
-                // ── Skip Previous ──────────────────────────────────────────
-                if (showSkip) {
-                  customItem(
-                    buttonGroupContent = {
-                      FilledTonalIconButton(
-                        onClick           = {
-                          haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                          viewModel.playPrevious()
-                        },
-                        enabled           = viewModel.hasPrevious(),
-                        shapes            = IconButtonDefaults.shapes(shape = prevShape, pressedShape = prevShape),
-                        interactionSource = prevInteraction,
-                        colors            = transportIconButtonColors(hideBackground),
-                        modifier          = Modifier
-                          .size(IconButtonDefaults.mediumContainerSize())
-                          .alpha(if (isBuffering) 0.5f else 1f)
-                          .animateWidth(prevInteraction)
-                          .onLongPressNoConsume {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            val newPos = (viewModel.precisePosition.value - 10f)
-                              .coerceAtLeast(0f)
-                              .toInt()
-                            resetControlsTimestamp = System.currentTimeMillis()
-                            viewModel.seekTo(newPos)
-                          },
-                      ) {
-                        Icon(
-                          imageVector        = Icons.Rounded.SkipPrevious,
-                          contentDescription = null,
-                          modifier           = Modifier.size(IconButtonDefaults.mediumIconSize),
-                        )
-                      }
+              // ── Skip Previous ──────────────────────────────────────────
+              if (showSkip) {
+                val prevEnabled = viewModel.hasPrevious()
+                Box(
+                  modifier = Modifier
+                    .graphicsLayer { scaleX = prevScale; scaleY = prevScale }
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .then(if (!hideBackground) Modifier.transportGlass(scrimColor, strong = false) else Modifier)
+                    .alpha(if (isBuffering || !prevEnabled) 0.5f else 1f)
+                    .clickable(
+                      interactionSource = prevInteraction,
+                      indication        = ripple(bounded = true),
+                      enabled           = prevEnabled,
+                      onClick           = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        viewModel.playPrevious()
+                      },
+                    )
+                    .onLongPressNoConsume {
+                      haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                      val newPos = (viewModel.precisePosition.value - 10f)
+                        .coerceAtLeast(0f)
+                        .toInt()
+                      resetControlsTimestamp = System.currentTimeMillis()
+                      viewModel.seekTo(newPos)
                     },
-                    menuContent = {},
-                  )
-                }
-
-                // ── Play / Pause — primaryContainer focal · unified spring morph ──
-                customItem(
-                  buttonGroupContent = {
-                    if (isBuffering) {
-                      // Soft radial halo glow behind the loading indicator — sized to
-                      // the play button (72dp) so the buffering swap doesn't visually jump.
-                      Box(modifier = Modifier.size(72.dp), contentAlignment = Alignment.Center) {
-                        Box(
-                          modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(
-                              brush = Brush.radialGradient(
-                                colors = listOf(
-                                  MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
-                                  Color.Transparent,
-                                ),
-                              ),
-                            ),
-                        )
-                        LoadingIndicator(
-                          modifier = Modifier.size(56.dp),
-                          color    = MaterialTheme.colorScheme.primary,
-                        )
-                      }
-                    } else {
-                      // M3 toggle button — the accent focal of the cluster. A
-                      // larger `primaryContainer`-filled shape (with the `strong`
-                      // highlight edge + shadow) so it reads as the anchor against
-                      // its tonal skip siblings through color + size + light. The
-                      // play/pause identity is carried by the icon, its spring pop,
-                      // AND the shape morph (circle when paused → squircle when
-                      // playing). The whole shape spring-scales on press. Collapses
-                      // to a bare accent glyph when backgrounds are hidden.
-                      FilledIconToggleButton(
-                        checked           = paused == false,
-                        onCheckedChange   = {
-                          haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                          resetControlsTimestamp = System.currentTimeMillis()
-                          viewModel.pauseUnpause()
-                        },
-                        interactionSource = playInteraction,
-                        shapes = IconButtonDefaults.toggleableShapes(
-                          shape        = heroShape,
-                          pressedShape = heroShape,
-                          checkedShape = heroShape,
-                        ),
-                        modifier = Modifier
-                          .graphicsLayer { scaleX = heroScale; scaleY = heroScale }
-                          .size(72.dp)
-                          .transportGlassButton(heroShape, hideBackground, strong = true),
-                        colors   = transportPlayButtonColors(hideBackground),
-                      ) {
-                        AnimatedContent(
-                          targetState    = paused == false,
-                          transitionSpec = {
-                            if (reduceMotion) {
-                              fadeIn(tween(150)) togetherWith fadeOut(tween(150))
-                            } else {
-                              // Shared spatial spring on the scale → the glyph pops
-                              // in and settles with a gentle overshoot on the same
-                              // curve as the shape morph; the fade rides the effects
-                              // spring so icon swap and container morph move as one.
-                              (scaleIn(
-                                animationSpec = spatialSpring,
-                                initialScale = 0.7f,
-                              ) + fadeIn(
-                                animationSpec = effectsSpring,
-                              )) togetherWith
-                                (scaleOut(
-                                  animationSpec = spatialSpring,
-                                  targetScale = 0.7f,
-                                ) + fadeOut(
-                                  animationSpec = effectsSpring,
-                                ))
-                            }
-                          },
-                          label = "play_pause_morph",
-                        ) { isPlaying ->
-                          Icon(
-                            imageVector        = if (isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
-                            contentDescription = null,
-                            modifier           = Modifier.size(56.dp),
-                          )
-                        }
-                      }
-                    }
-                  },
-                  menuContent = {},
-                )
-
-                // ── Skip Next ───────────────────────────────────────────────
-                if (showSkip) {
-                  customItem(
-                    buttonGroupContent = {
-                      FilledTonalIconButton(
-                        onClick           = {
-                          haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
-                          viewModel.playNext()
-                        },
-                        enabled           = viewModel.hasNext(),
-                        shapes            = IconButtonDefaults.shapes(shape = nextShape, pressedShape = nextShape),
-                        interactionSource = nextInteraction,
-                        colors            = transportIconButtonColors(hideBackground),
-                        modifier          = Modifier
-                          .size(IconButtonDefaults.mediumContainerSize())
-                          .alpha(if (isBuffering) 0.5f else 1f)
-                          .animateWidth(nextInteraction)
-                          .onLongPressNoConsume {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            val maxPos = viewModel.effectiveDuration.value
-                            val newPos = (viewModel.precisePosition.value + 10f)
-                              .coerceAtMost(maxPos)
-                              .toInt()
-                            resetControlsTimestamp = System.currentTimeMillis()
-                            viewModel.seekTo(newPos)
-                          },
-                      ) {
-                        Icon(
-                          imageVector        = Icons.Rounded.SkipNext,
-                          contentDescription = null,
-                          modifier           = Modifier.size(IconButtonDefaults.mediumIconSize),
-                        )
-                      }
-                    },
-                    menuContent = {},
+                  contentAlignment = Alignment.Center,
+                ) {
+                  Icon(
+                    imageVector        = Icons.Rounded.SkipPrevious,
+                    contentDescription = null,
+                    tint               = if (hideBackground) onSurfaceColor else Color.White,
+                    modifier           = Modifier.size(26.dp),
                   )
                 }
               }
+
+              // ── Play / Pause — M3 Expressive shape-morph hero ───────────
+              // The container shape itself is the toggle animation: a full circle
+              // (corner = half the 88dp box) when paused relaxes into a squircle
+              // (~30% corner) when playing, on the shared soft spring. A press
+              // softens the corner further (expressive squeeze) and `heroScale`
+              // shrinks the whole button. reduceMotion holds the press squeeze flat
+              // but the shape still settles via the spring.
+              val baseCorner = if (isPlaying) 26.dp else 44.dp
+              val targetCorner = if (playPressed && !reduceMotion) baseCorner - 8.dp else baseCorner
+              val heroCorner by animateDpAsState(
+                targetValue   = targetCorner,
+                animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow),
+                label         = "hero_corner",
+              )
+              val heroShape = RoundedCornerShape(heroCorner)
+
+              if (isBuffering) {
+                // Buffering reuses the hero's solid `primary` disc (same 88dp, same
+                // fill) with an `onPrimary` LoadingIndicator at its center, so it reads
+                // as the same button thinking — not a different component swapping in.
+                Box(
+                  modifier = Modifier
+                    .size(88.dp)
+                    .clip(CircleShape)
+                    .then(if (!hideBackground) Modifier.background(primaryColor) else Modifier),
+                  contentAlignment = Alignment.Center,
+                ) {
+                  LoadingIndicator(
+                    modifier = Modifier.size(52.dp),
+                    color    = if (hideBackground) primaryColor else onPrimaryColor,
+                  )
+                }
+              } else {
+                // Bold solid-`primary` morphing button — the unmistakable focal. No
+                // glass, no rim, no shadow: the saturated fill carries the depth and
+                // the shape change carries the motion. `toggleBeat` adds a subtle +4%
+                // scale pop on each toggle so the morph lands with a beat. hideBackground
+                // drops the fill and keeps the bare `primary` glyph.
+                Box(
+                  modifier = Modifier
+                    .graphicsLayer {
+                      val beatScale = heroScale * (1f + 0.04f * toggleBeat.value)
+                      scaleX = beatScale
+                      scaleY = beatScale
+                    }
+                    .size(88.dp)
+                    .clip(heroShape)
+                    .then(if (!hideBackground) Modifier.background(primaryColor) else Modifier)
+                    .clickable(
+                      interactionSource = playInteraction,
+                      indication        = ripple(bounded = true),
+                      onClick           = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        resetControlsTimestamp = System.currentTimeMillis()
+                        viewModel.pauseUnpause()
+                      },
+                    ),
+                  contentAlignment = Alignment.Center,
+                ) {
+                  // Stock M3 glyphs (Rounded Play/Pause) crossfaded with a small scale
+                  // via AnimatedContent. reduceMotion snaps with no transition. Glyph
+                  // rides in `onPrimary` over the filled disc (or `primary` when bare).
+                  AnimatedContent(
+                    targetState   = isPlaying,
+                    transitionSpec = {
+                      if (reduceMotion) {
+                        fadeIn(tween(0)) togetherWith fadeOut(tween(0))
+                      } else {
+                        (fadeIn(oneUiSpring) + scaleIn(oneUiSpring, initialScale = 0.7f)) togetherWith
+                          (fadeOut(oneUiSpring) + scaleOut(oneUiSpring, targetScale = 0.7f))
+                      }
+                    },
+                    label = "play_pause_icon",
+                  ) { playing ->
+                    Icon(
+                      imageVector        = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                      contentDescription = null,
+                      tint               = if (hideBackground) primaryColor else onPrimaryColor,
+                      modifier           = Modifier.size(44.dp),
+                    )
+                  }
+                }
+              }
+
+              // ── Skip Next ───────────────────────────────────────────────
+              if (showSkip) {
+                val nextEnabled = viewModel.hasNext()
+                Box(
+                  modifier = Modifier
+                    .graphicsLayer { scaleX = nextScale; scaleY = nextScale }
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .then(if (!hideBackground) Modifier.transportGlass(scrimColor, strong = false) else Modifier)
+                    .alpha(if (isBuffering || !nextEnabled) 0.5f else 1f)
+                    .clickable(
+                      interactionSource = nextInteraction,
+                      indication        = ripple(bounded = true),
+                      enabled           = nextEnabled,
+                      onClick           = {
+                        haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
+                        viewModel.playNext()
+                      },
+                    )
+                    .onLongPressNoConsume {
+                      haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                      val maxPos = viewModel.effectiveDuration.value
+                      val newPos = (viewModel.precisePosition.value + 10f)
+                        .coerceAtMost(maxPos)
+                        .toInt()
+                      resetControlsTimestamp = System.currentTimeMillis()
+                      viewModel.seekTo(newPos)
+                    },
+                  contentAlignment = Alignment.Center,
+                ) {
+                  Icon(
+                    imageVector        = Icons.Rounded.SkipNext,
+                    contentDescription = null,
+                    tint               = if (hideBackground) onSurfaceColor else Color.White,
+                    modifier           = Modifier.size(26.dp),
+                  )
+                }
+              }
+            }
             }
 
           AnimatedVisibility(
@@ -737,10 +756,6 @@ fun PlayerControls(
               loopStart = abLoopA?.toFloat(),
               loopEnd = abLoopB?.toFloat(),
             )
-          }
-
-          AnimatedVisibility(visible = showNextUp, enter = slideInHorizontally { it } + fadeIn(), exit = slideOutHorizontally { it } + fadeOut(), modifier = Modifier.constrainAs(nextUpPill) { bottom.linkTo(parent.bottom, 100.dp); end.linkTo(parent.end, spacing.large) }) {
-            NextUpPill(title = nextItemTitle ?: "", onClick = { viewModel.playNext() }, onDismiss = { viewModel.dismissNextUp() })
           }
 
           AnimatedVisibility(
@@ -790,9 +805,11 @@ fun PlayerControls(
     val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
     val speedPresets by playerPreferences.speedPresets.collectAsState()
 
-    AnimatedVisibility(visible = sheetShown != Sheets.None, enter = slideInVertically { it } + fadeIn(), exit = slideOutVertically { it } + fadeOut()) {
-      PlayerSheets(viewModel = viewModel, sheetShown = sheetShown, subtitles = subtitles.toImmutableList(), onAddSubtitle = viewModel::addSubtitle, onToggleSubtitle = { id -> if (viewModel.isSubtitleSelected(id)) { MPVLib.setPropertyString("sid", "no"); MPVLib.setPropertyString("secondary-sid", "no") } else { MPVLib.setPropertyInt("sid", id); MPVLib.setPropertyString("secondary-sid", "no") } }, isSubtitleSelected = viewModel::isSubtitleSelected, onRemoveSubtitle = viewModel::removeSubtitle, audioTracks = audioTracks.toImmutableList(), onAddAudio = viewModel::addAudio, onSelectAudio = { if (MPVLib.getPropertyInt("aid") == it.id) MPVLib.setPropertyString("aid", "no") else MPVLib.setPropertyInt("aid", it.id) }, chapter = chapters.getOrNull(currentChapter ?: 0), chapters = chapters.toImmutableList(), onSeekToChapter = { MPVLib.setPropertyInt("chapter", it); viewModel.unpause() }, decoder = decoder, onUpdateDecoder = { MPVLib.setPropertyString("hwdec", it.value) }, speed = playbackSpeed ?: playerPreferences.defaultSpeed.get(), onSpeedChange = { MPVLib.setPropertyFloat("speed", it.toFixed(2)) }, onMakeDefaultSpeed = { playerPreferences.defaultSpeed.set(it.toFixed(2)) }, onAddSpeedPreset = { playerPreferences.speedPresets += it.toFixed(2).toString() }, onRemoveSpeedPreset = { playerPreferences.speedPresets -= it.toFixed(2).toString() }, onResetSpeedPresets = playerPreferences.speedPresets::delete, speedPresets = speedPresets.map { it.toFloat() }.sorted(), onResetDefaultSpeed = { MPVLib.setPropertyFloat("speed", playerPreferences.defaultSpeed.deleteAndGet().toFixed(2)) }, sleepTimerTimeRemaining = sleepTimerTimeRemaining, onStartSleepTimer = viewModel::startTimer, onOpenPanel = onOpenPanel, onShowSheet = onOpenSheet, onDismissRequest = { onOpenSheet(Sheets.None) })
-    }
+    // No outer AnimatedVisibility here: each sheet host owns its entrance/exit
+    // (portrait ModalBottomSheet animates inside its own dialog window; landscape
+    // PlayerSideSheet slides in from the right). Wrapping them in a vertical slide
+    // composited both motions into a diagonal "rises from the bottom" mush.
+    PlayerSheets(viewModel = viewModel, sheetShown = sheetShown, subtitles = subtitles.toImmutableList(), onAddSubtitle = viewModel::addSubtitle, onToggleSubtitle = { id -> if (viewModel.isSubtitleSelected(id)) { MPVLib.setPropertyString("sid", "no"); MPVLib.setPropertyString("secondary-sid", "no") } else { MPVLib.setPropertyInt("sid", id); MPVLib.setPropertyString("secondary-sid", "no") } }, isSubtitleSelected = viewModel::isSubtitleSelected, onRemoveSubtitle = viewModel::removeSubtitle, audioTracks = audioTracks.toImmutableList(), onAddAudio = viewModel::addAudio, onSelectAudio = { if (MPVLib.getPropertyInt("aid") == it.id) MPVLib.setPropertyString("aid", "no") else MPVLib.setPropertyInt("aid", it.id) }, chapter = chapters.getOrNull(currentChapter ?: 0), chapters = chapters.toImmutableList(), onSeekToChapter = { MPVLib.setPropertyInt("chapter", it); viewModel.unpause() }, decoder = decoder, onUpdateDecoder = { MPVLib.setPropertyString("hwdec", it.value) }, speed = playbackSpeed ?: playerPreferences.defaultSpeed.get(), onSpeedChange = { MPVLib.setPropertyFloat("speed", it.toFixed(2)) }, onMakeDefaultSpeed = { playerPreferences.defaultSpeed.set(it.toFixed(2)) }, onAddSpeedPreset = { playerPreferences.speedPresets += it.toFixed(2).toString() }, onRemoveSpeedPreset = { playerPreferences.speedPresets -= it.toFixed(2).toString() }, onResetSpeedPresets = playerPreferences.speedPresets::delete, speedPresets = speedPresets.map { it.toFloat() }.sorted(), onResetDefaultSpeed = { MPVLib.setPropertyFloat("speed", playerPreferences.defaultSpeed.deleteAndGet().toFixed(2)) }, sleepTimerTimeRemaining = sleepTimerTimeRemaining, onStartSleepTimer = viewModel::startTimer, onOpenPanel = onOpenPanel, onShowSheet = onOpenSheet, onDismissRequest = { onOpenSheet(Sheets.None) })
 
     val panel by viewModel.panelShown.collectAsState()
     PlayerPanels(panelShown = panel, onDismissRequest = { onOpenPanel(Panels.None) }, viewModel = viewModel)
@@ -1019,102 +1036,3 @@ private fun PlayerUpdatesSection(
   }
 }
 
-@Composable
-fun NextUpPill(
-  title: String,
-  onClick: () -> Unit,
-  onDismiss: () -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  val haptic   = LocalHapticFeedback.current
-  val spacing  = MaterialTheme.spacing
-
-  // Fire haptic once when the pill appears
-  LaunchedEffect(Unit) {
-    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-  }
-
-  // SwipeToDismissBox replaces the manual Animatable + detectHorizontalDragGestures block.
-  // EndToStart = swipe left-to-right to dismiss (matches the original right-swipe logic).
-  val dismissState = rememberSwipeToDismissBoxState()
-
-  LaunchedEffect(dismissState.currentValue) {
-    if (dismissState.currentValue == SwipeToDismissBoxValue.StartToEnd) {
-      onDismiss()
-    }
-  }
-
-  SwipeToDismissBox(
-    state            = dismissState,
-    // No background layer needed — the pill slides away cleanly
-    backgroundContent = {},
-    modifier          = modifier.padding(spacing.small),
-    enableDismissFromStartToEnd = true,
-    enableDismissFromEndToStart = false,
-  ) {
-    Surface(
-      modifier = Modifier
-        .height(64.dp)
-        .widthIn(min = 180.dp, max = 300.dp),
-      shape          = CircleShape,
-      color          = MaterialTheme.colorScheme.secondaryContainer,
-      tonalElevation = 3.dp,
-      shadowElevation = 4.dp,
-    ) {
-      Row(
-        modifier = Modifier
-          .fillMaxSize()
-          .clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication        = ripple(),
-            onClick           = onClick,
-          )
-          .padding(horizontal = 20.dp),
-        verticalAlignment   = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Start,
-      ) {
-        Icon(
-          imageVector        = Icons.Outlined.SkipNext,
-          contentDescription = null,
-          tint               = MaterialTheme.colorScheme.onSecondaryContainer,
-          modifier           = Modifier.size(28.dp),
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-        Column(
-          modifier              = Modifier.weight(1f),
-          verticalArrangement   = Arrangement.Center,
-        ) {
-          // "NEXT UP" label aligned to M3 labelSmall role —
-          // removes the manual ExtraBold + 1.2sp tracking overrides
-          Text(
-            text  = "NEXT UP",
-            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
-            style = MaterialTheme.typography.labelSmall,
-          )
-          Text(
-            text     = title,
-            color    = MaterialTheme.colorScheme.onSecondaryContainer,
-            style    = MaterialTheme.typography.titleMedium.copy(
-              fontWeight = FontWeight.Bold,
-            ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-          )
-        }
-      }
-    }
-  }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
-@Composable
-fun PreviewNextUpPill() {
-  MpvexTheme {
-    Box(
-      modifier        = Modifier.fillMaxSize().padding(16.dp),
-      contentAlignment = Alignment.Center,
-    ) {
-      NextUpPill(title = "S01 E05 - The Final Stand", onClick = {}, onDismiss = {})
-    }
-  }
-}
