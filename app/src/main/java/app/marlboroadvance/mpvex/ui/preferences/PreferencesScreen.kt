@@ -54,7 +54,7 @@ object PreferencesScreen : Screen {
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             containerColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface,
             topBar = {
-                TopAppBar(
+                PreferenceTopBar(
                     title = {
                         Text(
                             text = stringResource(R.string.pref_preferences),
@@ -73,11 +73,7 @@ object PreferencesScreen : Screen {
                         }
                     },
                     scrollBehavior = scrollBehavior,
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                        titleContentColor = MaterialTheme.colorScheme.primary
-                    )
+                    containerColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface,
                 )
             }
         ) { padding ->

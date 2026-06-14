@@ -8,7 +8,6 @@ import android.widget.Toast
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -35,14 +34,12 @@ import androidx.documentfile.provider.DocumentFile
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.database.MpvExDatabase
 import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.SettingsManager
 import app.marlboroadvance.mpvex.preferences.SubtitlesPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.ConfirmDialog
 import app.marlboroadvance.mpvex.presentation.crash.CrashActivity
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
 import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
@@ -64,7 +61,6 @@ object AdvancedPreferencesScreen : Screen {
     val backStack = LocalBackStack.current
     val preferences = koinInject<AdvancedPreferences>()
     val subtitlesPreferences = koinInject<SubtitlesPreferences>()
-    val appPreferences = koinInject<AppearancePreferences>()
     val settingsManager = koinInject<SettingsManager>()
     val scope = rememberCoroutineScope()
     var showImportDialog by remember { mutableStateOf(false) }
@@ -74,14 +70,7 @@ object AdvancedPreferencesScreen : Screen {
     
     val clearedHistoryMsg = stringResource(R.string.pref_advanced_cleared_playback_history)
 
-    val darkMode by appPreferences.darkMode.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val isDark = when (darkMode) {
-      DarkMode.Dark -> true
-      DarkMode.Light -> false
-      DarkMode.System -> systemDarkTheme
-    }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+    val backgroundColor = rememberPreferenceBackgroundColor()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/xml")) { uri ->
@@ -142,7 +131,7 @@ object AdvancedPreferencesScreen : Screen {
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
-          TopAppBar(
+          PreferenceTopBar(
             title = { 
               Text(
                 text = stringResource(R.string.pref_advanced),
@@ -161,11 +150,7 @@ object AdvancedPreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                titleContentColor = MaterialTheme.colorScheme.primary
-            )
+            containerColor = backgroundColor,
           )
         },
       ) { padding ->

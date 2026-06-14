@@ -23,7 +23,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -101,8 +100,8 @@ object PlayerControlsPreferencesScreen : Screen {
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
-          TopAppBar(
-            title = { 
+          PreferenceTopBar(
+            title = {
               Text(
                 text = stringResource(id = R.string.pref_layout_title),
                 style = MaterialTheme.typography.titleLarge,
@@ -120,11 +119,7 @@ object PlayerControlsPreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                titleContentColor = MaterialTheme.colorScheme.primary
-            )
+            containerColor = backgroundColor,
           )
         },
       ) { padding ->

@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,7 +34,6 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -67,10 +65,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.R
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
@@ -83,7 +79,6 @@ object SettingsSearchScreen : Screen {
     override fun Content() {
         val context = LocalContext.current
         val backstack = LocalBackStack.current
-        val appPreferences = koinInject<AppearancePreferences>()
         val keyboardController = LocalSoftwareKeyboardController.current
         val focusRequester = remember { FocusRequester() }
 
@@ -108,14 +103,7 @@ object SettingsSearchScreen : Screen {
             }
         }
 
-        val darkMode by appPreferences.darkMode.collectAsState()
-        val systemDarkTheme = isSystemInDarkTheme()
-        val isDark = when (darkMode) {
-            DarkMode.Dark -> true
-            DarkMode.Light -> false
-            DarkMode.System -> systemDarkTheme
-        }
-        val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+        val backgroundColor = rememberPreferenceBackgroundColor()
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
         LaunchedEffect(Unit) {
@@ -130,7 +118,7 @@ object SettingsSearchScreen : Screen {
                 modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                 containerColor = Color.Transparent,
                 topBar = {
-                    TopAppBar(
+                    PreferenceTopBar(
                         title = {
                             Text(
                                 text = stringResource(R.string.settings_search_title),
@@ -149,11 +137,7 @@ object SettingsSearchScreen : Screen {
                             }
                         },
                         scrollBehavior = scrollBehavior,
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            titleContentColor = MaterialTheme.colorScheme.primary
-                        )
+                        containerColor = backgroundColor,
                     )
                 },
             ) { padding ->

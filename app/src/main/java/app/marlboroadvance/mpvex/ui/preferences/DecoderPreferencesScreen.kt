@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,7 +17,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -38,13 +36,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.DecoderPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.player.Debanding
 import app.marlboroadvance.mpvex.ui.player.MPVProfile
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.ListPreference
@@ -58,20 +54,12 @@ object DecoderPreferencesScreen : Screen {
   @Composable
   override fun Content() {
     val preferences = koinInject<DecoderPreferences>()
-    val appPreferences = koinInject<AppearancePreferences>()
     val backstack = LocalBackStack.current
     val context = LocalContext.current
     val isVulkanSupported = remember { VulkanUtils.isVulkanSupported(context) }
     var showGpuNextWarning by remember { mutableStateOf(false) }
 
-    val darkMode by appPreferences.darkMode.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val isDark = when (darkMode) {
-      DarkMode.Dark -> true
-      DarkMode.Light -> false
-      DarkMode.System -> systemDarkTheme
-    }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+    val backgroundColor = rememberPreferenceBackgroundColor()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Surface(
@@ -82,7 +70,7 @@ object DecoderPreferencesScreen : Screen {
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
-          TopAppBar(
+          PreferenceTopBar(
             title = {
               Text(
                 text = stringResource(R.string.pref_decoder),
@@ -101,11 +89,7 @@ object DecoderPreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                titleContentColor = MaterialTheme.colorScheme.primary
-            )
+            containerColor = backgroundColor,
           )
         },
       ) { padding ->

@@ -1,6 +1,5 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,7 +11,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -29,12 +27,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.AudioChannels
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.ListPreference
@@ -51,18 +47,10 @@ object AudioPreferencesScreen : Screen {
   override fun Content() {
     val backstack = LocalBackStack.current
     val preferences = koinInject<AudioPreferences>()
-    val appPreferences = koinInject<AppearancePreferences>()
-    
+
     val channelNames = AudioChannels.entries.associateWith { stringResource(it.title) }
 
-    val darkMode by appPreferences.darkMode.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val isDark = when (darkMode) {
-      DarkMode.Dark -> true
-      DarkMode.Light -> false
-      DarkMode.System -> systemDarkTheme
-    }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+    val backgroundColor = rememberPreferenceBackgroundColor()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Surface(
@@ -73,7 +61,7 @@ object AudioPreferencesScreen : Screen {
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
-          TopAppBar(
+          PreferenceTopBar(
             title = { 
               Text(
                 text = stringResource(R.string.pref_audio),
@@ -92,11 +80,7 @@ object AudioPreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                titleContentColor = MaterialTheme.colorScheme.primary
-            )
+            containerColor = backgroundColor,
           )
         },
       ) { padding ->

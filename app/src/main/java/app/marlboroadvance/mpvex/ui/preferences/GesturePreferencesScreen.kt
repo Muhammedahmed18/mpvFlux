@@ -1,6 +1,5 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,7 +13,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -38,13 +36,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.player.CustomKeyCodes
 import app.marlboroadvance.mpvex.ui.player.SingleActionGesture
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.Serializable
@@ -59,7 +55,6 @@ object GesturePreferencesScreen : Screen {
   @Composable
   override fun Content() {
     val preferences = koinInject<GesturePreferences>()
-    val appPreferences = koinInject<AppearancePreferences>()
     val backstack = LocalBackStack.current
     val useSingleTapForCenter by preferences.useSingleTapForCenter.collectAsState()
 
@@ -68,14 +63,7 @@ object GesturePreferencesScreen : Screen {
     
     val gestureNames = SingleActionGesture.entries.associateWith { stringResource(it.titleRes) }
 
-    val darkMode by appPreferences.darkMode.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val isDark = when (darkMode) {
-      DarkMode.Dark -> true
-      DarkMode.Light -> false
-      DarkMode.System -> systemDarkTheme
-    }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+    val backgroundColor = rememberPreferenceBackgroundColor()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Surface(
@@ -86,7 +74,7 @@ object GesturePreferencesScreen : Screen {
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
-          TopAppBar(
+          PreferenceTopBar(
             title = { 
               Text(
                 text = stringResource(R.string.pref_gesture),
@@ -105,11 +93,7 @@ object GesturePreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                titleContentColor = MaterialTheme.colorScheme.primary
-            )
+            containerColor = backgroundColor,
           )
         },
       ) { padding ->

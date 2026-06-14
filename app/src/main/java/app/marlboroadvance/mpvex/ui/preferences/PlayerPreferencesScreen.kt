@@ -1,6 +1,5 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -10,7 +9,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -26,13 +24,11 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.player.PlayerOrientation
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.ListPreference
@@ -49,18 +45,10 @@ object PlayerPreferencesScreen : Screen {
   override fun Content() {
     val backstack = LocalBackStack.current
     val preferences = koinInject<PlayerPreferences>()
-    val appPreferences = koinInject<AppearancePreferences>()
-    
+
     val orientationNames = PlayerOrientation.entries.associateWith { stringResource(it.titleRes) }
-    
-    val darkMode by appPreferences.darkMode.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val isDark = when (darkMode) {
-      DarkMode.Dark -> true
-      DarkMode.Light -> false
-      DarkMode.System -> systemDarkTheme
-    }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+
+    val backgroundColor = rememberPreferenceBackgroundColor()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Surface(
@@ -71,14 +59,14 @@ object PlayerPreferencesScreen : Screen {
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
-          TopAppBar(
-            title = { 
+          PreferenceTopBar(
+            title = {
               Text(
                 text = stringResource(id = R.string.pref_player),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.ExtraBold,
                 color = MaterialTheme.colorScheme.primary,
-              ) 
+              )
             },
             navigationIcon = {
               IconButton(onClick = backstack::removeLastOrNull) {
@@ -90,11 +78,7 @@ object PlayerPreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                titleContentColor = MaterialTheme.colorScheme.primary
-            )
+            containerColor = backgroundColor,
           )
         },
       ) { padding ->
@@ -109,75 +93,57 @@ object PlayerPreferencesScreen : Screen {
             )
           ) {
             item {
-              PreferenceSectionHeader(title = "General")
+              PreferenceSectionHeader(title = "Playback")
             }
-            
+
             item {
               PreferenceCard {
-                val orientation by preferences.orientation.collectAsState()
-                ListPreference(
-                  value = orientation,
-                  onValueChange = preferences.orientation::set,
-                  values = PlayerOrientation.entries,
-                  valueToText = { AnnotatedString(orientationNames[it] ?: "") },
-                  title = { 
-                    Text(
-                      text = stringResource(id = R.string.pref_player_orientation),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
-                    ) 
-                  },
-                  summary = { 
-                    Text(
-                      text = orientationNames[orientation] ?: "",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
-                    ) 
-                  },
-                )
-                
-                PreferenceDivider()
-                
                 val savePositionOnQuit by preferences.savePositionOnQuit.collectAsState()
                 SwitchPreference(
                   value = savePositionOnQuit,
                   onValueChange = preferences.savePositionOnQuit::set,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_player_save_position_on_quit),
                       style = MaterialTheme.typography.titleMedium,
                       fontWeight = FontWeight.Bold
-                    ) 
+                    )
                   },
                 )
-                
+
                 PreferenceDivider()
-                
+
                 val closeAfterEndOfVideo by preferences.closeAfterReachingEndOfVideo.collectAsState()
                 SwitchPreference(
                   value = closeAfterEndOfVideo,
                   onValueChange = preferences.closeAfterReachingEndOfVideo::set,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(id = R.string.pref_player_close_after_eof),
                       style = MaterialTheme.typography.titleMedium,
                       fontWeight = FontWeight.Bold
-                    ) 
+                    )
                   },
                 )
-                
-                PreferenceDivider()
-                
+              }
+            }
+
+            item {
+              PreferenceSectionHeader(title = "Playlist & Autoplay")
+            }
+
+            item {
+              PreferenceCard {
                 val autoplayNextVideo by preferences.autoplayNextVideo.collectAsState()
                 SwitchPreference(
                   value = autoplayNextVideo,
                   onValueChange = preferences.autoplayNextVideo::set,
-                  title = { 
+                  title = {
                     Text(
                       text = "Autoplay next video",
                       style = MaterialTheme.typography.titleMedium,
                       fontWeight = FontWeight.Bold
-                    ) 
+                    )
                   },
                   summary = {
                     Text(
@@ -190,19 +156,19 @@ object PlayerPreferencesScreen : Screen {
                     )
                   },
                 )
-                
+
                 PreferenceDivider()
-                
+
                 val playlistMode by preferences.playlistMode.collectAsState()
                 SwitchPreference(
                   value = playlistMode,
                   onValueChange = preferences.playlistMode::set,
-                  title = { 
+                  title = {
                     Text(
                       text = "Enable next/previous navigation",
                       style = MaterialTheme.typography.titleMedium,
                       fontWeight = FontWeight.Bold
-                    ) 
+                    )
                   },
                   summary = {
                     Text(
@@ -215,27 +181,35 @@ object PlayerPreferencesScreen : Screen {
                     )
                   },
                 )
-                
-                PreferenceDivider()
+              }
+            }
 
-                val showNextUpPrompt by preferences.showNextUpPrompt.collectAsState()
-                SwitchPreference(
-                    value = showNextUpPrompt,
-                    onValueChange = preferences.showNextUpPrompt::set,
-                    title = {
-                        Text(
-                            text = "Show \"Next Up\" prompt",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    summary = {
-                        Text(
-                            text = "Show a button to play next video when reaching the end",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+            item {
+              PreferenceSectionHeader(title = "Display & Screen")
+            }
+
+            item {
+              PreferenceCard {
+                val orientation by preferences.orientation.collectAsState()
+                ListPreference(
+                  value = orientation,
+                  onValueChange = preferences.orientation::set,
+                  values = PlayerOrientation.entries,
+                  valueToText = { AnnotatedString(orientationNames[it] ?: "") },
+                  title = {
+                    Text(
+                      text = stringResource(id = R.string.pref_player_orientation),
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    )
+                  },
+                  summary = {
+                    Text(
+                      text = orientationNames[orientation] ?: "",
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                  },
                 )
 
                 PreferenceDivider()
@@ -244,33 +218,11 @@ object PlayerPreferencesScreen : Screen {
                 SwitchPreference(
                   value = rememberBrightness,
                   onValueChange = preferences.rememberBrightness::set,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_player_remember_brightness),
                       style = MaterialTheme.typography.titleMedium,
                       fontWeight = FontWeight.Bold
-                    ) 
-                  },
-                )
-
-                PreferenceDivider()
-
-                val autoPiPOnNavigation by preferences.autoPiPOnNavigation.collectAsState()
-                SwitchPreference(
-                  value = autoPiPOnNavigation,
-                  onValueChange = preferences.autoPiPOnNavigation::set,
-                  title = { 
-                    Text(
-                      text = "Auto Picture-in-Picture",
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
-                    ) 
-                  },
-                  summary = {
-                    Text(
-                      text = "Automatically enter PIP mode when pressing home or back",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
@@ -281,12 +233,12 @@ object PlayerPreferencesScreen : Screen {
                 SwitchPreference(
                   value = keepScreenOnWhenPaused,
                   onValueChange = preferences.keepScreenOnWhenPaused::set,
-                  title = { 
+                  title = {
                     Text(
                       text = "Keep screen on when paused",
                       style = MaterialTheme.typography.titleMedium,
                       fontWeight = FontWeight.Bold
-                    ) 
+                    )
                   },
                   summary = {
                     Text(
@@ -294,6 +246,34 @@ object PlayerPreferencesScreen : Screen {
                         "Screen stays awake while video is paused"
                       else
                         "Screen can turn off while video is paused",
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                  },
+                )
+              }
+            }
+
+            item {
+              PreferenceSectionHeader(title = "Picture-in-Picture")
+            }
+
+            item {
+              PreferenceCard {
+                val autoPiPOnNavigation by preferences.autoPiPOnNavigation.collectAsState()
+                SwitchPreference(
+                  value = autoPiPOnNavigation,
+                  onValueChange = preferences.autoPiPOnNavigation::set,
+                  title = {
+                    Text(
+                      text = "Auto Picture-in-Picture",
+                      style = MaterialTheme.typography.titleMedium,
+                      fontWeight = FontWeight.Bold
+                    )
+                  },
+                  summary = {
+                    Text(
+                      text = "Automatically enter PIP mode when pressing home or back",
                       style = MaterialTheme.typography.bodyMedium,
                       color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

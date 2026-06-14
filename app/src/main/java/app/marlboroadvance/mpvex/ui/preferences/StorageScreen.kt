@@ -100,7 +100,7 @@ object StorageScreen : Screen {
     Scaffold(
       modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
       topBar = {
-        TopAppBar(
+        PreferenceTopBar(
           title = {
             Text(
               text = stringResource(R.string.pref_storage_title),
@@ -119,11 +119,7 @@ object StorageScreen : Screen {
             }
           },
           scrollBehavior = scrollBehavior,
-          colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent,
-            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            titleContentColor = MaterialTheme.colorScheme.primary,
-          ),
+          containerColor = MaterialTheme.colorScheme.background,
         )
       },
     ) { padding ->

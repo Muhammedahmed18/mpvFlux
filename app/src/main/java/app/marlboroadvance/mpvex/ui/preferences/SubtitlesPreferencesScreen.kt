@@ -271,6 +271,7 @@ object SubtitlesPreferencesScreen : Screen {
                   Text(
                     stringResource(R.string.pref_subtitles_fonts_dir),
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                   )
                   if (customFontEntries.isEmpty()) {
                     Text(
@@ -308,6 +309,7 @@ object SubtitlesPreferencesScreen : Screen {
                   Text(
                     stringResource(R.string.pref_subtitles_save_location),
                     style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
                   )
                   val folderPath = if (subtitleSaveFolder.isBlank()) {
                     stringResource(R.string.not_set_video_default)
