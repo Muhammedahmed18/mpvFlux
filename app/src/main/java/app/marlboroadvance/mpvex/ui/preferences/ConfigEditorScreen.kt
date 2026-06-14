@@ -5,7 +5,6 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
@@ -29,10 +28,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -61,7 +58,6 @@ data class ConfigEditorScreen(
     val context = LocalContext.current
     val backStack = LocalBackStack.current
     val preferences = koinInject<AdvancedPreferences>()
-    val appPreferences = koinInject<AppearancePreferences>()
     val scope = rememberCoroutineScope()
 
     val (fileName, initialValue) = when (configType) {
@@ -77,14 +73,7 @@ data class ConfigEditorScreen(
     var hasUnsavedChanges by remember { mutableStateOf(false) }
     val mpvConfStorageLocation by preferences.mpvConfStorageUri.collectAsState()
 
-    val darkMode by appPreferences.darkMode.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val isDark = when (darkMode) {
-      DarkMode.Dark -> true
-      DarkMode.Light -> false
-      DarkMode.System -> systemDarkTheme
-    }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+    val backgroundColor = rememberPreferenceBackgroundColor()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     LaunchedEffect(mpvConfStorageLocation) {
@@ -148,12 +137,9 @@ data class ConfigEditorScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
-          TopAppBar(
+          PreferenceTopBar(
             scrollBehavior = scrollBehavior,
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = Color.Transparent,
-                scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-            ),
+            containerColor = backgroundColor,
             title = {
               Column {
                 Text(

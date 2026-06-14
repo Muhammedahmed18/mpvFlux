@@ -2,9 +2,7 @@ package app.marlboroadvance.mpvex.ui.preferences
 
 import android.content.ClipData
 import android.os.Build
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -32,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalUriHandler
@@ -44,9 +41,7 @@ import app.marlboroadvance.mpvex.BuildConfig
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.crash.CrashActivity.Companion.collectDeviceInfo
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import `is`.xyz.mpv.Utils
 import kotlinx.coroutines.launch
@@ -66,15 +61,7 @@ object AboutScreen : Screen {
         val uriHandler = LocalUriHandler.current
         val scope = rememberCoroutineScope()
 
-        val appPreferences = koinInject<AppearancePreferences>()
-        val darkMode by appPreferences.darkMode.collectAsState()
-        val systemDarkTheme = isSystemInDarkTheme()
-        val isDark = when (darkMode) {
-            DarkMode.Dark -> true
-            DarkMode.Light -> false
-            DarkMode.System -> systemDarkTheme
-        }
-        val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+        val backgroundColor = rememberPreferenceBackgroundColor()
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
         Surface(
@@ -85,7 +72,7 @@ object AboutScreen : Screen {
                 modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                 containerColor = Color.Transparent,
                 topBar = {
-                    TopAppBar(
+                    PreferenceTopBar(
                         title = {
                             Text(
                                 text = "About",
@@ -104,11 +91,7 @@ object AboutScreen : Screen {
                             }
                         },
                         scrollBehavior = scrollBehavior,
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                            titleContentColor = MaterialTheme.colorScheme.primary,
-                        ),
+                        containerColor = backgroundColor,
                     )
                 },
             ) { paddingValues ->
@@ -218,10 +201,10 @@ object AboutScreen : Screen {
                     modifier = Modifier.size(76.dp),
                 ) {
                     Box(contentAlignment = Alignment.Center) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_launcher_foreground_vector),
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_launcher_monochrome),
                             contentDescription = "App Icon",
-                            contentScale = ContentScale.Inside,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(56.dp),
                         )
                     }

@@ -34,7 +34,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -173,7 +172,7 @@ data class ControlLayoutEditorScreen(
           modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
           containerColor = Color.Transparent,
           topBar = {
-            TopAppBar(
+            PreferenceTopBar(
               title = { 
                 Text(
                     text = title,
@@ -193,11 +192,7 @@ data class ControlLayoutEditorScreen(
                 }
               },
               scrollBehavior = scrollBehavior,
-              colors = TopAppBarDefaults.topAppBarColors(
-                  containerColor = Color.Transparent,
-                  scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-                  titleContentColor = MaterialTheme.colorScheme.primary
-              )
+              containerColor = backgroundColor,
             )
           },
         ) { padding ->
