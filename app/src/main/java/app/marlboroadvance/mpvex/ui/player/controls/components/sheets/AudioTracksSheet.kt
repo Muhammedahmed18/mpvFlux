@@ -34,17 +34,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreTime
-import androidx.compose.material3.BottomSheetDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,8 +56,6 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AudioChannels
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
-import app.marlboroadvance.mpvex.presentation.components.PlayerSideSheet
-import app.marlboroadvance.mpvex.presentation.components.rememberSideSheetWidth
 import app.marlboroadvance.mpvex.ui.player.TrackNode
 import app.marlboroadvance.mpvex.ui.player.controls.glassIconButtonColors
 import app.marlboroadvance.mpvex.ui.player.controls.playerControlsEnterAnimationSpec
@@ -77,7 +70,6 @@ sealed class AudioItem {
   data class Header(val title: String) : AudioItem()
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AudioTracksSheet(
   tracks: ImmutableList<TrackNode>,
@@ -87,45 +79,18 @@ fun AudioTracksSheet(
   onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val isLandscape =
-    LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-
-  if (isLandscape) {
-    // Landscape — right-anchored side sheet so the video stays watchable.
-    PlayerSideSheet(
-      onDismissRequest = onDismissRequest,
-      sheetWidth       = rememberSideSheetWidth(),
-      surfaceColor     = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-      AudioTracksSheetContent(
-        tracks            = tracks,
-        onSelect          = onSelect,
-        onAddAudioTrack   = onAddAudioTrack,
-        onOpenDelayPanel  = onOpenDelayPanel,
-        onDismissRequest  = onDismissRequest,
-        modifier          = modifier,
-      )
-    }
-  } else {
-    // Portrait — canonical M3 modal bottom sheet with built-in drag handle.
-    // skipPartiallyExpanded = true so the sheet opens at full height immediately
-    // (no half-peek state) — makes tracks at the bottom of the list reachable.
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-      onDismissRequest = onDismissRequest,
-      sheetState       = sheetState,
-      containerColor   = MaterialTheme.colorScheme.surfaceContainerLow,
-      dragHandle       = { BottomSheetDefaults.DragHandle() },
-    ) {
-      AudioTracksSheetContent(
-        tracks            = tracks,
-        onSelect          = onSelect,
-        onAddAudioTrack   = onAddAudioTrack,
-        onOpenDelayPanel  = onOpenDelayPanel,
-        onDismissRequest  = onDismissRequest,
-        modifier          = modifier,
-      )
-    }
+  // Orientation branching (side sheet vs bottom sheet) lives in the shared
+  // TracksSheetHost. `dismiss` animates the sheet out before clearing state,
+  // so e.g. picking an audio channel no longer pops the sheet instantly.
+  TracksSheetHost(onDismissRequest = onDismissRequest) { dismiss ->
+    AudioTracksSheetContent(
+      tracks            = tracks,
+      onSelect          = onSelect,
+      onAddAudioTrack   = onAddAudioTrack,
+      onOpenDelayPanel  = onOpenDelayPanel,
+      onDismissRequest  = dismiss,
+      modifier          = modifier,
+    )
   }
 }
 

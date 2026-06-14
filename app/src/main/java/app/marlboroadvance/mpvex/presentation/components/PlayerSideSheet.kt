@@ -4,8 +4,8 @@ package app.marlboroadvance.mpvex.presentation.components
 
 import android.annotation.SuppressLint
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,13 +45,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.ui.player.controls.playerControlsEnterAnimationSpec
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-private val sideSheetAnimationSpec = tween<Float>(350)
+// Spring shared with the player overlay (see PlayerControls.kt) so the sheet and
+// its scrim settle with the same fluid motion as the rest of the controls,
+// instead of the flat 350ms tween it previously used.
+private val sideSheetAnimationSpec: FiniteAnimationSpec<Float> = playerControlsEnterAnimationSpec()
 
 /**
  * Right-anchored modal side sheet for the player overlay. Slides in from the right
@@ -69,6 +73,11 @@ private val sideSheetAnimationSpec = tween<Float>(350)
  *  - Height fills the screen; content is window-inset-padded for status/nav bars.
  *
  * Shape: only the LEFT corners are rounded (right side is the screen edge).
+ *
+ * The content slot receives `requestDismiss` — an animated dismissal that slides
+ * the sheet off-screen before invoking [onDismissRequest]. Content should call it
+ * (rather than [onDismissRequest] directly) when dismissing programmatically,
+ * e.g. after the user picks an option, so the sheet never pops out of composition.
  */
 @SuppressLint("ConfigurationScreenWidthHeight")
 @Composable
@@ -78,7 +87,7 @@ fun PlayerSideSheet(
   modifier: Modifier = Modifier,
   tonalElevation: Dp = 1.dp,
   surfaceColor: Color? = null,
-  content: @Composable () -> Unit,
+  content: @Composable (requestDismiss: () -> Unit) -> Unit,
 ) {
   val scope = rememberCoroutineScope()
   val density = LocalDensity.current
@@ -166,7 +175,7 @@ fun PlayerSideSheet(
           enabled = anchoredDraggableState.targetValue == 0,
           onBack  = internalOnDismissRequest,
         )
-        content()
+        content(internalOnDismissRequest)
       },
     )
 

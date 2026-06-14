@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -60,6 +61,7 @@ import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,6 +84,7 @@ import app.marlboroadvance.mpvex.presentation.components.rememberSideSheetWidth
 import app.marlboroadvance.mpvex.ui.player.TrackNode
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.launch
 
 /**
  * Single source of truth for the soft top-light gradient that traces every glass
@@ -123,7 +126,62 @@ fun getTrackTitle(track: TrackNode): String {
   }
 }
 
+/**
+ * Shared orientation-aware host for every track-style sheet in the player —
+ * single source of truth, used by both the subtitles and audio sheets (the
+ * branching below was previously copy-pasted in each).
+ *
+ *  - Landscape → right-anchored [PlayerSideSheet] so the video stays watchable.
+ *  - Portrait  → canonical M3 [ModalBottomSheet] with built-in drag handle.
+ *
+ * Each host fully owns its entrance/exit animation. The content slot receives a
+ * `dismiss` lambda that animates the sheet out **before** clearing the sheet
+ * state — content should call it for programmatic dismissal (e.g. after the user
+ * picks an option) instead of the raw `onDismissRequest`, which pops instantly.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TracksSheetHost(
+  onDismissRequest: () -> Unit,
+  content: @Composable (dismiss: () -> Unit) -> Unit,
+) {
+  val isLandscape =
+    LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+
+  if (isLandscape) {
+    PlayerSideSheet(
+      onDismissRequest = onDismissRequest,
+      sheetWidth       = rememberSideSheetWidth(),
+      surfaceColor     = MaterialTheme.colorScheme.surfaceContainerLow,
+      content          = content,
+    )
+  } else {
+    // Partial expansion kept (no skipPartiallyExpanded): the sheet opens at
+    // half height so the video stays visible while picking a track; drag up
+    // reveals the rest of the list at the capped full height.
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+    // Even fully expanded the sheet stops at ~75% of the screen, so it never
+    // reads as a full-screen takeover of the player.
+    val maxSheetHeight = LocalConfiguration.current.screenHeightDp.dp * 0.75f
+    ModalBottomSheet(
+      onDismissRequest = onDismissRequest,
+      sheetState       = sheetState,
+      // Translucent "glass" container — MPV's SurfaceView can't be backdrop-blurred,
+      // so glass is approximated by letting the video glow through a high-alpha
+      // surface tint, matching the translucent track rows it hosts.
+      containerColor   = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.85f),
+      dragHandle       = { BottomSheetDefaults.DragHandle() },
+    ) {
+      Box(modifier = Modifier.heightIn(max = maxSheetHeight)) {
+        content {
+          scope.launch { sheetState.hide() }.invokeOnCompletion { onDismissRequest() }
+        }
+      }
+    }
+  }
+}
+
 @Composable
 fun <T> GenericTracksSheet(
   tracks: ImmutableList<T>,
@@ -134,45 +192,15 @@ fun <T> GenericTracksSheet(
   track: @Composable (T) -> Unit = {},
   footer: @Composable () -> Unit = {},
 ) {
-  val isLandscape =
-    LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-
-  if (isLandscape) {
-    // Landscape — right-anchored side sheet so the video stays watchable.
-    PlayerSideSheet(
-      onDismissRequest = onDismissRequest,
-      sheetWidth       = rememberSideSheetWidth(),
-      surfaceColor     = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-      GenericTracksSheetContent(
-        tracks        = tracks,
-        modifier      = modifier,
-        lazyListState = lazyListState,
-        header        = header,
-        track         = track,
-        footer        = footer,
-      )
-    }
-  } else {
-    // Portrait — canonical M3 modal bottom sheet with built-in drag handle.
-    // skipPartiallyExpanded = true so the sheet opens at full height immediately
-    // (no half-peek state) — makes tracks at the bottom of the list reachable.
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-      onDismissRequest = onDismissRequest,
-      sheetState       = sheetState,
-      containerColor   = MaterialTheme.colorScheme.surfaceContainerLow,
-      dragHandle       = { BottomSheetDefaults.DragHandle() },
-    ) {
-      GenericTracksSheetContent(
-        tracks        = tracks,
-        modifier      = modifier,
-        lazyListState = lazyListState,
-        header        = header,
-        track         = track,
-        footer        = footer,
-      )
-    }
+  TracksSheetHost(onDismissRequest = onDismissRequest) { _ ->
+    GenericTracksSheetContent(
+      tracks        = tracks,
+      modifier      = modifier,
+      lazyListState = lazyListState,
+      header        = header,
+      track         = track,
+      footer        = footer,
+    )
   }
 }
 
