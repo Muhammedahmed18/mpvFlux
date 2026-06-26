@@ -14,7 +14,7 @@ android {
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "app.marlboroadvance.mpvex"
+    applicationId = "app.marlboroadvance.mpvflux"
     minSdk = 26
     targetSdk = 36
     versionCode = 113
@@ -33,21 +33,18 @@ android {
   productFlavors {
     create("standard") {
       dimension = "distribution"
-      buildConfigField("boolean", "ENABLE_UPDATE_FEATURE", "true")
       buildConfigField("boolean", "SCOPED_STORAGE_ONLY", "false")
     }
 
     create("playstore") {
       dimension = "distribution"
       versionNameSuffix = "-playstore"
-      buildConfigField("boolean", "ENABLE_UPDATE_FEATURE", "false")
       buildConfigField("boolean", "SCOPED_STORAGE_ONLY", "true")
     }
 
     create("fdroid") {
       dimension = "distribution"
       versionNameSuffix = "-fdroid"
-      buildConfigField("boolean", "ENABLE_UPDATE_FEATURE", "false")
       buildConfigField("boolean", "SCOPED_STORAGE_ONLY", "false")
 
       ndk {
@@ -164,6 +161,17 @@ kotlin {
 
 composeCompiler {
   includeSourceInformation = true
+
+  // Phase 0 (recomposition audit): opt-in Compose compiler metrics + stability reports.
+  // Enable with `-PcomposeCompilerReports=true`; output lands in
+  // app/build/compose-compiler/{metrics,reports}. Off by default so normal builds are
+  // unaffected. The *-classes.txt report lists which params are inferred unstable
+  // (blocks skipping) and *-composables.txt shows skippable/restartable per composable.
+  if (project.findProperty("composeCompilerReports") == "true") {
+    val out = layout.buildDirectory.dir("compose-compiler")
+    metricsDestination.set(out.map { it.dir("metrics") })
+    reportsDestination.set(out.map { it.dir("reports") })
+  }
 }
 
 room {
@@ -172,6 +180,8 @@ room {
 
 dependencies {
   implementation(libs.androidx.activity.compose)
+  implementation(libs.androidx.lifecycle.runtime.compose)
+  implementation(libs.androidx.lifecycle.viewmodel.compose)
   implementation(platform(libs.androidx.compose.bom))
   implementation(libs.androidx.ui)
   implementation(libs.androidx.ui.graphics)
@@ -212,13 +222,6 @@ dependencies {
   implementation(libs.mediainfo.lib)
   implementation(files("libs/mpv-android-lib-v0.0.1.aar"))
 
-  // Network protocol libraries
-  implementation(libs.smbj)
-  implementation(libs.commons.net)
-  implementation(libs.sardine.android) {
-    exclude(group = "xpp3", module = "xpp3")
-  }
-  implementation(libs.nanohttpd)
   implementation(libs.lazycolumnscrollbar)
   implementation(libs.reorderable)
 }
