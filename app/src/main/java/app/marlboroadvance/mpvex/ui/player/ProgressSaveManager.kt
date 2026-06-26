@@ -9,6 +9,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -42,6 +43,12 @@ class ProgressSaveManager : KoinComponent {
     private val playbackStateRepository: PlaybackStateRepository by inject()
     private val browserPreferences: BrowserPreferences by inject()
     
+    // Single long-lived scope shared by all saves, instead of allocating a fresh
+    // CoroutineScope per call. SupervisorJob so one failed save can't cancel the scope
+    // (each save also catches its own exceptions). Individual saves are still cancelled
+    // via currentSaveJob; immediate saves run under NonCancellable to survive teardown.
+    private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private var currentSaveJob: Job? = null
     private var lastSavedPosition: Int? = null
     private var lastSavedMediaIdentifier: String? = null
@@ -68,7 +75,7 @@ class ProgressSaveManager : KoinComponent {
             currentSaveJob?.cancel()
         }
         
-        currentSaveJob = CoroutineScope(Dispatchers.IO).launch {
+        currentSaveJob = saveScope.launch {
             try {
                 // Debounce to prevent rapid saves unless immediate
                 if (!isImmediate) {

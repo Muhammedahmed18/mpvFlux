@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -69,9 +70,12 @@ class PlaylistViewModel(
       }
     }
 
-    // Then observe for updates with actual counts
+    // Then observe for updates with actual counts. distinctUntilChanged drops Room re-emissions
+    // that carry an identical playlist list, avoiding a redundant full per-playlist video recount
+    // (each recount does DB lookups + a filesystem existence check). collectLatest cancels a stale
+    // recount if a newer emission arrives mid-pass.
     viewModelScope.launch(Dispatchers.IO) {
-      repository.observeAllPlaylists().collectLatest { playlistsFromDb ->
+      repository.observeAllPlaylists().distinctUntilChanged().collectLatest { playlistsFromDb ->
         val sortedPlaylists = playlistsFromDb.sortedBy { it.name.lowercase() }
 
         val playlistsWithCounts = sortedPlaylists.map { playlist ->
@@ -133,18 +137,6 @@ class PlaylistViewModel(
 
   suspend fun createPlaylist(name: String): Long {
     return repository.createPlaylist(name)
-  }
-
-  suspend fun createM3UPlaylist(url: String): Result<Long> {
-    return repository.createM3UPlaylist(url)
-  }
-
-  suspend fun createM3UPlaylistFromFile(uri: android.net.Uri): Result<Long> {
-    return repository.createM3UPlaylistFromFile(getApplication(), uri)
-  }
-
-  suspend fun refreshM3UPlaylist(playlistId: Int): Result<Unit> {
-    return repository.refreshM3UPlaylist(playlistId)
   }
 
   suspend fun deletePlaylist(playlist: PlaylistEntity) {

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -79,12 +80,20 @@ fun SeekbarWithTimers(
     val scope = rememberCoroutineScope()
     val animatedPosition = remember { Animatable(positionFlow.value) }
 
+    // Position now arrives at ~1 Hz (whole-second ticks) to save battery. Bridge the gap
+    // with a 1s linear tween so the thumb glides at playback rate between ticks. Large
+    // deltas (user seeks, playlist/file changes) snap instantly instead of slow-crawling
+    // across the bar.
     LaunchedEffect(position, isUserInteracting) {
         if (!isUserInteracting && position != animatedPosition.value) {
-            animatedPosition.animateTo(
-                targetValue = position,
-                animationSpec = tween(durationMillis = 200, easing = LinearEasing),
-            )
+            if (kotlin.math.abs(position - animatedPosition.value) > 2f) {
+                animatedPosition.snapTo(position)
+            } else {
+                animatedPosition.animateTo(
+                    targetValue = position,
+                    animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
+                )
+            }
         }
     }
 
@@ -100,7 +109,7 @@ fun SeekbarWithTimers(
                 clickEvent()
                 positionTimerOnClick()
             },
-            modifier = Modifier.width(72.dp),
+            modifier = Modifier.widthIn(min = 72.dp),
         )
 
         Box(
@@ -161,7 +170,7 @@ fun SeekbarWithTimers(
                 clickEvent()
                 durationTimerOnCLick()
             },
-            modifier = Modifier.width(72.dp),
+            modifier = Modifier.widthIn(min = 72.dp),
         )
     }
 }
@@ -185,6 +194,8 @@ fun VideoTimer(
     ) {
         Text(
             text = Utils.prettyTime(value.toInt(), isInverted),
+            maxLines = 1,
+            softWrap = false,
             style = MaterialTheme.typography.titleSmall.copy(
                 fontWeight = FontWeight.Medium,
                 fontFeatureSettings = "tnum",
@@ -199,16 +210,17 @@ fun VideoTimer(
 fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Segment>, isPaused: Boolean = false, isScrubbing: Boolean = false, seekbarStyle: SeekbarStyle = SeekbarStyle.Standard, onSeek: (Float) -> Unit, onSeekFinished: () -> Unit, loopStart: Float? = null, loopEnd: Float? = null, modifier: Modifier = Modifier) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val interactionSource = remember { MutableInteractionSource() }
-    var heightFraction by remember { mutableFloatStateOf(1f) }
+    // Reuse a single Animatable across pause/scrub toggles instead of allocating a new
+    // one each time the effect re-runs.
+    val heightAnimatable = remember { Animatable(1f) }
     LaunchedEffect(isPaused, isScrubbing) {
         val shouldFlatten = isPaused || isScrubbing
         val targetHeight = if (shouldFlatten) 0.7f else 1f
         delay(if (shouldFlatten) 0L else 60L)
-        val animator = Animatable(heightFraction)
-        animator.animateTo(targetValue = targetHeight, animationSpec = tween(durationMillis = if (shouldFlatten) 550 else 800, easing = LinearEasing)) { heightFraction = value }
+        heightAnimatable.animateTo(targetValue = targetHeight, animationSpec = tween(durationMillis = if (shouldFlatten) 550 else 800, easing = LinearEasing))
     }
     val isThick = seekbarStyle == SeekbarStyle.Thick
-    val trackHeightDp = (if (isThick) 16.dp else 8.dp) * heightFraction
+    val trackHeightDp = (if (isThick) 16.dp else 8.dp) * heightAnimatable.value
     Slider(value = position, onValueChange = onSeek, onValueChangeFinished = onSeekFinished, valueRange = 0f..duration.coerceAtLeast(0.1f), modifier = Modifier.fillMaxWidth(), interactionSource = interactionSource,
         track = { sliderState ->
             Canvas(modifier = Modifier.fillMaxWidth().height(trackHeightDp)) {
@@ -241,4 +253,3 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
         thumb = { Box(modifier = Modifier.width(6.dp).height(if (isThick) 16.dp else 24.dp).background(primaryColor, if (isThick) RoundedCornerShape(3.dp) else CircleShape)) }
     )
 }
-
