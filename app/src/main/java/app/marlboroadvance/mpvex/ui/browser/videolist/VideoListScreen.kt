@@ -32,7 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -112,11 +112,10 @@ data class VideoListScreen(
         key = "VideoListViewModel_$bucketId",
         factory = VideoListViewModel.factory(context.applicationContext as android.app.Application, bucketId),
       )
-    val videos by viewModel.videos.collectAsState()
-    val videosWithPlaybackInfo by viewModel.videosWithPlaybackInfo.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val recentlyPlayedFilePath by viewModel.recentlyPlayedFilePath.collectAsState()
-    val lastPlayedInFolderPath by viewModel.lastPlayedInFolderPath.collectAsState()
+    val videosWithPlaybackInfo by viewModel.videosWithPlaybackInfo.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val recentlyPlayedFilePath by viewModel.recentlyPlayedFilePath.collectAsStateWithLifecycle()
+    val lastPlayedInFolderPath by viewModel.lastPlayedInFolderPath.collectAsStateWithLifecycle()
     val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
 
     // VideoCard settings
@@ -163,9 +162,10 @@ data class VideoListScreen(
       }
 
     // Selection manager
+    val sortedVideos = remember(sortedVideosWithInfo) { sortedVideosWithInfo.map { it.video } }
     val selectionManager =
       rememberSelectionManager(
-        items = sortedVideosWithInfo.map { it.video },
+        items = sortedVideos,
         getId = { it.id },
         onDeleteItems = { items, _ -> viewModel.deleteVideos(items) },
         onRenameItem = { video, newName -> viewModel.renameVideo(video, newName) }
@@ -182,7 +182,6 @@ data class VideoListScreen(
     val folderPickerOpen = rememberSaveable { mutableStateOf(false) }
     val operationType = remember { mutableStateOf<CopyPasteOps.OperationType?>(null) }
     val progressDialogOpen = rememberSaveable { mutableStateOf(false) }
-    val operationProgress by CopyPasteOps.operationProgress.collectAsState()
     val treePickerLauncher =
       rememberLauncherForActivityResult(OpenDocumentTreeContract()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -217,7 +216,7 @@ data class VideoListScreen(
     val showPrivateSpaceCompletionDialog = rememberSaveable { mutableStateOf(false) }
     val privateSpaceMovedCount = remember { mutableIntStateOf(0) }
 
-    val displayFolderName = videos.firstOrNull()?.bucketDisplayName ?: folderName
+    val displayFolderName = videosWithPlaybackInfo.firstOrNull()?.video?.bucketDisplayName ?: folderName
 
     // FAB visibility state
     val isFabVisible = remember { mutableStateOf(true) }
@@ -292,7 +291,7 @@ data class VideoListScreen(
           folderId = bucketId,
           videosWithInfo = sortedVideosWithInfo,
           videoCardSettings = videoCardSettings,
-          isLoading = isLoading && videos.isEmpty(),
+          isLoading = isLoading && videosWithPlaybackInfo.isEmpty(),
           isRefreshing = isRefreshing,
           recentlyPlayedFilePath = lastPlayedInFolderPath ?: recentlyPlayedFilePath,
           autoScrollToLastPlayed = autoScrollToLastPlayed,
@@ -353,129 +352,180 @@ data class VideoListScreen(
         }
       }
 
-      // Sort Sheet
-      VideoSortBottomSheet(
-        isOpen = sortDialogOpen.value,
-        onDismiss = { sortDialogOpen.value = false },
-        sortType = videoSortType,
-        sortOrder = videoSortOrder,
-        onSortTypeChange = { type -> browserPreferences.videoSortType.set(type) },
-        onSortOrderChange = { order -> browserPreferences.videoSortOrder.set(order) },
-      )
-
-      // Delete Dialog (Sheet)
-      DeleteConfirmationDialog(
-        isOpen = deleteDialogOpen.value,
-        onDismiss = { deleteDialogOpen.value = false },
-        onConfirm = { selectionManager.deleteSelected() },
-        itemType = "video",
-        itemCount = selectionManager.selectedCount,
-        itemNames = selectionManager.getSelectedItems().map { it.displayName },
-      )
-
-      // Rename Dialog
-      if (renameDialogOpen.value && selectionManager.isSingleSelection) {
-        val video = selectionManager.getSelectedItems().firstOrNull()
-        if (video != null) {
-          val baseName = video.displayName.substringBeforeLast('.')
-          val extension = "." + video.displayName.substringAfterLast('.', "")
-          RenameDialog(
-            isOpen = true,
-            onDismiss = { renameDialogOpen.value = false },
-            onConfirm = { newName -> selectionManager.renameSelected(newName) },
-            currentName = baseName,
-            itemType = "file",
-            extension = if (extension != ".") extension else null,
-          )
-        }
-      }
-
-      // Folder Picker (Sheet)
-      FolderPickerDialog(
-        isOpen = folderPickerOpen.value,
-        currentPath =
-          videos.firstOrNull()?.let { File(it.path).parent }
-            ?: Environment.getExternalStorageDirectory().absolutePath,
-        titlePrefix = if (operationType.value is CopyPasteOps.OperationType.Copy) "Copy to" else "Move to",
-        onDismiss = { folderPickerOpen.value = false },
-        onFolderSelected = { destinationPath ->
-          folderPickerOpen.value = false
-          val selectedVideos = selectionManager.getSelectedItems()
-          if (selectedVideos.isNotEmpty() && operationType.value != null) {
-            progressDialogOpen.value = true
-            coroutineScope.launch {
-              when (operationType.value) {
-                is CopyPasteOps.OperationType.Copy -> {
-                  CopyPasteOps.copyFiles(context, selectedVideos, destinationPath)
-                }
-
-                is CopyPasteOps.OperationType.Move -> {
-                  CopyPasteOps.moveFiles(context, selectedVideos, destinationPath)
-                }
-
-                else -> {}
-              }
-            }
-          }
-        },
-      )
-
-      // File Operation Progress (Sheet)
-      if (operationType.value != null) {
-        FileOperationProgressDialog(
-          isOpen = progressDialogOpen.value,
-          operationType = operationType.value!!,
-          progress = operationProgress,
-          onCancel = { CopyPasteOps.cancelOperation() },
-          onDismiss = {
-            progressDialogOpen.value = false
-            operationType.value = null
-            selectionManager.clear()
-            viewModel.refresh()
-          },
-        )
-      }
-
-      // Private Space Loading Sheet
-      LoadingDialog(
-        isOpen = movingToPrivateSpace.value,
-        message = "Moving to private space...",
-      )
-
-      // Private Space Completion Dialog
-      if (showPrivateSpaceCompletionDialog.value) {
-        androidx.compose.material3.AlertDialog(
-          onDismissRequest = { showPrivateSpaceCompletionDialog.value = false },
-          title = { Text(text = "Moved to Private Space", style = MaterialTheme.typography.headlineSmall) },
-          text = {
-            Text(
-              text = "Successfully moved ${privateSpaceMovedCount.intValue} video(s) to private space.\n\n" +
-                  "To access private space, long press on the app name at the top of the main screen.",
-              style = MaterialTheme.typography.bodyMedium,
-            )
-          },
-          confirmButton = {
-            androidx.compose.material3.Button(
-              onClick = { showPrivateSpaceCompletionDialog.value = false },
-            ) {
-              Text("Close")
-            }
-          },
-        )
-      }
-
-      // Add to Playlist Dialog
-      AddToPlaylistDialog(
-        isOpen = addToPlaylistDialogOpen.value,
-        videos = selectionManager.getSelectedItems(),
-        onDismiss = { addToPlaylistDialogOpen.value = false },
-        onSuccess = {
-          selectionManager.clear()
-          viewModel.refresh()
-        },
+      // All overlays (sort/delete/rename/copy-move/private-space/playlist) live in their
+      // own composable so their driving state stays out of the main Content scope.
+      VideoListDialogs(
+        selectionManager = selectionManager,
+        viewModel = viewModel,
+        browserPreferences = browserPreferences,
+        videoSortType = videoSortType,
+        videoSortOrder = videoSortOrder,
+        firstVideoPath = videosWithPlaybackInfo.firstOrNull()?.video?.path,
+        sortDialogOpen = sortDialogOpen,
+        deleteDialogOpen = deleteDialogOpen,
+        renameDialogOpen = renameDialogOpen,
+        addToPlaylistDialogOpen = addToPlaylistDialogOpen,
+        folderPickerOpen = folderPickerOpen,
+        progressDialogOpen = progressDialogOpen,
+        operationType = operationType,
+        movingToPrivateSpace = movingToPrivateSpace,
+        showPrivateSpaceCompletionDialog = showPrivateSpaceCompletionDialog,
+        privateSpaceMovedCount = privateSpaceMovedCount,
       )
     }
   }
+}
+
+@Composable
+private fun VideoListDialogs(
+  selectionManager: SelectionManager<Video, Long>,
+  viewModel: VideoListViewModel,
+  browserPreferences: BrowserPreferences,
+  videoSortType: VideoSortType,
+  videoSortOrder: SortOrder,
+  firstVideoPath: String?,
+  sortDialogOpen: androidx.compose.runtime.MutableState<Boolean>,
+  deleteDialogOpen: androidx.compose.runtime.MutableState<Boolean>,
+  renameDialogOpen: androidx.compose.runtime.MutableState<Boolean>,
+  addToPlaylistDialogOpen: androidx.compose.runtime.MutableState<Boolean>,
+  folderPickerOpen: androidx.compose.runtime.MutableState<Boolean>,
+  progressDialogOpen: androidx.compose.runtime.MutableState<Boolean>,
+  operationType: androidx.compose.runtime.MutableState<CopyPasteOps.OperationType?>,
+  movingToPrivateSpace: androidx.compose.runtime.MutableState<Boolean>,
+  showPrivateSpaceCompletionDialog: androidx.compose.runtime.MutableState<Boolean>,
+  privateSpaceMovedCount: androidx.compose.runtime.MutableIntState,
+) {
+  val context = LocalContext.current
+  val coroutineScope = rememberCoroutineScope()
+
+  // Sort Sheet
+  VideoSortBottomSheet(
+    isOpen = sortDialogOpen.value,
+    onDismiss = { sortDialogOpen.value = false },
+    sortType = videoSortType,
+    sortOrder = videoSortOrder,
+    onSortTypeChange = { type -> browserPreferences.videoSortType.set(type) },
+    onSortOrderChange = { order -> browserPreferences.videoSortOrder.set(order) },
+  )
+
+  // Delete Dialog (Sheet) — gated so getSelectedItems()/map only runs while the
+  // sheet is actually open, not on every Content recomposition.
+  if (deleteDialogOpen.value) {
+    val selectedForDelete = selectionManager.getSelectedItems()
+    DeleteConfirmationDialog(
+      isOpen = true,
+      onDismiss = { deleteDialogOpen.value = false },
+      onConfirm = { selectionManager.deleteSelected() },
+      itemType = "video",
+      itemCount = selectedForDelete.size,
+      itemNames = selectedForDelete.map { it.displayName },
+    )
+  }
+
+  // Rename Dialog
+  if (renameDialogOpen.value && selectionManager.isSingleSelection) {
+    val video = selectionManager.getSelectedItems().firstOrNull()
+    if (video != null) {
+      val baseName = video.displayName.substringBeforeLast('.')
+      val extension = "." + video.displayName.substringAfterLast('.', "")
+      RenameDialog(
+        isOpen = true,
+        onDismiss = { renameDialogOpen.value = false },
+        onConfirm = { newName -> selectionManager.renameSelected(newName) },
+        currentName = baseName,
+        itemType = "file",
+        extension = if (extension != ".") extension else null,
+      )
+    }
+  }
+
+  // Folder Picker (Sheet)
+  FolderPickerDialog(
+    isOpen = folderPickerOpen.value,
+    currentPath =
+      firstVideoPath?.let { File(it).parent }
+        ?: Environment.getExternalStorageDirectory().absolutePath,
+    titlePrefix = if (operationType.value is CopyPasteOps.OperationType.Copy) "Copy to" else "Move to",
+    onDismiss = { folderPickerOpen.value = false },
+    onFolderSelected = { destinationPath ->
+      folderPickerOpen.value = false
+      val selectedVideos = selectionManager.getSelectedItems()
+      if (selectedVideos.isNotEmpty() && operationType.value != null) {
+        progressDialogOpen.value = true
+        coroutineScope.launch {
+          when (operationType.value) {
+            is CopyPasteOps.OperationType.Copy -> {
+              CopyPasteOps.copyFiles(context, selectedVideos, destinationPath)
+            }
+
+            is CopyPasteOps.OperationType.Move -> {
+              CopyPasteOps.moveFiles(context, selectedVideos, destinationPath)
+            }
+
+            else -> {}
+          }
+        }
+      }
+    },
+  )
+
+  // File Operation Progress (Sheet)
+  if (operationType.value != null) {
+    // Collected here (not at Content scope) so frequent progress emissions during a
+    // copy/move only recompose this dialog, not the whole screen body.
+    val operationProgress by CopyPasteOps.operationProgress.collectAsStateWithLifecycle()
+    FileOperationProgressDialog(
+      isOpen = progressDialogOpen.value,
+      operationType = operationType.value!!,
+      progress = operationProgress,
+      onCancel = { CopyPasteOps.cancelOperation() },
+      onDismiss = {
+        progressDialogOpen.value = false
+        operationType.value = null
+        selectionManager.clear()
+        viewModel.refresh()
+      },
+    )
+  }
+
+  // Private Space Loading Sheet
+  LoadingDialog(
+    isOpen = movingToPrivateSpace.value,
+    message = "Moving to private space...",
+  )
+
+  // Private Space Completion Dialog
+  if (showPrivateSpaceCompletionDialog.value) {
+    androidx.compose.material3.AlertDialog(
+      onDismissRequest = { showPrivateSpaceCompletionDialog.value = false },
+      title = { Text(text = "Moved to Private Space", style = MaterialTheme.typography.headlineSmall) },
+      text = {
+        Text(
+          text = "Successfully moved ${privateSpaceMovedCount.intValue} video(s) to private space.\n\n" +
+              "To access private space, long press on the app name at the top of the main screen.",
+          style = MaterialTheme.typography.bodyMedium,
+        )
+      },
+      confirmButton = {
+        androidx.compose.material3.Button(
+          onClick = { showPrivateSpaceCompletionDialog.value = false },
+        ) {
+          Text("Close")
+        }
+      },
+    )
+  }
+
+  // Add to Playlist Dialog
+  AddToPlaylistDialog(
+    isOpen = addToPlaylistDialogOpen.value,
+    videos = selectionManager.getSelectedItems(),
+    onDismiss = { addToPlaylistDialogOpen.value = false },
+    onSuccess = {
+      selectionManager.clear()
+      viewModel.refresh()
+    },
+  )
 }
 
 @Composable
@@ -590,12 +640,19 @@ private fun VideoListContent(
                   }
                 }
 
+                // Read selection through a keyed derivedStateOf so toggling one card
+                // only recomposes that card, not every visible item that reads the
+                // shared SelectionManager state.
+                val isSelected by remember(selectionManager, video.id) {
+                  derivedStateOf { selectionManager.isSelected(video) }
+                }
+
                 VideoCard(
                   video = video,
                   settings = videoCardSettings,
                   progressPercentage = videoWithInfo.progressPercentage,
                   isRecentlyPlayed = recentlyPlayedFilePath?.let { video.path == it } ?: false,
-                  isSelected = selectionManager.isSelected(video),
+                  isSelected = isSelected,
                   isOldAndUnplayed = videoWithInfo.isOldAndUnplayed,
                   isWatched = videoWithInfo.isWatched,
                   onClick = currentOnClick,

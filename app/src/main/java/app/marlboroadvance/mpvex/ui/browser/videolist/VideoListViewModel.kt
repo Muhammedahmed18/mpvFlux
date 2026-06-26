@@ -22,7 +22,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
@@ -50,8 +50,8 @@ class VideoListViewModel(
   private val browserPreferences: app.marlboroadvance.mpvex.preferences.BrowserPreferences by inject()
   // Using MediaFileRepository singleton directly
 
+  // Internal source of truth (pre-enrichment). The UI consumes [videosWithPlaybackInfo] only.
   private val _videos = MutableStateFlow<List<Video>>(emptyList())
-  val videos: StateFlow<List<Video>> = _videos.asStateFlow()
 
   private val _videosWithPlaybackInfo = MutableStateFlow<List<VideoWithPlaybackInfo>>(emptyList())
   val videosWithPlaybackInfo: StateFlow<List<VideoWithPlaybackInfo>> = _videosWithPlaybackInfo.asStateFlow()
@@ -59,23 +59,27 @@ class VideoListViewModel(
   private val _isLoading = MutableStateFlow(true)
   val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+  // Recomputes when either the video list OR the recently-played history changes. Reading _videos
+  // as a flow (not _videos.value snapshot inside the map) keeps the highlight correct after the
+  // list reloads but history hasn't re-emitted.
   val lastPlayedInFolderPath: StateFlow<String?> =
-    recentlyPlayedRepository
-      .observeRecentlyPlayed(limit = 100)
-      .map { recentlyPlayedList ->
-        val folderPath = _videos.value.firstOrNull()?.path?.let { File(it).parent }
-        if (folderPath != null) {
-          recentlyPlayedList.firstOrNull { entity ->
-            try {
-              File(entity.filePath).parent == folderPath
-            } catch (_: Exception) {
-              false
-            }
-          }?.filePath
-        } else {
-          null
-        }
+    combine(
+      _videos,
+      recentlyPlayedRepository.observeRecentlyPlayed(limit = 100),
+    ) { videos, recentlyPlayedList ->
+      val folderPath = videos.firstOrNull()?.path?.let { File(it).parent }
+      if (folderPath != null) {
+        recentlyPlayedList.firstOrNull { entity ->
+          try {
+            File(entity.filePath).parent == folderPath
+          } catch (_: Exception) {
+            false
+          }
+        }?.filePath
+      } else {
+        null
       }
+    }
       .distinctUntilChanged()
       .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
@@ -84,7 +88,10 @@ class VideoListViewModel(
   init {
     loadVideos()
 
-    // Observe metadata-impacting preferences to trigger re-enrichment when toggled
+    // Observe metadata-impacting preferences and re-enrich when any of them is toggled.
+    // We carry the full combination (not an OR of them) so distinctUntilChanged reacts to *every*
+    // toggle — e.g. turning one chip off while another stays on. drop(1) skips the initial replay
+    // since the init loadVideos() above already performs first-load enrichment.
     viewModelScope.launch {
       combine(
         browserPreferences.showResolutionChip.changes(),
@@ -92,12 +99,12 @@ class VideoListViewModel(
         browserPreferences.showSubtitleIndicator.changes(),
         browserPreferences.showVideoThumbnails.changes()
       ) { showResolution, showFps, showSub, showThumb ->
-        // Return a combined signal - only trigger if something that needs enrichment becomes true
-        showResolution || showFps || showSub || showThumb
+        listOf(showResolution, showFps, showSub, showThumb)
       }
       .distinctUntilChanged()
-      .collectLatest { needsEnrichment ->
-        if (needsEnrichment && _videos.value.isNotEmpty()) {
+      .drop(1)
+      .collectLatest {
+        if (MetadataRetrieval.isVideoMetadataNeeded(browserPreferences) && _videos.value.isNotEmpty()) {
           val videosNeedEnrichment = _videos.value.any { video ->
             video.fps == 0f || video.subtitleCodec.isEmpty()
           }

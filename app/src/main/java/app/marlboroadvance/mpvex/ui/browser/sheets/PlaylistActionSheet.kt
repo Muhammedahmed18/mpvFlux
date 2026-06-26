@@ -1,9 +1,6 @@
 package app.marlboroadvance.mpvex.ui.browser.sheets
 
-import android.net.Uri
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -20,27 +17,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Link
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -61,7 +52,7 @@ import app.marlboroadvance.mpvex.database.repository.PlaylistRepository
 import kotlinx.coroutines.launch
 
 private enum class PlaylistSheetScreen {
-  Main, Create, M3U
+  Main, Create
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -114,8 +105,7 @@ fun PlaylistActionSheet(
       when (screen) {
         PlaylistSheetScreen.Main -> {
           MainOptionsContent(
-            onCreateClick = { currentScreen = PlaylistSheetScreen.Create },
-            onM3UClick = { currentScreen = PlaylistSheetScreen.M3U }
+            onCreateClick = { currentScreen = PlaylistSheetScreen.Create }
           )
         }
         PlaylistSheetScreen.Create -> {
@@ -134,16 +124,6 @@ fun PlaylistActionSheet(
             }
           )
         }
-        PlaylistSheetScreen.M3U -> {
-          M3UPlaylistContent(
-            onBack = { currentScreen = PlaylistSheetScreen.Main },
-            repository = repository,
-            context = context,
-            onSuccess = {
-              onDismiss()
-            }
-          )
-        }
       }
     }
   }
@@ -152,7 +132,6 @@ fun PlaylistActionSheet(
 @Composable
 private fun MainOptionsContent(
   onCreateClick: () -> Unit,
-  onM3UClick: () -> Unit,
 ) {
   Column(
     modifier =
@@ -199,41 +178,6 @@ private fun MainOptionsContent(
           )
           Text(
             text = "Create a new blank playlist",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-          )
-        }
-      }
-    }
-
-    Card(
-      onClick = onM3UClick,
-      modifier = Modifier.fillMaxWidth(),
-      colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-      ),
-    ) {
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Icon(
-          imageVector = Icons.Filled.Link,
-          contentDescription = null,
-          tint = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.size(24.dp),
-        )
-        Column(modifier = Modifier.weight(1f)) {
-          Text(
-            text = "Add M3U Playlist from URL",
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-          )
-          Text(
-            text = "Import a playlist from a web URL",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -302,118 +246,5 @@ private fun CreatePlaylistContent(
       modifier = Modifier.fillMaxWidth(),
       shape = MaterialTheme.shapes.extraLarge,
     )
-  }
-}
-
-@Composable
-private fun M3UPlaylistContent(
-  onBack: () -> Unit,
-  repository: PlaylistRepository,
-  context: android.content.Context,
-  onSuccess: () -> Unit,
-) {
-  var playlistUrl by remember { mutableStateOf("") }
-  var isLoading by remember { mutableStateOf(false) }
-  val coroutineScope = rememberCoroutineScope()
-
-  val filePickerLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.GetContent()
-  ) { uri: Uri? ->
-    uri?.let {
-      isLoading = true
-      coroutineScope.launch {
-        repository.createM3UPlaylistFromFile(context, it)
-          .onSuccess {
-            Toast.makeText(context, "M3U Playlist added", Toast.LENGTH_SHORT).show()
-            onSuccess()
-          }
-          .onFailure { Toast.makeText(context, "Failed: ${it.message}", Toast.LENGTH_LONG).show() }
-        isLoading = false
-      }
-    }
-  }
-
-  Column(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(horizontal = 24.dp)
-      .padding(bottom = 32.dp),
-    verticalArrangement = Arrangement.spacedBy(16.dp),
-  ) {
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.SpaceBetween,
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      IconButton(onClick = onBack, enabled = !isLoading) {
-        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-      }
-
-      Text(
-        text = "Add M3U Playlist",
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.weight(1f)
-      )
-
-      IconButton(
-        onClick = {
-          if (playlistUrl.isNotBlank()) {
-            isLoading = true
-            coroutineScope.launch {
-              repository.createM3UPlaylist(playlistUrl.trim())
-                .onSuccess {
-                  Toast.makeText(context, "M3U Playlist added", Toast.LENGTH_SHORT).show()
-                  onSuccess()
-                }
-                .onFailure { Toast.makeText(context, "Failed: ${it.message}", Toast.LENGTH_LONG).show() }
-              isLoading = false
-            }
-          }
-        },
-        enabled = playlistUrl.isNotBlank() && !isLoading,
-        colors = IconButtonDefaults.filledIconButtonColors(
-          containerColor = MaterialTheme.colorScheme.primaryContainer,
-          contentColor = MaterialTheme.colorScheme.primary,
-        ),
-        modifier = Modifier.size(56.dp)
-      ) {
-        if (isLoading) {
-          CircularProgressIndicator(modifier = Modifier.size(24.dp))
-        } else {
-          Icon(Icons.Default.Check, contentDescription = "Add")
-        }
-      }
-    }
-
-    OutlinedTextField(
-      value = playlistUrl,
-      onValueChange = { playlistUrl = it },
-      label = { Text("Playlist URL") },
-      modifier = Modifier.fillMaxWidth(),
-      enabled = !isLoading,
-      shape = MaterialTheme.shapes.extraLarge,
-    )
-
-    Row(
-      modifier = Modifier.fillMaxWidth(),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-      HorizontalDivider(modifier = Modifier.weight(1f))
-      Text("OR", style = MaterialTheme.typography.labelSmall)
-      HorizontalDivider(modifier = Modifier.weight(1f))
-    }
-
-    OutlinedButton(
-      onClick = { filePickerLauncher.launch("*/*") },
-      enabled = !isLoading,
-      modifier = Modifier.fillMaxWidth(),
-      shape = MaterialTheme.shapes.extraLarge,
-    ) {
-      Icon(Icons.Default.FolderOpen, contentDescription = null)
-      Spacer(Modifier.width(8.dp))
-      Text("Choose Local M3U File")
-    }
   }
 }

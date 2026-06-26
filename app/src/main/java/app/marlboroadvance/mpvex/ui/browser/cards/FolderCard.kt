@@ -276,7 +276,8 @@ private fun formatDuration(duration: Long): String {
   return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
 }
 
+private val FOLDER_DATE_FORMATTER by lazy { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
+
 private fun formatDate(timestampSeconds: Long): String {
-  val sdf = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
-  return sdf.format(Date(timestampSeconds * 1000))
+  return FOLDER_DATE_FORMATTER.format(Date(timestampSeconds * 1000))
 }
