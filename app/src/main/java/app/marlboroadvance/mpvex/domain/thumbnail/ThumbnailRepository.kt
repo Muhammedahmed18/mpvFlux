@@ -252,6 +252,19 @@ class ThumbnailRepository(
     videos.forEach { removeThumbnail(it) }
   }
 
+  /**
+   * Stop any in-flight batch generation for the given folder ids. Called right before a folder
+   * is deleted so a generation job that's mid-flight can't write a thumbnail back to disk after
+   * [removeThumbnails] has already purged it. The file-existence guard in [writeToDisk] closes
+   * the remaining single-frame race for individually requested thumbnails.
+   */
+  fun cancelFolderGeneration(folderIds: List<String>) {
+    folderIds.forEach { id ->
+      folderJobs.remove(id)?.cancel()
+      folderStates.remove(id)
+    }
+  }
+
   fun clearThumbnailCache() {
     folderJobs.values.forEach { it.cancel() }
     folderJobs.clear()
@@ -366,6 +379,12 @@ class ThumbnailRepository(
   }
 
   private fun writeToDisk(video: Video, bitmap: Bitmap) {
+    // Delete-race guard: if the source file was removed while this thumbnail was being
+    // generated, don't resurrect an orphan on disk that a folder delete just purged.
+    // Network videos have no local file to check, so they're exempt.
+    if (!isNetworkUrl(video.path) && video.path.isNotBlank() && !File(video.path).exists()) {
+      return
+    }
     val diskFile = File(diskDir, keyToFileName(diskKey(video)))
     runCatching {
       FileOutputStream(diskFile).use { out ->

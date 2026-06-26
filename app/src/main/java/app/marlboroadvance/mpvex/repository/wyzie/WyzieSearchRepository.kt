@@ -210,8 +210,11 @@ class WyzieSearchRepository(
     private val preferences: SubtitlesPreferences,
     private val advancedPreferences: AdvancedPreferences
 ) {
-    private val baseUrl = "https://sub.wyzie.ru"
-    private val wyzieApiKey = "wyzie-e7fc58625c54c89725589f5c67e6ffc3"
+    // Subtitle requests are proxied through a Cloudflare Worker that injects the Wyzie
+    // API key server-side. The key is never shipped in the app, so it can't be extracted
+    // from the APK or revoked the way an embedded key was. To rotate the key, update the
+    // Worker's WYZIE_KEY secret — no app update required.
+    private val baseUrl = "https://wyzie-proxy.muhammedahmed1455.workers.dev"
     private val userAgent = "mpvFlux/1.0"
 
     private fun Request.Builder.addAuth(): Request.Builder {
@@ -322,7 +325,6 @@ class WyzieSearchRepository(
         
         val url = StringBuilder("$baseUrl/search?id=${encode(id)}")
             .apply {
-                append("&key=$wyzieApiKey")
                 if (season != null && episode != null) {
                     append("&season=$season")
                     append("&episode=$episode")
@@ -379,7 +381,11 @@ class WyzieSearchRepository(
 
     suspend fun download(subtitle: WyzieSubtitle, mediaTitle: String): Result<Uri> = withContext(Dispatchers.IO) {
         try {
-            val downloadUrl = if (subtitle.url.contains("?")) "${subtitle.url}&key=$wyzieApiKey" else "${subtitle.url}?key=$wyzieApiKey"
+            // Route Wyzie-hosted files through the proxy (key injected server-side).
+            // Third-party CDN links (e.g. OpenSubtitles) are used as-is — they need no key.
+            val downloadUrl = subtitle.url
+                .replace("https://sub.wyzie.io", baseUrl)
+                .replace("https://sub.wyzie.ru", baseUrl)
             val response = client.newCall(Request.Builder().url(downloadUrl).addAuth().build()).execute()
             if (!response.isSuccessful) return@withContext Result.failure(Exception("Download failed: ${response.code}"))
 
@@ -434,7 +440,7 @@ class WyzieSearchRepository(
 
     suspend fun getTvShowDetails(id: Int): Result<WyzieTvShowDetails> = withContext(Dispatchers.IO) {
         try {
-            val url = "$baseUrl/api/tmdb/tv/$id?key=$wyzieApiKey"
+            val url = "$baseUrl/api/tmdb/tv/$id"
             val request = Request.Builder().url(url).addAuth().build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw IOException("Failed to get TV show details: ${response.code}")
@@ -449,7 +455,7 @@ class WyzieSearchRepository(
 
     suspend fun getSeasonEpisodes(id: Int, season: Int): Result<List<WyzieEpisode>> = withContext(Dispatchers.IO) {
         try {
-            val url = "$baseUrl/api/tmdb/tv/$id/$season?key=$wyzieApiKey"
+            val url = "$baseUrl/api/tmdb/tv/$id/$season"
             val request = Request.Builder().url(url).addAuth().build()
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) throw IOException("Failed to get season episodes: ${response.code}")
@@ -463,7 +469,7 @@ class WyzieSearchRepository(
     }
 
     private fun tmdbSearch(query: String): List<WyzieTmdbResult> {
-        val url = "$baseUrl/api/tmdb/search?q=${URLEncoder.encode(query, "UTF-8")}&key=$wyzieApiKey"
+        val url = "$baseUrl/api/tmdb/search?q=${URLEncoder.encode(query, "UTF-8")}"
         val request = Request.Builder().url(url).addAuth().build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw IOException("TMDb search failed: ${response.code}")

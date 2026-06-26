@@ -26,38 +26,6 @@
 -dontnote org.xmlpull.v1.**
 -dontwarn org.slf4j.impl.StaticLoggerBinder
 
-# SMBJ ProGuard Rules
-# Keep SMBJ classes
--keep class com.hierynomus.smbj.** { *; }
--keep class com.hierynomus.mssmb2.** { *; }
--keep class com.hierynomus.msdtyp.** { *; }
--keep class com.hierynomus.msfscc.** { *; }
--keep class com.hierynomus.protocol.** { *; }
--keep class com.hierynomus.spnego.** { *; }
--keep class com.hierynomus.ntlm.** { *; }
--keep class com.hierynomus.security.** { *; }
-
-# JGSS (Kerberos/SPNEGO) - Optional, not needed for basic NTLM auth
-# These are used for domain authentication, which we don't use
--dontwarn org.ietf.jgss.**
--dontnote org.ietf.jgss.**
-
-# MBassador (event bus used by SMBJ) - EL (Expression Language) is optional
--dontwarn net.engio.mbassy.dispatch.el.**
--dontnote net.engio.mbassy.dispatch.el.**
--dontwarn javax.el.**
--dontnote javax.el.**
-
-# Keep MBassador core classes
--keep class net.engio.mbassy.** { *; }
-
-# BouncyCastle (crypto provider used by SMBJ)
--keep class org.bouncycastle.** { *; }
--dontwarn org.bouncycastle.**
-
-# ASN.1 classes
--keep class com.hierynomus.asn1.** { *; }
-
 # Keep all classes that use reflection or are loaded dynamically
 -keepattributes Signature
 -keepattributes *Annotation*
@@ -72,4 +40,16 @@
     private void readObject(java.io.ObjectInputStream);
     java.lang.Object writeReplace();
     java.lang.Object readResolve();
+}
+
+# Strip verbose/debug/info logging from release builds. R8 treats these calls as
+# side-effect-free and removes them, and then eliminates the now-unused string
+# concatenation that builds each message — so neither the log write nor its message
+# construction costs anything in release. Warnings (w) and errors (e) are kept for
+# crash diagnostics.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+    public static boolean isLoggable(java.lang.String, int);
 }
