@@ -9,7 +9,6 @@ import app.marlboroadvance.mpvex.BuildConfig
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
 import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
-import `is`.xyz.mpv.Utils
 import java.io.File
 
 /**
@@ -129,18 +128,6 @@ object MediaUtils {
       ),
   )
   suspend fun hasRecentlyPlayedFile(): Boolean = RecentlyPlayedOps.hasRecentlyPlayed()
-
-  /**
-   * Validate URL structure and protocol support.
-   * Checks only URL format and MPV protocol support (http, https, rtsp, rtmp, etc.).
-   * Network errors are detected when MPV attempts to open the stream.
-   */
-  fun isURLValid(url: String): Boolean =
-    url.toUri().let { uri ->
-      val structureOk =
-        uri.isHierarchical && !uri.isRelative && (!uri.host.isNullOrBlank() || !uri.path.isNullOrBlank())
-      structureOk && Utils.PROTOCOLS.contains(uri.scheme)
-    }
 
   /**
    * Share videos via system share sheet.
