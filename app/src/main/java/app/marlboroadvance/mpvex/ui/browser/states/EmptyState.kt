@@ -33,7 +33,7 @@ fun EmptyState(
   modifier: Modifier = Modifier,
   action: (@Composable () -> Unit)? = null,
 ) {
-  val glowColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+  val glowColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
 
   Column(
     modifier = modifier
@@ -42,11 +42,11 @@ fun EmptyState(
     verticalArrangement = Arrangement.Center,
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-
+    // Icon Container with Glow
     Box(
       contentAlignment = Alignment.Center,
       modifier = Modifier
-        .size(160.dp)
+        .size(140.dp) // Reduced from 160dp
         .drawBehind {
           drawCircle(
             brush = Brush.radialGradient(
@@ -58,21 +58,23 @@ fun EmptyState(
         },
     ) {
       Surface(
-        modifier = Modifier.size(88.dp),
+        modifier = Modifier.size(80.dp), // Slightly smaller, standard M3 feel
         shape = CircleShape,
         color = MaterialTheme.colorScheme.primaryContainer,
-        tonalElevation = 0.dp,
       ) {
         Icon(
           imageVector = icon,
-          contentDescription = title,
-          modifier = Modifier.padding(22.dp),
+          contentDescription = null, // Title is already read by Text below
+          modifier = Modifier.padding(20.dp),
           tint = MaterialTheme.colorScheme.onPrimaryContainer,
         )
       }
     }
 
-    Spacer(modifier = Modifier.height(40.dp))
+    // Spacing: (140 - 80) / 2 = 30dp intrinsic padding. 
+    // To get a ~24dp visual gap, we use a small offset or no spacer.
+    // Here we use 0.dp because the Box already provides 30dp of empty space.
+    Spacer(modifier = Modifier.height(0.dp))
 
     Text(
       text = title,
@@ -82,7 +84,7 @@ fun EmptyState(
       color = MaterialTheme.colorScheme.onSurface,
     )
 
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(8.dp)) // Standard M3 spacing
 
     Text(
       text = message,
@@ -92,7 +94,7 @@ fun EmptyState(
     )
 
     if (action != null) {
-      Spacer(modifier = Modifier.height(28.dp))
+      Spacer(modifier = Modifier.height(32.dp))
       action()
     }
   }
