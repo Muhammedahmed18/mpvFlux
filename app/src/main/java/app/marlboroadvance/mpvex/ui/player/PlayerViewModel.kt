@@ -203,11 +203,14 @@ class PlayerViewModel(
     // Position is now handled by MPV property observation via pos StateFlow
     // This eliminates unnecessary CPU usage and battery drain
     
-    // Observe position changes efficiently instead of polling
+    // Observe position changes via the INTEGER time-pos property, which fires ~once per
+    // second (on whole-second changes) instead of the sub-second DOUBLE property that
+    // fired many times per second. The seekbar bridges the 1 Hz ticks with a linear
+    // tween, so the thumb still glides smoothly while we avoid the high-frequency
+    // JNI/Flow churn for the entire playback session. (See Seekbar.kt.)
     viewModelScope.launch {
-      MPVLib.propDouble["time-pos"].collect { position ->
-        val currentPos = position?.toFloat() ?: 0f
-        _precisePosition.value = currentPos
+      MPVLib.propInt["time-pos"].collect { position ->
+        _precisePosition.value = position?.toFloat() ?: 0f
       }
     }
     

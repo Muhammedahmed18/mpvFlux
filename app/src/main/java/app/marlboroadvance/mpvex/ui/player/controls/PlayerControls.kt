@@ -237,6 +237,10 @@ fun PlayerControls(
   }
   val playerTimeToDisappear by playerPreferences.playerTimeToDisappear.collectAsState()
   val chapters by viewModel.chapters.collectAsState(persistentListOf())
+  // chapters flows as a plain List, so toImmutableList() copies. Hoist one copy and
+  // share it across the seekbar block and PlayerSheets instead of re-copying on every
+  // controls-root recomposition (which fires on each scrub delta via resetControlsTimestamp).
+  val chaptersImm = remember(chapters) { chapters.toImmutableList() }
   val playlistMode by playerPreferences.playlistMode.collectAsState()
 
   val abLoopA by viewModel.abLoopA.collectAsState()
@@ -750,7 +754,7 @@ fun PlayerControls(
                 playerPreferences.invertDuration.set(!invertDuration)
               },
               positionTimerOnClick = {},
-              chapters = if (showChapterMarkers) chapters.toImmutableList() else persistentListOf(),
+              chapters = if (showChapterMarkers) chaptersImm else persistentListOf(),
               paused = paused ?: false,
               seekbarStyle = seekbarStyle,
               loopStart = abLoopA?.toFloat(),
@@ -805,11 +809,18 @@ fun PlayerControls(
     val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
     val speedPresets by playerPreferences.speedPresets.collectAsState()
 
+    // These flows emit plain Lists/Sets; hoist the immutable conversions and the
+    // preset sort so they aren't rebuilt on every controls-root recomposition (the
+    // sheets themselves are usually None and skip on their own).
+    val subtitlesImm = remember(subtitles) { subtitles.toImmutableList() }
+    val audioTracksImm = remember(audioTracks) { audioTracks.toImmutableList() }
+    val sortedSpeedPresets = remember(speedPresets) { speedPresets.map { it.toFloat() }.sorted() }
+
     // No outer AnimatedVisibility here: each sheet host owns its entrance/exit
     // (portrait ModalBottomSheet animates inside its own dialog window; landscape
     // PlayerSideSheet slides in from the right). Wrapping them in a vertical slide
     // composited both motions into a diagonal "rises from the bottom" mush.
-    PlayerSheets(viewModel = viewModel, sheetShown = sheetShown, subtitles = subtitles.toImmutableList(), onAddSubtitle = viewModel::addSubtitle, onToggleSubtitle = { id -> if (viewModel.isSubtitleSelected(id)) { MPVLib.setPropertyString("sid", "no"); MPVLib.setPropertyString("secondary-sid", "no") } else { MPVLib.setPropertyInt("sid", id); MPVLib.setPropertyString("secondary-sid", "no") } }, isSubtitleSelected = viewModel::isSubtitleSelected, onRemoveSubtitle = viewModel::removeSubtitle, audioTracks = audioTracks.toImmutableList(), onAddAudio = viewModel::addAudio, onSelectAudio = { if (MPVLib.getPropertyInt("aid") == it.id) MPVLib.setPropertyString("aid", "no") else MPVLib.setPropertyInt("aid", it.id) }, chapter = chapters.getOrNull(currentChapter ?: 0), chapters = chapters.toImmutableList(), onSeekToChapter = { MPVLib.setPropertyInt("chapter", it); viewModel.unpause() }, decoder = decoder, onUpdateDecoder = { MPVLib.setPropertyString("hwdec", it.value) }, speed = playbackSpeed ?: playerPreferences.defaultSpeed.get(), onSpeedChange = { MPVLib.setPropertyFloat("speed", it.toFixed(2)) }, onMakeDefaultSpeed = { playerPreferences.defaultSpeed.set(it.toFixed(2)) }, onAddSpeedPreset = { playerPreferences.speedPresets += it.toFixed(2).toString() }, onRemoveSpeedPreset = { playerPreferences.speedPresets -= it.toFixed(2).toString() }, onResetSpeedPresets = playerPreferences.speedPresets::delete, speedPresets = speedPresets.map { it.toFloat() }.sorted(), onResetDefaultSpeed = { MPVLib.setPropertyFloat("speed", playerPreferences.defaultSpeed.deleteAndGet().toFixed(2)) }, sleepTimerTimeRemaining = sleepTimerTimeRemaining, onStartSleepTimer = viewModel::startTimer, onOpenPanel = onOpenPanel, onShowSheet = onOpenSheet, onDismissRequest = { onOpenSheet(Sheets.None) })
+    PlayerSheets(viewModel = viewModel, sheetShown = sheetShown, subtitles = subtitlesImm, onAddSubtitle = viewModel::addSubtitle, onToggleSubtitle = { id -> if (viewModel.isSubtitleSelected(id)) { MPVLib.setPropertyString("sid", "no"); MPVLib.setPropertyString("secondary-sid", "no") } else { MPVLib.setPropertyInt("sid", id); MPVLib.setPropertyString("secondary-sid", "no") } }, isSubtitleSelected = viewModel::isSubtitleSelected, onRemoveSubtitle = viewModel::removeSubtitle, audioTracks = audioTracksImm, onAddAudio = viewModel::addAudio, onSelectAudio = { if (MPVLib.getPropertyInt("aid") == it.id) MPVLib.setPropertyString("aid", "no") else MPVLib.setPropertyInt("aid", it.id) }, chapter = chaptersImm.getOrNull(currentChapter ?: 0), chapters = chaptersImm, onSeekToChapter = { MPVLib.setPropertyInt("chapter", it); viewModel.unpause() }, decoder = decoder, onUpdateDecoder = { MPVLib.setPropertyString("hwdec", it.value) }, speed = playbackSpeed ?: playerPreferences.defaultSpeed.get(), onSpeedChange = { MPVLib.setPropertyFloat("speed", it.toFixed(2)) }, onMakeDefaultSpeed = { playerPreferences.defaultSpeed.set(it.toFixed(2)) }, onAddSpeedPreset = { playerPreferences.speedPresets += it.toFixed(2).toString() }, onRemoveSpeedPreset = { playerPreferences.speedPresets -= it.toFixed(2).toString() }, onResetSpeedPresets = playerPreferences.speedPresets::delete, speedPresets = sortedSpeedPresets, onResetDefaultSpeed = { MPVLib.setPropertyFloat("speed", playerPreferences.defaultSpeed.deleteAndGet().toFixed(2)) }, sleepTimerTimeRemaining = sleepTimerTimeRemaining, onStartSleepTimer = viewModel::startTimer, onOpenPanel = onOpenPanel, onShowSheet = onOpenSheet, onDismissRequest = { onOpenSheet(Sheets.None) })
 
     val panel by viewModel.panelShown.collectAsState()
     PlayerPanels(panelShown = panel, onDismissRequest = { onOpenPanel(Panels.None) }, viewModel = viewModel)

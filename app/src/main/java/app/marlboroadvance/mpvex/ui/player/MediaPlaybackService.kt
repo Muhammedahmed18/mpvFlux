@@ -71,8 +71,6 @@ class MediaPlaybackService :
   private var mediaTitle = ""
   private var mediaArtist = ""
   private var paused = false
-  private var lastNotificationUpdateTime = 0L
-  private val notificationUpdateIntervalMs = 1000L // Update notification every 1 second
 
   inner class MediaPlaybackBinder : Binder() {
     fun getService() = this@MediaPlaybackService
@@ -96,7 +94,11 @@ class MediaPlaybackService :
       MPVLib.observeProperty("pause", MPVLib.MpvFormat.MPV_FORMAT_FLAG)
       MPVLib.observeProperty("media-title", MPVLib.MpvFormat.MPV_FORMAT_STRING)
       MPVLib.observeProperty("metadata/artist", MPVLib.MpvFormat.MPV_FORMAT_STRING)
-      MPVLib.observeProperty("time-pos", MPVLib.MpvFormat.MPV_FORMAT_DOUBLE)
+      // NOTE: time-pos is intentionally NOT observed. The MediaSession reports a
+      // position + playback speed once per real transition (play/pause/seek) and the
+      // system media controls extrapolate the elapsed time from there. Observing
+      // time-pos (a sub-second DOUBLE) just to re-post the notification every second
+      // is pure battery waste, especially during screen-off background audio.
       Log.d(TAG, "MPV observer registered")
     } catch (e: Exception) {
       Log.e(TAG, "Error registering MPV observer", e)
@@ -260,12 +262,20 @@ class MediaPlaybackService :
       }
       mediaSession.setMetadata(metadataBuilder.build())
 
-      // Update playback state
-      val position = runCatching { 
-        MPVLib.getPropertyDouble("time-pos")?.times(1000)?.toLong() 
+      // Update playback state. Capture the position at this instant and report the
+      // real playback speed; the system extrapolates the live position from these,
+      // so we don't need to re-push state every second.
+      val position = runCatching {
+        MPVLib.getPropertyDouble("time-pos")?.times(1000)?.toLong()
       }.getOrNull() ?: 0L
-      
+
+      val playbackSpeed = runCatching {
+        MPVLib.getPropertyDouble("speed")?.toFloat()
+      }.getOrNull() ?: 1.0f
+
       val state = if (paused) PlaybackStateCompat.STATE_PAUSED else PlaybackStateCompat.STATE_PLAYING
+      // When paused, report speed 0 so the controller freezes the displayed position.
+      val reportedSpeed = if (paused) 0f else playbackSpeed
 
       mediaSession.setPlaybackState(
         PlaybackStateCompat
@@ -278,7 +288,7 @@ class MediaPlaybackService :
               PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
               PlaybackStateCompat.ACTION_STOP or
               PlaybackStateCompat.ACTION_SEEK_TO,
-          ).setState(state, position, 1.0f)
+          ).setState(state, position, reportedSpeed)
           .build(),
       )
 
@@ -404,16 +414,7 @@ class MediaPlaybackService :
   override fun eventProperty(
     property: String,
     value: Double,
-  ) {
-    if (property == "time-pos") {
-      // Throttle notification updates to avoid excessive updates
-      val currentTime = System.currentTimeMillis()
-      if (currentTime - lastNotificationUpdateTime >= notificationUpdateIntervalMs) {
-        lastNotificationUpdateTime = currentTime
-        updateMediaSession()
-      }
-    }
-  }
+  ) {}
 
   override fun eventProperty(
     property: String,

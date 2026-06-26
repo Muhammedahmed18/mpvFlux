@@ -157,10 +157,16 @@ fun PlaylistSheet(
   val lazyGridState       = rememberLazyGridState()
 
   val currentItem = remember(playlist) { playlist.find { it.isPlaying } }
-  // Option B: completed videos are hidden entirely — "Up Next" only lists the
-  // items still ahead, excluding the now-playing item and anything watched.
-  val queue       = remember(playlist) {
+  
+  // Logic for toggling watched view
+  var isShowingWatched by remember { mutableStateOf(false) }
+  
+  val queue = remember(playlist) {
     playlist.filterNot { it.isPlaying || it.isWatched }.toImmutableList()
+  }
+  
+  val watchedList = remember(playlist) {
+    playlist.filter { it.isWatched && !it.isPlaying }.toImmutableList()
   }
 
   val density    = LocalDensity.current
@@ -203,8 +209,8 @@ fun PlaylistSheet(
           .fillMaxHeight()
           .padding(bottom = MaterialTheme.spacing.smaller),
       ) {
-        // Left panel: dedicated now-playing sidebar
-        Box(
+        // Left panel: sidebar + One UI Toggle Pill
+        Column(
           modifier         = Modifier
             .weight(0.38f)
             .fillMaxHeight()
@@ -212,15 +218,24 @@ fun PlaylistSheet(
               top    = MaterialTheme.spacing.small,
               bottom = MaterialTheme.spacing.medium,
             ),
-          contentAlignment = Alignment.TopCenter,
+          horizontalAlignment = Alignment.CenterHorizontally,
         ) {
           PlaylistNowPlayingPanel(
-            item                = currentItem,
+            item                = currentItem!!,
             thumbnailRepository = thumbnailRepository,
             onClick             = { onItemClick(currentItem) },
             accentColor         = accentColor,
             skipThumbnail       = isM3UPlaylist,
           )
+          
+          Spacer(modifier = Modifier.weight(1f))
+          
+          if (watchedList.isNotEmpty()) {
+            OneUI8TogglePill(
+              isShowingWatched = isShowingWatched,
+              onClick = { isShowingWatched = !isShowingWatched }
+            )
+          }
         }
 
         VerticalDivider(
@@ -237,16 +252,23 @@ fun PlaylistSheet(
             .weight(0.62f)
             .fillMaxHeight(),
         ) {
+          val activeList = if (isShowingWatched) watchedList else queue
+          val headerTitle = when {
+            isShowingWatched -> "Watched"
+            currentItem != null -> "Up Next"
+            else -> "Playlist"
+          }
+
           PlaylistQueueHeader(
-            upNextCount = queue.size,
-            currentItem = currentItem,
+            count       = activeList.size,
+            title       = headerTitle,
             isListMode  = isListMode,
             isPortrait  = false,
             onListMode  = { isListMode = it },
           )
           PlaylistQueueContent(
             modifier            = Modifier.weight(1f),
-            queue               = queue,
+            queue               = activeList,
             isListMode          = isListMode,
             lazyListState       = lazyListState,
             lazyGridState       = lazyGridState,
@@ -294,8 +316,8 @@ fun PlaylistSheet(
         }
 
         PlaylistQueueHeader(
-          upNextCount = queue.size,
-          currentItem = currentItem,
+          count       = queue.size,
+          title       = if (currentItem != null) "Up Next" else "Playlist",
           isListMode  = isListMode,
           isPortrait  = isPortrait,
           onListMode  = { isListMode = it },
@@ -318,13 +340,55 @@ fun PlaylistSheet(
 }
 
 // ---------------------------------------------------------------------------
+// OneUI8TogglePill — Stylish pill-shaped switcher
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun OneUI8TogglePill(
+  isShowingWatched: Boolean,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  val haptics = LocalHapticFeedback.current
+  Surface(
+    onClick = {
+      haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+      onClick()
+    },
+    modifier     = modifier
+      .height(48.dp)
+      .padding(horizontal = 16.dp),
+    shape        = CircleShape,
+    color        = MaterialTheme.colorScheme.secondaryContainer,
+    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    shadowElevation = 4.dp,
+  ) {
+    Row(
+      modifier              = Modifier.padding(horizontal = 20.dp),
+      verticalAlignment     = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      Icon(
+        imageVector = if (isShowingWatched) Icons.AutoMirrored.Default.ViewList else Icons.Outlined.Check,
+        contentDescription = null,
+        modifier = Modifier.size(18.dp),
+      )
+      Text(
+        text  = if (isShowingWatched) "Next Up" else "Watched",
+        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+      )
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // PlaylistQueueHeader — "Up Next" / "Playlist" row with badge and view toggles
 // ---------------------------------------------------------------------------
 
 @Composable
 private fun PlaylistQueueHeader(
-  upNextCount: Int,
-  currentItem: PlaylistItem?,
+  count: Int,
+  title: String,
   isListMode: Boolean,
   isPortrait: Boolean,
   onListMode: (Boolean) -> Unit,
@@ -341,7 +405,7 @@ private fun PlaylistQueueHeader(
       horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
     ) {
       Text(
-        text  = if (currentItem != null) "Up Next" else "Playlist",
+        text  = title,
         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
@@ -350,7 +414,7 @@ private fun PlaylistQueueHeader(
         contentColor   = MaterialTheme.colorScheme.onSecondaryContainer,
       ) {
         Text(
-          text  = "$upNextCount",
+          text  = "$count",
           style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
         )
       }
@@ -495,7 +559,7 @@ private fun AllCaughtUpHint(
       modifier           = Modifier.size(18.dp),
     )
     Text(
-      text  = "You're all caught up",
+      text  = "Nothing here yet",
       style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )

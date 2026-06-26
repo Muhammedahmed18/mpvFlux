@@ -11,9 +11,6 @@ import android.content.res.Configuration
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
-import android.media.MediaMetadata
-import android.media.session.MediaSession
-import android.media.session.PlaybackState
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -234,22 +231,10 @@ class PlayerActivity :
    */
   private var serviceBound = false
 
-  // ==================== MediaSession ====================
-
-  /**
-   * MediaSession for integration with system media controls.
-   */
-  private lateinit var mediaSession: MediaSession
-
-  /**
-   * Tracks whether MediaSession has been successfully initialized.
-   */
-  private var mediaSessionInitialized = false
-
-  /**
-   * Builder for MediaSession playback states.
-   */
-  private lateinit var playbackStateBuilder: PlaybackState.Builder
+  // System media controls (lock screen, Bluetooth, headset) are owned solely by
+  // MediaPlaybackService's MediaSessionCompat. The Activity previously kept a second,
+  // parallel android.media.session.MediaSession which produced two competing active
+  // sessions; it has been removed so the Service is the single source of truth.
 
   // ==================== Audio Focus ====================
 
@@ -325,7 +310,6 @@ class PlayerActivity :
     setupBackPressHandler()
     setupPlayerControls()
     setupPipHelper()
-    setupMediaSession()
     setupViewModelCallbacks()
 
     lifecycleScope.launch {
@@ -554,7 +538,6 @@ class PlayerActivity :
       cleanupMPV()
       cleanupAudio()
       cleanupReceivers()
-      releaseMediaSession()
     }.onFailure { e ->
       Log.e(TAG, "Error during onDestroy", e)
     }
@@ -1199,7 +1182,8 @@ class PlayerActivity :
     } else {
       window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
-    updateMediaSessionPlaybackState(!isPaused)
+    // MediaPlaybackService observes the "pause" property directly and updates the
+    // MediaSession/notification itself, so no Activity-side push is needed here.
     runCatching {
       if (isInPictureInPictureMode) {
         pipHelper.updatePictureInPictureParams()
@@ -1404,8 +1388,6 @@ class PlayerActivity :
         }
       }
     }
-
-    updateMediaSessionPlaybackState(isPlaying = true)
 
     fetchNetworkStreamTitle()
   }
@@ -1971,84 +1953,6 @@ class PlayerActivity :
     return super.onKeyUp(keyCode, event)
   }
 
-  private fun setupMediaSession() {
-    runCatching {
-      mediaSession =
-        MediaSession(this, TAG).apply {
-          setCallback(
-            object : MediaSession.Callback() {
-              override fun onPlay() {
-                viewModel.unpause()
-                updateMediaSessionPlaybackState(isPlaying = true)
-              }
-
-              override fun onPause() {
-                viewModel.pause()
-                updateMediaSessionPlaybackState(isPlaying = false)
-              }
-
-              override fun onSeekTo(pos: Long) {
-                viewModel.seekTo((pos / 1000).toInt())
-                updateMediaSessionPlaybackState(isPlaying = viewModel.paused == false)
-              }
-            },
-          )
-          isActive = true
-        }
-      playbackStateBuilder =
-        PlaybackState
-          .Builder()
-          .setActions(
-            PlaybackState.ACTION_PLAY or
-              PlaybackState.ACTION_PAUSE or
-              PlaybackState.ACTION_PLAY_PAUSE or
-              PlaybackState.ACTION_SEEK_TO,
-          )
-      mediaSessionInitialized = true
-    }.onFailure { e ->
-      Log.e(TAG, "Failed to initialize MediaSession", e)
-      mediaSessionInitialized = false
-    }
-  }
-
-  private fun updateMediaSessionPlaybackState(isPlaying: Boolean) {
-    if (!mediaSessionInitialized) return
-    runCatching {
-      val state = if (isPlaying) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED
-      val positionMs = (viewModel.pos ?: 0) * 1000L
-      mediaSession.setPlaybackState(
-        playbackStateBuilder
-          .setState(state, positionMs, if (isPlaying) 1.0f else 0f)
-          .build(),
-      )
-    }.onFailure { e -> Log.e(TAG, "Error updating playback state", e) }
-  }
-
-  private fun updateMediaSessionMetadata(
-    title: String,
-    durationMs: Long,
-  ) {
-    if (!mediaSessionInitialized) return
-    runCatching {
-      val metadata =
-        MediaMetadata
-          .Builder()
-          .putString(MediaMetadata.METADATA_KEY_TITLE, title)
-          .putLong(MediaMetadata.METADATA_KEY_DURATION, durationMs)
-          .build()
-      mediaSession.setMetadata(metadata)
-    }.onFailure { e -> Log.e(TAG, "Error updating metadata", e) }
-  }
-
-  private fun releaseMediaSession() {
-    if (!mediaSessionInitialized) return
-    runCatching {
-      mediaSession.isActive = false
-      mediaSession.release()
-    }.onFailure { e -> Log.e(TAG, "Error releasing MediaSession", e) }
-    mediaSessionInitialized = false
-  }
-
   private val serviceConnection =
     object : ServiceConnection {
       override fun onServiceConnected(
@@ -2316,11 +2220,6 @@ class PlayerActivity :
       // Step 3: Refresh UI and metadata without artificial delay
       withContext(Dispatchers.Main) {
         updateDisplayTitle()
-        val durationMs = (MPVLib.getPropertyDouble("duration")?.times(1000))?.toLong() ?: 0L
-        updateMediaSessionMetadata(
-          title = getTitleForControls(),
-          durationMs = durationMs,
-        )
         viewModel.refreshPlaylistItems()
       }
     }
@@ -2359,12 +2258,7 @@ class PlayerActivity :
     MPVLib.setPropertyString("force-media-title", displayTitle)
     viewModel.setMediaTitle(displayTitle)
 
-    val durationMs = (MPVLib.getPropertyDouble("duration")?.times(1000))?.toLong() ?: 0L
-    updateMediaSessionMetadata(
-      title = displayTitle,
-      durationMs = durationMs,
-    )
-
+    // Push title/artist/thumbnail to the Service, which owns the MediaSession + notification.
     if (serviceBound && mediaPlaybackService != null) {
       val artist = runCatching { MPVLib.getPropertyString("metadata/artist") }.getOrNull() ?: ""
       val thumbnail = runCatching { MPVLib.grabThumbnail(1080) }.getOrNull()
