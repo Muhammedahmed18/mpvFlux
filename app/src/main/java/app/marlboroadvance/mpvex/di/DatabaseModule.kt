@@ -501,12 +501,6 @@ val DatabaseModule =
     }
 
     single {
-      app.marlboroadvance.mpvex.repository.NetworkRepository(
-        dao = get(),
-      )
-    }
-
-    single {
       PlaylistRepository(
         playlistDao = get<MpvExDatabase>().playlistDao(),
       )

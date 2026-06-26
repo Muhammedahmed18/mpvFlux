@@ -1,8 +1,10 @@
 package app.marlboroadvance.mpvex.domain.media.model
 
 import androidx.compose.runtime.Immutable
+import kotlinx.serialization.Serializable
 
 @Immutable
+@Serializable
 data class VideoFolder(
   val bucketId: String,
   val name: String,
