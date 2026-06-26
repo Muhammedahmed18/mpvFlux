@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -43,7 +44,6 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationSheet
 import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistDetailScreen
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
-import app.marlboroadvance.mpvex.ui.browser.sheets.PlayLinkSheet
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
@@ -63,14 +63,13 @@ object RecentlyPlayedScreen : Screen {
     val viewModel: RecentlyPlayedViewModel =
       viewModel(factory = RecentlyPlayedViewModel.factory(context.applicationContext as android.app.Application))
 
-    val recentItems by viewModel.recentItems.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
+    val recentItems by viewModel.recentItems.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val showDeleteSheet = rememberSaveable { mutableStateOf(false) }
     val advancedPreferences = koinInject<AdvancedPreferences>()
     val appearancePreferences = koinInject<app.marlboroadvance.mpvex.preferences.AppearancePreferences>()
     val enableRecentlyPlayed by advancedPreferences.enableRecentlyPlayed.collectAsState()
 
-    val showLinkDialog = remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val browserPreferences = koinInject<BrowserPreferences>()
     val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
@@ -231,11 +230,6 @@ object RecentlyPlayedScreen : Screen {
           }
       )
       
-      PlayLinkSheet(
-        isOpen = showLinkDialog.value,
-        onDismiss = { showLinkDialog.value = false },
-        onPlayLink = { url -> MediaUtils.playFile(url, context, "play_link") },
-      )
     }
   }
 }
@@ -319,13 +313,18 @@ private fun RecentItemsContent(
           ) { index ->
             when (val item = recentItems[index]) {
               is RecentlyPlayedItem.VideoItem -> {
+                // Keyed derivedStateOf isolates this row's recomposition from
+                // selection changes on other rows sharing the SelectionManager state.
+                val isSelected by remember(selectionManager, item.video.id) {
+                  derivedStateOf { selectionManager.isSelected(item) }
+                }
                 VideoCard(
                   video = item.video,
                   settings = videoCardSettings,
                   isRecentlyPlayed = true,
                   progressPercentage = item.progressPercentage,
                   isWatched = item.isWatched,
-                  isSelected = selectionManager.isSelected(item),
+                  isSelected = isSelected,
                   onClick = {
                     if (selectionManager.isInSelectionMode) selectionManager.toggle(item)
                     else onVideoClick(item.video)
@@ -349,10 +348,13 @@ private fun RecentItemsContent(
                   totalDuration = 0,
                   lastModified = item.playlist.updatedAt / 1000,
                 )
+                val isSelected by remember(selectionManager, item.playlist.id) {
+                  derivedStateOf { selectionManager.isSelected(item) }
+                }
                 FolderCard(
                    folder = folderModel,
                    settings = folderCardSettings,
-                   isSelected = selectionManager.isSelected(item),
+                   isSelected = isSelected,
                    onClick = {
                     if (selectionManager.isInSelectionMode) selectionManager.toggle(item)
                     else onPlaylistClick(item)

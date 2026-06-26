@@ -20,9 +20,13 @@ import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.utils.permission.PermissionUtils
 
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.koin.java.KoinJavaComponent.inject
 import java.io.File
@@ -47,8 +51,11 @@ class RecentlyPlayedViewModel(application: Application) : AndroidViewModel(appli
   val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
   init {
-    // Observe recently played changes and update automatically
-    viewModelScope.launch {
+    // Observe recently played changes and update automatically. Runs on IO because the
+    // per-emission rebuild (loadRecentVideosFromEntities) does DB lookups + metadata extraction.
+    // collectLatest cancels a stale rebuild when a newer DB emission arrives; distinctUntilChanged
+    // drops Room re-emissions that carry identical content.
+    viewModelScope.launch(Dispatchers.IO) {
       val db = org.koin.java.KoinJavaComponent.get<MpvExDatabase>(MpvExDatabase::class.java)
 
       // Combine both flows - entities and playlists
@@ -57,9 +64,11 @@ class RecentlyPlayedViewModel(application: Application) : AndroidViewModel(appli
         db.recentlyPlayedDao().observeRecentlyPlayedPlaylists(limit = 50),
       ) { entities, playlists ->
         Pair(entities, playlists)
-      }.collect { (entities, playlists) ->
-        loadRecentVideosFromEntities(entities, playlists)
       }
+        .distinctUntilChanged()
+        .collectLatest { (entities, playlists) ->
+          loadRecentVideosFromEntities(entities, playlists)
+        }
     }
   }
 
@@ -187,6 +196,10 @@ class RecentlyPlayedViewModel(application: Application) : AndroidViewModel(appli
       // Keep backward compatibility
       val videos = sortedItems.filterIsInstance<RecentlyPlayedItem.VideoItem>().map { it.video }
       _recentVideos.value = videos
+    } catch (e: CancellationException) {
+      // A newer DB emission superseded this rebuild (collectLatest). Leave the current list intact
+      // for the replacement pass to overwrite, and don't report it as an error.
+      throw e
     } catch (e: Exception) {
       Log.e("RecentlyPlayedViewModel", "Error loading recent videos", e)
       _recentItems.value = emptyList()

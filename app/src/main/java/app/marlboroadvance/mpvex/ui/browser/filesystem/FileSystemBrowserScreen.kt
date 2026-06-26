@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.VideoLibrary
@@ -42,7 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -73,13 +72,13 @@ import app.marlboroadvance.mpvex.ui.browser.components.BrowserBottomBar
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.AddToPlaylistDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
+import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteProgressDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.FileOperationProgressDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.FolderPickerDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
 import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
-import app.marlboroadvance.mpvex.ui.browser.sheets.PlayLinkSheet
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.browser.states.PermissionDeniedState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
@@ -134,13 +133,14 @@ fun FileSystemBrowserScreen(path: String? = null) {
   )
 
   // State collection
-  val currentPath by viewModel.currentPath.collectAsState()
-  val items by viewModel.items.collectAsState()
-  val videoFilesWithPlayback by viewModel.videoFilesWithPlayback.collectAsState()
-  val isLoading by viewModel.isLoading.collectAsState()
-  val error by viewModel.error.collectAsState()
-  val isAtRoot by viewModel.isAtRoot.collectAsState()
-  val breadcrumbs by viewModel.breadcrumbs.collectAsState()
+  val currentPath by viewModel.currentPath.collectAsStateWithLifecycle()
+  val items by viewModel.items.collectAsStateWithLifecycle()
+  val videoFilesWithPlayback by viewModel.videoFilesWithPlayback.collectAsStateWithLifecycle()
+  val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+  val error by viewModel.error.collectAsStateWithLifecycle()
+  val isAtRoot by viewModel.isAtRoot.collectAsStateWithLifecycle()
+  val breadcrumbs by viewModel.breadcrumbs.collectAsStateWithLifecycle()
+  val deleteProgress by viewModel.deleteProgress.collectAsStateWithLifecycle()
   val playlistMode by playerPreferences.playlistMode.collectAsState()
   val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
 
@@ -200,7 +200,6 @@ fun FileSystemBrowserScreen(path: String? = null) {
   
   // UI state
   val isRefreshing = remember { mutableStateOf(false) }
-  val showLinkDialog = remember { mutableStateOf(false) }
   val sortDialogOpen = rememberSaveable { mutableStateOf(false) }
   val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
   val renameDialogOpen = rememberSaveable { mutableStateOf(false) }
@@ -213,7 +212,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
   val folderPickerOpen = rememberSaveable { mutableStateOf(false) }
   val operationType = remember { mutableStateOf<CopyPasteOps.OperationType?>(null) }
   val progressDialogOpen = rememberSaveable { mutableStateOf(false) }
-  val operationProgress by CopyPasteOps.operationProgress.collectAsState()
+  val operationProgress by CopyPasteOps.operationProgress.collectAsStateWithLifecycle()
 
   // Bottom bar visibility state
   var showFloatingBottomBar by remember { mutableStateOf(false) }
@@ -571,36 +570,39 @@ fun FileSystemBrowserScreen(path: String? = null) {
     }
 
     // Dialogs
-    PlayLinkSheet(
-      isOpen = showLinkDialog.value,
-      onDismiss = { showLinkDialog.value = false },
-      onPlayLink = { url -> MediaUtils.playFile(url, context, "play_link") },
-    )
-
     FileSystemSortBottomSheet(
       isOpen = sortDialogOpen.value,
       onDismiss = { sortDialogOpen.value = false },
     )
 
-    DeleteConfirmationDialog(
-      isOpen = deleteDialogOpen.value,
-      onDismiss = { deleteDialogOpen.value = false },
-      onConfirm = {
-        if (folderSelectionManager.isInSelectionMode) {
-          folderSelectionManager.deleteSelected()
-        }
-        if (videoSelectionManager.isInSelectionMode) {
-          videoSelectionManager.deleteSelected()
-        }
-      },
-      itemType = when {
-        folderSelectionManager.isInSelectionMode && videoSelectionManager.isInSelectionMode -> "item"
-        folderSelectionManager.isInSelectionMode -> "folder"
-        else -> "video"
-      },
-      itemCount = selectedCount,
-      itemNames = (folderSelectionManager.getSelectedItems().map { it.name } +
-        videoSelectionManager.getSelectedItems().map { it.displayName }),
+    // Gated so getSelectedItems()/map (over two managers) only runs while open.
+    if (deleteDialogOpen.value) {
+      val selectedNames = folderSelectionManager.getSelectedItems().map { it.name } +
+        videoSelectionManager.getSelectedItems().map { it.displayName }
+      DeleteConfirmationDialog(
+        isOpen = true,
+        onDismiss = { deleteDialogOpen.value = false },
+        onConfirm = {
+          if (folderSelectionManager.isInSelectionMode) {
+            folderSelectionManager.deleteSelected()
+          }
+          if (videoSelectionManager.isInSelectionMode) {
+            videoSelectionManager.deleteSelected()
+          }
+        },
+        itemType = when {
+          folderSelectionManager.isInSelectionMode && videoSelectionManager.isInSelectionMode -> "item"
+          folderSelectionManager.isInSelectionMode -> "folder"
+          else -> "video"
+        },
+        itemCount = selectedCount,
+        itemNames = selectedNames,
+      )
+    }
+
+    DeleteProgressDialog(
+      progress = deleteProgress,
+      onCancel = { viewModel.cancelDeletion() },
     )
 
     // Rename Dialog
@@ -856,6 +858,11 @@ private fun FileSystemBrowserContent(
       // Only show scrollbar if list has more than 20 items
       val hasEnoughItems = items.size > 20
 
+      // Hoist the type partitioning so it isn't re-filtered (twice) on every
+      // recomposition of the list content.
+      val folderEntries = remember(items) { items.filterIsInstance<FileSystemItem.Folder>() }
+      val videoEntries = remember(items) { items.filterIsInstance<FileSystemItem.VideoFile>() }
+
       // Animate scrollbar alpha
       val scrollbarAlpha by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isAtTop || !hasEnoughItems) 0f else 1f,
@@ -895,9 +902,12 @@ private fun FileSystemBrowserContent(
 
             // Folders first
             items(
-              items = items.filterIsInstance<FileSystemItem.Folder>(),
+              items = folderEntries,
               key = { it.path },
             ) { folder ->
+              val isSelected by remember(folderSelectionManager, folder.path) {
+                derivedStateOf { folderSelectionManager.isSelected(folder) }
+              }
               val folderModel = app.marlboroadvance.mpvex.domain.media.model.VideoFolder(
                 bucketId = folder.path,
                 name = folder.name,
@@ -911,7 +921,7 @@ private fun FileSystemBrowserContent(
               FolderCard(
                 folder = folderModel,
                 settings = folderCardSettings,
-                isSelected = folderSelectionManager.isSelected(folder),
+                isSelected = isSelected,
                 onClick = { onFolderClick(folder) },
                 onLongClick = { onFolderLongClick(folder) },
                 onThumbClick = if (tapThumbnailToSelect) {
@@ -924,15 +934,18 @@ private fun FileSystemBrowserContent(
 
             // Videos second
             items(
-              items = items.filterIsInstance<FileSystemItem.VideoFile>(),
+              items = videoEntries,
               key = { "${it.video.id}_${it.video.path}" },
             ) { videoFile ->
+              val isSelected by remember(videoSelectionManager, videoFile.video.id) {
+                derivedStateOf { videoSelectionManager.isSelected(videoFile.video) }
+              }
               VideoCard(
                 video = videoFile.video,
                 settings = videoCardSettings,
                 progressPercentage = videoFilesWithPlayback[videoFile.video.id],
                 isRecentlyPlayed = false,
-                isSelected = videoSelectionManager.isSelected(videoFile.video),
+                isSelected = isSelected,
                 onClick = { onVideoClick(videoFile.video) },
                 onLongClick = { onVideoLongClick(videoFile.video) },
                 onThumbClick = if (tapThumbnailToSelect) {
@@ -1126,7 +1139,7 @@ private fun BreadcrumbNavigation(
     horizontalArrangement = Arrangement.spacedBy(4.dp),
     verticalAlignment = Alignment.CenterVertically
   ) {
-    items(breadcrumbs) { component ->
+    items(breadcrumbs, key = { it.fullPath }) { component ->
       androidx.compose.material3.TextButton(
         onClick = { onBreadcrumbClick(component) },
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),

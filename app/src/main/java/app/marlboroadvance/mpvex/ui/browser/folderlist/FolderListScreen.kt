@@ -26,7 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +59,7 @@ import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
+import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteProgressDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
@@ -106,11 +107,11 @@ object FolderListScreen : Screen {
     val appearancePreferences = koinInject<AppearancePreferences>()
     val gesturePreferences = koinInject<GesturePreferences>()
 
-    val videoFolders by viewModel.videoFolders.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val isScanning by viewModel.isScanning.collectAsState()
-    val scanStatus by viewModel.scanStatus.collectAsState()
-    val hasCompletedInitialLoad by viewModel.hasCompletedInitialLoad.collectAsState()
+    val videoFolders by viewModel.videoFolders.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
+    val hasCompletedInitialLoad by viewModel.hasCompletedInitialLoad.collectAsStateWithLifecycle()
+    val deleteProgress by viewModel.deleteProgress.collectAsStateWithLifecycle()
 
     val folderSortType by browserPreferences.folderSortType.collectAsState()
     val folderSortOrder by browserPreferences.folderSortOrder.collectAsState()
@@ -212,7 +213,6 @@ object FolderListScreen : Screen {
               folders = sortedFolders,
               isLoading = isLoading,
               isScanning = isScanning,
-              scanStatus = scanStatus,
               hasCompletedInitialLoad = hasCompletedInitialLoad,
               tapThumbnailToSelect = { currentTapThumbnailToSelect },
               navigationBarHeight = navigationBarHeight,
@@ -265,13 +265,22 @@ object FolderListScreen : Screen {
         onShowDateChipChange = { browserPreferences.showDateChip.set(it) },
       )
 
-      DeleteConfirmationDialog(
-        isOpen = deleteDialogOpen.value,
-        onDismiss = { deleteDialogOpen.value = false },
-        onConfirm = { selectionManager.deleteSelected() },
-        itemType = "folder",
-        itemCount = selectionManager.selectedCount,
-        itemNames = selectionManager.getSelectedItems().map { it.name },
+      // Gated so getSelectedItems()/map only runs while the sheet is open.
+      if (deleteDialogOpen.value) {
+        val selectedForDelete = selectionManager.getSelectedItems()
+        DeleteConfirmationDialog(
+          isOpen = true,
+          onDismiss = { deleteDialogOpen.value = false },
+          onConfirm = { selectionManager.deleteSelected() },
+          itemType = "folder",
+          itemCount = selectedForDelete.size,
+          itemNames = selectedForDelete.map { it.name },
+        )
+      }
+
+      DeleteProgressDialog(
+        progress = deleteProgress,
+        onCancel = { viewModel.cancelDeletion() },
       )
 
       if (renameDialogOpen.value && selectionManager.isSingleSelection) {
@@ -292,7 +301,6 @@ private fun FolderListContent(
   folders: List<VideoFolder>,
   isLoading: Boolean,
   isScanning: Boolean,
-  scanStatus: String?,
   hasCompletedInitialLoad: Boolean,
   tapThumbnailToSelect: () -> Boolean,
   navigationBarHeight: androidx.compose.ui.unit.Dp,
@@ -336,7 +344,7 @@ private fun FolderListContent(
       if (showFullScreenLoading) {
         LoadingState(
           title = "Scanning for videos...",
-          message = scanStatus ?: "Please wait",
+          message = "Please wait",
           modifier = Modifier.fillMaxSize(),
         )
       } else {

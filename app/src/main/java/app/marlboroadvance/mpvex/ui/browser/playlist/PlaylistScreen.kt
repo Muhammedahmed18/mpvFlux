@@ -26,7 +26,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,7 +71,7 @@ object PlaylistScreen : Screen {
       factory = PlaylistViewModel.factory(context.applicationContext as android.app.Application)
     )
 
-    val playlistsWithCount by viewModel.playlistsWithCount.collectAsState()
+    val playlistsWithCount by viewModel.playlistsWithCount.collectAsStateWithLifecycle()
     val selectionManager = rememberSelectionManager(
       items = playlistsWithCount,
       getId = { it.playlist.id },
@@ -172,11 +173,14 @@ object PlaylistScreen : Screen {
             verticalArrangement = Arrangement.spacedBy(10.dp)
           ) {
             items(items = playlistsWithCount, key = { it.playlist.id }) { item ->
+              val isSelected by remember(selectionManager, item.playlist.id) {
+                derivedStateOf { selectionManager.isSelected(item) }
+              }
               PlaylistCard(
                 playlist = item.playlist,
                 itemCount = item.itemCount,
                 settings = folderCardSettings,
-                isSelected = selectionManager.isSelected(item),
+                isSelected = isSelected,
                 onClick = {
                   if (selectionManager.isInSelectionMode) selectionManager.toggle(item)
                   else backstack.add(PlaylistDetailScreen(item.playlist.id))
@@ -212,14 +216,18 @@ object PlaylistScreen : Screen {
         }
       }
 
-      DeleteConfirmationDialog(
-        isOpen = deleteDialogOpen.value,
-        onDismiss = { deleteDialogOpen.value = false },
-        onConfirm = { selectionManager.deleteSelected() },
-        itemType = "playlist",
-        itemCount = selectionManager.selectedCount,
-        itemNames = selectionManager.getSelectedItems().map { it.playlist.name }
-      )
+      // Gated so getSelectedItems()/map only runs while the sheet is open.
+      if (deleteDialogOpen.value) {
+        val selectedForDelete = selectionManager.getSelectedItems()
+        DeleteConfirmationDialog(
+          isOpen = true,
+          onDismiss = { deleteDialogOpen.value = false },
+          onConfirm = { selectionManager.deleteSelected() },
+          itemType = "playlist",
+          itemCount = selectedForDelete.size,
+          itemNames = selectedForDelete.map { it.playlist.name }
+        )
+      }
 
       PlaylistActionSheet(
         isOpen = showActionSheet,

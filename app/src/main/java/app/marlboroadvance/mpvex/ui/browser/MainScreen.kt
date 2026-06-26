@@ -21,10 +21,8 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -45,7 +43,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.browser.folderlist.FolderListScreen
-import app.marlboroadvance.mpvex.ui.browser.networkstreaming.NetworkStreamingScreen
 import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistScreen
 import app.marlboroadvance.mpvex.ui.browser.recentlyplayed.RecentlyPlayedScreen
 import kotlinx.coroutines.launch
@@ -59,7 +56,7 @@ object MainScreen : Screen {
   override fun Content() {
     val pagerState = rememberPagerState(
       initialPage = persistentSelectedTab,
-      pageCount = { 4 }
+      pageCount = { 3 }
     )
     val scope = rememberCoroutineScope()
 
@@ -79,8 +76,7 @@ object MainScreen : Screen {
           Icons.AutoMirrored.Outlined.PlaylistPlay,
           "Playlists",
           "Playlists"
-        ),
-        NavItem(Icons.Filled.Language, Icons.Outlined.Language, "Network", "Network")
+        )
       )
     }
 
@@ -168,7 +164,6 @@ object MainScreen : Screen {
             0 -> FolderListScreen.Content()
             1 -> RecentlyPlayedScreen.Content()
             2 -> PlaylistScreen.Content()
-            3 -> NetworkStreamingScreen.Content()
           }
         }
       }

@@ -21,10 +21,13 @@ import app.marlboroadvance.mpvex.utils.storage.TreeViewScanner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
@@ -85,13 +88,9 @@ class FileSystemBrowserViewModel(
   // Whether we're at the home directory (top-most allowed directory)
   // Similar to Fossify's check for home folder or root
   val isAtRoot: StateFlow<Boolean> =
-    MutableStateFlow(initialPath == null).apply {
-      viewModelScope.launch {
-        _currentPath.collect { path ->
-          value = path == STORAGE_ROOTS_MARKER || path == homeDirectory
-        }
-      }
-    }
+    _currentPath
+      .map { it == STORAGE_ROOTS_MARKER || it == homeDirectory }
+      .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), initialPath == null)
 
   companion object {
     private const val TAG = "FileSystemBrowserVM"
@@ -238,40 +237,11 @@ class FileSystemBrowserViewModel(
   }
 
   /**
-   * Delete folders (and their contents)
-   * Based on Fossify's deleteFiles() logic with folder support
+   * Delete folders (and their contents) file-by-file with live progress, cancellation, and full
+   * trace cleanup. Shared with the album view via [deleteFoldersWithProgress] in the base ViewModel.
    */
-  fun deleteFolders(folders: List<FileSystemItem.Folder>): Pair<Int, Int> {
-    var successCount = 0
-    var failureCount = 0
-
-    Log.d(TAG, "Deleting ${folders.size} folders")
-
-    folders.forEach { folder ->
-      try {
-        val dir = File(folder.path)
-        if (dir.exists() && dir.deleteRecursively()) {
-          successCount++
-          Log.d(TAG, "Successfully deleted folder: ${folder.path}")
-        } else {
-          failureCount++
-          Log.w(TAG, "Failed to delete folder: ${folder.path}")
-        }
-      } catch (e: Exception) {
-        Log.e(TAG, "Exception deleting folder: ${folder.path}", e)
-        failureCount++
-      }
-    }
-
-    // Set flag if any deletions were successful
-    if (successCount > 0) {
-      // Notify that media library has changed
-      MediaLibraryEvents.notifyChanged()
-    }
-
-    Log.d(TAG, "Folder deletion complete: $successCount success, $failureCount failed")
-    return Pair(successCount, failureCount)
-  }
+  suspend fun deleteFolders(folders: List<FileSystemItem.Folder>): Pair<Int, Int> =
+    deleteFoldersWithProgress(folders.map { it.path })
 
   /**
    * Delete videos - delegates to base class implementation

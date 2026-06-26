@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -44,7 +45,6 @@ import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
 import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
-import app.marlboroadvance.mpvex.ui.browser.cards.M3UVideoCard
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
@@ -76,12 +76,12 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
         factory = PlaylistDetailViewModel.factory(context.applicationContext as android.app.Application, playlistId),
       )
 
-    val playlist by viewModel.playlist.collectAsState()
+    val playlist by viewModel.playlist.collectAsStateWithLifecycle()
     val browserPreferences = koinInject<BrowserPreferences>()
     val appearancePreferences = koinInject<app.marlboroadvance.mpvex.preferences.AppearancePreferences>()
-    val videoItems by viewModel.videoItems.collectAsState()
+    val videoItems by viewModel.videoItems.collectAsStateWithLifecycle()
     val videos = videoItems.map { it.video }
-    val isLoading by viewModel.isLoading.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
 
     val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
@@ -242,11 +242,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
         enabled = !selectionManager.isInSelectionMode && !isReorderMode,
         listState = listState,
         modifier = Modifier.fillMaxSize().padding(padding),
-        onRefresh = {
-          if (playlist?.isM3uPlaylist == true) {
-            viewModel.refreshM3UPlaylist().onFailure { Toast.makeText(context, "Failed: ${it.message}", Toast.LENGTH_LONG).show() }
-          } else viewModel.refreshNow()
-        },
+        onRefresh = { viewModel.refreshNow() },
       ) {
         PlaylistVideoListContent(
           videoItems = videoItems,
@@ -380,31 +376,21 @@ private fun PlaylistVideoListContent(
                   modifier = Modifier.fillMaxWidth(),
                   verticalAlignment = Alignment.CenterVertically,
                 ) {
-                  if (isM3uPlaylist) {
-                    M3UVideoCard(
-                      title = item.video.displayName,
-                      url = item.video.path,
-                      onClick = { onVideoItemClick(item) },
-                      onLongClick = { onVideoItemLongClick(item) },
-                      settings = videoCardSettings,
-                      isSelected = selectionManager.isSelected(item),
-                      isRecentlyPlayed = item.playlistItem.id == mostRecentlyPlayedItem?.playlistItem?.id,
-                      modifier = Modifier.weight(1f),
-                    )
-                  } else {
-                    VideoCard(
-                      video = item.video,
-                      settings = videoCardSettings,
-                      progressPercentage = if (item.playlistItem.lastPosition > 0 && item.video.duration > 0) item.playlistItem.lastPosition.toFloat() / item.video.duration.toFloat() else null,
-                      isRecentlyPlayed = item.playlistItem.id == mostRecentlyPlayedItem?.playlistItem?.id,
-                      isSelected = selectionManager.isSelected(item),
-                      onClick = { onVideoItemClick(item) },
-                      onLongClick = { onVideoItemLongClick(item) },
-                      onThumbClick = { if (tapThumbnailToSelect || selectionManager.isInSelectionMode) onVideoItemLongClick(item) else onVideoItemClick(item) },
-                      showSubtitleIndicator = showSubtitleIndicator,
-                      modifier = Modifier.weight(1f),
-                    )
+                  val isSelected by remember(selectionManager, item.playlistItem.id) {
+                    derivedStateOf { selectionManager.isSelected(item) }
                   }
+                  VideoCard(
+                    video = item.video,
+                    settings = videoCardSettings,
+                    progressPercentage = if (item.playlistItem.lastPosition > 0 && item.video.duration > 0) item.playlistItem.lastPosition.toFloat() / item.video.duration.toFloat() else null,
+                    isRecentlyPlayed = item.playlistItem.id == mostRecentlyPlayedItem?.playlistItem?.id,
+                    isSelected = isSelected,
+                    onClick = { onVideoItemClick(item) },
+                    onLongClick = { onVideoItemLongClick(item) },
+                    onThumbClick = { if (tapThumbnailToSelect || selectionManager.isInSelectionMode) onVideoItemLongClick(item) else onVideoItemClick(item) },
+                    showSubtitleIndicator = showSubtitleIndicator,
+                    modifier = Modifier.weight(1f),
+                  )
 
                   if (isReorderMode) {
                     IconButton(onClick = { }, modifier = Modifier.size(48.dp).draggableHandle()) {

@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -61,14 +62,14 @@ class PlaylistDetailViewModel(
   init {
     // Observe playlist info
     viewModelScope.launch(Dispatchers.IO) {
-      playlistRepository.observePlaylistById(playlistId).collectLatest { playlist ->
+      playlistRepository.observePlaylistById(playlistId).distinctUntilChanged().collectLatest { playlist ->
         _playlist.value = playlist
       }
     }
 
     // Observe playlist items and load video metadata
     viewModelScope.launch(Dispatchers.IO) {
-      playlistRepository.observePlaylistItems(playlistId).collectLatest { items ->
+      playlistRepository.observePlaylistItems(playlistId).distinctUntilChanged().collectLatest { items ->
         _isLoading.value = true
         try {
           if (items.isEmpty()) {
@@ -260,12 +261,4 @@ class PlaylistDetailViewModel(
     playlistRepository.reorderPlaylistItems(playlistId, newOrder)
   }
 
-  suspend fun refreshM3UPlaylist(): Result<Unit> {
-    return try {
-      _isLoading.value = true
-      playlistRepository.refreshM3UPlaylist(playlistId)
-    } finally {
-      _isLoading.value = false
-    }
-  }
 }
