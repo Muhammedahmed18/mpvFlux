@@ -17,8 +17,8 @@ android {
     applicationId = "app.marlboroadvance.mpvflux"
     minSdk = 26
     targetSdk = 36
-    versionCode = 132
-    versionName = "1.3.2"
+    versionCode = 133
+    versionName = "1.3.3"
 
     vectorDrawables {
       useSupportLibrary = true
@@ -219,7 +219,8 @@ dependencies {
   implementation(libs.truetype.parser)
   implementation(libs.fsaf)
   implementation(libs.mediainfo.lib)
-  implementation(files("libs/mpv-android-lib-v0.0.1.aar"))
+  // mpv/libass/ffmpeg from Maven Central (was a 77.6 MB AAR in app/libs)
+  implementation(libs.mpv.android)
 
   implementation(libs.lazycolumnscrollbar)
   implementation(libs.reorderable)
