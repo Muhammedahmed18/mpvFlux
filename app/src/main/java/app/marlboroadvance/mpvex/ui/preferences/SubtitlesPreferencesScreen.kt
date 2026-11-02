@@ -229,6 +229,21 @@ object SubtitlesPreferencesScreen : Screen {
 
               PreferenceDivider()
 
+              val usePhoneFont by preferences.usePhoneFontForTextSubs.collectAsState()
+              SwitchPreference(
+                value = usePhoneFont,
+                onValueChange = { preferences.usePhoneFontForTextSubs.set(it) },
+                title = { Text(stringResource(R.string.pref_sub_phone_font_title), fontWeight = FontWeight.Bold) },
+                summary = {
+                  Text(
+                    stringResource(R.string.pref_sub_phone_font_summary),
+                    color = MaterialTheme.colorScheme.outline,
+                  )
+                },
+              )
+
+              PreferenceDivider()
+
               val overrideAss by preferences.overrideAssSubs.collectAsState()
               SwitchPreference(
                 value = overrideAss,

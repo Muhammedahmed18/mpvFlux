@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.panels
 
+import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,6 +68,13 @@ fun SubtitlesMiscellaneousCard(modifier: Modifier = Modifier) {
             MPVLib.setPropertyString("secondary-sub-ass-override", if (it) "force" else "scale")
           },
           { Text(stringResource(R.string.player_sheets_sub_override_ass)) },
+        )
+        val usePhoneFont by preferences.usePhoneFontForTextSubs.collectAsState()
+        SwitchPreference(
+          usePhoneFont,
+          onValueChange = { preferences.usePhoneFontForTextSubs.set(it) },
+          { Text(stringResource(R.string.pref_sub_phone_font_title)) },
+          summary = { Text(stringResource(R.string.pref_sub_phone_font_summary)) },
         )
         var scaleByWindow by remember {
           mutableStateOf(MPVLib.getPropertyString("sub-scale-by-window") == "yes")

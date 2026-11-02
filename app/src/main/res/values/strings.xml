@@ -578,6 +578,8 @@
   <string name="dialog_import_complete">Import complete</string>
   <string name="dialog_custom_seek_duration">Enter custom seek duration in seconds (1-120)</string>
   <string name="dialog_custom_hide_time">Enter custom hide time in milliseconds</string>
+  <string name="pref_sub_phone_font_title">Use phone font for text subtitles</string>
+  <string name="pref_sub_phone_font_summary">SRT and VTT subtitles use your phone\'s current font, including theme store fonts. ASS subtitles keep their own styling.</string>
   <!-- Browser cards -->
   <plurals name="card_video_count">
     <item quantity="one">%1$d video</item>

@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex.ui.player
 
+import app.marlboroadvance.mpvex.ui.player.subtitles.TextSubtitleLayer
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
@@ -452,6 +453,9 @@ class PlayerActivity :
 
   @RequiresApi(Build.VERSION_CODES.P)
   private fun setupPlayerControls() {
+    binding.subtitles.setContent {
+      TextSubtitleLayer(viewModel = viewModel)
+    }
     binding.controls.setContent {
       MpvexTheme {
         PlayerControls(

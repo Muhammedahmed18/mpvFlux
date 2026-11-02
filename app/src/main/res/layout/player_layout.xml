@@ -9,6 +9,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- Text subtitles drawn with Android (phone font). Kept separate from the controls
+         layer so it stays visible in picture-in-picture, where controls are hidden. -->
+    <androidx.compose.ui.platform.ComposeView
+        android:id="@+id/subtitles"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
     <androidx.compose.ui.platform.ComposeView
         android:id="@+id/controls"
         android:layout_width="match_parent"

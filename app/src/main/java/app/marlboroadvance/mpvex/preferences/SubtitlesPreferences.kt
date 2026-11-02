@@ -37,6 +37,10 @@ class SubtitlesPreferences(
   val subPos = preferenceStore.getInt("sub_pos", 100)
 
   val overrideAssSubs = preferenceStore.getBoolean("sub_override_ass")
+
+  // Draw text subtitles (SRT/VTT/...) with Android instead of libass so they use the
+  // phone's current font, including theme-store fonts. ASS/SSA always stay on libass.
+  val usePhoneFontForTextSubs = preferenceStore.getBoolean("sub_text_phone_font", true)
   val scaleByWindow = preferenceStore.getBoolean("sub_scale_by_window", true)
 
   val defaultSubDelay = preferenceStore.getInt("sub_default_delay")
