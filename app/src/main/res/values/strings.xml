@@ -580,6 +580,13 @@
   <string name="dialog_custom_hide_time">Enter custom hide time in milliseconds</string>
   <string name="pref_sub_phone_font_title">Use phone font for text subtitles</string>
   <string name="pref_sub_phone_font_summary">SRT and VTT subtitles use your phone\'s current font, including theme store fonts. ASS subtitles keep their own styling.</string>
+  <string name="decoder_sheet_title">Decoder</string>
+  <string name="decoder_supported">Supported</string>
+  <string name="decoder_not_supported">Not supported on this phone</string>
+  <string name="decoder_reason_no_hw">Your phone has no %1$s hardware decoder</string>
+  <string name="decoder_reason_profile">Your phone can\'t decode %1$s %2$s in hardware</string>
+  <string name="decoder_reason_resolution">Your phone can\'t decode %1$s at %2$d×%3$d in hardware</string>
+  <string name="decoder_sheet_sw_note">%1$s, so this video plays with software decoding (SW) and uses more battery.</string>
   <!-- Browser cards -->
   <plurals name="card_video_count">
     <item quantity="one">%1$d video</item>

@@ -376,6 +376,7 @@ fun TrackSelectableBar(
   metadata: List<TrackMetadata> = emptyList(),
   trailingContent: @Composable (() -> Unit)? = null,
   badge: (@Composable () -> Unit)? = null,
+  enabled: Boolean = true,
 ) {
   val haptic = LocalHapticFeedback.current
   val interactionSource = remember { MutableInteractionSource() }
@@ -414,9 +415,16 @@ fun TrackSelectableBar(
       onClick()
     },
     interactionSource = interactionSource,
+    // Unavailable options (e.g. a hardware decoder this phone doesn't have) stay visible
+    // but dimmed and can't be selected.
+    enabled           = enabled,
     modifier          = modifier
       .fillMaxWidth()
-      .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
+      .graphicsLayer {
+        scaleX = pressScale
+        scaleY = pressScale
+        alpha = if (enabled) 1f else 0.5f
+      }
       .border(borderWidth, borderBrush, shape),
     shape             = shape,
     color             = containerColor,
