@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.util.LruCache
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.utils.media.MediaInfoOps
+import app.marlboroadvance.mpvex.utils.perf.PerfTrace
 import `is`.xyz.mpv.FastThumbnails
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -113,78 +114,72 @@ class ThumbnailRepository(
     heightPx: Int,
   ): Bitmap? =
     withContext(Dispatchers.IO) {
-      val key = thumbnailKey(video)
+      PerfTrace.time("ThumbnailRepository", "getThumbnail", thresholdMs = 50) {
+        val key = thumbnailKey(video)
 
-      if (isNetworkUrl(video.path) && !appearancePreferences.showNetworkThumbnails.get()) {
-        return@withContext null
-      }
+        if (isNetworkUrl(video.path) && !appearancePreferences.showNetworkThumbnails.get()) {
+          return@time null
+        }
+        memoryCache.get(key)?.let { return@time it }
 
-      memoryCache.get(key)?.let { return@withContext it }
+        ongoingOperations[key]?.let { existing ->
+          if (existing.isCancelled) ongoingOperations.remove(key, existing)
+        }
 
-      // Remove any stale cancelled Deferred before computing — a cancelled Deferred
-      // will never complete, so any awaiter on it would suspend forever.
-      ongoingOperations[key]?.let { existing ->
-        if (existing.isCancelled) ongoingOperations.remove(key, existing)
-      }
-
-      // computeIfAbsent is atomic on ConcurrentHashMap: the lambda only runs if no
-      // entry exists for this key. Any second coroutine arriving concurrently finds
-      // the already-stored Deferred and awaits it, closing the race window that
-      // existed between the old null-check and the separate store below.
-      val deferred = ongoingOperations.computeIfAbsent(key) {
-        async {
-          try {
-            loadFromDisk(video)?.let { thumbnail ->
-              memoryCache.put(key, thumbnail)
-              _thumbnailReadyKeys.tryEmit(key)
-              return@async thumbnail
-            }
-
-            if (isNetworkUrl(video.path) && !appearancePreferences.showNetworkThumbnails.get()) {
-              return@async null
-            }
-
-            // Acquire permit to generate. This throttles the CPU-intensive generation process.
-            generationSemaphore.withPermit {
-              val aspect = if (widthPx > 0 && heightPx > 0) {
-                widthPx.toFloat() / heightPx.toFloat()
-              } else {
-                16f / 9f
+        val deferred = ongoingOperations.computeIfAbsent(key) {
+          async {
+            try {
+              loadFromDisk(video)?.let { thumbnail ->
+                memoryCache.put(key, thumbnail)
+                _thumbnailReadyKeys.tryEmit(key)
+                return@async thumbnail
               }
 
-              val targetWidth = diskCacheDimension
-              val targetHeight = (targetWidth / aspect).toInt()
+              if (isNetworkUrl(video.path) && !appearancePreferences.showNetworkThumbnails.get()) {
+                return@async null
+              }
 
-              val videoKey = videoBaseKey(video)
-              val thumbnail = if (useMediaStoreForVideo.containsKey(videoKey)) {
-                generateWithMediaStore(video, targetWidth, targetHeight)
-              } else {
-                val fastResult = generateWithFastThumbnails(video, targetWidth, targetHeight)
-                if (fastResult == null) {
-                  useMediaStoreForVideo[videoKey] = true
+              generationSemaphore.withPermit {
+                val aspect = if (widthPx > 0 && heightPx > 0) {
+                  widthPx.toFloat() / heightPx.toFloat()
+                } else {
+                  16f / 9f
+                }
+
+                val targetWidth = diskCacheDimension
+                val targetHeight = (targetWidth / aspect).toInt()
+
+                val videoKey = videoBaseKey(video)
+                val thumbnail = if (useMediaStoreForVideo.containsKey(videoKey)) {
                   generateWithMediaStore(video, targetWidth, targetHeight)
                 } else {
-                  fastResult
+                  val fastResult = generateWithFastThumbnails(video, targetWidth, targetHeight)
+                  if (fastResult == null) {
+                    useMediaStoreForVideo[videoKey] = true
+                    generateWithMediaStore(video, targetWidth, targetHeight)
+                  } else {
+                    fastResult
+                  }
                 }
+
+                if (thumbnail == null) {
+                  return@withPermit null
+                }
+
+                memoryCache.put(key, thumbnail)
+                _thumbnailReadyKeys.tryEmit(key)
+                writeToDisk(video, thumbnail)
+
+                thumbnail
               }
-
-              if (thumbnail == null) {
-                return@withPermit null
-              }
-
-              memoryCache.put(key, thumbnail)
-              _thumbnailReadyKeys.tryEmit(key)
-              writeToDisk(video, thumbnail)
-
-              thumbnail
+            } finally {
+              ongoingOperations.remove(key)
             }
-          } finally {
-            ongoingOperations.remove(key)
           }
         }
-      }
 
-      return@withContext deferred.await()
+        deferred.await()
+      }
     }
 
   suspend fun getCachedThumbnail(

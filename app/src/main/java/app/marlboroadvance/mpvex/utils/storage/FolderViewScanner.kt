@@ -7,6 +7,7 @@ import android.provider.MediaStore
 import android.util.Log
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
+import app.marlboroadvance.mpvex.utils.perf.PerfTrace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -24,7 +25,7 @@ object FolderViewScanner {
     // Smart cache with short TTL (10 seconds)
     private var cachedFolderList: List<VideoFolder>? = null
     private var cacheTimestamp: Long = 0
-    private const val CACHE_TTL_MS = 10_000L // 10 seconds for faster refresh
+    private const val CACHE_TTL_MS = 300_000L // 5 minutes for fewer rescans
     
     /**
      * Clear cache (call when media library changes)
@@ -48,12 +49,13 @@ object FolderViewScanner {
     )
     
     /**
-     * Helper data class for video info during scanning
+     * Helper data class for folder stats during scanning
      */
-    private data class VideoInfo(
-        val size: Long,
-        val duration: Long,
-        val dateModified: Long
+    private data class FolderStats(
+        var count: Int = 0,
+        var size: Long = 0L,
+        var duration: Long = 0L,
+        var lastModified: Long = 0L
     )
     
     /**
@@ -70,33 +72,36 @@ object FolderViewScanner {
             }
         }
         
-        // Build fresh data
-        val allFolders = mutableMapOf<String, FolderData>()
-        
-        // Step 1: Scan MediaStore (fast, covers most cases)
-        scanMediaStoreImmediateChildren(context, allFolders)
-        
-        // Step 2: Scan external volumes via filesystem (USB OTG, SD cards)
-        scanExternalVolumes(context, allFolders)
-        
-        // Convert to VideoFolder list
-        val result = allFolders.values.map { data ->
-            VideoFolder(
-                bucketId = data.path,
-                name = data.name,
-                path = data.path,
-                videoCount = data.videoCount,
-                totalSize = data.totalSize,
-                totalDuration = data.totalDuration,
-                lastModified = data.lastModified
-            )
-        }.sortedBy { it.name.lowercase(Locale.getDefault()) }
-        
-        // Update cache
-        cachedFolderList = result
-        cacheTimestamp = now
-        
-        result
+        PerfTrace.section("FolderViewScanner.getAllVideoFolders") {
+            PerfTrace.time(TAG, "getAllVideoFolders", thresholdMs = 50) {
+                val allFolders = mutableMapOf<String, FolderData>()
+
+                PerfTrace.time(TAG, "scanMediaStoreImmediateChildren", thresholdMs = 50) {
+                    scanMediaStoreImmediateChildren(context, allFolders)
+                }
+
+                PerfTrace.time(TAG, "scanExternalVolumes", thresholdMs = 50) {
+                    scanExternalVolumes(context, allFolders)
+                }
+
+                val result = allFolders.values.map { data ->
+                    VideoFolder(
+                        bucketId = data.path,
+                        name = data.name,
+                        path = data.path,
+                        videoCount = data.videoCount,
+                        totalSize = data.totalSize,
+                        totalDuration = data.totalDuration,
+                        lastModified = data.lastModified
+                    )
+                }.sortedBy { it.name.lowercase(Locale.getDefault()) }
+
+                cachedFolderList = result
+                cacheTimestamp = now
+
+                result
+            }
+        }
     }
     
     /**
@@ -126,9 +131,10 @@ object FolderViewScanner {
                 val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
                 val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_MODIFIED)
                 
-                // Collect videos by folder
-                val videosByFolder = mutableMapOf<String, MutableList<VideoInfo>>()
-                
+                val statsByFolder = mutableMapOf<String, FolderStats>()
+                val childCountByFolder = mutableMapOf<String, Int>()
+                val sep = File.separatorChar
+
                 while (cursor.moveToNext()) {
                     val videoPath = cursor.getString(dataColumn)
                     val file = File(videoPath)
@@ -139,40 +145,32 @@ object FolderViewScanner {
                     val size = cursor.getLong(sizeColumn)
                     val duration = cursor.getLong(durationColumn)
                     val dateModified = cursor.getLong(dateColumn)
-                    
-                    videosByFolder.getOrPut(folderPath) { mutableListOf() }.add(
-                        VideoInfo(size, duration, dateModified)
-                    )
+
+                    val stats = statsByFolder.getOrPut(folderPath) { FolderStats() }
+                    stats.count += 1
+                    stats.size += size
+                    stats.duration += duration
+                    if (dateModified > stats.lastModified) {
+                        stats.lastModified = dateModified
+                    }
+
+                    val parentSep = folderPath.lastIndexOf(sep)
+                    if (parentSep > 0) {
+                        val parent = folderPath.substring(0, parentSep)
+                        childCountByFolder[parent] = (childCountByFolder[parent] ?: 0) + 1
+                    }
                 }
-                
-                // Build folder data - only count immediate children videos
-                for ((folderPath, videos) in videosByFolder) {
-                    var totalSize = 0L
-                    var totalDuration = 0L
-                    var lastModified = 0L
-                    
-                    for (video in videos) {
-                        totalSize += video.size
-                        totalDuration += video.duration
-                        if (video.dateModified > lastModified) {
-                            lastModified = video.dateModified
-                        }
-                    }
-                    
-                    // Check if this folder has subfolders with videos
-                    val hasSubfolders = videosByFolder.keys.any { otherPath ->
-                        otherPath != folderPath && 
-                        otherPath.startsWith("$folderPath${File.separator}") &&
-                        File(otherPath).parent == folderPath
-                    }
-                    
+
+                for ((folderPath, stats) in statsByFolder) {
+                    val hasSubfolders = (childCountByFolder[folderPath] ?: 0) > 0
+
                     folders[folderPath] = FolderData(
                         path = folderPath,
                         name = File(folderPath).name,
-                        videoCount = videos.size,
-                        totalSize = totalSize,
-                        totalDuration = totalDuration,
-                        lastModified = lastModified,
+                        videoCount = stats.count,
+                        totalSize = stats.size,
+                        totalDuration = stats.duration,
+                        lastModified = stats.lastModified,
                         hasSubfolders = hasSubfolders
                     )
                 }

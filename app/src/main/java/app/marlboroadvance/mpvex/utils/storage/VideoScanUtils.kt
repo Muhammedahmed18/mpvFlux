@@ -10,6 +10,7 @@ import android.provider.MediaStore
 import android.util.Log
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.utils.media.MediaInfoOps
+import app.marlboroadvance.mpvex.utils.perf.PerfTrace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -231,9 +232,12 @@ object VideoScanUtils {
         
         try {
             val uri = Uri.fromFile(file)
-            val result = runBlocking {
-                MediaInfoOps.extractBasicMetadata(context, uri, file.name)
-            }
+            val result =
+                PerfTrace.time(TAG, "extractVideoMetadata.runBlocking", thresholdMs = 50) {
+                    runBlocking {
+                        MediaInfoOps.extractBasicMetadata(context, uri, file.name)
+                    }
+                }
             
             result.onSuccess { metadata ->
                 duration = metadata.durationMs

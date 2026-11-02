@@ -8,10 +8,16 @@ import app.marlboroadvance.mpvex.di.PreferencesModule
 import app.marlboroadvance.mpvex.presentation.crash.CrashActivity
 import app.marlboroadvance.mpvex.presentation.crash.GlobalExceptionHandler
 import app.marlboroadvance.mpvex.utils.media.MediaLibraryEvents
+import app.marlboroadvance.mpvex.utils.storage.FolderViewScanner
+import app.marlboroadvance.mpvex.utils.storage.TreeViewScanner
 import `is`.xyz.mpv.FastThumbnails
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.android.ext.koin.androidContext
@@ -43,6 +49,8 @@ class App : Application() {
 
     FastThumbnails.initialize(this)
 
+    observeMediaLibraryChanges()
+
     // Perform cache maintenance on app startup (non-blocking)
     applicationScope.launch {
       runCatching {
@@ -56,6 +64,17 @@ class App : Application() {
         triggerMediaScanOnLaunch()
       }
     }
+  }
+
+  @OptIn(FlowPreview::class)
+  private fun observeMediaLibraryChanges() {
+    MediaLibraryEvents.changes
+      .debounce(500L)
+      .onEach {
+        TreeViewScanner.clearCache()
+        FolderViewScanner.clearCache()
+      }
+      .launchIn(applicationScope)
   }
   
   /**

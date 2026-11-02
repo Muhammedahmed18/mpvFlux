@@ -45,6 +45,7 @@ import app.marlboroadvance.mpvex.ui.theme.MpvexTheme
 import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
 import app.marlboroadvance.mpvex.utils.media.HttpUtils
 import app.marlboroadvance.mpvex.utils.media.SubtitleOps
+import app.marlboroadvance.mpvex.utils.perf.PerfTrace
 import app.marlboroadvance.mpvex.utils.storage.FileTypeUtils
 import app.marlboroadvance.mpvex.utils.storage.FileFilterUtils
 import com.github.k1rakishou.fsaf.FileManager
@@ -548,25 +549,27 @@ class PlayerActivity :
   private fun cleanupMPV() {
     if (!mpvInitialized) return
 
-    player.isExiting = true
+    PerfTrace.time(TAG, "cleanupMPV", thresholdMs = 16) {
+      player.isExiting = true
 
-    endBackgroundPlayback()
+      endBackgroundPlayback()
 
-    if (!isFinishing || isManualBackgroundPlayback) return
+      if (!isFinishing || isManualBackgroundPlayback) return@time
 
-    runCatching {
-      MPVLib.removeObserver(playerObserver)
+      runCatching {
+        MPVLib.removeObserver(playerObserver)
 
-      if (isReady) {
-        MPVLib.setPropertyBoolean("pause", true)
-        MPVLib.command("quit")
-        Thread.sleep(100)
+        if (isReady) {
+          MPVLib.setPropertyBoolean("pause", true)
+          MPVLib.command("quit")
+          Thread.sleep(100)
+        }
+
+        MPVLib.destroy()
+        mpvInitialized = false
+      }.onFailure { e ->
+        Log.e(TAG, "Error cleaning up MPV", e)
       }
-
-      MPVLib.destroy()
-      mpvInitialized = false
-    }.onFailure { e ->
-      Log.e(TAG, "Error cleaning up MPV", e)
     }
   }
 

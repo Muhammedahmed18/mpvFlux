@@ -27,6 +27,7 @@ import app.marlboroadvance.mpvex.repository.wyzie.WyzieSubtitle
 import app.marlboroadvance.mpvex.utils.media.ChecksumUtils
 import app.marlboroadvance.mpvex.utils.media.MediaInfoParser
 import app.marlboroadvance.mpvex.utils.media.SubtitleHashUtils
+import app.marlboroadvance.mpvex.utils.perf.PerfTrace
 import `is`.xyz.mpv.MPVLib
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -1536,44 +1537,41 @@ class PlayerViewModel(
     // Per-item watched state is meaningless for network/M3U streams, so skip the DB lookups there.
     val supportsWatchedState = !activity.isCurrentPlaylistM3U()
 
-    return activity.playlist.mapIndexed { index, uri ->
-      val title = activity.getPlaylistItemTitle(uri)
-      // Path is not used for thumbnail loading - thumbnails are loaded directly from URI
-      // Keep it for cache key compatibility
-      val path = uri.toString()
-      val isCurrentlyPlaying = index == activity.playlistIndex
+    return PerfTrace.time("PlayerViewModel", "getPlaylistData.map", thresholdMs = 16) {
+      activity.playlist.mapIndexed { index, uri ->
+        val title = activity.getPlaylistItemTitle(uri)
+        val path = uri.toString()
+        val isCurrentlyPlaying = index == activity.playlistIndex
 
-      // Try to get from cache first (synchronized access)
-      val cacheKey = uri.toString()
-      val (durationStr, resolutionStr) = synchronized(metadataCache) { metadataCache[cacheKey] } ?: ("" to "")
+        val cacheKey = uri.toString()
+        val (durationStr, resolutionStr) =
+          synchronized(metadataCache) { metadataCache[cacheKey] } ?: ("" to "")
 
-      // Resolve watched state: live progress for the current item, persisted state for the rest.
-      var itemProgress = if (isCurrentlyPlaying) currentProgress else 0f
-      var itemWatched = isCurrentlyPlaying && currentProgress >= 95f
-      if (!isCurrentlyPlaying && supportsWatchedState) {
-        val state = playbackStateRepository.getVideoDataByTitle(activity.getPlaylistItemMediaIdentifier(uri))
-        if (state != null) {
-          itemWatched = state.hasBeenWatched
-          // timeRemaining is only meaningful when we knew the duration at save time;
-          // without it we can't place a resume bar, so leave progress at 0.
-          itemProgress = if (state.lastPosition > 0 && state.timeRemaining > 0) {
-            val total = state.lastPosition + state.timeRemaining
-            (state.lastPosition.toFloat() / total.toFloat() * 100f).coerceIn(0f, 100f)
-          } else 0f
+        var itemProgress = if (isCurrentlyPlaying) currentProgress else 0f
+        var itemWatched = isCurrentlyPlaying && currentProgress >= 95f
+        if (!isCurrentlyPlaying && supportsWatchedState) {
+          val state = playbackStateRepository.getVideoDataByTitle(activity.getPlaylistItemMediaIdentifier(uri))
+          if (state != null) {
+            itemWatched = state.hasBeenWatched
+            itemProgress = if (state.lastPosition > 0 && state.timeRemaining > 0) {
+              val total = state.lastPosition + state.timeRemaining
+              (state.lastPosition.toFloat() / total.toFloat() * 100f).coerceIn(0f, 100f)
+            } else 0f
+          }
         }
-      }
 
-      app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaylistItem(
-        uri = uri,
-        title = title,
-        index = index,
-        isPlaying = isCurrentlyPlaying,
-        path = path,
-        progressPercent = itemProgress,
-        isWatched = itemWatched,
-        duration = durationStr,
-        resolution = resolutionStr,
-      )
+        app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaylistItem(
+          uri = uri,
+          title = title,
+          index = index,
+          isPlaying = isCurrentlyPlaying,
+          path = path,
+          progressPercent = itemProgress,
+          isWatched = itemWatched,
+          duration = durationStr,
+          resolution = resolutionStr,
+        )
+      }
     }
   }
 
