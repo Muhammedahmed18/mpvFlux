@@ -25,9 +25,8 @@ import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.ShortNavigationBar
+import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -114,15 +113,15 @@ object MainScreen : Screen {
               shadowElevation = 8.dp,
               tonalElevation = 2.dp
             ) {
-              NavigationBar(
-                modifier = Modifier.height(72.dp),
+              // M3 Expressive "short" navigation bar inside the floating pill: shorter
+              // (64dp), pill-shaped active indicator, and labels always visible.
+              ShortNavigationBar(
                 containerColor = Color.Transparent,
-                tonalElevation = 0.dp,
-                windowInsets = WindowInsets(0, 0, 0, 0)
+                windowInsets = WindowInsets(0, 0, 0, 0),
               ) {
                 navItems.forEachIndexed { index, item ->
                   val selected = pagerState.currentPage == index
-                  NavigationBarItem(
+                  ShortNavigationBarItem(
                     selected = selected,
                     onClick = {
                       scope.launch {
@@ -136,14 +135,6 @@ object MainScreen : Screen {
                       )
                     },
                     label = { Text(item.label) },
-                    alwaysShowLabel = false,
-                    colors = NavigationBarItemDefaults.colors(
-                      selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                      selectedTextColor = MaterialTheme.colorScheme.primary,
-                      indicatorColor = MaterialTheme.colorScheme.primaryContainer,
-                      unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                      unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                   )
                 }
               }

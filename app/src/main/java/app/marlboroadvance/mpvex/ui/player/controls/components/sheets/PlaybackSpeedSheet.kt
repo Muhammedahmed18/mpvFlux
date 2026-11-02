@@ -133,8 +133,7 @@ fun PlaybackSpeedSheet(
           Text(text = stringResource(R.string.player_sheets_speed_slider_label), style = MaterialTheme.typography.bodyMedium)
           Text(
               text = "${speed.toFixed(2)}x", 
-              style = MaterialTheme.typography.headlineMedium,
-              fontWeight = FontWeight.Bold
+              style = MaterialTheme.typography.headlineMediumEmphasized
           )
       }
 
@@ -257,8 +256,7 @@ fun PlaybackSpeedSheet(
             Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
                 Text(
                     text = stringResource(id = R.string.pref_audio_pitch_correction_title),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
+                    style = MaterialTheme.typography.bodyMediumEmphasized
                 )
                 Text(
                     text = stringResource(id = R.string.pref_audio_pitch_correction_summary),

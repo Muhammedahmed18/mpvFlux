@@ -188,8 +188,7 @@ fun FolderCard(
       ) {
         Text(
           text = folder.name,
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold,
+          style = MaterialTheme.typography.titleMediumEmphasized,
           color = MaterialTheme.colorScheme.onSurface,
           maxLines = if (settings.unlimitedNameLines) Int.MAX_VALUE else 2,
           overflow = TextOverflow.Ellipsis,

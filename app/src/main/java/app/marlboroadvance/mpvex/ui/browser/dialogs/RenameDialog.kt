@@ -126,8 +126,7 @@ fun RenameDialog(
       ) {
         Text(
           text = "Rename $itemType",
-          style = MaterialTheme.typography.headlineSmall,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.headlineSmallEmphasized,
           modifier = Modifier.weight(1f)
         )
 

@@ -65,8 +65,7 @@ fun DeleteConfirmationSheet(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (deleteFiles) "Delete Files" else "Remove from History",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineSmallEmphasized,
                     )
                     Text(
                         text = if (selectedCount == 1) "1 item selected" else "$selectedCount items selected",

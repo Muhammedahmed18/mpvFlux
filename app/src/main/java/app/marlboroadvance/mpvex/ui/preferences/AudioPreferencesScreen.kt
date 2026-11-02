@@ -65,8 +65,7 @@ object AudioPreferencesScreen : Screen {
             title = { 
               Text(
                 text = stringResource(R.string.pref_audio),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -108,8 +107,7 @@ object AudioPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_preferred_languages),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
@@ -140,8 +138,7 @@ object AudioPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_audio_pitch_correction_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
@@ -162,8 +159,7 @@ object AudioPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_audio_volume_normalization_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
@@ -184,8 +180,7 @@ object AudioPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.background_playback_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
@@ -201,8 +196,7 @@ object AudioPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(id = R.string.pref_audio_channels),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
@@ -223,8 +217,7 @@ object AudioPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_audio_volume_boost_cap),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   valueRange = 0f..200f,

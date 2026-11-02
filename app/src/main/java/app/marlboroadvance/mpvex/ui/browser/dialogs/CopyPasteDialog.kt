@@ -94,8 +94,7 @@ fun FileOperationProgressDialog(
         Column(modifier = Modifier.weight(1f)) {
           Text(
             text = "$operationName files",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.ExtraBold,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
           )
           if (!isOperationComplete) {
             Text(
@@ -191,8 +190,7 @@ fun FileOperationProgressDialog(
             // Current File Name
             Text(
               text = progress.currentFile,
-              style = MaterialTheme.typography.titleMedium,
-              fontWeight = FontWeight.Bold,
+              style = MaterialTheme.typography.titleMediumEmphasized,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
             )
@@ -353,8 +351,7 @@ private fun SummaryRow(
     )
     Text(
       text = value,
-      style = MaterialTheme.typography.bodyLarge,
-      fontWeight = FontWeight.Bold,
+      style = MaterialTheme.typography.bodyLargeEmphasized,
     )
   }
 }

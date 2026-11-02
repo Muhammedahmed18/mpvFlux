@@ -76,8 +76,7 @@ object AboutScreen : Screen {
                         title = {
                             Text(
                                 text = "About",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold,
+                                style = MaterialTheme.typography.titleLargeEmphasized,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         },
@@ -213,8 +212,7 @@ object AboutScreen : Screen {
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "mpvFlux",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.headlineMediumEmphasized,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Spacer(modifier = Modifier.height(10.dp))
@@ -226,8 +224,7 @@ object AboutScreen : Screen {
             ) {
                 Text(
                     text = "v$cleanVersion ($channel)",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.labelLargeEmphasized,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 )
@@ -256,8 +253,7 @@ object AboutScreen : Screen {
     private fun SectionHeader(text: String) {
         Text(
             text = text,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMediumEmphasized,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(start = 4.dp, top = 8.dp),
         )
@@ -330,8 +326,7 @@ object AboutScreen : Screen {
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
@@ -368,8 +363,7 @@ object AboutScreen : Screen {
                 )
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyLargeEmphasized,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
@@ -490,8 +484,7 @@ object AboutScreen : Screen {
                 )
                 Text(
                     text = value,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
+                    style = MaterialTheme.typography.bodyMediumEmphasized,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                 )

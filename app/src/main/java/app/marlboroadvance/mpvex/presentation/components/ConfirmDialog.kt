@@ -45,8 +45,7 @@ fun ConfirmDialog(
       ) {
         Text(
           title,
-          style = MaterialTheme.typography.headlineMedium,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.headlineMediumEmphasized,
           color = AlertDialogDefaults.titleContentColor,
         )
         Text(

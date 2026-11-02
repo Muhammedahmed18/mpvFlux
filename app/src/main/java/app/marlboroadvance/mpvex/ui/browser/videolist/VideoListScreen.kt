@@ -1,5 +1,7 @@
 package app.marlboroadvance.mpvex.ui.browser.videolist
 
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import android.content.Intent
 import android.os.Environment
 import androidx.activity.compose.BackHandler
@@ -161,6 +163,20 @@ data class VideoListScreen(
         }
       }
 
+    // Top bar subtitle, e.g. "12 videos · 8 watched" (M3 Expressive top app bar subtitle).
+    val videoCountLabel = pluralStringResource(
+      R.plurals.card_video_count,
+      sortedVideosWithInfo.size,
+      sortedVideosWithInfo.size,
+    )
+    val watchedCount = remember(sortedVideosWithInfo) { sortedVideosWithInfo.count { it.isWatched } }
+    val watchedLabel = stringResource(R.string.topbar_subtitle_watched, videoCountLabel, watchedCount)
+    val topBarSubtitle = when {
+      sortedVideosWithInfo.isEmpty() -> null
+      watchedCount > 0 -> watchedLabel
+      else -> videoCountLabel
+    }
+
     // Selection manager
     val sortedVideos = remember(sortedVideosWithInfo) { sortedVideosWithInfo.map { it.video } }
     val selectionManager =
@@ -250,6 +266,7 @@ data class VideoListScreen(
       topBar = {
         BrowserTopBar(
           title = displayFolderName,
+          subtitle = topBarSubtitle,
           isInSelectionMode = selectionManager.isInSelectionMode,
           selectedCount = selectionManager.selectedCount,
           totalCount = sortedVideosWithInfo.size,
@@ -498,7 +515,7 @@ private fun VideoListDialogs(
   if (showPrivateSpaceCompletionDialog.value) {
     androidx.compose.material3.AlertDialog(
       onDismissRequest = { showPrivateSpaceCompletionDialog.value = false },
-      title = { Text(text = "Moved to Private Space", style = MaterialTheme.typography.headlineSmall) },
+      title = { Text(text = stringResource(R.string.dialog_moved_private_title), style = MaterialTheme.typography.headlineSmall) },
       text = {
         Text(
           text = "Successfully moved ${privateSpaceMovedCount.intValue} video(s) to private space.\n\n" +
@@ -510,7 +527,7 @@ private fun VideoListDialogs(
         androidx.compose.material3.Button(
           onClick = { showPrivateSpaceCompletionDialog.value = false },
         ) {
-          Text("Close")
+          Text(stringResource(R.string.close))
         }
       },
     )

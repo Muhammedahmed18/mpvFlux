@@ -427,7 +427,7 @@ private fun FrameInfoDisplay(
     ) {
       Text(
         text = "Frame: ",
-        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.ExtraBold),
+        style = MaterialTheme.typography.bodyMediumEmphasized,
         color = MaterialTheme.colorScheme.tertiary,
       )
       Text(
@@ -447,7 +447,7 @@ private fun FrameInfoDisplay(
     ) {
       Text(
         text = "Timestamp: ",
-        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.ExtraBold),
+        style = MaterialTheme.typography.bodyMediumEmphasized,
         color = MaterialTheme.colorScheme.tertiary,
       )
       Text(

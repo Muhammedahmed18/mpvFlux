@@ -78,8 +78,7 @@ object GesturePreferencesScreen : Screen {
             title = { 
               Text(
                 text = stringResource(R.string.pref_gesture),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               ) 
             },
@@ -138,8 +137,7 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(id = R.string.pref_player_double_tap_seek_duration),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
@@ -164,8 +162,7 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = "Double Tap Seek Area Width",
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
@@ -188,8 +185,7 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_gesture_double_tap_left_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
@@ -219,8 +215,7 @@ object GesturePreferencesScreen : Screen {
                       text = stringResource(
                         if (useSingleTapForCenter) R.string.pref_gesture_single_tap_center_title else R.string.pref_gesture_double_tap_center_title,
                       ),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = { 
@@ -243,8 +238,7 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_gesture_double_tap_right_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
@@ -265,8 +259,7 @@ object GesturePreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(id = R.string.pref_gesture_use_single_tap_for_center_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
@@ -331,8 +324,7 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_gesture_media_previous),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
@@ -355,8 +347,7 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_gesture_media_play),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
@@ -379,8 +370,7 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_gesture_media_next),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
@@ -401,18 +391,17 @@ object GesturePreferencesScreen : Screen {
     if (showCustomSeekDialog) {
       AlertDialog(
         onDismissRequest = { showCustomSeekDialog = false },
-        title = { Text(text = stringResource(id = R.string.pref_player_double_tap_seek_duration), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
+        title = { Text(text = stringResource(id = R.string.pref_player_double_tap_seek_duration), style = MaterialTheme.typography.headlineSmallEmphasized) },
         text = {
           Column {
-            Text(
-              text = "Enter custom seek duration in seconds (1-120)",
+            Text(text = stringResource(R.string.dialog_custom_seek_duration),
               style = MaterialTheme.typography.bodyMedium,
               modifier = Modifier.padding(bottom = 16.dp),
             )
             OutlinedTextField(
               value = customSeekValue,
               onValueChange = { customSeekValue = it },
-              label = { Text("Seconds") },
+              label = { Text(stringResource(R.string.seconds)) },
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
               modifier = Modifier.fillMaxWidth(),
               singleLine = true,

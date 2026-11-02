@@ -160,7 +160,7 @@ private fun AudioTracksSheetContent(
           }
           Text(
             text  = "Channels",
-            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
+            style = MaterialTheme.typography.headlineSmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
           )
         }

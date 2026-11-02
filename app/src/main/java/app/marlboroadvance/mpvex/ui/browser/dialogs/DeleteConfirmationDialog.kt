@@ -65,8 +65,7 @@ fun DeleteConfirmationDialog(
       ) {
         Text(
           text = "Delete $itemCount $itemText?",
-          style = MaterialTheme.typography.headlineSmall,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.headlineSmallEmphasized,
           modifier = Modifier.weight(1f)
         )
 

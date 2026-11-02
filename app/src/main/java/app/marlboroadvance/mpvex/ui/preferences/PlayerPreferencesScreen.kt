@@ -63,8 +63,7 @@ object PlayerPreferencesScreen : Screen {
             title = {
               Text(
                 text = stringResource(id = R.string.pref_player),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -105,8 +104,7 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_player_save_position_on_quit),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                 )
@@ -120,8 +118,7 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(id = R.string.pref_player_close_after_eof),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                 )
@@ -141,8 +138,7 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = "Autoplay next video",
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
@@ -166,8 +162,7 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = "Enable next/previous navigation",
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
@@ -199,8 +194,7 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(id = R.string.pref_player_orientation),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
@@ -221,8 +215,7 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_player_remember_brightness),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                 )
@@ -236,8 +229,7 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = "Keep screen on when paused",
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
@@ -267,8 +259,7 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = "Auto Picture-in-Picture",
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
@@ -295,8 +286,7 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.show_splash_ovals_on_double_tap_to_seek),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
@@ -310,8 +300,7 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.show_time_on_double_tap_to_seek),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
@@ -325,8 +314,7 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_use_precise_seeking),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
@@ -340,8 +328,7 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_custom_skip_duration_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   valueRange = 5f..180f,
@@ -372,8 +359,7 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_gestures_brightness),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
@@ -387,8 +373,7 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_gestures_volume),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
@@ -402,8 +387,7 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.swap_the_volume_and_brightness_slider),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold,
+                      style = MaterialTheme.typography.titleMediumEmphasized,
                     )
                   },
                 )
@@ -417,8 +401,7 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_player_gestures_pinch_to_zoom),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
@@ -432,8 +415,7 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_gestures_horizontal_swipe_to_seek),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
@@ -447,8 +429,7 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_gestures_horizontal_swipe_sensitivity),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   valueRange = 0.020f..0.1f,
@@ -473,8 +454,7 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_gestures_hold_for_multiple_speed),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   valueRange = 0f..6f,
@@ -502,8 +482,7 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = "Dynamic Speed Overlay",
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 

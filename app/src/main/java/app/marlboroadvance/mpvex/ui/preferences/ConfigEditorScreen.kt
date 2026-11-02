@@ -144,15 +144,13 @@ data class ConfigEditorScreen(
               Column {
                 Text(
                   text = screenTitle,
-                  style = MaterialTheme.typography.titleLarge,
-                  fontWeight = FontWeight.Bold,
+                  style = MaterialTheme.typography.titleLargeEmphasized,
                   color = MaterialTheme.colorScheme.primary,
                 )
                 if (hasUnsavedChanges) {
                   Text(
                     text = "Unsaved changes",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.labelSmallEmphasized,
                     color = MaterialTheme.colorScheme.error,
                   )
                 }

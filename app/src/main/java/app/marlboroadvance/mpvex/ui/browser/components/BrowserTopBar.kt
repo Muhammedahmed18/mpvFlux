@@ -83,6 +83,7 @@ fun BrowserTopBar(
   onTitleLongPress: (() -> Unit)? = null,
   useRemoveIcon: Boolean = false,
   onAddToPlaylistClick: (() -> Unit)? = null,
+  subtitle: String? = null,
 ) {
   if (isInSelectionMode) {
     SelectionTopBar(
@@ -106,6 +107,7 @@ fun BrowserTopBar(
   } else {
     NormalTopBar(
       title = title,
+      subtitle = subtitle,
       onBackClick = onBackClick,
       onSortClick = onSortClick,
       onSettingsClick = onSettingsClick,
@@ -120,6 +122,7 @@ fun BrowserTopBar(
 @Composable
 private fun NormalTopBar(
   title: String,
+  subtitle: String?,
   onBackClick: (() -> Unit)?,
   onSortClick: (() -> Unit)?,
   onSettingsClick: (() -> Unit)?,
@@ -140,29 +143,32 @@ private fun NormalTopBar(
     }
   }
 
-  TopAppBar(
-    colors = TopAppBarDefaults.topAppBarColors(
-      containerColor = Color.Transparent,
-      scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
-    ),
-    title = {
-      Text(
-        text = title,
-        style = if (onBackClick == null) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
-        fontWeight = FontWeight.ExtraBold,
-        color = MaterialTheme.colorScheme.primary,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
-            .pointerInput(onTitleLongPress) {
-                detectTapGestures(
-                    onTap = { coroutineScope.launch { toggleDarkMode() } },
-                    onLongPress = { onTitleLongPress?.invoke() }
-                )
-            }
-      )
-    },
-    navigationIcon = {
+  val colors = TopAppBarDefaults.topAppBarColors(
+    containerColor = Color.Transparent,
+    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+  )
+  val titleContent: @Composable () -> Unit = {
+    Text(
+      text = title,
+      // Expressive emphasized styles replace the manual ExtraBold on the base style.
+      style = if (onBackClick == null) {
+        MaterialTheme.typography.headlineMediumEmphasized
+      } else {
+        MaterialTheme.typography.titleLargeEmphasized
+      },
+      color = MaterialTheme.colorScheme.primary,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      modifier = Modifier
+        .pointerInput(onTitleLongPress) {
+          detectTapGestures(
+            onTap = { coroutineScope.launch { toggleDarkMode() } },
+            onLongPress = { onTitleLongPress?.invoke() },
+          )
+        },
+    )
+  }
+  val navigationIconContent: @Composable () -> Unit = {
       if (onBackClick != null) {
         IconButton(onClick = onBackClick) {
           Icon(
@@ -172,8 +178,8 @@ private fun NormalTopBar(
           )
         }
       }
-    },
-    actions = {
+    }
+  val actionsContent: @Composable RowScope.() -> Unit = {
       additionalActions()
       if (onSortClick != null) {
         IconButton(onClick = onSortClick) {
@@ -188,14 +194,40 @@ private fun NormalTopBar(
         IconButton(onClick = onSettingsClick) {
           Icon(
             Icons.Rounded.Settings,
-            contentDescription = "Settings",
+            contentDescription = stringResource(R.string.settings),
             tint = MaterialTheme.colorScheme.secondary,
           )
         }
       }
-    },
-    modifier = modifier,
-  )
+    }
+
+  if (subtitle.isNullOrBlank()) {
+    TopAppBar(
+      title = titleContent,
+      navigationIcon = navigationIconContent,
+      actions = actionsContent,
+      colors = colors,
+      modifier = modifier,
+    )
+  } else {
+    // M3 Expressive top app bar with a subtitle line (e.g. "12 videos · 4.2 GB").
+    TopAppBar(
+      title = titleContent,
+      subtitle = {
+        Text(
+          text = subtitle,
+          style = MaterialTheme.typography.labelLarge,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      },
+      navigationIcon = navigationIconContent,
+      actions = actionsContent,
+      colors = colors,
+      modifier = modifier,
+    )
+  }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -232,8 +264,7 @@ private fun SelectionTopBar(
       ) {
         Text(
           stringResource(R.string.selected_items, selectedCount, totalCount),
-          style = MaterialTheme.typography.titleLarge,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.titleLargeEmphasized,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
@@ -278,7 +309,7 @@ private fun SelectionTopBar(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
           ) {
             Icon(Icons.Rounded.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text(text = "Info", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp))
+            Text(text = "Info", style = MaterialTheme.typography.labelLargeEmphasized, modifier = Modifier.padding(start = 4.dp))
           }
         }
       }

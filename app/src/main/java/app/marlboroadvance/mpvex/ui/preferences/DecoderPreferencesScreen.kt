@@ -74,8 +74,7 @@ object DecoderPreferencesScreen : Screen {
             title = {
               Text(
                 text = stringResource(R.string.pref_decoder),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -118,8 +117,7 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_profile_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
@@ -142,8 +140,7 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_try_hw_dec_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
@@ -164,8 +161,7 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_gpu_next_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
@@ -180,7 +176,7 @@ object DecoderPreferencesScreen : Screen {
                 if (showGpuNextWarning) {
                   AlertDialog(
                     onDismissRequest = { showGpuNextWarning = false },
-                    title = { Text(stringResource(R.string.pref_decoder_gpu_next_enable_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
+                    title = { Text(stringResource(R.string.pref_decoder_gpu_next_enable_title), style = MaterialTheme.typography.headlineSmallEmphasized) },
                     text = {
                       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(R.string.pref_decoder_gpu_next_warning), style = MaterialTheme.typography.bodyMedium)
@@ -215,8 +211,7 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_vulkan_title) + " (Experimental)",
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
@@ -242,8 +237,7 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_debanding_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
@@ -266,8 +260,7 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_yuv420p_title),
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {

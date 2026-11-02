@@ -52,8 +52,7 @@ fun LoadingState(
     ) {
       Text(
         text = title,
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.headlineSmallEmphasized,
         textAlign = TextAlign.Center,
         color = MaterialTheme.colorScheme.onSurface,
       )

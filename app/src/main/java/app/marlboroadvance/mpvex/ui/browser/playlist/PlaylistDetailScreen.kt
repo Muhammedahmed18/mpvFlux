@@ -1,5 +1,8 @@
 package app.marlboroadvance.mpvex.ui.browser.playlist
 
+import app.marlboroadvance.mpvex.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -139,7 +142,8 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
     Scaffold(
       topBar = {
         BrowserTopBar(
-          title = playlist?.name ?: "Playlist",
+          title = playlist?.name ?: stringResource(R.string.playlist_default_title),
+          subtitle = if (videos.isEmpty()) null else pluralStringResource(R.plurals.card_video_count, videos.size, videos.size),
           isInSelectionMode = selectionManager.isInSelectionMode,
           selectedCount = selectionManager.selectedCount,
           totalCount = videos.size,
@@ -227,7 +231,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
                   ) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Play All", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Text("Play All", style = MaterialTheme.typography.labelLargeEmphasized)
                   }
                 }
               }
@@ -287,14 +291,14 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
     if (deleteDialogOpen.value) {
         AlertDialog(
             onDismissRequest = { deleteDialogOpen.value = false },
-            title = { Text("Remove from playlist?", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
-            text = { Text("Selected items will be removed from this playlist. Files will not be deleted.", style = MaterialTheme.typography.bodyMedium) },
+            title = { Text(stringResource(R.string.dialog_remove_from_playlist_title), style = MaterialTheme.typography.headlineSmallEmphasized) },
+            text = { Text(stringResource(R.string.dialog_remove_from_playlist_message), style = MaterialTheme.typography.bodyMedium) },
             confirmButton = {
               TextButton(onClick = { selectionManager.deleteSelected(); deleteDialogOpen.value = false }) {
-                Text("Remove", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.remove), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
               }
             },
-            dismissButton = { TextButton(onClick = { deleteDialogOpen.value = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { deleteDialogOpen.value = false }) { Text(stringResource(R.string.cancel)) } },
             shape = MaterialTheme.shapes.extraLarge
         )
     }
@@ -409,16 +413,16 @@ private fun PlaylistVideoListContent(
 private fun StreamUrlDialog(url: String, onDismiss: () -> Unit, onCopy: () -> Unit) {
   AlertDialog(
     onDismissRequest = onDismiss,
-    title = { Text("Stream URL", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
+    title = { Text(stringResource(R.string.dialog_stream_url_title), style = MaterialTheme.typography.headlineSmallEmphasized) },
     text = { Text(text = url, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.fillMaxWidth()) },
     confirmButton = {
       TextButton(onClick = { onCopy(); onDismiss() }) {
         Icon(Icons.Filled.ContentCopy, contentDescription = null, Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text("Copy", fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.copy), fontWeight = FontWeight.Bold)
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
     shape = MaterialTheme.shapes.extraLarge
   )
 }

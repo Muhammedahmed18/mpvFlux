@@ -192,8 +192,7 @@ fun FilePickerDialog(
                   Column(modifier = Modifier.fillMaxWidth()) {
                       Text(
                         text = "Select Subtitle",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineSmallEmphasized,
                       )
                       Text(
                         text = displayName,
@@ -232,8 +231,7 @@ fun FilePickerDialog(
                       Column(modifier = Modifier.weight(1f)) {
                           Text(
                             text = "Select Subtitle",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.headlineMediumEmphasized,
                           )
                           Text(
                             text = displayName,
@@ -373,8 +371,7 @@ private fun StorageVolumeItem(
     ) {
       Text(
         text = description,
-        style = MaterialTheme.typography.bodyLarge,
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.bodyLargeEmphasized,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )

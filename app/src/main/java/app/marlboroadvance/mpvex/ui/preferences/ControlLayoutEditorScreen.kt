@@ -176,8 +176,7 @@ data class ControlLayoutEditorScreen(
               title = { 
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
                     color = MaterialTheme.colorScheme.primary
                 ) 
               },
@@ -252,8 +251,7 @@ data class ControlLayoutEditorScreen(
                                  )
                                  Text(
                                       text = "Region is empty",
-                                      style = MaterialTheme.typography.titleMedium,
-                                      fontWeight = FontWeight.Bold,
+                                      style = MaterialTheme.typography.titleMediumEmphasized,
                                       color = MaterialTheme.colorScheme.onSurfaceVariant,
                                  )
                                  Text(
@@ -367,8 +365,7 @@ private fun IconsLegend() {
         ) {
             Text(
                 text = "Icons Legend",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
             )
 

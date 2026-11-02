@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
+import androidx.compose.material3.LoadingIndicator
 import android.content.Intent
 import android.graphics.Typeface
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,7 +29,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieEncodings
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieFormats
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieSources
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -93,8 +93,7 @@ object SubtitlesPreferencesScreen : Screen {
           title = {
             Text(
               text = stringResource(R.string.pref_subtitles),
-              style = MaterialTheme.typography.headlineSmall,
-              fontWeight = FontWeight.ExtraBold,
+              style = MaterialTheme.typography.headlineSmallEmphasized,
               color = MaterialTheme.colorScheme.primary,
             )
           },
@@ -270,8 +269,7 @@ object SubtitlesPreferencesScreen : Screen {
                 Column {
                   Text(
                     stringResource(R.string.pref_subtitles_fonts_dir),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMediumEmphasized,
                   )
                   if (customFontEntries.isEmpty()) {
                     Text(
@@ -308,8 +306,7 @@ object SubtitlesPreferencesScreen : Screen {
                 Column {
                   Text(
                     stringResource(R.string.pref_subtitles_save_location),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMediumEmphasized,
                   )
                   val folderPath = if (subtitleSaveFolder.isBlank()) {
                     stringResource(R.string.not_set_video_default)
@@ -540,8 +537,7 @@ object SubtitlesPreferencesScreen : Screen {
             ) {
               Text(
                 text = "Installed Fonts",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLargeEmphasized,
               )
               IconButton(
                 onClick = {
@@ -564,7 +560,7 @@ object SubtitlesPreferencesScreen : Screen {
                   .height(160.dp),
                 contentAlignment = Alignment.Center,
               ) {
-                CircularProgressIndicator()
+                LoadingIndicator()
               }
             } else if (fontViewerEntries.isEmpty()) {
               Box(

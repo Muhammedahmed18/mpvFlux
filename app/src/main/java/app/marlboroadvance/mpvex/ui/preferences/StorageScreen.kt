@@ -104,8 +104,7 @@ object StorageScreen : Screen {
           title = {
             Text(
               text = stringResource(R.string.pref_storage_title),
-              style = MaterialTheme.typography.titleLarge,
-              fontWeight = FontWeight.ExtraBold,
+              style = MaterialTheme.typography.titleLargeEmphasized,
               color = MaterialTheme.colorScheme.primary,
             )
           },
@@ -180,15 +179,13 @@ object StorageScreen : Screen {
             ) {
               Text(
                 text = stringResource(R.string.pref_storage_total_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMediumEmphasized,
                 modifier = Modifier.weight(1f),
               )
               Text(
                 text = totalBytes?.let { CacheSizeUtils.formatBytes(it) }
                   ?: stringResource(R.string.pref_storage_size_unknown),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMediumEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             }
@@ -338,8 +335,7 @@ private fun ThumbnailStorageCard(
         Column(modifier = Modifier.weight(1f)) {
           Text(
             text = stringResource(R.string.pref_storage_thumbnails_title),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMediumEmphasized,
           )
           Text(
             text = if (usedBytes != null) {
@@ -357,8 +353,7 @@ private fun ThumbnailStorageCard(
         }
         Text(
           text = if (usedBytes != null) "$percent%" else stringResource(R.string.pref_storage_size_unknown),
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.titleMediumEmphasized,
           color = MaterialTheme.colorScheme.primary,
         )
       }
@@ -398,8 +393,7 @@ private fun CacheSizeRow(
     title = {
       Text(
         text = title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.titleMediumEmphasized,
       )
     },
     summary = {

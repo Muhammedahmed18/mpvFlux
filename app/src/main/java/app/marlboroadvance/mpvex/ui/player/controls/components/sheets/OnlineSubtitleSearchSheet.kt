@@ -1,5 +1,7 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -165,7 +167,7 @@ fun OnlineSubtitleSearchSheet(
                 }
               }
               if (isSearching || isDownloading || isSearchingMedia) {
-                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                LoadingIndicator(modifier = Modifier.size(24.dp))
                 Spacer(Modifier.width(8.dp))
               }
 
@@ -254,8 +256,8 @@ fun OnlineSubtitleSearchSheet(
         }
       }
       if (isSearching) {
-        LinearProgressIndicator(
-          modifier = Modifier.fillMaxWidth().padding(horizontal = MaterialTheme.spacing.medium).height(2.dp),
+        LinearWavyProgressIndicator(
+          modifier = Modifier.fillMaxWidth().padding(horizontal = MaterialTheme.spacing.medium),
           color = MaterialTheme.colorScheme.primary
         )
       }
@@ -339,8 +341,7 @@ fun WyzieSubtitleRow(
                     }
                     Text(
                         text = subtitle.displayName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         modifier = Modifier.basicMarquee()
@@ -383,8 +384,7 @@ fun TmdbResultRow(
         Column {
             Text(
                 text = result.title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.bodyLargeEmphasized
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -423,8 +423,7 @@ fun SeriesDetailsSection(
             ) {
                 Text(
                     text = tvShow.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleSmallEmphasized,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
@@ -441,8 +440,7 @@ fun SeriesDetailsSection(
                   ) {
                       Text(
                           text = selectedSeason?.let { "S${it.season_number}" } ?: "Season",
-                          style = MaterialTheme.typography.labelLarge,
-                          fontWeight = FontWeight.Bold,
+                          style = MaterialTheme.typography.labelLargeEmphasized,
                           maxLines = 1
                       )
                       Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -482,17 +480,15 @@ fun SeriesDetailsSection(
                       shape = RoundedCornerShape(8.dp)
                   ) {
                       if (isFetchingEpisodes) {
-                          CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp), 
-                            strokeWidth = 2.dp,
+                          LoadingIndicator(
+                            modifier = Modifier.size(20.dp),
                             color = MaterialTheme.colorScheme.primary
                           )
                           Spacer(Modifier.width(6.dp))
                       }
                       Text(
                           text = selectedEpisode?.let { "E${it.episode_number}" } ?: "Ep",
-                          style = MaterialTheme.typography.labelLarge,
-                          fontWeight = FontWeight.Bold,
+                          style = MaterialTheme.typography.labelLargeEmphasized,
                           maxLines = 1
                       )
                       Icon(Icons.Default.ArrowDropDown, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -510,8 +506,7 @@ fun SeriesDetailsSection(
                                 Column(modifier = Modifier.padding(vertical = 4.dp)) {
                                   Text(
                                     "Ep ${episode.episode_number}", 
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    fontWeight = FontWeight.Bold
+                                    style = MaterialTheme.typography.bodyLargeEmphasized
                                   )
                                   episode.name?.let { 
                                     Text(

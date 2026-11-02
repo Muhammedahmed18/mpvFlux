@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex.ui.browser.sheets
 
+import app.marlboroadvance.mpvex.R
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -63,8 +64,13 @@ fun PlaylistActionSheet(
   repository: PlaylistRepository,
   context: android.content.Context,
   modifier: Modifier = Modifier,
+  startWithCreate: Boolean = false,
 ) {
-  var currentScreen by remember(isOpen) { mutableStateOf(PlaylistSheetScreen.Main) }
+  // With only one option left on the main screen ("Create empty playlist"), callers like
+  // the Playlists FAB open straight into the create form to save a tap.
+  var currentScreen by remember(isOpen) {
+    mutableStateOf(if (startWithCreate) PlaylistSheetScreen.Create else PlaylistSheetScreen.Main)
+  }
   val scope = rememberCoroutineScope()
 
   if (!isOpen) return
@@ -110,15 +116,17 @@ fun PlaylistActionSheet(
         }
         PlaylistSheetScreen.Create -> {
           CreatePlaylistContent(
-            onBack = { currentScreen = PlaylistSheetScreen.Main },
+            onBack = {
+              if (startWithCreate) onDismiss() else currentScreen = PlaylistSheetScreen.Main
+            },
             onConfirm = { name ->
               scope.launch {
                 try {
                   repository.createPlaylist(name)
-                  Toast.makeText(context, "Playlist created successfully", Toast.LENGTH_SHORT).show()
+                  Toast.makeText(context, context.getString(R.string.playlist_created), Toast.LENGTH_SHORT).show()
                   onDismiss()
                 } catch (e: Exception) {
-                  Toast.makeText(context, "Failed: ${e.message}", Toast.LENGTH_LONG).show()
+                  Toast.makeText(context, context.getString(R.string.playlist_create_failed, e.message ?: ""), Toast.LENGTH_LONG).show()
                 }
               }
             }
@@ -212,8 +220,7 @@ private fun CreatePlaylistContent(
       
       Text(
         text = "Create Playlist",
-        style = MaterialTheme.typography.headlineSmall,
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.headlineSmallEmphasized,
         modifier = Modifier.weight(1f)
       )
 

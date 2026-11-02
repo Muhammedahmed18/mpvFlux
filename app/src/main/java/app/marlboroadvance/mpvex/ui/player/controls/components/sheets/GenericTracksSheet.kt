@@ -291,7 +291,7 @@ fun SheetHeader(
       }
       Text(
         text  = title,
-        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
+        style = MaterialTheme.typography.headlineSmallEmphasized,
         color = MaterialTheme.colorScheme.onSurface,
       )
     }
@@ -662,8 +662,7 @@ fun AddTrackRow(
       Spacer(modifier = Modifier.size(MaterialTheme.spacing.small))
       Text(
         text = title,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.Bold
+        style = MaterialTheme.typography.labelLargeEmphasized
       )
     }
 

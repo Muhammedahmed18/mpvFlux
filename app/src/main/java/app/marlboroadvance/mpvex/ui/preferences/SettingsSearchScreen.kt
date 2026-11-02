@@ -122,8 +122,7 @@ object SettingsSearchScreen : Screen {
                         title = {
                             Text(
                                 text = stringResource(R.string.settings_search_title),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold,
+                                style = MaterialTheme.typography.titleLargeEmphasized,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         },
@@ -352,8 +351,7 @@ private fun SearchResultItem(
 
                 Text(
                     text = preference.category,
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Black,
+                    style = MaterialTheme.typography.labelSmallEmphasized,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 2.dp)
                 )

@@ -144,8 +144,7 @@ fun PermissionDeniedState(
       // Title
       Text(
         text = "Storage Access\nRequired",
-        style = MaterialTheme.typography.headlineLarge,
-        fontWeight = FontWeight.SemiBold,
+        style = MaterialTheme.typography.headlineLargeEmphasized,
         textAlign = TextAlign.Center,
         color = Color.White,
         lineHeight = 40.sp
@@ -204,8 +203,7 @@ fun PermissionDeniedState(
       ) {
         Text(
           text = "Grant Access",
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.SemiBold,
+          style = MaterialTheme.typography.titleMediumEmphasized,
         )
       }
 
@@ -238,7 +236,7 @@ fun PermissionDeniedState(
   // Explanation Dialog
   if (showExplanationDialog) {
     val uriHandler = LocalUriHandler.current
-    val githubUrl = "https://github.com/marlboro-advance/mpvex"
+    val githubUrl = "https://github.com/Muhammedahmed18/mpvFlux"
 
     AlertDialog(
       onDismissRequest = { showExplanationDialog = false },
@@ -251,8 +249,7 @@ fun PermissionDeniedState(
         )
       },
       title = {
-        Text(
-          text = "Why this permission is needed",
+        Text(text = stringResource(R.string.perm_why_title),
           style = MaterialTheme.typography.headlineSmall,
           fontWeight = FontWeight.Medium,
         )
@@ -267,8 +264,7 @@ fun PermissionDeniedState(
         ) {
           if (isPlayStoreBuild) {
             // Play Store build explanation
-            Text(
-              text = "mpvEx needs access to your video files to provide its core functionality as a media player.",
+            Text(text = stringResource(R.string.perm_why_intro),
               style = MaterialTheme.typography.bodyMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -283,41 +279,35 @@ fun PermissionDeniedState(
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Text(
-              text = "The permission is used exclusively for:",
+            Text(text = stringResource(R.string.perm_why_used_for),
               style = MaterialTheme.typography.bodyMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
               fontWeight = FontWeight.Medium,
             )
 
-            Text(
-              text = "• Discovering and displaying your video files\n• Playing media content\n• Loading subtitle files",
+            Text(text = stringResource(R.string.perm_why_uses),
               style = MaterialTheme.typography.bodyMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           } else {
             // Standard build explanation
-            Text(
-              text = "mpvEx has always required storage access permission as it's essential for the app to find all media and subtitle files on your device, including the ones that are not supported by the system.",
+            Text(text = stringResource(R.string.perm_why_history),
               style = MaterialTheme.typography.bodyMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Text(
-              text = "However, due to a change in security policy, apps built for Android 11 and above now require additional permission to continue accessing the same.",
+            Text(text = stringResource(R.string.perm_why_policy),
               style = MaterialTheme.typography.bodyMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            Text(
-              text = "Please know that this permission is only used for the auto-discovery of media/subtitle files on your device and will not allow us to access the private data files stored by other apps in any way.",
+            Text(text = stringResource(R.string.perm_why_scope),
               style = MaterialTheme.typography.bodyMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
           }
 
-          Text(
-            text = "mpvEx is an open source project. You can review the source code and verify how permissions are used by visiting our GitHub repository at:",
+          Text(text = stringResource(R.string.perm_why_open_source),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -358,8 +348,7 @@ fun PermissionDeniedState(
             },
           )
 
-          Text(
-            text = "Be rest assured, your privacy is our utmost priority, and we neither access your files for other purposes nor transfer or store them to our servers. They remain safe on your device.",
+          Text(text = stringResource(R.string.perm_why_privacy),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium,

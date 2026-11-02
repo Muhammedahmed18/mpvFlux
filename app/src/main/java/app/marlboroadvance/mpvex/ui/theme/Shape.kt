@@ -1,17 +1,15 @@
 package app.marlboroadvance.mpvex.ui.theme
 
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
-import androidx.compose.ui.unit.dp
 
 /**
- * M3 Expressive Shape Tokens
- * Media players benefit from smoother, more rounded shapes (pill-shaped)
+ * M3 Expressive shape scale, using the official corner sizes:
+ * extraSmall 4dp, small 8dp, medium 12dp, large 16dp, largeIncreased 20dp,
+ * extraLarge 28dp, extraLargeIncreased 32dp, extraExtraLarge 48dp.
+ *
+ * The app previously used custom values (medium 16, large 28, extraLarge 36), which made
+ * cards and tiles noticeably rounder than Android's own apps and left no room for the
+ * Expressive "increased" sizes. Components that want a softer look should pick a larger
+ * step (e.g. shapes.largeIncreased) rather than inflating the base scale.
  */
-val AppShapes = Shapes(
-    extraSmall = RoundedCornerShape(4.dp),
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(16.dp),
-    large = RoundedCornerShape(28.dp),
-    extraLarge = RoundedCornerShape(36.dp)
-)
+val AppShapes = Shapes()

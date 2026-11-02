@@ -150,8 +150,7 @@ class MediaInfoActivity : ComponentActivity() {
           title = {
             Text(
               text = fileName.substringBeforeLast('.'),
-              style = MaterialTheme.typography.titleLarge,
-              fontWeight = FontWeight.ExtraBold,
+              style = MaterialTheme.typography.titleLargeEmphasized,
               color = MaterialTheme.colorScheme.primary,
               maxLines = 1,
               overflow = TextOverflow.Ellipsis,
@@ -445,8 +444,7 @@ class MediaInfoActivity : ComponentActivity() {
         ) {
           Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleLargeEmphasized,
             modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
           )
           
@@ -543,8 +541,7 @@ class MediaInfoActivity : ComponentActivity() {
           Text(
             text = section.name,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleSmallEmphasized,
             color = MaterialTheme.colorScheme.primary,
           )
         }
@@ -622,8 +619,7 @@ class MediaInfoActivity : ComponentActivity() {
         }
         Text(
           text = title,
-          style = MaterialTheme.typography.titleSmall,
-          fontWeight = FontWeight.SemiBold,
+          style = MaterialTheme.typography.titleSmallEmphasized,
           color = onContainerColor,
           modifier = Modifier.weight(1f),
         )
@@ -635,8 +631,7 @@ class MediaInfoActivity : ComponentActivity() {
             Text(
               text = badge,
               modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-              style = MaterialTheme.typography.labelSmall,
-              fontWeight = FontWeight.Bold,
+              style = MaterialTheme.typography.labelSmallEmphasized,
               color = onContainerColor,
             )
           }
@@ -680,8 +675,7 @@ class MediaInfoActivity : ComponentActivity() {
           ) {
             Text(
               "View All Tracks",
-              style = MaterialTheme.typography.labelLarge,
-              fontWeight = FontWeight.SemiBold,
+              style = MaterialTheme.typography.labelLargeEmphasized,
             )
             Spacer(Modifier.width(4.dp))
             Icon(
@@ -722,8 +716,7 @@ class MediaInfoActivity : ComponentActivity() {
         Spacer(modifier = Modifier.height(2.dp))
         Text(
           text = value,
-          style = MaterialTheme.typography.bodyMedium,
-          fontWeight = FontWeight.SemiBold,
+          style = MaterialTheme.typography.bodyMediumEmphasized,
           color = MaterialTheme.colorScheme.onSurface,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,

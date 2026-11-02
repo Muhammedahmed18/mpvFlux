@@ -377,7 +377,7 @@ private fun OneUI8TogglePill(
       )
       Text(
         text  = if (isShowingWatched) "Next Up" else "Watched",
-        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+        style = MaterialTheme.typography.labelLargeEmphasized,
       )
     }
   }
@@ -408,7 +408,7 @@ private fun PlaylistQueueHeader(
     ) {
       Text(
         text  = title,
-        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+        style = MaterialTheme.typography.titleSmallEmphasized,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
       Badge(
@@ -417,7 +417,7 @@ private fun PlaylistQueueHeader(
       ) {
         Text(
           text  = "$count",
-          style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+          style = MaterialTheme.typography.labelMediumEmphasized,
         )
       }
     }
@@ -828,7 +828,7 @@ private fun PlaylistHeroCard(
       ) {
         Text(
           text     = item.title,
-          style    = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+          style    = MaterialTheme.typography.titleLargeEmphasized,
           color    = Color.White,
           maxLines = 2,
           overflow = TextOverflow.Ellipsis,
@@ -984,7 +984,7 @@ private fun PlaylistNowPlayingPanel(
         // Title
         Text(
           text     = item.title,
-          style    = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+          style    = MaterialTheme.typography.titleSmallEmphasized,
           color    = MaterialTheme.colorScheme.onPrimaryContainer,
           maxLines = 2,
           overflow = TextOverflow.Ellipsis,
@@ -1206,7 +1206,7 @@ private fun PlaylistListItemContent(
         Text(
           text     = "${item.index + 1}",
           modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-          style    = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+          style    = MaterialTheme.typography.labelSmallEmphasized,
         )
       }
 
@@ -1459,7 +1459,7 @@ private fun PlaylistGridItemContent(
         Text(
           text     = "${item.index + 1}",
           modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-          style    = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+          style    = MaterialTheme.typography.labelSmallEmphasized,
         )
       }
 
@@ -1493,7 +1493,7 @@ private fun PlaylistGridItemContent(
         modifier = Modifier
           .align(Alignment.BottomStart)
           .padding(start = 10.dp, end = 10.dp, bottom = 12.dp),
-        style    = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+        style    = MaterialTheme.typography.titleSmallEmphasized,
         color    = Color.White,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

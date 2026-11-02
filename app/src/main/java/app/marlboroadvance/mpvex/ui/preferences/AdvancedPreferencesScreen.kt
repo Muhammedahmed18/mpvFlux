@@ -98,9 +98,9 @@ object AdvancedPreferencesScreen : Screen {
     if (showExportDialog && exportStats != null) {
       AlertDialog(
         onDismissRequest = { showExportDialog = false },
-        title = { Text("Export Complete", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.dialog_export_complete), style = MaterialTheme.typography.headlineSmallEmphasized) },
         text = { Text("Successfully exported ${exportStats?.totalExported} items!", style = MaterialTheme.typography.bodyMedium) },
-        confirmButton = { TextButton(onClick = { showExportDialog = false }) { Text("OK", fontWeight = FontWeight.Bold) } },
+        confirmButton = { TextButton(onClick = { showExportDialog = false }) { Text(stringResource(R.string.generic_ok), fontWeight = FontWeight.Bold) } },
         shape = MaterialTheme.shapes.extraLarge
       )
     }
@@ -108,7 +108,7 @@ object AdvancedPreferencesScreen : Screen {
     if (showImportDialog && importStats != null) {
       AlertDialog(
         onDismissRequest = { showImportDialog = false },
-        title = { Text("Import Complete", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.dialog_import_complete), style = MaterialTheme.typography.headlineSmallEmphasized) },
         text = {
           Text(
             "Successfully imported: ${importStats?.imported}\n" +
@@ -118,7 +118,7 @@ object AdvancedPreferencesScreen : Screen {
             style = MaterialTheme.typography.bodyMedium
           )
         },
-        confirmButton = { TextButton(onClick = { showImportDialog = false }) { Text("OK", fontWeight = FontWeight.Bold) } },
+        confirmButton = { TextButton(onClick = { showImportDialog = false }) { Text(stringResource(R.string.generic_ok), fontWeight = FontWeight.Bold) } },
         shape = MaterialTheme.shapes.extraLarge
       )
     }
@@ -135,8 +135,7 @@ object AdvancedPreferencesScreen : Screen {
             title = { 
               Text(
                 text = stringResource(R.string.pref_advanced),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -215,7 +214,7 @@ object AdvancedPreferencesScreen : Screen {
                 var inputConf by remember { mutableStateOf(preferences.inputConf.get()) }
                 
                 TwoTargetIconButtonPreference(
-                  title = { Text(text = stringResource(R.string.pref_advanced_mpv_conf_storage_location), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+                  title = { Text(text = stringResource(R.string.pref_advanced_mpv_conf_storage_location), style = MaterialTheme.typography.titleMediumEmphasized) },
                   summary = {
                     if (mpvConfStorageLocation.isNotBlank()) {
                       Text(text = getSimplifiedPathFromUri(mpvConfStorageLocation), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -255,7 +254,7 @@ object AdvancedPreferencesScreen : Screen {
                 SwitchPreference(
                   value = enableRecentlyPlayed,
                   onValueChange = preferences.enableRecentlyPlayed::set,
-                  title = { Text(text = stringResource(R.string.pref_advanced_enable_recently_played_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+                  title = { Text(text = stringResource(R.string.pref_advanced_enable_recently_played_title), style = MaterialTheme.typography.titleMediumEmphasized) },
                   summary = { Text(text = stringResource(R.string.pref_advanced_enable_recently_played_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 )
                 
@@ -300,7 +299,7 @@ object AdvancedPreferencesScreen : Screen {
                 SwitchPreference(
                   value = verboseLogging,
                   onValueChange = preferences.verboseLogging::set,
-                  title = { Text(text = stringResource(R.string.pref_advanced_verbose_logging_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+                  title = { Text(text = stringResource(R.string.pref_advanced_verbose_logging_title), style = MaterialTheme.typography.titleMediumEmphasized) },
                   summary = { Text(text = stringResource(R.string.pref_advanced_verbose_logging_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 )
                 

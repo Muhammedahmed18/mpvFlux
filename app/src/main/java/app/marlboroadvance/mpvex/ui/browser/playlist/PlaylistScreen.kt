@@ -1,5 +1,8 @@
 package app.marlboroadvance.mpvex.ui.browser.playlist
 
+import app.marlboroadvance.mpvex.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -20,7 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -117,7 +120,7 @@ object PlaylistScreen : Screen {
     Scaffold(
       topBar = {
         BrowserTopBar(
-          title = "Playlists",
+          title = stringResource(R.string.playlists_title),
           isInSelectionMode = selectionManager.isInSelectionMode,
           selectedCount = selectionManager.selectedCount,
           totalCount = playlistsWithCount.size,
@@ -132,22 +135,16 @@ object PlaylistScreen : Screen {
       },
       floatingActionButton = {
         if (!selectionManager.isInSelectionMode) {
-          val fabScale by animateFloatAsState(
-              targetValue = 1f,
-              animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-              label = "fab_scale"
-          )
-          FloatingActionButton(
+          // Extended FAB with a label: the action is clear at a glance and it opens the
+          // create form directly (the old sheet only had this one option left).
+          ExtendedFloatingActionButton(
             onClick = { showActionSheet = true },
-            containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shape = MaterialTheme.shapes.large,
-            modifier = Modifier
-                .padding(bottom = navBarHeight)
-                .scale(fabScale)
-          ) {
-            Icon(Icons.Default.Add, contentDescription = "Add Playlist", modifier = Modifier.size(28.dp))
-          }
+            icon = { Icon(Icons.Default.Add, contentDescription = null) },
+            text = { Text(stringResource(R.string.playlist_new)) },
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.padding(bottom = navBarHeight),
+          )
         }
       }
     ) { padding ->
@@ -155,8 +152,8 @@ object PlaylistScreen : Screen {
         if (playlistsWithCount.isEmpty()) {
           EmptyState(
             icon = Icons.AutoMirrored.Filled.PlaylistPlay,
-            title = "No Playlists",
-            message = "Create a playlist to see it here",
+            title = stringResource(R.string.playlists_empty_title),
+            message = stringResource(R.string.playlists_empty_message),
             modifier = Modifier.fillMaxSize()
           )
         } else {
@@ -233,7 +230,8 @@ object PlaylistScreen : Screen {
         isOpen = showActionSheet,
         onDismiss = { showActionSheet = false },
         repository = repository,
-        context = context
+        context = context,
+        startWithCreate = true,
       )
     }
   }

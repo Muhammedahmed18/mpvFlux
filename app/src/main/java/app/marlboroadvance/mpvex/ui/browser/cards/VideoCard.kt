@@ -204,7 +204,7 @@ private fun VideoInfoPanel(
   ) {
     Text(
       text = displayTitle,
-      style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+      style = MaterialTheme.typography.titleMediumEmphasized,
       color = when {
         isRecentlyPlayed -> MaterialTheme.colorScheme.tertiary
         isWatched -> MaterialTheme.colorScheme.onSurfaceVariant

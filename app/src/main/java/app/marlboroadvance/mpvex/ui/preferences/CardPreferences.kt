@@ -113,8 +113,7 @@ fun PreferenceItem(
         title = { 
             Text(
                 text = title, 
-                style = MaterialTheme.typography.titleMedium, 
-                fontWeight = FontWeight.Bold 
+                style = MaterialTheme.typography.titleMediumEmphasized 
             ) 
         },
         summary = summary?.let { 

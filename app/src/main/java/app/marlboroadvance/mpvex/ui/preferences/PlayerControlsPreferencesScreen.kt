@@ -104,8 +104,7 @@ object PlayerControlsPreferencesScreen : Screen {
             title = {
               Text(
                 text = stringResource(id = R.string.pref_layout_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
+                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -196,7 +195,7 @@ object PlayerControlsPreferencesScreen : Screen {
                 SeekbarStyle.entries.forEachIndexed { index, style ->
                   ListItem(
                     headlineContent = {
-                      Text(text = style.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                      Text(text = style.name, style = MaterialTheme.typography.titleMediumEmphasized)
                     },
                     trailingContent = {
                       RadioButton(
@@ -234,7 +233,7 @@ object PlayerControlsPreferencesScreen : Screen {
                 SwitchPreference(
                   value = hidePlayerButtonsBackground,
                   onValueChange = { appearancePrefs.hidePlayerButtonsBackground.set(it) },
-                  title = { Text(text = stringResource(id = R.string.pref_appearance_hide_player_buttons_background_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+                  title = { Text(text = stringResource(id = R.string.pref_appearance_hide_player_buttons_background_title), style = MaterialTheme.typography.titleMediumEmphasized) },
                   summary = { Text(text = stringResource(id = R.string.pref_appearance_hide_player_buttons_background_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 )
                 
@@ -244,7 +243,7 @@ object PlayerControlsPreferencesScreen : Screen {
                 SwitchPreference(
                   value = showFileExtension,
                   onValueChange = playerPrefs.showFileExtension::set,
-                  title = { Text(stringResource(R.string.pref_player_show_file_extension_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+                  title = { Text(stringResource(R.string.pref_player_show_file_extension_title), style = MaterialTheme.typography.titleMediumEmphasized) },
                   summary = { Text(stringResource(R.string.pref_player_show_file_extension_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
                 )
 
@@ -264,7 +263,7 @@ object PlayerControlsPreferencesScreen : Screen {
                   valueToText = { value ->
                     if (value == -1) AnnotatedString("Custom") else AnnotatedString("$value ms")
                   },
-                  title = { Text(text = stringResource(R.string.pref_player_display_hide_player_control_time), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
+                  title = { Text(text = stringResource(R.string.pref_player_display_hide_player_control_time), style = MaterialTheme.typography.titleMediumEmphasized) },
                   summary = {
                     Text(
                       text = if (isCustomTimeValue) "Custom ($playerTimeToDisappear ms)" else "$playerTimeToDisappear ms",
@@ -278,14 +277,14 @@ object PlayerControlsPreferencesScreen : Screen {
               if (showCustomTimeDialog) {
                 AlertDialog(
                   onDismissRequest = { showCustomTimeDialog = false },
-                  title = { Text(text = stringResource(R.string.pref_player_display_hide_player_control_time), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
+                  title = { Text(text = stringResource(R.string.pref_player_display_hide_player_control_time), style = MaterialTheme.typography.headlineSmallEmphasized) },
                   text = {
                     Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-                      Text(text = "Enter custom hide time in milliseconds", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 16.dp))
+                      Text(text = stringResource(R.string.dialog_custom_hide_time), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 16.dp))
                       OutlinedTextField(
                         value = customTimeValue,
                         onValueChange = { customTimeValue = it },
-                        label = { Text("Milliseconds") },
+                        label = { Text(stringResource(R.string.milliseconds)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -332,8 +331,7 @@ object PlayerControlsPreferencesScreen : Screen {
     ) {
       Text(
         text = title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.titleMediumEmphasized,
         modifier = Modifier.weight(1f),
       )
       IconButton(onClick = onClick) {

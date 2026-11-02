@@ -549,6 +549,35 @@
   <string name="playlist_refresh_error">Failed to refresh playlist: %s</string>
   <string name="playlist_m3u_badge">M3U</string>
   <string name="toast_av1_software_decoding">Your phone has no AV1 hardware decoder, so this video uses more battery. HEVC (x265) releases play in hardware.</string>
+  <string name="topbar_subtitle_watched">%1$s · %2$d watched</string>
+  <string name="playlist_default_title">Playlist</string>
+  <string name="playlists_title">Playlists</string>
+  <string name="playlists_empty_title">No playlists</string>
+  <string name="playlists_empty_message">Create a playlist to see it here</string>
+  <string name="playlist_new">New playlist</string>
+  <string name="playlist_created">Playlist created</string>
+  <string name="playlist_create_failed">Couldn\'t create playlist: %1$s</string>
+  <!-- Dialogs -->
+  <string name="dialog_deleting_folder">Deleting folder</string>
+  <string name="dialog_create_folder_title">Create new folder</string>
+  <string name="dialog_folder_name">Folder name</string>
+  <string name="dialog_remove_from_playlist_title">Remove from playlist?</string>
+  <string name="dialog_remove_from_playlist_message">Selected items will be removed from this playlist. Files will not be deleted.</string>
+  <string name="dialog_stream_url_title">Stream URL</string>
+  <string name="perm_why_title">Why this permission is needed</string>
+  <string name="perm_why_intro">MpvFlux needs access to your video files to provide its core functionality as a media player.</string>
+  <string name="perm_why_used_for">The permission is used exclusively for:</string>
+  <string name="perm_why_uses">• Discovering and displaying your video files\n• Playing media content\n• Loading subtitle files</string>
+  <string name="perm_why_history">MpvFlux requires storage access because it\'s essential for finding all media and subtitle files on your device, including ones the system doesn\'t index.</string>
+  <string name="perm_why_policy">Due to a change in security policy, apps built for Android 11 and above need this additional permission to access the same files.</string>
+  <string name="perm_why_scope">This permission is only used to discover media and subtitle files on your device. It does not give access to the private data of other apps.</string>
+  <string name="perm_why_open_source">MpvFlux is open source. You can review the code and verify how permissions are used in our GitHub repository:</string>
+  <string name="perm_why_privacy">Your files are never used for anything else, uploaded or stored on any server. They stay on your device.</string>
+  <string name="dialog_moved_private_title">Moved to Private Space</string>
+  <string name="dialog_export_complete">Export complete</string>
+  <string name="dialog_import_complete">Import complete</string>
+  <string name="dialog_custom_seek_duration">Enter custom seek duration in seconds (1-120)</string>
+  <string name="dialog_custom_hide_time">Enter custom hide time in milliseconds</string>
   <!-- Browser cards -->
   <plurals name="card_video_count">
     <item quantity="one">%1$d video</item>

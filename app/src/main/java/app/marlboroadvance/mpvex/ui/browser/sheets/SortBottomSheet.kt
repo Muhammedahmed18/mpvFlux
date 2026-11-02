@@ -91,8 +91,7 @@ fun SortBottomSheet(
         Column(modifier = Modifier.weight(1f)) {
           Text(
             text = title,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.ExtraBold,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
           )
           Text(
@@ -154,8 +153,7 @@ private fun SectionCard(
   ) {
     Text(
       text = title,
-      style = MaterialTheme.typography.titleSmall,
-      fontWeight = FontWeight.Bold,
+      style = MaterialTheme.typography.titleSmallEmphasized,
       color = MaterialTheme.colorScheme.primary,
     )
     content()

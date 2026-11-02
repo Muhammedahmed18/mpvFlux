@@ -219,8 +219,7 @@ object FoldersPreferencesScreen : Screen {
               Spacer(modifier = Modifier.padding(8.dp))
               Text(
                 text = stringResource(R.string.pref_folders_add_folder),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleMediumEmphasized,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
               )
             }
@@ -250,7 +249,7 @@ object FoldersPreferencesScreen : Screen {
     if (showClearAllDialog) {
       AlertDialog(
         onDismissRequest = { showClearAllDialog = false },
-        title = { Text(stringResource(R.string.pref_folders_clear_all_confirm_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) },
+        title = { Text(stringResource(R.string.pref_folders_clear_all_confirm_title), style = MaterialTheme.typography.headlineSmallEmphasized) },
         text = { Text(stringResource(R.string.pref_folders_clear_all_confirm_message), style = MaterialTheme.typography.bodyMedium) },
         confirmButton = {
           TextButton(
@@ -327,8 +326,7 @@ private fun BlacklistedFolderItem(
         Column {
           Text(
             text = folderPath.substringAfterLast('/'),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMediumEmphasized,
           )
           Text(
             text = folderPath,
@@ -403,8 +401,7 @@ private fun AddFolderBottomSheet(
             } else {
               stringResource(R.string.pref_folders_select_folders)
             },
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false)
@@ -514,8 +511,7 @@ private fun AddFolderBottomSheet(
                   Column(modifier = Modifier.padding(start = 12.dp)) {
                     Text(
                       text = folder.name,
-                      style = MaterialTheme.typography.titleMedium,
-                      fontWeight = FontWeight.Bold
+                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                     Text(
                       text = folder.path,

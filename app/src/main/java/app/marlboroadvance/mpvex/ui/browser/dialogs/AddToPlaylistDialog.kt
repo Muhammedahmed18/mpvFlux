@@ -131,8 +131,7 @@ fun AddToPlaylistDialog(
         Column(modifier = Modifier.weight(1f)) {
           Text(
             text = "Add to Playlist",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
           )
           Text(
             text = if (videos.size == 1) {
@@ -168,8 +167,7 @@ fun AddToPlaylistDialog(
       if (playlists.isNotEmpty()) {
         Text(
           text = "Existing Playlists",
-          style = MaterialTheme.typography.labelLarge,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.labelLargeEmphasized,
           color = MaterialTheme.colorScheme.primary,
         )
 
@@ -243,8 +241,7 @@ private fun PlaylistItemCard(
       ) {
         Text(
           text = playlist.name,
-          style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.titleMediumEmphasized,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
@@ -283,8 +280,7 @@ private fun EmptyPlaylistsMessage() {
       )
       Text(
         text = "No playlists yet",
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.titleMediumEmphasized,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
       Text(
@@ -356,8 +352,7 @@ private fun CreatePlaylistDialog(
       ) {
         Text(
           text = "Create New Playlist",
-          style = MaterialTheme.typography.headlineSmall,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.headlineSmallEmphasized,
           modifier = Modifier.weight(1f)
         )
 

@@ -1,5 +1,8 @@
 package app.marlboroadvance.mpvex.ui.browser.dialogs
 
+import app.marlboroadvance.mpvex.R
+import androidx.compose.ui.res.stringResource
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -64,7 +67,7 @@ fun DeleteProgressDialog(
       )
     },
     title = {
-      Text(text = "Deleting folder")
+      Text(text = stringResource(R.string.dialog_deleting_folder))
     },
     text = {
       Column(
@@ -74,8 +77,7 @@ fun DeleteProgressDialog(
         Row(verticalAlignment = Alignment.Bottom) {
           Text(
             text = progress.completed.toString(),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.headlineMediumEmphasized,
             color = MaterialTheme.colorScheme.primary,
           )
           Text(
@@ -85,7 +87,8 @@ fun DeleteProgressDialog(
           )
         }
 
-        LinearProgressIndicator(
+        // Expressive wavy progress: the wave signals ongoing work, unlike a static meter.
+        LinearWavyProgressIndicator(
           progress = { animatedFraction },
           modifier = Modifier.fillMaxWidth(),
         )
@@ -103,7 +106,7 @@ fun DeleteProgressDialog(
     },
     confirmButton = {
       TextButton(onClick = onCancel) {
-        Text(text = "Cancel")
+        Text(text = stringResource(R.string.cancel))
       }
     },
   )

@@ -1,5 +1,7 @@
 package app.marlboroadvance.mpvex.ui.browser.dialogs
 
+import app.marlboroadvance.mpvex.R
+import androidx.compose.ui.res.stringResource
 import android.content.Context
 import android.os.Environment
 import androidx.compose.foundation.basicMarquee
@@ -147,8 +149,7 @@ fun FolderPickerDialog(
           )
           Text(
             text = displayName,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.ExtraBold,
+            style = MaterialTheme.typography.headlineSmallEmphasized,
             maxLines = 1,
             modifier = Modifier.basicMarquee()
           )
@@ -174,8 +175,7 @@ fun FolderPickerDialog(
       if (isSameAsSource) {
         Text(
           text = "Cannot select the same folder",
-          style = MaterialTheme.typography.bodyMedium,
-          fontWeight = FontWeight.Bold,
+          style = MaterialTheme.typography.bodyMediumEmphasized,
           color = MaterialTheme.colorScheme.error,
         )
       }
@@ -296,8 +296,7 @@ private fun StorageVolumeItem(
     Column {
       Text(
         text = description,
-        style = MaterialTheme.typography.bodyLarge,
-        fontWeight = FontWeight.Bold,
+        style = MaterialTheme.typography.bodyLargeEmphasized,
       )
       Text(
         text = volumePath,
@@ -346,7 +345,7 @@ private fun CreateFolderDialog(
 
   AlertDialog(
     onDismissRequest = onDismiss,
-    title = { Text("Create New Folder", fontWeight = FontWeight.Bold) },
+    title = { Text(stringResource(R.string.dialog_create_folder_title), fontWeight = FontWeight.Bold) },
     text = {
       Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedTextField(
@@ -355,7 +354,7 @@ private fun CreateFolderDialog(
             folderName = it
             error = null
           },
-          label = { Text("Folder name") },
+          label = { Text(stringResource(R.string.dialog_folder_name)) },
           singleLine = true,
           isError = error != null,
           modifier = Modifier.fillMaxWidth(),
@@ -384,11 +383,11 @@ private fun CreateFolderDialog(
         },
         shape = MaterialTheme.shapes.extraLarge,
       ) {
-        Text("Create", fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.create), fontWeight = FontWeight.Bold)
       }
     },
     dismissButton = {
-      TextButton(onClick = onDismiss) { Text("Cancel") }
+      TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
     },
     shape = MaterialTheme.shapes.extraLarge,
   )

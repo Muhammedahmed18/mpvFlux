@@ -58,8 +58,7 @@ object PreferencesScreen : Screen {
                     title = {
                         Text(
                             text = stringResource(R.string.pref_preferences),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.titleLargeEmphasized,
                             color = MaterialTheme.colorScheme.primary
                         )
                     },

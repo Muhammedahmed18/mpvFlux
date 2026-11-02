@@ -89,7 +89,7 @@ import dev.vivvvek.seeker.Segment
 // ---------------------------------------------------------------------------
 @Composable
 private fun chipValueLabelStyle() =
-  MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.ExtraBold)
+  MaterialTheme.typography.labelLargeEmphasized
 
 // ---------------------------------------------------------------------------
 // One UI–style translucent "glass" for controls layered over video. MPV draws
@@ -305,7 +305,7 @@ fun RenderPlayerButton(
               ) {
                 Text(
                   text  = "$current / $total",
-                  style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                  style = MaterialTheme.typography.labelSmallEmphasized,
                   color = MaterialTheme.colorScheme.onPrimaryContainer,
                   modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
                 )
@@ -323,7 +323,7 @@ fun RenderPlayerButton(
 
           Text(
             text  = mediaTitle ?: "",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+            style = MaterialTheme.typography.titleMediumEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = if (isTitleOverflowing) TextOverflow.Clip else TextOverflow.Ellipsis,

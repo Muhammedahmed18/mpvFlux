@@ -79,8 +79,7 @@ object AppearancePreferencesScreen : Screen {
                         title = {
                             Text(
                                 text = stringResource(R.string.pref_appearance_title),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold,
+                                style = MaterialTheme.typography.titleLargeEmphasized,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         },
@@ -143,8 +142,7 @@ object AppearancePreferencesScreen : Screen {
                                     title = { 
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_amoled_mode_title),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         ) 
                                     },
                                     summary = {
@@ -172,8 +170,7 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_unlimited_name_lines_title),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
@@ -194,8 +191,7 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_show_unplayed_old_video_label_title),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
@@ -216,8 +212,7 @@ object AppearancePreferencesScreen : Screen {
                                     title = { 
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_unplayed_old_video_days_title),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         ) 
                                     },
                                     valueRange = 1f..30f,
@@ -245,8 +240,7 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(R.string.pref_appearance_auto_scroll_title),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
@@ -269,8 +263,7 @@ object AppearancePreferencesScreen : Screen {
                                     title = { 
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_watched_threshold_title),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         ) 
                                     },
                                     valueRange = 50f..100f,
@@ -296,8 +289,7 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_gesture_tap_thumbnail_to_select_title),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
@@ -318,8 +310,7 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_show_network_thumbnails_title),
-                                            style = MaterialTheme.typography.titleMedium,
-                                            fontWeight = FontWeight.Bold
+                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
