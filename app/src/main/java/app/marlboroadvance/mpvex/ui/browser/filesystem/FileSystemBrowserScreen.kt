@@ -956,7 +956,6 @@ private fun FileSystemBrowserContent(
                 showSubtitleIndicator = showSubtitleIndicator,
                 overrideShowSizeChip = null,
                 overrideShowResolutionChip = null,
-                useFolderNameStyle = false,
               )
             }
           }

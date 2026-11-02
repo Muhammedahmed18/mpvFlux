@@ -232,6 +232,13 @@ class PlayerActivity :
    */
   private var serviceBound = false
 
+  /**
+   * Video track that was active before the app went to the background with playback
+   * still running. While set, video decoding is switched off (vid=no) so background
+   * audio doesn't keep decoding frames nobody can see. Restored in [onStart].
+   */
+  private var videoTrackBeforeBackground: String? = null
+
   // System media controls (lock screen, Bluetooth, headset) are owned solely by
   // MediaPlaybackService's MediaSessionCompat. The Activity previously kept a second,
   // parallel android.media.session.MediaSession which produced two competing active
@@ -665,6 +672,10 @@ class PlayerActivity :
       if (!shouldAllowBackgroundPlayback && (isUserFinishing || isFinishing)) {
         viewModel.pause()
       }
+
+      if (shouldAllowBackgroundPlayback && !isFinishing && !isInPictureInPictureMode) {
+        disableVideoForBackground()
+      }
     }.onFailure { e ->
       Log.e(TAG, "Error during onStop", e)
     }
@@ -694,9 +705,34 @@ class PlayerActivity :
       }
 
       isManualBackgroundPlayback = false
+      restoreVideoAfterBackground()
     }.onFailure { e ->
       Log.e(TAG, "Error during onStart", e)
     }
+  }
+
+  /**
+   * Stop decoding video while only audio is playing in the background.
+   * Saves the current track so [restoreVideoAfterBackground] can bring it back.
+   */
+  private fun disableVideoForBackground() {
+    if (!mpvInitialized || videoTrackBeforeBackground != null) return
+    val currentVid = runCatching { MPVLib.getPropertyString("vid") }.getOrNull()
+    if (currentVid.isNullOrBlank() || currentVid == "no") return
+    videoTrackBeforeBackground = currentVid
+    runCatching { MPVLib.setPropertyString("vid", "no") }
+      .onFailure { e -> Log.e(TAG, "Failed to disable video for background playback", e) }
+  }
+
+  /** Turn video decoding back on when the player returns to the foreground. */
+  private fun restoreVideoAfterBackground() {
+    if (videoTrackBeforeBackground == null) return
+    videoTrackBeforeBackground = null
+    if (!mpvInitialized) return
+    // "auto" rather than the saved track id: setting vid also sets the option for
+    // later files, and the next episode in a playlist may number its tracks differently.
+    runCatching { MPVLib.setPropertyString("vid", "auto") }
+      .onFailure { e -> Log.e(TAG, "Failed to restore video after background playback", e) }
   }
 
   private fun setupWindowFlags() {

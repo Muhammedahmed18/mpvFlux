@@ -35,14 +35,17 @@ class ThumbnailRepository(
       app.marlboroadvance.mpvex.preferences.AppearancePreferences::class.java
     )
   }
-  private val diskCacheDimension = 1024
-  private val diskJpegQuality = 100
+  // 640px wide covers list/grid cards on high-density screens (~200dp x 3.0) while
+  // decoding, scaling and storing far less than the previous 1024px. JPEG quality 90 is
+  // visually identical for thumbnails at roughly a third of the file size of 100.
+  private val diskCacheDimension = 640
+  private val diskJpegQuality = 90
 
   // Disk cache schema version. Bump this whenever the key scheme or stored format
   // changes so stale files are wiped once on the next launch (see migrateDiskCacheIfNeeded).
-  // v4 = content-identity keys (size|dateModified); v3 also included duration; v2 and
-  // earlier were path-based.
-  private val diskCacheSchema = 4
+  // v5 = 640px / q90 (wipes the old 1024px files); v4 = content-identity keys
+  // (size|dateModified); v3 also included duration; v2 and earlier were path-based.
+  private val diskCacheSchema = 5
 
   // Upper bound on the on-disk thumbnail cache. When exceeded, the least-recently-used
   // files (by lastModified) are evicted until back under budget. This bounds growth and

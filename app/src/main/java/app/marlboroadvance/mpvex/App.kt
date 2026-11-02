@@ -93,13 +93,26 @@ class App : Application() {
   }
 
   /**
-   * Trigger a media scan on app launch to ensure MediaStore is up-to-date
-   * This helps detect videos added by external apps while the app was closed
+   * Trigger a media scan on app launch to ensure MediaStore is up-to-date.
+   * This helps detect videos added by external apps while the app was closed.
+   *
+   * A recursive scan of the whole storage is expensive (disk + CPU), and Android
+   * already indexes most new files on its own, so it runs at most once every
+   * [LAUNCH_SCAN_INTERVAL_MS] instead of on every launch.
    */
   private fun triggerMediaScanOnLaunch() {
     try {
+      val prefs = getSharedPreferences(LAUNCH_SCAN_PREFS, MODE_PRIVATE)
+      val now = System.currentTimeMillis()
+      val lastScan = prefs.getLong(KEY_LAST_LAUNCH_SCAN, 0L)
+      if (now - lastScan in 0L until LAUNCH_SCAN_INTERVAL_MS) {
+        android.util.Log.d("App", "Skipping launch media scan (last scan ${(now - lastScan) / 60_000} min ago)")
+        return
+      }
+      prefs.edit().putLong(KEY_LAST_LAUNCH_SCAN, now).apply()
+
       val externalStorage = android.os.Environment.getExternalStorageDirectory()
-      
+
       android.media.MediaScannerConnection.scanFile(
         this,
         arrayOf(externalStorage.absolutePath),
@@ -114,5 +127,11 @@ class App : Application() {
     } catch (e: Exception) {
       android.util.Log.e("App", "Failed to trigger media scan on launch", e)
     }
+  }
+
+  private companion object {
+    const val LAUNCH_SCAN_PREFS = "media_scan"
+    const val KEY_LAST_LAUNCH_SCAN = "last_launch_scan"
+    const val LAUNCH_SCAN_INTERVAL_MS = 12L * 60 * 60 * 1000 // 12 hours
   }
 }

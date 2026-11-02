@@ -69,6 +69,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -97,6 +98,7 @@ import app.marlboroadvance.mpvex.domain.media.model.Video
 import org.koin.compose.koinInject
 import app.marlboroadvance.mpvex.presentation.components.PlayerSheet
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
+import `is`.xyz.mpv.MPVLib
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -579,7 +581,12 @@ fun PlayingAnimationIndicator(
   val bar2 = remember { Animatable(0.55f) }
   val bar3 = remember { Animatable(0.2f) }
 
-  LaunchedEffect(Unit) {
+  // Only animate while actually playing: when paused the bars freeze in place instead of
+  // keeping the UI redrawing every frame for as long as the sheet is open.
+  val paused by MPVLib.propBoolean["pause"].collectAsState()
+
+  LaunchedEffect(paused) {
+    if (paused == true) return@LaunchedEffect
     launch {
       while (true) {
         bar1.animateTo(0.85f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow))

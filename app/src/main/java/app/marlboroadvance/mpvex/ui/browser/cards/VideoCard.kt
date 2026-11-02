@@ -1,26 +1,17 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,9 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
@@ -51,10 +40,10 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -62,8 +51,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -79,12 +66,8 @@ import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.compose.koinInject
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
-
-private val DATE_FORMATTER by lazy { SimpleDateFormat("MMM d", Locale.getDefault()) }
 
 @Immutable
 data class VideoCardSettings(
@@ -116,7 +99,6 @@ fun VideoCard(
   showSubtitleIndicator: Boolean = true,
   overrideShowSizeChip: Boolean? = null,
   overrideShowResolutionChip: Boolean? = null,
-  useFolderNameStyle: Boolean = false, // Ignored, kept for API compatibility
   allowThumbnailGeneration: Boolean = true,
 ) {
   val isNew = remember(video.dateModified, settings.showUnplayedOldVideoLabel, isOldAndUnplayed, settings.unplayedOldVideoDays) {
@@ -140,29 +122,7 @@ fun VideoCard(
   val showResolutionChip = overrideShowResolutionChip ?: settings.showResolutionChip
 
   val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
-
-  val cardScale by animateFloatAsState(
-    targetValue = when {
-      isPressed -> 0.96f
-      isSelected -> 0.98f
-      else -> 1f
-    },
-    animationSpec = spring(
-      dampingRatio = Spring.DampingRatioLowBouncy,
-      stiffness = Spring.StiffnessMediumLow
-    ),
-    label = "video_card_scale"
-  )
-
-  val tonalElevation = if (isPressed) 4.dp else 1.dp
-  val selectionBorderWidth = if (isSelected) 2.dp else 0.dp
-
-  val containerColor = if (isSelected) {
-    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.16f)
-  } else {
-    MaterialTheme.colorScheme.surfaceContainerLow
-  }
+  val cardScale = BrowserCardDefaults.pressScale(interactionSource, "video_card_scale")
 
   Surface(
     modifier = modifier
@@ -175,16 +135,12 @@ fun VideoCard(
         onLongClick = onLongClick,
       ),
     shape = MaterialTheme.shapes.extraLarge,
-    color = containerColor,
-    tonalElevation = tonalElevation,
-    border = if (isSelected) {
-      BorderStroke(selectionBorderWidth, MaterialTheme.colorScheme.primary)
-    } else null,
+    color = BrowserCardDefaults.containerColor(isSelected),
   ) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(12.dp),
+        .padding(BrowserCardDefaults.ContentPadding),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       VideoThumbnail(
@@ -198,13 +154,14 @@ fun VideoCard(
         allowThumbnailGeneration = allowThumbnailGeneration,
         onThumbClick = onThumbClick,
         onLongClick = onLongClick,
+        // ~42% of the card: leaves the title enough room for long anime file names
+        // on 360dp phones (the old 1.3:1 split with a 170dp minimum squeezed it).
         modifier = Modifier
-          .weight(1.3f)
-          .widthIn(min = 170.dp)
+          .fillMaxWidth(0.42f)
           .aspectRatio(16f / 9f)
       )
 
-      Spacer(modifier = Modifier.width(16.dp))
+      Spacer(modifier = Modifier.width(BrowserCardDefaults.ThumbnailGap))
 
       VideoInfoPanel(
         displayTitle = displayTitle,
@@ -239,19 +196,21 @@ private fun VideoInfoPanel(
   unlimitedNameLines: Boolean,
   modifier: Modifier = Modifier
 ) {
+  // Watched state is carried by the dimmed thumbnail + check badge; the text stays at
+  // full opacity (only the title softens) so it remains readable.
   Column(
-    modifier = if (isWatched) modifier.alpha(0.55f) else modifier,
-    verticalArrangement = Arrangement.spacedBy(8.dp)
+    modifier = modifier,
+    verticalArrangement = Arrangement.spacedBy(6.dp)
   ) {
     Text(
       text = displayTitle,
       style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
       color = when {
-        isSelected -> MaterialTheme.colorScheme.primary
         isRecentlyPlayed -> MaterialTheme.colorScheme.tertiary
+        isWatched -> MaterialTheme.colorScheme.onSurfaceVariant
         else -> MaterialTheme.colorScheme.onSurface
       },
-      maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2,
+      maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 3,
       overflow = TextOverflow.Ellipsis,
     )
 
@@ -295,6 +254,8 @@ fun VideoThumbnail(
         .combinedClickable(
           onClick = onThumbClick,
           onLongClick = onLongClick,
+          indication = ripple(bounded = true),
+          interactionSource = remember { MutableInteractionSource() },
         ),
       contentAlignment = Alignment.Center,
     ) {
@@ -366,7 +327,7 @@ fun VideoThumbnail(
             contentDescription = null,
             modifier = Modifier
               .matchParentSize()
-              .alpha(imageAlpha * (if (isWatched) 0.4f else 1f)),
+              .alpha(imageAlpha * (if (isWatched) 0.5f else 1f)),
             contentScale = ContentScale.Crop,
           )
         } else if (!isLoading || loadFailed) {
@@ -399,7 +360,7 @@ fun VideoThumbnail(
           ) {
             Icon(
               imageVector = Icons.Filled.Check,
-              contentDescription = "Watched",
+              contentDescription = stringResource(R.string.card_cd_watched),
               modifier = Modifier
                 .padding(horizontal = 6.dp, vertical = 4.dp)
                 .size(12.dp),
@@ -487,34 +448,12 @@ fun VideoThumbnail(
     }
 
     // Selection Check Badge (Bottom End)
-    AnimatedVisibility(
+    SelectionCheckBadge(
       visible = isSelected,
-      enter = fadeIn(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleIn(
-        spring(dampingRatio = Spring.DampingRatioNoBouncy),
-        transformOrigin = TransformOrigin(1f, 1f)
-      ),
-      exit = fadeOut(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleOut(
-        spring(dampingRatio = Spring.DampingRatioNoBouncy),
-        transformOrigin = TransformOrigin(1f, 1f)
-      ),
       modifier = Modifier
         .align(Alignment.BottomEnd)
         .padding(bottom = 8.dp, end = 8.dp),
-    ) {
-      Surface(
-        color = MaterialTheme.colorScheme.primaryContainer,
-        shape = CircleShape,
-        modifier = Modifier.size(22.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
-      ) {
-        Icon(
-          imageVector = Icons.Filled.Check,
-          contentDescription = "Selected",
-          modifier = Modifier.padding(3.dp),
-          tint = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
-      }
-    }
+    )
   }
 }
 
@@ -587,7 +526,7 @@ fun VideoMetadataChips(
   val attributeParts = buildList {
     resolutionLabel?.let { add(it) }
     if (showSizeChip && video.size > 0) add(video.sizeFormatted)
-    if (showDateChip && video.dateModified > 0) add(formatDate(video.dateModified))
+    if (showDateChip && video.dateModified > 0) add(formatCardDate(video.dateModified))
   }
 
   // 4K becomes an emphasized "is this the version I want" badge, gated by the same
@@ -643,10 +582,6 @@ fun VideoMetadataChips(
       }
     }
   }
-}
-
-private fun formatDate(timestampSeconds: Long): String {
-  return DATE_FORMATTER.format(Date(timestampSeconds * 1000))
 }
 
 // Compact clock format for the "continue watching" pill: H:MM:SS once an hour
