@@ -1,10 +1,7 @@
 package app.marlboroadvance.mpvex.ui.theme
 
-import android.graphics.Bitmap
 import android.os.Build
-import android.view.View
 import androidx.annotation.StringRes
-import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.ripple.RippleAlpha
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -17,139 +14,11 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.view.drawToBitmap
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import org.koin.compose.koinInject
-import kotlin.math.hypot
-
-// ============================================================================
-// Theme Transition Animation State & Components
-// ============================================================================
-class ThemeTransitionState {
-    var isAnimating by mutableStateOf(false)
-        private set
-    var clickPosition by mutableStateOf(Offset.Zero)
-        private set
-    var screenshotBitmap by mutableStateOf<Bitmap?>(null)
-        private set
-    var animationProgress = Animatable(0f)
-        private set
-    
-    private var captureView: View? = null
-    
-    fun setView(view: View) {
-        captureView = view
-    }
-    
-    fun startTransition(position: Offset) {
-        if (isAnimating) return
-        
-        captureView?.let { view ->
-            try {
-                val bitmap = view.drawToBitmap()
-                screenshotBitmap = bitmap
-                clickPosition = position
-                isAnimating = true
-            } catch (e: Exception) {
-                screenshotBitmap = null
-                isAnimating = false
-            }
-        }
-    }
-    
-    fun finishTransition() {
-        val oldBitmap = screenshotBitmap
-        screenshotBitmap = null
-        clickPosition = Offset.Zero
-        isAnimating = false
-        oldBitmap?.recycle()
-    }
-    
-    suspend fun resetProgress() {
-        animationProgress.snapTo(0f)
-    }
-}
-
-val LocalThemeTransitionState = staticCompositionLocalOf<ThemeTransitionState?> { null }
-
-@Composable
-fun rememberThemeTransitionState(): ThemeTransitionState {
-    return remember { ThemeTransitionState() }
-}
-
-@Composable
-private fun ThemeTransitionOverlay(
-    state: ThemeTransitionState,
-    content: @Composable () -> Unit
-) {
-    content()
-}
-
-private class CircularRevealShape(
-    private val progress: Float,
-    private val center: Offset,
-    private val containerSize: Size,
-) : androidx.compose.ui.graphics.Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
-        density: androidx.compose.ui.unit.Density,
-    ): androidx.compose.ui.graphics.Outline {
-        val actualCenter = if (center == Offset.Zero) {
-            Offset(size.width / 2f, size.height / 2f)
-        } else {
-            center
-        }
-        
-        val maxRadius = longestDistanceToCorner(size, actualCenter) * 1.1f
-        val currentRadius = maxRadius * progress
-        
-        val path = android.graphics.Path().apply {
-            addRect(0f, 0f, size.width, size.height, android.graphics.Path.Direction.CW)
-            addCircle(actualCenter.x, actualCenter.y, currentRadius, android.graphics.Path.Direction.CCW)
-        }
-        
-        return androidx.compose.ui.graphics.Outline.Generic(
-            path.asComposePath()
-        )
-    }
-    
-    private fun longestDistanceToCorner(size: Size, center: Offset): Float {
-        val topLeft = hypot(center.x, center.y)
-        val topRight = hypot(size.width - center.x, center.y)
-        val bottomLeft = hypot(center.x, size.height - center.y)
-        val bottomRight = hypot(size.width - center.x, size.height - center.y)
-        return maxOf(topLeft, topRight, bottomLeft, bottomRight)
-    }
-}
-
-private fun android.graphics.Path.asComposePath(): androidx.compose.ui.graphics.Path {
-    val composePath = androidx.compose.ui.graphics.Path()
-    composePath.asAndroidPath().set(this)
-    return composePath
-}
-
-@Composable
-private fun ThemeTransitionContent(content: @Composable () -> Unit) {
-    val state = LocalThemeTransitionState.current
-    
-    if (state != null) {
-        ThemeTransitionOverlay(state = state, content = content)
-    } else {
-        content()
-    }
-}
 
 // ============================================================================
 // Main Theme
@@ -198,17 +67,14 @@ fun MpvexTheme(content: @Composable () -> Unit) {
 
     CompositionLocalProvider(
         LocalSpacing provides Spacing(),
-        LocalThemeTransitionState provides rememberThemeTransitionState(),
     ) {
-        ThemeTransitionContent {
-            MaterialTheme(
-                colorScheme = colorScheme,
-                typography = AppTypography,
-                shapes = AppShapes, // Apply M3 Expressive Shapes
-                motionScheme = MotionScheme.expressive(), // Already using expressive motion
-                content = content,
-            )
-        }
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = AppTypography,
+            shapes = AppShapes, // Apply M3 Expressive Shapes
+            motionScheme = MotionScheme.expressive(), // Already using expressive motion
+            content = content,
+        )
     }
 }
 

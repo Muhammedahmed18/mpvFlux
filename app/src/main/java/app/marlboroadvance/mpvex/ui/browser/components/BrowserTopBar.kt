@@ -9,10 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.Info
@@ -40,15 +38,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -58,7 +50,6 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.ui.theme.DarkMode
-import app.marlboroadvance.mpvex.ui.theme.LocalThemeTransitionState
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
@@ -139,12 +130,8 @@ private fun NormalTopBar(
   val preferences = koinInject<AppearancePreferences>()
   val darkMode by preferences.darkMode.collectAsState()
   val darkTheme = isSystemInDarkTheme()
-  val themeTransition = LocalThemeTransitionState.current
   val coroutineScope = rememberCoroutineScope()
-  
-  // Track position only when needed to avoid recomposition during scrolls
-  var layoutCoordinates by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
-  
+
   fun toggleDarkMode() {
     when (darkMode) {
       DarkMode.System -> preferences.darkMode.set(if (darkTheme) DarkMode.Light else DarkMode.Dark)
@@ -167,22 +154,9 @@ private fun NormalTopBar(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
-            .onGloballyPositioned { layoutCoordinates = it }
             .pointerInput(onTitleLongPress) {
                 detectTapGestures(
-                    onTap = { localOffset ->
-                        if (themeTransition?.isAnimating == true) return@detectTapGestures
-                        
-                        // Calculate window offset only at the moment of tap
-                        val positionInWindow = layoutCoordinates?.positionInWindow() ?: Offset.Zero
-                        val windowOffset = Offset(
-                            positionInWindow.x + localOffset.x,
-                            positionInWindow.y + localOffset.y
-                        )
-
-                        themeTransition?.startTransition(windowOffset)
-                        coroutineScope.launch { toggleDarkMode() }
-                    },
+                    onTap = { coroutineScope.launch { toggleDarkMode() } },
                     onLongPress = { onTitleLongPress?.invoke() }
                 )
             }

@@ -171,6 +171,15 @@ class MediaPlaybackService :
     result.sendResult(mutableListOf())
   }
 
+  /**
+   * Replace the notification / lock-screen artwork (e.g. with a frame of the new episode)
+   * without touching the title, which the media-title observer keeps up to date.
+   */
+  fun setArtwork(artwork: Bitmap?) {
+    thumbnail = artwork
+    updateMediaSession()
+  }
+
   fun setMediaInfo(
     title: String,
     artist: String,

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.filled.Check
@@ -64,7 +63,7 @@ import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Serializable
 data class PlaylistDetailScreen(val playlistId: Int) : Screen {
-  @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterialApi::class)
+  @OptIn(ExperimentalMaterial3Api::class)
   @Composable
   override fun Content() {
     val context = LocalContext.current

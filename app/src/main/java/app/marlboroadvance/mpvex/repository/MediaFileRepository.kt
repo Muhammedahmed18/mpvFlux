@@ -181,7 +181,7 @@ object MediaFileRepository {
     }
 
     return Video(
-      id = path.hashCode().toLong(),
+      id = app.marlboroadvance.mpvex.domain.media.model.VideoIds.fromPath(path),
       title = title,
       displayName = displayName,
       path = path,
@@ -241,7 +241,7 @@ object MediaFileRepository {
     val subtitleCodec = metadata?.subtitleCodec ?: ""
 
     return Video(
-      id = path.hashCode().toLong(),
+      id = app.marlboroadvance.mpvex.domain.media.model.VideoIds.fromPath(path),
       title = title,
       displayName = displayName,
       path = path,

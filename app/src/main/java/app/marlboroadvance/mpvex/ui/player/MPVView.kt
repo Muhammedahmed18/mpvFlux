@@ -136,7 +136,9 @@ class MPVView(
     }
 
     MPVLib.setOptionString("speed", playerPreferences.defaultSpeed.get().toString())
-    MPVLib.setOptionString("vd-lavc-film-grain", "cpu")
+    // "auto" lets the GPU apply AV1 film grain when the renderer supports it. Forcing "cpu"
+    // added per-frame CPU work on top of software AV1 decoding (no AV1 hardware decoder).
+    MPVLib.setOptionString("vd-lavc-film-grain", "auto")
 
     val preciseSeek = playerPreferences.usePreciseSeeking.get()
     MPVLib.setOptionString("hr-seek", if (preciseSeek) "yes" else "no")

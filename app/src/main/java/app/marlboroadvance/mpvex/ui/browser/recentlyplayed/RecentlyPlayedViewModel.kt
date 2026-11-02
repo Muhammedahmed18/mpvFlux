@@ -258,7 +258,7 @@ class RecentlyPlayedViewModel(application: Application) : AndroidViewModel(appli
       }
 
       Video(
-        id = file.absolutePath.hashCode().toLong(),
+        id = app.marlboroadvance.mpvex.domain.media.model.VideoIds.fromPath(file.absolutePath),
         title = title,
         displayName = displayName,
         path = filePath,
@@ -325,7 +325,7 @@ class RecentlyPlayedViewModel(application: Application) : AndroidViewModel(appli
     }
     
     return Video(
-      id = url.hashCode().toLong(),
+      id = app.marlboroadvance.mpvex.domain.media.model.VideoIds.fromPath(url),
       title = videoTitle,
       displayName = displayName,
       path = url,

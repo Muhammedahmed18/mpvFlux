@@ -228,19 +228,22 @@ class PlayerViewModel(
 
   val maxVolume = host.audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
 
-  val subtitleTracks: StateFlow<List<TrackNode>> =
+  // track-list is decoded from JSON once per change and shared; the audio and subtitle
+  // lists used to decode the whole track list separately.
+  private val allTracks: StateFlow<List<TrackNode>> =
     MPVLib.propNode["track-list"]
-      .map { node ->
-        node?.toObject<List<TrackNode>>(json)?.filter { it.isSubtitle }?.toImmutableList()
-          ?: persistentListOf()
-      }.stateIn(viewModelScope, SharingStarted.Lazily, persistentListOf())
+      .map { node -> node?.toObject<List<TrackNode>>(json) ?: emptyList() }
+      .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+  val subtitleTracks: StateFlow<List<TrackNode>> =
+    allTracks
+      .map { tracks -> tracks.filter { it.isSubtitle }.toImmutableList() }
+      .stateIn(viewModelScope, SharingStarted.Lazily, persistentListOf())
 
   val audioTracks: StateFlow<List<TrackNode>> =
-    MPVLib.propNode["track-list"]
-      .map { node ->
-        node?.toObject<List<TrackNode>>(json)?.filter { it.isAudio }?.toImmutableList()
-          ?: persistentListOf()
-      }.stateIn(viewModelScope, SharingStarted.Lazily, persistentListOf())
+    allTracks
+      .map { tracks -> tracks.filter { it.isAudio }.toImmutableList() }
+      .stateIn(viewModelScope, SharingStarted.Lazily, persistentListOf())
 
   val chapters: StateFlow<List<dev.vivvvek.seeker.Segment>> =
     MPVLib.propNode["chapter-list"]

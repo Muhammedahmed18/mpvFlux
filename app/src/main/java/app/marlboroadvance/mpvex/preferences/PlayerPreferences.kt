@@ -69,6 +69,9 @@ class PlayerPreferences(
 
   val keepScreenOnWhenPaused = preferenceStore.getBoolean("keep_screen_on_when_paused", false)
 
+  // One-time hint shown when an AV1 file has to be decoded in software.
+  val av1SoftwareHintShown = preferenceStore.getBoolean("av1_software_hint_shown", false)
+
   // Persist aspect ratio setting (default to Fit)
   val defaultVideoAspect = preferenceStore.getEnum("default_video_aspect", VideoAspect.Fit)
   val defaultCustomAspectRatio = preferenceStore.getObject(

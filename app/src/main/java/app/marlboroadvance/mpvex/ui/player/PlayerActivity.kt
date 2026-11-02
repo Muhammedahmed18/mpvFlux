@@ -239,6 +239,9 @@ class PlayerActivity :
    */
   private var videoTrackBeforeBackground: String? = null
 
+  /** Whether the first-frame work (notification artwork, AV1 hint) already ran for the current file. */
+  private var firstFrameHandled = false
+
   // System media controls (lock screen, Bluetooth, headset) are owned solely by
   // MediaPlaybackService's MediaSessionCompat. The Activity previously kept a second,
   // parallel android.media.session.MediaSession which produced two competing active
@@ -1318,8 +1321,52 @@ class PlayerActivity :
         if (!isReady) {
           isReady = true
         }
+        if (!firstFrameHandled) {
+          firstFrameHandled = true
+          refreshNotificationArtwork()
+          maybeShowSoftwareAv1Hint()
+        }
       }
     }
+  }
+
+  /**
+   * Grab a small frame of the current file for the media notification / lock screen.
+   * Done on the first playback restart (a frame has been decoded by then) rather than
+   * at file load, and at 512px: notification art is shown far smaller than the old
+   * 1080px grab, which cost a noticeable hitch at the start of every episode.
+   */
+  private fun refreshNotificationArtwork() {
+    val artwork = runCatching { MPVLib.grabThumbnail(NOTIFICATION_ARTWORK_SIZE) }.getOrNull() ?: return
+    MediaPlaybackService.thumbnail = artwork
+    mediaPlaybackService?.setArtwork(artwork)
+  }
+
+  /**
+   * Explain once why some files drain more battery: when an AV1 video ends up on the
+   * software decoder even though hardware decoding is enabled, the phone has no AV1
+   * hardware decoder. Runs on the first playback restart of each file (the decoder is
+   * initialised by then) and never again once shown.
+   */
+  private fun maybeShowSoftwareAv1Hint() {
+    if (playerPreferences.av1SoftwareHintShown.get()) return
+
+    val codec = runCatching { MPVLib.getPropertyString("current-tracks/video/codec") }.getOrNull()
+    if (!codec.equals("av1", ignoreCase = true)) return
+
+    // Respect a deliberate choice of software decoding.
+    val requestedHwdec = runCatching { MPVLib.getPropertyString("hwdec") }.getOrNull()
+    if (requestedHwdec == "no") return
+
+    val currentHwdec = runCatching { MPVLib.getPropertyString("hwdec-current") }.getOrNull()
+    if (!currentHwdec.isNullOrEmpty() && currentHwdec != "no") return
+
+    playerPreferences.av1SoftwareHintShown.set(true)
+    android.widget.Toast.makeText(
+      this,
+      getString(app.marlboroadvance.mpvex.R.string.toast_av1_software_decoding),
+      android.widget.Toast.LENGTH_LONG,
+    ).show()
   }
 
   private fun handleFileLoaded() {
@@ -1330,6 +1377,7 @@ class PlayerActivity :
       }
     }
     mediaIdentifier = getMediaIdentifier(intent, fileName)
+    firstFrameHandled = false
 
     startBackgroundPlayback()
 
@@ -2015,20 +2063,23 @@ class PlayerActivity :
     }
 
     if (serviceBound) {
+      // Next file in an already-running session: drop the previous episode's artwork;
+      // refreshNotificationArtwork() supplies the new frame once it's decoded.
+      mediaPlaybackService?.setArtwork(null)
       return
     }
 
     MediaPlaybackService.createNotificationChannel(this)
 
     val artist = runCatching { MPVLib.getPropertyString("metadata/artist") }.getOrNull() ?: ""
-    val thumbnail = runCatching { MPVLib.grabThumbnail(1080) }.getOrNull()
 
     val intent = Intent(this, MediaPlaybackService::class.java).apply {
       putExtra("media_title", fileName)
       putExtra("media_artist", artist)
     }
 
-    MediaPlaybackService.thumbnail = thumbnail
+    // Artwork arrives with the first decoded frame (refreshNotificationArtwork).
+    MediaPlaybackService.thumbnail = null
 
     try {
       startForegroundService(intent)
@@ -2297,11 +2348,15 @@ class PlayerActivity :
     MPVLib.setPropertyString("force-media-title", displayTitle)
     viewModel.setMediaTitle(displayTitle)
 
-    // Push title/artist/thumbnail to the Service, which owns the MediaSession + notification.
+    // Push title/artist to the Service, which owns the MediaSession + notification. The
+    // artwork is kept as-is: refreshNotificationArtwork() grabs it once per file.
     if (serviceBound && mediaPlaybackService != null) {
       val artist = runCatching { MPVLib.getPropertyString("metadata/artist") }.getOrNull() ?: ""
-      val thumbnail = runCatching { MPVLib.grabThumbnail(1080) }.getOrNull()
-      mediaPlaybackService?.setMediaInfo(title = displayTitle, artist = artist, thumbnail = thumbnail)
+      mediaPlaybackService?.setMediaInfo(
+        title = displayTitle,
+        artist = artist,
+        thumbnail = MediaPlaybackService.thumbnail,
+      )
     }
   }
 
@@ -2488,6 +2543,7 @@ class PlayerActivity :
     private const val DELAY_DIVISOR = 1000.0
     private const val DEFAULT_PLAYBACK_SPEED = 1.0
     private const val DEFAULT_SUB_SPEED = 1.0
+    private const val NOTIFICATION_ARTWORK_SIZE = 512
     const val TAG = "mpvex"
   }
 }

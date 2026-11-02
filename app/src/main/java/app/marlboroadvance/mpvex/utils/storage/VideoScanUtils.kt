@@ -8,12 +8,13 @@ import android.os.storage.StorageManager
 import android.os.storage.StorageVolume
 import android.provider.MediaStore
 import android.util.Log
+import app.marlboroadvance.mpvex.database.repository.VideoMetadataCacheRepository
 import app.marlboroadvance.mpvex.domain.media.model.Video
-import app.marlboroadvance.mpvex.utils.media.MediaInfoOps
+import app.marlboroadvance.mpvex.domain.media.model.VideoIds
 import app.marlboroadvance.mpvex.utils.perf.PerfTrace
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import org.koin.java.KoinJavaComponent
 import java.io.File
 import java.util.Locale
 import kotlin.math.log10
@@ -25,16 +26,6 @@ import kotlin.math.pow
  */
 object VideoScanUtils {
     private const val TAG = "VideoScanUtils"
-    
-    /**
-     * Video metadata extracted from files
-     */
-    data class VideoMetadata(
-        val duration: Long,
-        val mimeType: String,
-        val width: Int = 0,
-        val height: Int = 0,
-    )
     
     /**
      * Get all videos in a specific folder
@@ -52,7 +43,7 @@ object VideoScanUtils {
         // Fallback to filesystem if MediaStore returned nothing
         val folder = File(folderPath)
         if (folder.exists() && folder.canRead() && videosMap.isEmpty()) {
-            scanVideosFromFileSystem(context, folder, videosMap)
+            scanVideosFromFileSystem(folder, videosMap)
         }
         
         videosMap.values.sortedBy { it.displayName.lowercase(Locale.getDefault()) }
@@ -156,106 +147,80 @@ object VideoScanUtils {
     }
     
     /**
-     * Scan videos from filesystem (fallback)
+     * Scan videos from filesystem (fallback for folders MediaStore doesn't index, e.g.
+     * hidden or .nomedia folders).
+     *
+     * Metadata goes through [VideoMetadataCacheRepository]: files whose size and
+     * modification time are unchanged are served from the cache, and only new/changed
+     * files are parsed (in parallel). Previously every file was re-parsed one by one,
+     * with runBlocking, on every visit to the folder.
      */
-    private fun scanVideosFromFileSystem(
-        context: Context,
+    private suspend fun scanVideosFromFileSystem(
         folder: File,
         videosMap: MutableMap<String, Video>
     ) {
         try {
-            val files = folder.listFiles() ?: return
-            
-            for (file in files) {
+            val videoFiles = folder.listFiles()?.filter { file ->
+                file.isFile &&
+                    FileTypeUtils.VIDEO_EXTENSIONS.contains(file.extension.lowercase(Locale.getDefault())) &&
+                    !videosMap.containsKey(file.absolutePath)
+            }.orEmpty()
+            if (videoFiles.isEmpty()) return
+
+            val metadataByPath = runCatching {
+                PerfTrace.time(TAG, "scanVideosFromFileSystem.metadata", thresholdMs = 50) {
+                    metadataCache().getOrExtractMetadataBatch(
+                        videoFiles.map { Triple(it, Uri.fromFile(it), it.name) },
+                    )
+                }
+            }.onFailure { e ->
+                Log.w(TAG, "Metadata lookup failed for ${folder.absolutePath}", e)
+            }.getOrDefault(emptyMap())
+
+            for (file in videoFiles) {
                 try {
-                    if (!file.isFile) continue
-                    
-                    val extension = file.extension.lowercase(Locale.getDefault())
-                    if (!FileTypeUtils.VIDEO_EXTENSIONS.contains(extension)) continue
-                    
                     val path = file.absolutePath
-                    if (videosMap.containsKey(path)) continue
-                    
-                    val uri = Uri.fromFile(file)
-                    val displayName = file.name
-                    val title = file.nameWithoutExtension
                     val size = file.length()
                     val dateModified = file.lastModified() / 1000
-                    
-                    // Extract metadata
-                    val metadata = extractVideoMetadata(context, file)
-                    
+                    val metadata = metadataByPath[path]
+                    val duration = metadata?.durationMs ?: 0L
+                    val width = metadata?.width ?: 0
+                    val height = metadata?.height ?: 0
+
                     videosMap[path] = Video(
-                        id = path.hashCode().toLong(),
-                        title = title,
-                        displayName = displayName,
+                        id = VideoIds.fromPath(path),
+                        title = file.nameWithoutExtension,
+                        displayName = file.name,
                         path = path,
-                        uri = uri,
-                        duration = metadata.duration,
-                        durationFormatted = formatDuration(metadata.duration),
+                        uri = Uri.fromFile(file),
+                        duration = duration,
+                        durationFormatted = formatDuration(duration),
                         size = size,
                         sizeFormatted = formatFileSize(size),
                         dateModified = dateModified,
                         dateAdded = dateModified,
-                        mimeType = metadata.mimeType,
+                        mimeType = FileTypeUtils.getMimeTypeFromExtension(file.extension.lowercase(Locale.getDefault())),
                         bucketId = folder.absolutePath,
                         bucketDisplayName = folder.name,
-                        width = metadata.width,
-                        height = metadata.height,
-                        fps = 0f,
-                        resolution = formatResolution(metadata.width, metadata.height),
-                        hasEmbeddedSubtitles = false,
-                        subtitleCodec = ""
+                        width = width,
+                        height = height,
+                        fps = metadata?.fps ?: 0f,
+                        resolution = formatResolution(width, height),
+                        hasEmbeddedSubtitles = metadata?.hasEmbeddedSubtitles ?: false,
+                        subtitleCodec = metadata?.subtitleCodec ?: ""
                     )
                 } catch (e: Exception) {
                     Log.w(TAG, "Error processing file: ${file.absolutePath}", e)
-                    continue
                 }
             }
-            
         } catch (e: Exception) {
             Log.e(TAG, "Filesystem video scan error", e)
         }
     }
-    
-    /**
-     * Extracts video metadata using MediaInfo library
-     */
-    fun extractVideoMetadata(
-        context: Context,
-        file: File,
-    ): VideoMetadata {
-        var duration = 0L
-        var mimeType = "video/*"
-        var width = 0
-        var height = 0
-        
-        try {
-            val uri = Uri.fromFile(file)
-            val result =
-                PerfTrace.time(TAG, "extractVideoMetadata.runBlocking", thresholdMs = 50) {
-                    runBlocking {
-                        MediaInfoOps.extractBasicMetadata(context, uri, file.name)
-                    }
-                }
-            
-            result.onSuccess { metadata ->
-                duration = metadata.durationMs
-                width = metadata.width
-                height = metadata.height
-                mimeType = FileTypeUtils.getMimeTypeFromExtension(file.extension.lowercase())
-            }.onFailure { e ->
-                Log.w(TAG, "Could not extract metadata for ${file.absolutePath}, using fallback", e)
-                mimeType = FileTypeUtils.getMimeTypeFromExtension(file.extension.lowercase())
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Could not extract metadata for ${file.absolutePath}, using fallback", e)
-            mimeType = FileTypeUtils.getMimeTypeFromExtension(file.extension.lowercase())
-        }
-        
-        return VideoMetadata(duration, mimeType, width, height)
-    }
-    
+
+    private fun metadataCache(): VideoMetadataCacheRepository =
+        KoinJavaComponent.get(VideoMetadataCacheRepository::class.java)
+
     // Formatting utilities
     
     private fun formatDuration(durationMs: Long): String {

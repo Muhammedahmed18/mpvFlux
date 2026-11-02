@@ -104,6 +104,16 @@ class MainActivity : ComponentActivity() {
     }
   }
 
+  override fun onStart() {
+    super.onStart()
+    app.marlboroadvance.mpvex.utils.media.MediaStoreWatcher.start(this)
+  }
+
+  override fun onStop() {
+    app.marlboroadvance.mpvex.utils.media.MediaStoreWatcher.stop(this)
+    super.onStop()
+  }
+
   override fun onDestroy() {
     try {
       super.onDestroy()

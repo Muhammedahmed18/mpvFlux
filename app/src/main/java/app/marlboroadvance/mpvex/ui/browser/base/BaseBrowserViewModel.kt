@@ -182,7 +182,7 @@ abstract class BaseBrowserViewModel(
   private fun videoFromFile(file: File): Video {
     val dateModified = file.lastModified() / 1000
     return Video(
-      id = file.absolutePath.hashCode().toLong(),
+      id = app.marlboroadvance.mpvex.domain.media.model.VideoIds.fromPath(file.absolutePath),
       title = file.nameWithoutExtension,
       displayName = file.name,
       path = file.absolutePath,
