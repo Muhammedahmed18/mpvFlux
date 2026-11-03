@@ -37,6 +37,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -115,6 +118,8 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.MultipleSpeedPlay
 import app.marlboroadvance.mpvex.ui.player.controls.components.SpeedControlSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.TextPlayerUpdate
 import app.marlboroadvance.mpvex.ui.player.controls.components.ThumbZoneUnlock
+import app.marlboroadvance.mpvex.ui.player.controls.components.LockedClockPill
+import app.marlboroadvance.mpvex.ui.player.controls.components.LockedInfoPill
 import app.marlboroadvance.mpvex.ui.player.controls.components.VolumeSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarWithTimers
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
@@ -306,7 +311,7 @@ fun PlayerControls(
   ) {
     // Read the timestamp to ensure it's considered "used" and correctly triggers re-execution
     if (resetControlsTimestamp >= 0 && controlsShown && paused == false && !isSeeking) {
-      val delayTime = if (areControlsLocked) 2000L else playerTimeToDisappear.toLong()
+      val delayTime = if (areControlsLocked) 3000L else playerTimeToDisappear.toLong()
       delay(delayTime)
       viewModel.hideControls()
     }
@@ -391,6 +396,7 @@ fun PlayerControls(
           val (topLeftControls, topRightControls) = createRefs()
           val (volumeSlider, brightnessSlider) = createRefs()
           val unlockControlsButton = createRef()
+          val (lockedInfoPill, lockedClockPill) = createRefs()
           val (bottomRightControls, bottomLeftControls) = createRefs()
           val playerPauseButton = createRef()
           val seekbar = createRef()
@@ -458,15 +464,48 @@ fun PlayerControls(
             },
           )
 
+          // Locked controls: unlock button on the right edge where the right thumb rests
+          // (about 62% down in landscape, bottom-right in portrait), clock pill top-left and
+          // a display-only time/progress/battery pill bottom-center in place of the seekbar.
+          val lockedInsets = WindowInsets.safeDrawing
           AnimatedVisibility(
             visible = controlsShown && areControlsLocked,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier.then(if (showSystemStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier).constrainAs(unlockControlsButton) {
-              top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.small)
-              end.linkTo(parent.end, spacing.large)
-            },
+            enter = fadeIn(playerControlsEnterAnimationSpec()),
+            exit = fadeOut(playerControlsExitAnimationSpec()),
+            modifier = Modifier
+              .windowInsetsPadding(lockedInsets.only(WindowInsetsSides.End + WindowInsetsSides.Bottom))
+              .constrainAs(unlockControlsButton) {
+                top.linkTo(parent.top)
+                bottom.linkTo(parent.bottom)
+                end.linkTo(parent.end, spacing.small)
+                verticalBias = if (isPortrait) 0.88f else 0.62f
+              },
           ) { ThumbZoneUnlock(onUnlock = { viewModel.unlockControls() }) }
+
+          AnimatedVisibility(
+            visible = controlsShown && areControlsLocked,
+            enter = fadeIn(playerControlsEnterAnimationSpec()),
+            exit = fadeOut(playerControlsExitAnimationSpec()),
+            modifier = Modifier
+              .windowInsetsPadding(lockedInsets.only(WindowInsetsSides.Start + WindowInsetsSides.Top))
+              .constrainAs(lockedClockPill) {
+                top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.medium)
+                start.linkTo(parent.start, spacing.large)
+              },
+          ) { LockedClockPill() }
+
+          AnimatedVisibility(
+            visible = controlsShown && areControlsLocked,
+            enter = fadeIn(playerControlsEnterAnimationSpec()),
+            exit = fadeOut(playerControlsExitAnimationSpec()),
+            modifier = Modifier
+              .windowInsetsPadding(lockedInsets.only(WindowInsetsSides.Bottom))
+              .constrainAs(lockedInfoPill) {
+                start.linkTo(parent.start)
+                end.linkTo(parent.end)
+                bottom.linkTo(parent.bottom, if (isPortrait) spacing.extraLarge else spacing.medium)
+              },
+          ) { LockedInfoPill(viewModel = viewModel) }
 
           AnimatedVisibility(
             visible = controlsShown && !areControlsLocked,

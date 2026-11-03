@@ -4,7 +4,14 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.res.stringResource
+import app.marlboroadvance.mpvex.R
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
@@ -32,10 +39,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * A redesigned "Thumb Zone" unlock button for one-handed operation.
- * Features glass-morphism, a circular progress arc with a track baseline,
- * and an atmospheric "light bleed" aura.
- * Visually anchored to the corner while maintaining a generous hit area.
+ * "Thumb Zone" unlock button for the locked player.
+ *
+ * Placed on the right edge where the right thumb rests (see PlayerControls). A 64dp glass
+ * circle inside a 96dp hit area, hold-to-unlock with a progress ring, a light haptic tick
+ * when the hold starts and a strong one on unlock, plus a "Hold to unlock" hint that slides
+ * out to the left for the first moments so it's clear a tap isn't enough.
  */
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -67,9 +76,19 @@ fun ThumbZoneUnlock(
   val lockedIconTint   = MaterialTheme.colorScheme.onSurface
   val unlockedIconTint = MaterialTheme.colorScheme.onPrimary
 
+  // Short hint next to the button, shown briefly each time the locked controls appear.
+  var showHint by remember { mutableStateOf(true) }
+  LaunchedEffect(Unit) {
+    delay(HINT_VISIBLE_MS)
+    showHint = false
+  }
+
   // Handle the hold-to-unlock progress logic
   LaunchedEffect(isPressed) {
     if (isPressed && !isUnlocked) {
+      // Light tick so the user feels the hold has started.
+      haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+      showHint = false
       progress.animateTo(
         targetValue   = 1f,
         // FastOutSlowInEasing replaces LinearEasing — consistent with Phase 4 motion alignment.
@@ -142,17 +161,39 @@ fun ThumbZoneUnlock(
   val arcStrokeWidth   = with(density) { 3.dp.toPx() }
   val borderStrokeWidth = with(density) { 0.5.dp.toPx() }
 
+  Row(
+    modifier = modifier.graphicsLayer { alpha = componentAlpha },
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+  AnimatedVisibility(
+    visible = showHint && !isUnlocked,
+    enter = fadeIn(playerControlsEnterAnimationSpec()) + expandHorizontally(expandFrom = Alignment.End),
+    exit = fadeOut(playerControlsExitAnimationSpec()) + shrinkHorizontally(shrinkTowards = Alignment.End),
+  ) {
+    Surface(
+      shape = CircleShape,
+      color = glassColor,
+      border = BorderStroke(0.5.dp, glassBorderColor),
+    ) {
+      Text(
+        text = stringResource(R.string.player_hold_to_unlock),
+        style = MaterialTheme.typography.labelLargeEmphasized,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+      )
+    }
+  }
   Box(
-    modifier = modifier
+    modifier = Modifier
       .size(96.dp)
       .graphicsLayer {
-        alpha  = componentAlpha
         scaleX = buttonScale
         scaleY = buttonScale
       }
       .drawBehind {
-        val circleRadius = 36.dp.toPx()
-        val visualCenter = Offset(size.width - circleRadius, size.height - circleRadius)
+        // 64dp circle centered in the 96dp touch area.
+        val circleRadius = 32.dp.toPx()
+        val visualCenter = center
 
         // 1. Atmospheric Aura Glow — unchanged
         val baseAuraAlpha = if (isUnlocked) auraFlashAlpha.value else (progress.value * 0.12f)
@@ -164,7 +205,7 @@ fun ThumbZoneUnlock(
                 primaryColor.copy(alpha = baseAuraAlpha * 0.2f),
                 Color.Transparent,
               ),
-              center = Offset(size.width, size.height),
+              center = visualCenter,
               radius = circleRadius * 2.5f,
             ),
             radius = circleRadius * 2.5f,
@@ -226,7 +267,6 @@ fun ThumbZoneUnlock(
     contentAlignment = Alignment.Center,
   ) {
     Box(
-      modifier         = Modifier.offset(x = 12.dp, y = 12.dp),
       contentAlignment = Alignment.Center,
     ) {
       AnimatedContent(
@@ -256,4 +296,7 @@ fun ThumbZoneUnlock(
       }
     }
   }
+  }
 }
+
+private const val HINT_VISIBLE_MS = 1500L

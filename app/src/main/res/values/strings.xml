@@ -587,6 +587,7 @@
   <string name="decoder_reason_profile">Your phone can\'t decode %1$s %2$s in hardware</string>
   <string name="decoder_reason_resolution">Your phone can\'t decode %1$s at %2$d×%3$d in hardware</string>
   <string name="decoder_sheet_sw_note">%1$s, so this video plays with software decoding (SW) and uses more battery.</string>
+  <string name="player_hold_to_unlock">Hold to unlock</string>
   <!-- Browser cards -->
   <plurals name="card_video_count">
     <item quantity="one">%1$d video</item>
