@@ -1,4 +1,11 @@
+import com.android.build.api.artifact.ArtifactTransformationRequest
+import com.android.build.api.artifact.SingleArtifact
+import com.android.build.api.variant.BuiltArtifact
 import com.android.build.api.variant.FilterConfiguration
+import javax.inject.Inject
+import org.gradle.workers.WorkAction
+import org.gradle.workers.WorkParameters
+import org.gradle.workers.WorkerExecutor
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -17,8 +24,8 @@ android {
     applicationId = "app.marlboroadvance.mpvflux"
     minSdk = 26
     targetSdk = 36
-    versionCode = 134
-    versionName = "1.3.4"
+    versionCode = 135
+    versionName = "1.3.5"
 
     vectorDrawables {
       useSupportLibrary = true
@@ -142,6 +149,21 @@ androidComponents {
         (output.versionCode.orNull ?: 0) * 10 + (abiCodes[abi] ?: 0)
       )
     }
+
+    // Local release builds: the final APKs themselves are named mpvFlux-<abi>-v<version>.apk
+    // (one set of files, in app/build/outputs/apk/<flavor>/release/ or the folder picked in
+    // "Generate Signed APK"). Uses AGP 9's artifact transform API, since outputFileName no
+    // longer exists. Skipped on CI (CI=true), where the workflows sign and rename by the
+    // original app-<flavor>-<abi>-release names.
+    if (variant.buildType == "release" && System.getenv("CI") == null) {
+      val renameTask = tasks.register<RenameApksTask>("renameApksFor${variant.name.replaceFirstChar { it.uppercase() }}") {
+        flavor.set(variant.flavorName ?: "")
+      }
+      val request = variant.artifacts.use(renameTask)
+        .wiredWithDirectories(RenameApksTask::input, RenameApksTask::output)
+        .toTransformMany(SingleArtifact.APK)
+      renameTask.configure { transformationRequest.set(request) }
+    }
   }
 }
 
@@ -227,6 +249,64 @@ dependencies {
 }
 
 /* ---------------- Git helpers ---------------- */
+
+/**
+ * Renames each built APK to "mpvFlux-<abi>-v<version>.apk" (standard flavor) or
+ * "mpvFlux-<flavor>-<abi>-v<version>.apk" (playstore / fdroid). Universal APKs use "universal".
+ * Android Studio and the output-metadata.json see only the renamed files.
+ * Pattern from Google's gradle-recipes "workerEnabledTransformation" (AGP 9.1).
+ */
+abstract class RenameApksTask @Inject constructor(
+  private val workers: WorkerExecutor,
+) : DefaultTask() {
+  @get:InputFiles
+  abstract val input: DirectoryProperty
+
+  @get:OutputDirectory
+  abstract val output: DirectoryProperty
+
+  @get:Internal
+  abstract val transformationRequest: Property<ArtifactTransformationRequest<RenameApksTask>>
+
+  @get:Input
+  abstract val flavor: Property<String>
+
+  @TaskAction
+  fun rename() {
+    val flavorName = flavor.get()
+    val prefix = if (flavorName.isEmpty() || flavorName == "standard") "mpvFlux" else "mpvFlux-$flavorName"
+
+    transformationRequest.get().submit(
+      this,
+      workers.noIsolation(),
+      CopyApkWork::class.java,
+    ) { apk: BuiltArtifact, outputLocation: Directory, params: CopyApkParams ->
+      val abi = apk.filters
+        .find { it.filterType == FilterConfiguration.FilterType.ABI }
+        ?.identifier ?: "universal"
+      // versionName carries the flavor suffix ("1.3.5-playstore"); strip it for the file name.
+      val version = (apk.versionName ?: "").removeSuffix("-$flavorName")
+      params.inputApkFile.set(File(apk.outputFile))
+      params.outputApkFile.set(File(outputLocation.asFile, "$prefix-$abi-v$version.apk"))
+      params.outputApkFile.get().asFile
+    }
+  }
+}
+
+interface CopyApkParams : WorkParameters, java.io.Serializable {
+  val inputApkFile: RegularFileProperty
+  val outputApkFile: RegularFileProperty
+}
+
+abstract class CopyApkWork @Inject constructor(
+  private val params: CopyApkParams,
+) : WorkAction<CopyApkParams> {
+  override fun execute() {
+    val target = params.outputApkFile.get().asFile
+    target.delete()
+    params.inputApkFile.get().asFile.copyTo(target)
+  }
+}
 
 fun getCommitCount(): String =
   runCommand("git rev-list --count HEAD") ?: "0"
