@@ -4,14 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.ui.res.stringResource
-import app.marlboroadvance.mpvex.R
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Lock
@@ -43,8 +35,7 @@ import kotlinx.coroutines.launch
  *
  * Placed on the right edge where the right thumb rests (see PlayerControls). A 64dp glass
  * circle inside a 96dp hit area, hold-to-unlock with a progress ring, a light haptic tick
- * when the hold starts and a strong one on unlock, plus a "Hold to unlock" hint that slides
- * out to the left for the first moments so it's clear a tap isn't enough.
+ * when the hold starts and a strong one on unlock. A quick tap does nothing.
  */
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -76,19 +67,11 @@ fun ThumbZoneUnlock(
   val lockedIconTint   = MaterialTheme.colorScheme.onSurface
   val unlockedIconTint = MaterialTheme.colorScheme.onPrimary
 
-  // Short hint next to the button, shown briefly each time the locked controls appear.
-  var showHint by remember { mutableStateOf(true) }
-  LaunchedEffect(Unit) {
-    delay(HINT_VISIBLE_MS)
-    showHint = false
-  }
-
   // Handle the hold-to-unlock progress logic
   LaunchedEffect(isPressed) {
     if (isPressed && !isUnlocked) {
       // Light tick so the user feels the hold has started.
       haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-      showHint = false
       progress.animateTo(
         targetValue   = 1f,
         // FastOutSlowInEasing replaces LinearEasing — consistent with Phase 4 motion alignment.
@@ -161,32 +144,11 @@ fun ThumbZoneUnlock(
   val arcStrokeWidth   = with(density) { 3.dp.toPx() }
   val borderStrokeWidth = with(density) { 0.5.dp.toPx() }
 
-  Row(
-    modifier = modifier.graphicsLayer { alpha = componentAlpha },
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-  AnimatedVisibility(
-    visible = showHint && !isUnlocked,
-    enter = fadeIn(playerControlsEnterAnimationSpec()) + expandHorizontally(expandFrom = Alignment.End),
-    exit = fadeOut(playerControlsExitAnimationSpec()) + shrinkHorizontally(shrinkTowards = Alignment.End),
-  ) {
-    Surface(
-      shape = CircleShape,
-      color = glassColor,
-      border = BorderStroke(0.5.dp, glassBorderColor),
-    ) {
-      Text(
-        text = stringResource(R.string.player_hold_to_unlock),
-        style = MaterialTheme.typography.labelLargeEmphasized,
-        color = MaterialTheme.colorScheme.onSurface,
-        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-      )
-    }
-  }
   Box(
-    modifier = Modifier
+    modifier = modifier
       .size(96.dp)
       .graphicsLayer {
+        alpha = componentAlpha
         scaleX = buttonScale
         scaleY = buttonScale
       }
@@ -296,7 +258,4 @@ fun ThumbZoneUnlock(
       }
     }
   }
-  }
 }
-
-private const val HINT_VISIBLE_MS = 1500L

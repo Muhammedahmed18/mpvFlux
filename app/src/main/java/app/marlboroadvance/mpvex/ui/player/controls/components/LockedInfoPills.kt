@@ -7,20 +7,15 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.text.format.DateFormat
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryChargingFull
-import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -36,7 +31,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -48,11 +42,11 @@ import java.util.Date
 
 /**
  * Pills shown while the player controls are locked (the seekbar and buttons are hidden):
- * - [LockedInfoPill]: playback time / duration, a thin progress bar and battery level.
+ * - [LockedInfoPill]: time left in the video and the battery level, e.g. "−11:06 · 82%".
  * - [LockedClockPill]: the phone's clock (the status bar is hidden in fullscreen).
  *
- * Both are display-only (no seeking while locked) and only exist while visible, so the
- * battery receiver and clock ticker don't run the rest of the time.
+ * Both are display-only and only exist while visible, so the battery receiver and clock
+ * ticker don't run the rest of the time.
  */
 @Composable
 fun LockedInfoPill(
@@ -63,38 +57,27 @@ fun LockedInfoPill(
   val duration by viewModel.effectiveDuration.collectAsState()
   val battery = rememberBatteryState()
 
-  val progress = if (duration > 0f) (position / duration).coerceIn(0f, 1f) else 0f
+  val remaining = (duration - position).coerceAtLeast(0f)
   val lowBattery = battery.level in 0..LOW_BATTERY_PERCENT && !battery.charging
 
   LockedPillSurface(modifier = modifier) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+      // Time left answers "how long until the episode ends?" at a glance.
       Text(
-        text = "${Utils.prettyTime(position.toInt())} / ${Utils.prettyTime(duration.toInt())}",
+        text = if (duration > 0f) "\u2212${Utils.prettyTime(remaining.toInt())}" else Utils.prettyTime(position.toInt()),
         style = pillTextStyle(),
         color = MaterialTheme.colorScheme.onSurface,
       )
 
-      // Display-only progress: rounded track with the played part in the theme color.
-      Box(
-        modifier = Modifier
-          .width(PROGRESS_WIDTH)
-          .height(4.dp)
-          .clip(CircleShape)
-          .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)),
-      ) {
-        Box(
-          modifier = Modifier
-            .fillMaxHeight()
-            .fillMaxWidth(progress)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary),
-        )
-      }
-
       if (battery.level >= 0) {
+        Text(
+          text = "\u00B7",
+          style = pillTextStyle(),
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         val batteryColor = when {
           lowBattery -> MaterialTheme.colorScheme.error
           battery.charging -> MaterialTheme.colorScheme.primary
@@ -104,12 +87,15 @@ fun LockedInfoPill(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-          Icon(
-            imageVector = if (battery.charging) Icons.Filled.BatteryChargingFull else Icons.Filled.BatteryFull,
-            contentDescription = null,
-            tint = batteryColor,
-            modifier = Modifier.size(16.dp),
-          )
+          // Icon only when it says something: charging, or low battery.
+          if (battery.charging || lowBattery) {
+            Icon(
+              imageVector = if (battery.charging) Icons.Filled.BatteryChargingFull else Icons.Filled.BatteryAlert,
+              contentDescription = null,
+              tint = batteryColor,
+              modifier = Modifier.size(16.dp),
+            )
+          }
           Text(
             text = "${battery.level}%",
             style = pillTextStyle(),
@@ -211,4 +197,3 @@ private fun rememberBatteryState(): BatteryState {
 
 private const val LOW_BATTERY_PERCENT = 15
 private const val MINUTE_MS = 60_000L
-private val PROGRESS_WIDTH = 96.dp

@@ -464,9 +464,10 @@ fun PlayerControls(
             },
           )
 
-          // Locked controls: unlock button on the right edge where the right thumb rests
-          // (about 62% down in landscape, bottom-right in portrait), clock pill top-left and
-          // a display-only time/progress/battery pill bottom-center in place of the seekbar.
+          // Locked controls: unlock button where the right thumb naturally rests (inset from the
+          // edge, not flush against it), clock pill top-left and a small time-left/battery pill
+          // at the top center so it never covers subtitles (beside the clock in landscape,
+          // under it in portrait).
           val lockedInsets = WindowInsets.safeDrawing
           AnimatedVisibility(
             visible = controlsShown && areControlsLocked,
@@ -477,8 +478,11 @@ fun PlayerControls(
               .constrainAs(unlockControlsButton) {
                 top.linkTo(parent.top)
                 bottom.linkTo(parent.bottom)
-                end.linkTo(parent.end, spacing.small)
-                verticalBias = if (isPortrait) 0.88f else 0.62f
+                // The 64dp circle sits 16dp inside its 96dp touch area, so the visible button is
+                // about 80dp from the edge in landscape and 32dp in portrait. safeDrawing insets
+                // keep it clear of a camera cutout on that side.
+                end.linkTo(parent.end, if (isPortrait) 16.dp else 64.dp)
+                verticalBias = if (isPortrait) 0.80f else 0.58f
               },
           ) { ThumbZoneUnlock(onUnlock = { viewModel.unlockControls() }) }
 
@@ -499,11 +503,16 @@ fun PlayerControls(
             enter = fadeIn(playerControlsEnterAnimationSpec()),
             exit = fadeOut(playerControlsExitAnimationSpec()),
             modifier = Modifier
-              .windowInsetsPadding(lockedInsets.only(WindowInsetsSides.Bottom))
+              .windowInsetsPadding(lockedInsets.only(WindowInsetsSides.Top))
               .constrainAs(lockedInfoPill) {
                 start.linkTo(parent.start)
                 end.linkTo(parent.end)
-                bottom.linkTo(parent.bottom, if (isPortrait) spacing.extraLarge else spacing.medium)
+                if (isPortrait) {
+                  // Portrait is too narrow for both pills on one row.
+                  top.linkTo(lockedClockPill.bottom, spacing.small)
+                } else {
+                  top.linkTo(parent.top, spacing.medium)
+                }
               },
           ) { LockedInfoPill(viewModel = viewModel) }
 

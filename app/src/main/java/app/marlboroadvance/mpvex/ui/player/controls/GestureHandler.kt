@@ -137,7 +137,8 @@ fun GestureHandler(
       if (tapCount == 1 && pendingSingleTapRegion != null && !isDoubleTapSeeking && !longPressTriggeredDuringTouch) {
         val region = pendingSingleTapRegion!!
         val isCenterTap = region == "center"
-        if (useSingleTapForCenter && isCenterTap) {
+        // While locked, a tap only shows/hides the locked pills (no play/pause).
+        if (useSingleTapForCenter && isCenterTap && !areControlsLocked) {
           viewModel.handleCenterSingleTap()
         } else {
           if (panelShown != Panels.None && !allowGesturesInPanels) {
