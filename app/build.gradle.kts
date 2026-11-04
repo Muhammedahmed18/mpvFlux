@@ -276,6 +276,13 @@ abstract class RenameApksTask @Inject constructor(
     val flavorName = flavor.get()
     val prefix = if (flavorName.isEmpty() || flavorName == "standard") "mpvFlux" else "mpvFlux-$flavorName"
 
+    // Remove APKs from earlier versions (e.g. mpvFlux-arm64-v8a-v1.3.5.apk) so the folder
+    // only holds the current build. Gradle/Android Studio never delete them because the
+    // version is part of the file name.
+    output.get().asFile.listFiles { file ->
+      file.name.startsWith("mpvFlux") && file.name.endsWith(".apk")
+    }?.forEach { it.delete() }
+
     transformationRequest.get().submit(
       this,
       workers.noIsolation(),
