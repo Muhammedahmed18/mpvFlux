@@ -597,4 +597,30 @@
   <string name="card_cd_selected">Selected</string>
   <string name="card_storage_internal">Internal</string>
   <string name="card_storage_sd_card">SD card</string>
+  <!-- Preferred language picker (audio + subtitles) -->
+  <string name="pref_preferred_language">Preferred language</string>
+  <string name="lang_video_default">Video default</string>
+  <string name="lang_video_default_summary">Use the track the video file marks as default</string>
+  <string name="lang_english">English</string>
+  <string name="lang_japanese">Japanese</string>
+  <string name="lang_urdu">Urdu</string>
+  <string name="lang_hindi">Hindi</string>
+  <string name="lang_arabic">Arabic</string>
+  <string name="lang_spanish">Spanish</string>
+  <string name="lang_portuguese">Portuguese</string>
+  <string name="lang_french">French</string>
+  <string name="lang_german">German</string>
+  <string name="lang_indonesian">Indonesian</string>
+  <string name="lang_chinese">Chinese</string>
+  <string name="lang_korean">Korean</string>
+  <!-- Subtitle search settings -->
+  <string name="all">All</string>
+  <string name="pref_subtitles_search_section">Subtitle Search</string>
+  <string name="pref_subtitles_sources">Subtitle Sources</string>
+  <string name="pref_subtitles_advanced_filters">Advanced Search Filters</string>
+  <string name="pref_subtitles_hearing_impaired">Hearing-impaired friendly</string>
+  <string name="pref_subtitles_hearing_impaired_summary">Only show subtitles optimized for hearing impaired</string>
+  <string name="pref_subtitles_formats">Preferred Formats</string>
+  <string name="pref_subtitles_encodings">Preferred Encodings</string>
+  <string name="dialog_export_success">Successfully exported %1$d items!</string>
 </resources>

@@ -99,7 +99,7 @@ object AdvancedPreferencesScreen : Screen {
       AlertDialog(
         onDismissRequest = { showExportDialog = false },
         title = { Text(stringResource(R.string.dialog_export_complete), style = MaterialTheme.typography.headlineSmallEmphasized) },
-        text = { Text("Successfully exported ${exportStats?.totalExported} items!", style = MaterialTheme.typography.bodyMedium) },
+        text = { Text(stringResource(R.string.dialog_export_success, exportStats?.totalExported ?: 0), style = MaterialTheme.typography.bodyMedium) },
         confirmButton = { TextButton(onClick = { showExportDialog = false }) { Text(stringResource(R.string.generic_ok), fontWeight = FontWeight.Bold) } },
         shape = MaterialTheme.shapes.extraLarge
       )

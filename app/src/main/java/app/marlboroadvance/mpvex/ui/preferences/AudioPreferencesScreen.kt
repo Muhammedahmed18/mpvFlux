@@ -1,9 +1,7 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -15,7 +13,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,20 +21,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AudioChannels
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
+import app.marlboroadvance.mpvex.ui.preferences.components.LanguagePickerPreference
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.ListPreference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import me.zhanghai.compose.preference.SliderPreference
 import me.zhanghai.compose.preference.SwitchPreference
-import me.zhanghai.compose.preference.TextFieldPreference
 import org.koin.compose.koinInject
 
 @Serializable
@@ -100,35 +96,12 @@ object AudioPreferencesScreen : Screen {
             item {
               PreferenceCard {
                 val preferredLanguages by preferences.preferredLanguages.collectAsState()
-                TextFieldPreference(
+                LanguagePickerPreference(
+                  title = stringResource(R.string.pref_preferred_language),
                   value = preferredLanguages,
                   onValueChange = { preferences.preferredLanguages.set(it) },
-                  textToValue = { it },
-                  title = { 
-                    Text(
-                      text = stringResource(R.string.pref_preferred_languages),
-                      style = MaterialTheme.typography.titleMediumEmphasized
-                    ) 
-                  },
-                  summary = {
-                    Text(
-                      text = preferredLanguages.ifBlank { stringResource(R.string.not_set_video_default) },
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                  },
-                  textField = { value, onValueChange, _ ->
-                    Column {
-                      Text(stringResource(R.string.pref_audio_preferred_language))
-                      TextField(
-                        value,
-                        onValueChange,
-                        modifier = Modifier.fillMaxWidth(),
-                      )
-                    }
-                  },
                 )
-                
+
                 PreferenceDivider()
 
                 val audioPitchCorrection by preferences.audioPitchCorrection.collectAsState()

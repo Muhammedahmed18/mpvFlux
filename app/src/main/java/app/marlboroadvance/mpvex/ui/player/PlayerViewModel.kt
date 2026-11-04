@@ -826,10 +826,19 @@ class PlayerViewModel(
   }
 
 
+  /**
+   * True when the user turned the main subtitles off in the player. Saved with the playback
+   * state so a resumed video stays off only if the user chose that, not when automatic
+   * selection simply found no matching track.
+   */
+  @Volatile
+  var subtitlesTurnedOffByUser: Boolean = false
+
   fun toggleSubtitle(id: Int) {
     val primarySid = MPVLib.getPropertyInt("sid") ?: 0
     val secondarySid = MPVLib.getPropertyInt("secondary-sid") ?: 0
 
+    subtitlesTurnedOffByUser = id == primarySid
     when {
       id == primarySid -> MPVLib.setPropertyString("sid", "no")
       id == secondarySid -> MPVLib.setPropertyString("secondary-sid", "no")

@@ -37,7 +37,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -57,6 +56,7 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.SubtitlesPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
+import app.marlboroadvance.mpvex.ui.preferences.components.LanguagePickerPreference
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.utils.media.CustomFontEntry
 import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
@@ -69,7 +69,6 @@ import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.Preference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import me.zhanghai.compose.preference.SwitchPreference
-import me.zhanghai.compose.preference.TextFieldPreference
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.TextButton
@@ -181,33 +180,15 @@ object SubtitlesPreferencesScreen : Screen {
             PreferenceCard {
 
               val preferredLanguages by preferences.preferredLanguages.collectAsState()
-              TextFieldPreference(
+              LanguagePickerPreference(
+                title = stringResource(R.string.pref_preferred_language),
                 value = preferredLanguages,
-                onValueChange = preferences.preferredLanguages::set,
-                textToValue = { it },
-                title = { Text(stringResource(R.string.pref_preferred_languages), fontWeight = FontWeight.Bold) },
-                summary = {
-                  if (preferredLanguages.isNotBlank()) {
-                    Text(
-                      preferredLanguages,
-                      color = MaterialTheme.colorScheme.outline,
-                    )
-                  } else {
-                    Text(
-                      stringResource(R.string.not_set_video_default),
-                      color = MaterialTheme.colorScheme.outline,
-                    )
-                  }
-                },
-                textField = { value, onValueChange, _ ->
-                  Column {
-                    Text(stringResource(R.string.enter_language_codes))
-                    TextField(
-                      value,
-                      onValueChange,
-                      modifier = Modifier.fillMaxWidth(),
-                      placeholder = { Text(stringResource(R.string.language_codes_placeholder)) },
-                    )
+                onValueChange = { code ->
+                  preferences.preferredLanguages.set(code)
+                  // Online subtitle search follows the preferred language until the user
+                  // picks search languages themselves.
+                  if (code.isNotEmpty() && !preferences.subdlLanguages.isSet()) {
+                    preferences.subdlLanguages.set(setOf(code))
                   }
                 },
               )
@@ -218,7 +199,7 @@ object SubtitlesPreferencesScreen : Screen {
               SwitchPreference(
                 value = autoload,
                 onValueChange = { preferences.autoloadMatchingSubtitles.set(it) },
-                title = { Text(stringResource(R.string.pref_subtitles_autoload_title), fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.pref_subtitles_autoload_title), style = MaterialTheme.typography.titleMediumEmphasized) },
                 summary = {
                   Text(
                     stringResource(R.string.pref_subtitles_autoload_summary),
@@ -233,7 +214,7 @@ object SubtitlesPreferencesScreen : Screen {
               SwitchPreference(
                 value = usePhoneFont,
                 onValueChange = { preferences.usePhoneFontForTextSubs.set(it) },
-                title = { Text(stringResource(R.string.pref_sub_phone_font_title), fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.pref_sub_phone_font_title), style = MaterialTheme.typography.titleMediumEmphasized) },
                 summary = {
                   Text(
                     stringResource(R.string.pref_sub_phone_font_summary),
@@ -248,7 +229,7 @@ object SubtitlesPreferencesScreen : Screen {
               SwitchPreference(
                 value = overrideAss,
                 onValueChange = { preferences.overrideAssSubs.set(it) },
-                title = { Text(stringResource(R.string.player_sheets_sub_override_ass), fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.player_sheets_sub_override_ass), style = MaterialTheme.typography.titleMediumEmphasized) },
                 summary = {
                   Text(
                     stringResource(R.string.player_sheets_sub_override_ass_subtitle),
@@ -263,7 +244,7 @@ object SubtitlesPreferencesScreen : Screen {
               SwitchPreference(
                 value = scaleByWindow,
                 onValueChange = { preferences.scaleByWindow.set(it) },
-                title = { Text(stringResource(R.string.player_sheets_sub_scale_by_window), fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.player_sheets_sub_scale_by_window), style = MaterialTheme.typography.titleMediumEmphasized) },
                 summary = {
                   Text(
                     stringResource(R.string.player_sheets_sub_scale_by_window_summary),
@@ -306,7 +287,7 @@ object SubtitlesPreferencesScreen : Screen {
 
           // === ONLINE SUBTITLE SECTION ===
           item {
-            PreferenceSectionHeader(title = "Subtitle Search")
+            PreferenceSectionHeader(title = stringResource(R.string.pref_subtitles_search_section))
           }
 
           item {
@@ -342,14 +323,12 @@ object SubtitlesPreferencesScreen : Screen {
               var showClearDialog by remember { mutableStateOf(false) }
               val scope = androidx.compose.runtime.rememberCoroutineScope()
 
-              PreferenceDivider()
-
               // Wyzie Sources
               MultiChoicePreference(
-                title = { Text("Subtitle Sources", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.pref_subtitles_sources), style = MaterialTheme.typography.titleMediumEmphasized) },
                 summary = {
                   val summaryText = if (wyzieSources.isEmpty() || wyzieSources.contains("all")) {
-                    "All"
+                    stringResource(R.string.all)
                   } else {
                     wyzieSources.mapNotNull { WyzieSources.ALL[it] }.joinToString(", ")
                   }
@@ -366,7 +345,7 @@ object SubtitlesPreferencesScreen : Screen {
               // Languages
               val subdlLanguages by preferences.subdlLanguages.collectAsState()
               MultiChoicePreference(
-                title = { Text(stringResource(R.string.pref_subtitles_subdl_languages), fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.pref_subtitles_subdl_languages), style = MaterialTheme.typography.titleMediumEmphasized) },
                 summary = {
                   val summaryText = if (subdlLanguages.isEmpty() || subdlLanguages.contains("all")) {
                     stringResource(R.string.all_languages)
@@ -395,7 +374,7 @@ object SubtitlesPreferencesScreen : Screen {
                   horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                   Text(
-                    text = "Advanced Search Filters",
+                    text = stringResource(R.string.pref_subtitles_advanced_filters),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
@@ -412,17 +391,17 @@ object SubtitlesPreferencesScreen : Screen {
                     SwitchPreference(
                       value = wyzieHearingImpaired,
                       onValueChange = { preferences.wyzieHearingImpaired.set(it) },
-                      title = { Text("Hearing-impaired friendly", fontWeight = FontWeight.Bold) },
-                      summary = { Text("Only show subtitles optimized for hearing impaired") }
+                      title = { Text(stringResource(R.string.pref_subtitles_hearing_impaired), style = MaterialTheme.typography.titleMediumEmphasized) },
+                      summary = { Text(stringResource(R.string.pref_subtitles_hearing_impaired_summary)) }
                     )
 
                     PreferenceDivider()
 
                     MultiChoicePreference(
-                      title = { Text("Preferred Formats", fontWeight = FontWeight.Bold) },
+                      title = { Text(stringResource(R.string.pref_subtitles_formats), style = MaterialTheme.typography.titleMediumEmphasized) },
                       summary = {
                         val summaryText = if (wyzieFormats.isEmpty() || wyzieFormats.contains("all")) {
-                          "All"
+                          stringResource(R.string.all)
                         } else {
                           wyzieFormats.mapNotNull { WyzieFormats.ALL[it] }.joinToString(", ")
                         }
@@ -437,10 +416,10 @@ object SubtitlesPreferencesScreen : Screen {
                     PreferenceDivider()
 
                     MultiChoicePreference(
-                      title = { Text("Preferred Encodings", fontWeight = FontWeight.Bold) },
+                      title = { Text(stringResource(R.string.pref_subtitles_encodings), style = MaterialTheme.typography.titleMediumEmphasized) },
                       summary = {
                         val summaryText = if (wyzieEncodings.isEmpty() || wyzieEncodings.contains("all")) {
-                          "All"
+                          stringResource(R.string.all)
                         } else {
                           wyzieEncodings.mapNotNull { WyzieEncodings.ALL[it] }.joinToString(", ")
                         }
@@ -460,7 +439,7 @@ object SubtitlesPreferencesScreen : Screen {
               PreferenceDivider()
 
               Preference(
-                title = { Text(stringResource(R.string.pref_subtitles_clear_downloads), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.pref_subtitles_clear_downloads), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMediumEmphasized) },
                 summary = { Text(stringResource(R.string.pref_subtitles_clear_downloads_summary)) },
                 onClick = { showClearDialog = true },
                 enabled = subtitleSaveFolder.isNotBlank()

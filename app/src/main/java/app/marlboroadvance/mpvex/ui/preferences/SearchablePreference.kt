@@ -411,7 +411,7 @@ object SearchablePreferences {
                 screen = SubtitlesPreferencesScreen,
             ))
             add(SearchablePreference(
-                titleRes = R.string.pref_preferred_languages,
+                titleRes = R.string.pref_preferred_language,
                 keywords = listOf("language", "preferred", "subtitle", "audio", "locale", "code"),
                 category = "Subtitles",
                 screen = SubtitlesPreferencesScreen,
@@ -447,7 +447,7 @@ object SearchablePreferences {
                 screen = AudioPreferencesScreen,
             ))
             add(SearchablePreference(
-                titleRes = R.string.pref_preferred_languages,
+                titleRes = R.string.pref_preferred_language,
                 keywords = listOf("language", "preferred", "subtitle", "audio", "locale", "code"),
                 category = "Audio",
                 screen = AudioPreferencesScreen,

@@ -1401,9 +1401,10 @@ class PlayerActivity :
     setIntentExtras(intent.extras)
 
     lifecycleScope.launch(Dispatchers.IO) {
+      viewModel.subtitlesTurnedOffByUser = false
       val hasState = loadVideoPlaybackState()
 
-      trackSelector.onFileLoaded(hasState)
+      trackSelector.onFileLoaded(hasState, viewModel.subtitlesTurnedOffByUser)
 
       if (!hasState) {
         withContext(Dispatchers.Main) {
@@ -1622,7 +1623,13 @@ class PlayerActivity :
       duration = viewModel.duration ?: 0,
       playbackSpeed = MPVLib.getPropertyDouble("speed") ?: DEFAULT_PLAYBACK_SPEED,
       videoZoom = MPVLib.getPropertyDouble("video-zoom")?.toFloat() ?: 0f,
-      sid = player.sid,
+      sid = player.sid.let { sid ->
+        when {
+          sid > 0 -> sid
+          viewModel.subtitlesTurnedOffByUser -> SID_OFF_BY_USER
+          else -> 0
+        }
+      },
       secondarySid = player.secondarySid,
       subDelay = ((MPVLib.getPropertyDouble("sub-delay") ?: 0.0) * MILLISECONDS_TO_SECONDS).toInt(),
       subSpeed = MPVLib.getPropertyDouble("sub-speed") ?: DEFAULT_SUB_SPEED,
@@ -1683,6 +1690,9 @@ class PlayerActivity :
     if (state.sid > 0) {
       player.sid = state.sid
     }
+    // SID_OFF_BY_USER marks "the user turned subtitles off"; older saves used -1 for any
+    // "off", which is treated as "pick automatically again".
+    viewModel.subtitlesTurnedOffByUser = state.sid == SID_OFF_BY_USER
 
     if (state.secondarySid > 0) {
       player.secondarySid = state.secondarySid
@@ -2545,6 +2555,9 @@ class PlayerActivity :
     private const val MAX_MPV_VOLUME = 100
     private const val MILLISECONDS_TO_SECONDS = 1000
     private const val DELAY_DIVISOR = 1000.0
+
+    // Saved "sid" when the user turned subtitles off themselves (see PlayerViewModel).
+    private const val SID_OFF_BY_USER = -2
     private const val DEFAULT_PLAYBACK_SPEED = 1.0
     private const val DEFAULT_SUB_SPEED = 1.0
     private const val NOTIFICATION_ARTWORK_SIZE = 512
