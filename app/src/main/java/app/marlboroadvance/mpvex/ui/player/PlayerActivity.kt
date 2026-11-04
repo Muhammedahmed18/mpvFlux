@@ -830,15 +830,32 @@ class PlayerActivity :
     } else null
 
     if (tree != null) {
+      // Listing a user folder through Android's document API is slow, and doing it before
+      // every episode adds up. Sync once per app launch; a different folder or a config
+      // edited inside the app (both change the key) triggers a fresh sync.
+      if (mpvDirectorySyncKey() == lastMpvDirSyncKey && File(filesDir, "mpv.conf").exists()) {
+        Log.d(TAG, "MPV directory already synced this session, skipping")
+        return
+      }
       Log.d(TAG, "Syncing from user MPV directory: ${tree.uri}")
       syncConfigFiles(tree)
       syncFonts(tree)
+      lastMpvDirSyncKey = mpvDirectorySyncKey()
       Log.d(TAG, "Full MPV directory sync completed")
     } else {
       Log.d(TAG, "No MPV directory configured, using preferences fallback")
       copyMPVConfigFromPreferences()
     }
   }
+
+  /** Identifies what the last folder sync was based on (see [syncFromUserMpvDirectory]). */
+  private fun mpvDirectorySyncKey(): String =
+    listOf(
+      advancedPreferences.mpvConfStorageUri.get(),
+      advancedPreferences.mpvConf.get().hashCode().toString(),
+      advancedPreferences.inputConf.get().hashCode().toString(),
+      subtitlesPreferences.fontsFolder.get(),
+    ).joinToString("|")
 
   private fun syncConfigFiles(tree: DocumentFile) {
     for (configName in listOf("mpv.conf", "input.conf")) {
@@ -2555,6 +2572,10 @@ class PlayerActivity :
     private const val MAX_MPV_VOLUME = 100
     private const val MILLISECONDS_TO_SECONDS = 1000
     private const val DELAY_DIVISOR = 1000.0
+
+    // Key of the last mpv config folder sync in this app process (see syncFromUserMpvDirectory).
+    @Volatile
+    private var lastMpvDirSyncKey: String? = null
 
     // Saved "sid" when the user turned subtitles off themselves (see PlayerViewModel).
     private const val SID_OFF_BY_USER = -2

@@ -76,6 +76,16 @@ class ThumbnailRepository(
   private val folderStates = ConcurrentHashMap<String, FolderState>()
   private val folderJobs = ConcurrentHashMap<String, Job>()
 
+  // Last batch request per folder that is still on screen, so paused batches can resume
+  // from FolderState.nextIndex. Removed when the folder screen closes or the batch finishes.
+  private data class FolderRequest(val videos: List<Video>, val widthPx: Int, val heightPx: Int)
+  private val folderRequests = ConcurrentHashMap<String, FolderRequest>()
+
+  // True while the app's browser isn't visible (e.g. a video is playing). Batch generation
+  // waits instead of decoding frames from other episodes alongside playback.
+  @Volatile
+  private var batchPaused = false
+
   private val useMediaStoreForVideo = ConcurrentHashMap<String, Boolean>()
 
   init {
@@ -260,13 +270,43 @@ class ThumbnailRepository(
     folderIds.forEach { id ->
       folderJobs.remove(id)?.cancel()
       folderStates.remove(id)
+      folderRequests.remove(id)
     }
+  }
+
+  /**
+   * Pause all folder batches, e.g. when the player opens or the app goes to the background.
+   * Progress is kept, so [resumeFolderGeneration] continues where each batch stopped.
+   */
+  fun pauseFolderGeneration() {
+    batchPaused = true
+    folderJobs.values.forEach { it.cancel() }
+    folderJobs.clear()
+  }
+
+  /** Restart batches paused by [pauseFolderGeneration] for folders that are still open. */
+  fun resumeFolderGeneration() {
+    if (!batchPaused) return
+    batchPaused = false
+    folderRequests.entries.toList().forEach { (id, request) ->
+      startFolderThumbnailGeneration(id, request.videos, request.widthPx, request.heightPx)
+    }
+  }
+
+  /**
+   * The folder screen was closed: stop its batch. Its progress is kept, so reopening the
+   * folder continues from the same video instead of starting over.
+   */
+  fun stopFolderGeneration(folderId: String) {
+    folderRequests.remove(folderId)
+    folderJobs.remove(folderId)?.cancel()
   }
 
   fun clearThumbnailCache() {
     folderJobs.values.forEach { it.cancel() }
     folderJobs.clear()
     folderStates.clear()
+    folderRequests.clear()
     ongoingOperations.clear()
     useMediaStoreForVideo.clear()
 
@@ -295,6 +335,10 @@ class ThumbnailRepository(
 
     if (filteredVideos.isEmpty()) return
 
+    val request = FolderRequest(videos, widthPx, heightPx)
+    folderRequests[folderId] = request
+    if (batchPaused) return
+
     folderJobs.entries.removeAll { !it.value.isActive }
 
     if (folderJobs.size >= maxconcurrentfolders && !folderJobs.containsKey(folderId)) {
@@ -302,6 +346,7 @@ class ThumbnailRepository(
         job.cancel()
         folderJobs.remove(oldestId)
         folderStates.remove(oldestId)
+        folderRequests.remove(oldestId)
       }
     }
 
@@ -325,6 +370,8 @@ class ThumbnailRepository(
           i++
           state.nextIndex = i
         }
+        // Done: nothing left to resume for this folder.
+        folderRequests.remove(folderId, request)
       }
   }
 

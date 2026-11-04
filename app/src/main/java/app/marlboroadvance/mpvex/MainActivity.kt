@@ -55,6 +55,7 @@ import androidx.navigation3.scene.Scene
  */
 class MainActivity : ComponentActivity() {
   private val appearancePreferences by inject<AppearancePreferences>()
+  private val thumbnailRepository by inject<app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository>()
 
   // Create a coroutine scope tied to the activity lifecycle
   private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -107,10 +108,14 @@ class MainActivity : ComponentActivity() {
   override fun onStart() {
     super.onStart()
     app.marlboroadvance.mpvex.utils.media.MediaStoreWatcher.start(this)
+    // Continue folder thumbnail batches paused while a video was playing.
+    thumbnailRepository.resumeFolderGeneration()
   }
 
   override fun onStop() {
     app.marlboroadvance.mpvex.utils.media.MediaStoreWatcher.stop(this)
+    // Player opened or app in background: don't decode thumbnails alongside playback.
+    thumbnailRepository.pauseFolderGeneration()
     super.onStop()
   }
 

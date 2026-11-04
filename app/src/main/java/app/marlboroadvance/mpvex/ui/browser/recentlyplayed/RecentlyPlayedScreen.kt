@@ -263,6 +263,12 @@ private fun RecentItemsContent(
     recentItems.filterIsInstance<RecentlyPlayedItem.VideoItem>().map { it.video }
   }
 
+
+  // Leaving this screen stops its thumbnail batch (progress is kept for next time).
+  DisposableEffect(Unit) {
+    onDispose { thumbnailRepository.stopFolderGeneration("recently_played") }
+  }
+
   LaunchedEffect(recentVideos.size, showVideoThumbnails, thumbWidthPx, thumbHeightPx) {
     if (showVideoThumbnails && recentVideos.isNotEmpty()) {
       thumbnailRepository.startFolderThumbnailGeneration(

@@ -575,6 +575,12 @@ private fun VideoListContent(
   val thumbWidthPx = with(density) { thumbWidthDp.roundToPx() }
   val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
 
+
+  // Leaving the folder stops its thumbnail batch (progress is kept for next time).
+  DisposableEffect(folderId) {
+    onDispose { thumbnailRepository.stopFolderGeneration(folderId) }
+  }
+
   LaunchedEffect(folderId, showVideoThumbnails, videosWithInfo.size, thumbWidthPx, thumbHeightPx) {
     if (showVideoThumbnails && videosWithInfo.isNotEmpty()) {
       thumbnailRepository.startFolderThumbnailGeneration(

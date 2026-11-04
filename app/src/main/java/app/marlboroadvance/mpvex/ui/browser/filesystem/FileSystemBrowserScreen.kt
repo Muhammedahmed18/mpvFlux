@@ -802,6 +802,12 @@ private fun FileSystemBrowserContent(
     }
   }
 
+
+  // Leaving the folder stops its thumbnail batch (progress is kept for next time).
+  DisposableEffect(folderId) {
+    onDispose { thumbnailRepository.stopFolderGeneration(folderId) }
+  }
+
   // Generate thumbnails sequentially
   LaunchedEffect(folderId, showVideoThumbnails, videos.size, thumbWidthPx, thumbHeightPx) {
     if (showVideoThumbnails && videos.isNotEmpty()) {
