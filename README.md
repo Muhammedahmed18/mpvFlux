@@ -13,7 +13,21 @@ Full ASS/SSA subtitle rendering, hardware decoding and a modern Material 3 desig
 [![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](#-download)
 [![License](https://img.shields.io/github/license/Muhammedahmed18/mpvFlux)](LICENSE)
 
-[**Download**](https://github.com/Muhammedahmed18/mpvFlux/releases/latest) · [Features](#-features) · [Build](#-building-from-source) · [Report a bug](https://github.com/Muhammedahmed18/mpvFlux/issues)
+[**Download**](https://github.com/Muhammedahmed18/mpvFlux/releases/latest) · [Screenshots](#-screenshots) · [Features](#-features) · [Build](#-building-from-source) · [Report a bug](https://github.com/Muhammedahmed18/mpvFlux/issues)
+
+</div>
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/folderscreen.png" width="260" alt="Folder list">
+&nbsp;
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/videoscreen.png" width="260" alt="Episode list">
+
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/player.png" width="760" alt="Player">
 
 </div>
 
@@ -24,14 +38,19 @@ Full ASS/SSA subtitle rendering, hardware decoding and a modern Material 3 desig
 ### 🎬 Playback
 - **Powered by mpv:** plays practically any local video format.
 - **Hardware decoding first:** uses MediaCodec and falls back to software only when needed.
+- **Knows what your phone can decode:** the decoder sheet checks the video's codec, profile and resolution and explains when hardware decoding isn't available (for example AV1 or 10-bit H.264).
 - **Picture-in-picture** and **background audio playback**.
 - **Resume where you left off**, plus a recently played list and playlists.
 - Frame-by-frame navigation, chapters, speed presets and a sleep timer.
+- **Locked controls made for one hand:** a hold-to-unlock button where your right thumb rests, plus small pills showing the clock, time left and battery.
 - Advanced users can edit `mpv.conf` directly in the app.
 
 ### 💬 Subtitles
 - **Full ASS/SSA rendering** through libass, with your typesetting, karaoke and signs exactly as the fansub intended.
 - **Online subtitle search with hash matching:** identifies your file from its first and last 64 KB, so the subtitles you find are synced to that exact release.
+- **SRT/VTT subtitles use your phone's font**, including fonts from your phone's theme store. ASS/SSA keeps its original styling.
+- **Preferred audio and subtitle language** picked from a list, matching every language code a file may use (`en`, `eng`, `en-US`…).
+- **Subtitles off by default** if you prefer turning them on yourself.
 - Custom fonts, styling, subtitle delay and secondary subtitles.
 
 ### 🔋 Battery and performance
@@ -39,6 +58,7 @@ Full ASS/SSA subtitle rendering, hardware decoding and a modern Material 3 desig
 - **Video decoding pauses during background playback**, so audio-only listening doesn't waste power.
 - **Smart media scanning:** an asynchronous scanner with caching keeps large libraries responsive, and full rescans are limited to once every 12 hours.
 - **Lightweight thumbnail cache**, limited in size and cleaned up automatically.
+- **No background work while you watch:** thumbnail generation pauses while a video is playing.
 
 ### 🎨 Design
 - **Material 3 Expressive** UI with dynamic (wallpaper) colours and an OLED black option.
@@ -56,10 +76,12 @@ Get the latest APK from the [**Releases page**](https://github.com/Muhammedahmed
 
 | File | For |
 |---|---|
-| `…-arm64-v8a-….apk` | Most phones (recommended) |
-| `…-armeabi-v7a-….apk` | Older 32-bit phones |
-| `…-x86_64-….apk` / `x86` | Emulators, Chromebooks |
-| `…-universal-….apk` | Not sure? This one works everywhere |
+| `mpvFlux-arm64-v8a-vX.Y.Z.apk` | Most phones (recommended) |
+| `mpvFlux-armeabi-v7a-vX.Y.Z.apk` | Older 32-bit phones |
+| `mpvFlux-x86_64-vX.Y.Z.apk` / `mpvFlux-x86-vX.Y.Z.apk` | Emulators, Chromebooks |
+| `mpvFlux-universal-vX.Y.Z.apk` | Not sure? This one works everywhere |
+| `mpvFlux-playstore-vX.Y.Z.apk` | Play Store build |
+| `mpvFlux-fdroid-vX.Y.Z.apk` | F-Droid build |
 
 **Requires Android 8.0 (API 26) or newer.**
 
@@ -79,7 +101,9 @@ cd mpvFlux
 ./gradlew assembleStandardDebug
 ```
 
-The APK ends up in `app/build/outputs/apk/standard/debug/`.
+The debug APK ends up in `app/build/outputs/apk/standard/debug/`.
+
+Release builds (`./gradlew assembleStandardRelease`, or **Build → Generate Signed APK** in Android Studio) are named like the GitHub releases, e.g. `mpvFlux-arm64-v8a-v1.3.9.apk`, in `app/build/outputs/apk/standard/release/` or the destination folder you choose.
 
 | Build flavour | Purpose |
 |---|---|
