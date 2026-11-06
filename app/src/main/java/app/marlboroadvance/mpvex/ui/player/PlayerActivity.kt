@@ -1476,6 +1476,10 @@ class PlayerActivity :
     viewModel.unpause()
 
     if (subtitlesPreferences.autoloadMatchingSubtitles.get()) {
+      // With subtitles set to "Off", matching files are added to the list but not turned on.
+      val selectAutoloaded = !app.marlboroadvance.mpvex.preferences.PreferredLanguage.isOff(
+        subtitlesPreferences.preferredLanguages.get(),
+      )
       lifecycleScope.launch {
         val networkFilePath = intent.getStringExtra("network_file_path")
         val networkConnectionId = intent.getLongExtra("network_connection_id", -1L)
@@ -1485,6 +1489,7 @@ class PlayerActivity :
             videoFilePath = networkFilePath,
             videoFileName = fileName,
             networkConnectionId = networkConnectionId,
+            selectFirst = selectAutoloaded,
           )
         } else {
           val filePath = parsePathFromIntent(intent)
@@ -1492,6 +1497,7 @@ class PlayerActivity :
             SubtitleOps.autoloadSubtitles(
               videoFilePath = filePath,
               videoFileName = fileName,
+              selectFirst = selectAutoloaded,
             )
           }
         }

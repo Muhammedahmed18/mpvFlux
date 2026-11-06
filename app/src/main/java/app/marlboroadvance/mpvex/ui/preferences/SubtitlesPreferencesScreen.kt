@@ -53,6 +53,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.preferences.PreferredLanguage
 import app.marlboroadvance.mpvex.preferences.SubtitlesPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
@@ -187,10 +188,11 @@ object SubtitlesPreferencesScreen : Screen {
                   preferences.preferredLanguages.set(code)
                   // Online subtitle search follows the preferred language until the user
                   // picks search languages themselves.
-                  if (code.isNotEmpty() && !preferences.subdlLanguages.isSet()) {
+                  if (code.isNotEmpty() && code != PreferredLanguage.OFF && !preferences.subdlLanguages.isSet()) {
                     preferences.subdlLanguages.set(setOf(code))
                   }
                 },
+                showOffOption = true,
               )
 
               PreferenceDivider()

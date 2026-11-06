@@ -32,6 +32,8 @@ object SubtitleOps {
     videoFilePath: String,
     videoFileName: String,
     networkConnectionId: Long = -1L,
+    // False when subtitles are set to "Off": files are still added to the list, unselected.
+    selectFirst: Boolean = true,
   ) = withContext(Dispatchers.IO) {
     try {
       // Skip file descriptor URIs (these don't have a parent directory concept)
@@ -49,10 +51,10 @@ object SubtitleOps {
           return@withContext
         }
         // For network streams, try to load subtitles with common extensions
-        autoloadNetworkSubtitles(videoFilePath, videoFileName)
+        autoloadNetworkSubtitles(videoFilePath, videoFileName, selectFirst)
       } else {
         // For local files, scan the directory
-        autoloadLocalSubtitles(videoFilePath, videoFileName)
+        autoloadLocalSubtitles(videoFilePath, videoFileName, selectFirst)
       }
     } catch (e: Exception) {
       Log.e(TAG, "Error loading subtitles", e)
@@ -62,6 +64,7 @@ object SubtitleOps {
   private suspend fun autoloadLocalSubtitles(
     videoFilePath: String,
     videoFileName: String,
+    selectFirst: Boolean,
   ) {
     val videoFile = File(videoFilePath)
     val videoDirectory = videoFile.parentFile ?: return
@@ -79,7 +82,7 @@ object SubtitleOps {
         subtitles.forEachIndexed { index, subtitle ->
           // MPV command format: sub-add <url> [<flags> [<title>]]
           // Use "select" for the first autoloaded subtitle so it is enabled by default
-          val flag = if (index == 0) "select" else "auto"
+          val flag = if (index == 0 && selectFirst) "select" else "auto"
           MPVLib.command("sub-add", subtitle.absolutePath, flag, subtitle.name)
           Log.d(TAG, "Loaded local subtitle: ${subtitle.name} (flag=$flag)")
         }
@@ -90,6 +93,7 @@ object SubtitleOps {
   private suspend fun autoloadNetworkSubtitles(
     videoFilePath: String,
     videoFileName: String,
+    selectFirst: Boolean,
   ) {
     // Get base name without extension
     val baseName = videoFileName.substringBeforeLast('.')
@@ -111,7 +115,7 @@ object SubtitleOps {
         // Try to add the subtitle - MPV will handle if it doesn't exist
         // Use "auto" flag so MPV doesn't select it if it's not found
         // Only use "select" for the first one (.srt)
-        val flag = if (index == 0) "select" else "auto"
+        val flag = if (index == 0 && selectFirst) "select" else "auto"
         MPVLib.command("sub-add", subtitleUrl, flag, "$baseName.$ext")
         Log.d(TAG, "Attempting to load network subtitle: $subtitleUrl (flag=$flag)")
       } catch (e: Exception) {

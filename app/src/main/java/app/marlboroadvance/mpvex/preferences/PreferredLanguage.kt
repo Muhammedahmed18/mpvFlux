@@ -10,7 +10,8 @@ import app.marlboroadvance.mpvex.R
  * three-letter ("eng"), the older bibliographic form ("ger" vs "deu") or with a region
  * ("en-US", "pt-BR", "es-419"). [aliases] lists every form so a pick always matches.
  *
- * The preference stores [code] ("" = video default). Older free-text values such as
+ * The preference stores [code] ("" = video default, [OFF] = subtitles off, subtitles only).
+ * Older free-text values such as
  * "eng,jpn" or "English" are read through [fromStored], so nothing needs migrating.
  */
 enum class PreferredLanguage(
@@ -54,6 +55,11 @@ enum class PreferredLanguage(
   }
 
   companion object {
+    /** Stored value for "start every video with subtitles off" (subtitle picker only). */
+    const val OFF = "off"
+
+    fun isOff(value: String): Boolean = value.trim().equals(OFF, ignoreCase = true)
+
     /**
      * Reads the stored preference. Blank means "video default" (null). Old free-text values
      * use their first entry: "eng,jpn" → English, "Japanese" → Japanese. Anything that

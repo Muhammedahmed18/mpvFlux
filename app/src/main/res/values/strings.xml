@@ -599,6 +599,8 @@
   <string name="card_storage_sd_card">SD card</string>
   <!-- Preferred language picker (audio + subtitles) -->
   <string name="pref_preferred_language">Preferred language</string>
+  <string name="lang_off">Off</string>
+  <string name="lang_off_summary">Start every video with subtitles off</string>
   <string name="lang_video_default">Video default</string>
   <string name="lang_video_default_summary">Use the track the video file marks as default</string>
   <string name="lang_english">English</string>

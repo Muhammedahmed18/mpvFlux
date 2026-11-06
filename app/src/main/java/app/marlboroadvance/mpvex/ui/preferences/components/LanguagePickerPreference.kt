@@ -35,14 +35,17 @@ import me.zhanghai.compose.preference.Preference
  * "Preferred language" setting: shows the current choice and opens an M3 dialog with one
  * radio button per language plus "Video default". Picking an option saves it and closes
  * the dialog. [value] is the stored preference string ("" = video default).
+ * [showOffOption] adds "Off" at the top (subtitles only), stored as [PreferredLanguage.OFF].
  */
 @Composable
 fun LanguagePickerPreference(
   title: String,
   value: String,
   onValueChange: (String) -> Unit,
+  showOffOption: Boolean = false,
 ) {
   var showDialog by remember { mutableStateOf(false) }
+  val isOff = showOffOption && PreferredLanguage.isOff(value)
   val selected = remember(value) { PreferredLanguage.fromStored(value) }
 
   Preference(
@@ -51,7 +54,11 @@ fun LanguagePickerPreference(
     },
     summary = {
       Text(
-        text = selected?.let { languageLabel(it) } ?: stringResource(R.string.lang_video_default),
+        text = when {
+          isOff -> stringResource(R.string.lang_off)
+          selected != null -> languageLabel(selected)
+          else -> stringResource(R.string.lang_video_default)
+        },
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
@@ -70,11 +77,24 @@ fun LanguagePickerPreference(
             .selectableGroup(),
           verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+          if (showOffOption) {
+            item {
+              LanguageOption(
+                label = stringResource(R.string.lang_off),
+                supporting = stringResource(R.string.lang_off_summary),
+                selected = isOff,
+                onClick = {
+                  onValueChange(PreferredLanguage.OFF)
+                  showDialog = false
+                },
+              )
+            }
+          }
           item {
             LanguageOption(
               label = stringResource(R.string.lang_video_default),
               supporting = stringResource(R.string.lang_video_default_summary),
-              selected = selected == null,
+              selected = selected == null && !isOff,
               onClick = {
                 onValueChange("")
                 showDialog = false

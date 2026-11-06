@@ -33,6 +33,8 @@ import kotlinx.coroutines.delay
  * ignored keywords.
  *
  * **Subtitle Selection Strategy (Highest to Lowest Priority):**
+ * - **Off:** if the preferred subtitle language is "Off", nothing is selected (a track the
+ *   user turned on for this video earlier is still restored on resume).
  * - **Pass 00 (External Override):** Manually loaded external subtitle files.
  * - **Video default (no language picked):** the single track the file flags as default
  *   (ignoring forced / signs-only tracks); if none, English as before.
@@ -231,6 +233,14 @@ class TrackSelector(
       }
 
       if (hasState && currentSid > 0) return
+
+      // "Off" picked in settings: start without subtitles, even if the file or a matching
+      // external file has some. The user can still turn them on from the subtitle sheet.
+      if (PreferredLanguage.isOff(subtitlesPreferences.preferredLanguages.get())) {
+        if (currentSid > 0) MPVLib.setPropertyString("sid", "no")
+        Log.d(TAG, "Smart Sub: Subtitles set to Off in settings. Not selecting any track.")
+        return
+      }
 
       val isAnimeContext = detectAnimeContext(tracks)
       Log.d(TAG, "Smart Tracks: Context defined by Internal Auto-Detection -> $isAnimeContext")
