@@ -150,8 +150,9 @@ internal object MediaInfoFormatter {
       } else {
         null
       }
+    // The tile is labelled "Frame rate", so the "FPS" unit MediaInfo appends is dropped.
     val frameRate =
-      v.frameRate.clean()?.let { fps ->
+      v.frameRate.clean()?.replace(FPS_SUFFIX, "")?.trim()?.ifBlank { null }?.let { fps ->
         if (v.frameRateMode.equals("VFR", ignoreCase = true)) {
           "$fps · ${context.getString(R.string.media_info_frame_rate_variable)}"
         } else {
@@ -339,6 +340,8 @@ internal object MediaInfoFormatter {
   }
 
   // ── Small helpers ─────────────────────────────────────────────────────────
+
+  private val FPS_SUFFIX = Regex("""\s*fps\s*$""", RegexOption.IGNORE_CASE)
 
   /** MediaInfo returns "" for missing values; older code also used "---". */
   private fun String.clean(): String? = trim().takeIf { it.isNotEmpty() && it != "---" }

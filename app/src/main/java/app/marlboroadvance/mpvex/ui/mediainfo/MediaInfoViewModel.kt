@@ -2,12 +2,8 @@ package app.marlboroadvance.mpvex.ui.mediainfo
 
 import android.app.Application
 import android.content.Context
-import android.graphics.Bitmap
-import android.media.MediaMetadataRetriever
 import android.net.Uri
-import android.os.Build
 import android.provider.OpenableColumns
-import android.util.Size
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.marlboroadvance.mpvex.R
@@ -29,9 +25,6 @@ internal class MediaInfoViewModel(application: Application) : AndroidViewModel(a
   private val _state = MutableStateFlow<MediaInfoUiState>(MediaInfoUiState.Loading)
   val state: StateFlow<MediaInfoUiState> = _state.asStateFlow()
 
-  private val _thumbnail = MutableStateFlow<Bitmap?>(null)
-  val thumbnail: StateFlow<Bitmap?> = _thumbnail.asStateFlow()
-
   private var uri: Uri? = null
   private var requested = false
   private var loadJob: Job? = null
@@ -41,7 +34,6 @@ internal class MediaInfoViewModel(application: Application) : AndroidViewModel(a
     if (requested && uri == this.uri) return
     requested = true
     this.uri = uri
-    _thumbnail.value = null
     reload()
   }
 
@@ -61,10 +53,6 @@ internal class MediaInfoViewModel(application: Application) : AndroidViewModel(a
     loadJob =
       viewModelScope.launch {
         val fileName = withContext(Dispatchers.IO) { displayName(app, target) }
-
-        if (_thumbnail.value == null) {
-          launch { _thumbnail.value = withContext(Dispatchers.IO) { loadThumbnail(app, target) } }
-        }
 
         val (info, inform) =
           MediaInfoOps.getMediaInfoWithReport(app, target, fileName).getOrElse { e ->
@@ -90,42 +78,4 @@ internal class MediaInfoViewModel(application: Application) : AndroidViewModel(a
     }.getOrNull() ?: fallback
   }
 
-  /**
-   * A frame for the header. MediaStore's own thumbnail is used when available (cheap and
-   * cached by the system); otherwise one frame is decoded at 10% of the duration.
-   */
-  private fun loadThumbnail(context: Context, uri: Uri): Bitmap? {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && uri.scheme == "content") {
-      runCatching {
-        context.contentResolver.loadThumbnail(uri, Size(THUMB_WIDTH, THUMB_HEIGHT), null)
-      }.getOrNull()?.let { return it }
-    }
-
-    val retriever = MediaMetadataRetriever()
-    return try {
-      retriever.setDataSource(context, uri)
-      val durationMs =
-        retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-      val timeUs = durationMs * 1000L / 10L
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-        retriever.getScaledFrameAtTime(
-          timeUs,
-          MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
-          THUMB_WIDTH,
-          THUMB_HEIGHT,
-        )
-      } else {
-        retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-      }
-    } catch (_: Exception) {
-      null
-    } finally {
-      runCatching { retriever.release() }
-    }
-  }
-
-  private companion object {
-    const val THUMB_WIDTH = 960
-    const val THUMB_HEIGHT = 540
-  }
 }

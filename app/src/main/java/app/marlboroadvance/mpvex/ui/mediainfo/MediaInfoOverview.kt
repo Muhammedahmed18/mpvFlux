@@ -6,15 +6,12 @@
 
 package app.marlboroadvance.mpvex.ui.mediainfo
 
-import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +26,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,8 +36,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryAlert
@@ -70,13 +64,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -89,22 +79,19 @@ private const val COLLAPSED_TRACK_COUNT = 5
 @Composable
 internal fun MediaInfoOverview(
   details: MediaInfoDetails,
-  thumbnail: Bitmap?,
   copyActions: CopyActions,
 ) {
   val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp
 
   BoxWithConstraints(Modifier.fillMaxSize()) {
     if (maxWidth >= 720.dp) {
-      // Landscape / tablet: picture, badges and the phone card on the left, details on the right.
+      // Landscape / tablet: badges and the phone card on the left, details on the right.
       Row(Modifier.fillMaxSize()) {
-        val headerState = rememberLazyListState()
         LazyColumn(
-          state = headerState,
           modifier = Modifier.weight(0.42f).fillMaxHeight(),
           contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding),
         ) {
-          headerItems(details, thumbnail, headerState)
+          headerItems(details)
         }
         LazyColumn(
           modifier = Modifier.weight(0.58f).fillMaxHeight(),
@@ -114,25 +101,18 @@ internal fun MediaInfoOverview(
         }
       }
     } else {
-      val listState = rememberLazyListState()
       LazyColumn(
-        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(top = 8.dp, bottom = bottomPadding),
       ) {
-        headerItems(details, thumbnail, listState)
+        headerItems(details)
         sectionItems(details, copyActions)
       }
     }
   }
 }
 
-private fun LazyListScope.headerItems(
-  details: MediaInfoDetails,
-  thumbnail: Bitmap?,
-  listState: LazyListState,
-) {
-  item(key = "header") { ThumbnailHeader(thumbnail, details.isAudioOnly, listState) }
+private fun LazyListScope.headerItems(details: MediaInfoDetails) {
   if (details.badges.isNotEmpty()) {
     item(key = "badges") { BadgeRow(details.badges) }
   }
@@ -176,65 +156,7 @@ private fun LazyListScope.sectionItems(details: MediaInfoDetails, copyActions: C
   }
 }
 
-// ── Header ─────────────────────────────────────────────────────────────────
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun ThumbnailHeader(thumbnail: Bitmap?, isAudioOnly: Boolean, listState: LazyListState) {
-  val surface = MaterialTheme.colorScheme.surface
-  Box(
-    modifier =
-      Modifier
-        .padding(horizontal = 16.dp, vertical = 8.dp)
-        .fillMaxWidth()
-        .aspectRatio(16f / 9f)
-        // Gentle parallax while the header scrolls away. Read in the layer block, so
-        // scrolling only redraws the header instead of recomposing it.
-        .graphicsLayer {
-          val offset =
-            if (listState.firstVisibleItemIndex == 0) listState.firstVisibleItemScrollOffset.toFloat() else size.height
-          val progress = if (size.height > 0f) (offset / size.height).coerceIn(0f, 1f) else 0f
-          translationY = offset * 0.35f
-          alpha = 1f - progress * 0.7f
-          val scale = 1f - progress * 0.06f
-          scaleX = scale
-          scaleY = scale
-        }
-        .clip(CardShape)
-        .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-  ) {
-    Crossfade(
-      targetState = thumbnail,
-      animationSpec = MaterialTheme.motionScheme.defaultEffectsSpec(),
-      label = "media_info_thumbnail",
-    ) { bitmap ->
-      if (bitmap != null) {
-        val image = remember(bitmap) { bitmap.asImageBitmap() }
-        Image(
-          bitmap = image,
-          contentDescription = null,
-          contentScale = ContentScale.Crop,
-          modifier = Modifier.fillMaxSize(),
-        )
-      } else {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-          Icon(
-            imageVector = if (isAudioOnly) Icons.Filled.MusicNote else Icons.Filled.Movie,
-            contentDescription = null,
-            modifier = Modifier.size(56.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-          )
-        }
-      }
-    }
-    // Soft fade into the page at the bottom edge.
-    Box(
-      Modifier
-        .fillMaxSize()
-        .background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to surface.copy(alpha = 0.55f))),
-    )
-  }
-}
+// ── Badges and phone card ──────────────────────────────────────────────────
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -119,7 +118,6 @@ internal fun MediaInfoScreen(
   onBack: () -> Unit,
 ) {
   val state by viewModel.state.collectAsState()
-  val thumbnail by viewModel.thumbnail.collectAsState()
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val snackbarHostState = remember { SnackbarHostState() }
@@ -228,7 +226,6 @@ internal fun MediaInfoScreen(
         is MediaInfoUiState.Loaded ->
           MediaInfoTabs(
             details = current.details,
-            thumbnail = thumbnail,
             copyActions = copyActions,
             // Same colour the large top bar fades to when collapsed, so bar and tabs match.
             tabColor = {
@@ -243,7 +240,6 @@ internal fun MediaInfoScreen(
 @Composable
 private fun MediaInfoTabs(
   details: MediaInfoDetails,
-  thumbnail: android.graphics.Bitmap?,
   copyActions: CopyActions,
   tabColor: () -> androidx.compose.ui.graphics.Color,
 ) {
@@ -275,7 +271,7 @@ private fun MediaInfoTabs(
       key = { it },
     ) { page ->
       when (page) {
-        0 -> MediaInfoOverview(details, thumbnail, copyActions)
+        0 -> MediaInfoOverview(details, copyActions)
         else -> MediaInfoReport(details.reportSections, copyActions)
       }
     }
@@ -321,7 +317,6 @@ private fun MediaInfoLoading() {
       modifier = Modifier.fillMaxWidth().padding(16.dp),
       verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-      SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(16f / 9f), 28.dp)
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         repeat(4) { SkeletonBlock(Modifier.width(64.dp).height(32.dp), 12.dp) }
       }
