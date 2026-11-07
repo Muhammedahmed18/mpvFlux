@@ -15,6 +15,7 @@ import app.marlboroadvance.mpvex.repository.MediaFileRepository
 import app.marlboroadvance.mpvex.ui.browser.base.BaseBrowserViewModel
 import app.marlboroadvance.mpvex.utils.media.MediaLibraryEvents
 import app.marlboroadvance.mpvex.utils.media.MetadataRetrieval
+import app.marlboroadvance.mpvex.utils.media.PlaybackProgressEvents
 import app.marlboroadvance.mpvex.utils.sort.SortUtils
 import app.marlboroadvance.mpvex.utils.storage.FolderViewScanner
 import app.marlboroadvance.mpvex.utils.storage.TreeViewScanner
@@ -138,6 +139,15 @@ class FileSystemBrowserViewModel(
         // Clear cache when media library changes
         MediaFileRepository.clearCache()
         loadCurrentDirectory()
+      }
+    }
+
+    // Saved playback progress changed: refresh only the progress bars of the videos in the
+    // current directory. Nothing on disk changed, so the directory isn't reloaded.
+    viewModelScope.launch(Dispatchers.IO) {
+      PlaybackProgressEvents.changes.collectLatest {
+        val items = _unsortedItems.value
+        if (items.any { it is FileSystemItem.VideoFile }) loadPlaybackInfo(items)
       }
     }
 

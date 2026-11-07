@@ -72,6 +72,10 @@ class MainActivity : ComponentActivity() {
     
     PermissionUtils.setMediaAccessLauncher(mediaAccessLauncher)
 
+    // Storage-wide media scan (rate-limited to once every 12 h). Started here rather than in
+    // App.onCreate so that opening a video straight from another app doesn't scan storage.
+    (application as? App)?.runLaunchMediaScanIfDue()
+
     setContent {
       // Set up theme and edge-to-edge display
       val dark by appearancePreferences.darkMode.collectAsState()

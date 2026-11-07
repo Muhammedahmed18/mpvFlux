@@ -155,12 +155,22 @@ fun SeekbarWithTimers(
                     }
             )
 
-            val currentPos = if (isUserInteracting) userPosition else animatedPosition.value
-            
-            when (seekbarStyle) {
-                SeekbarStyle.Standard -> StandardSeekbar(position = currentPos, duration = duration, chapters = chapters, isPaused = paused, isScrubbing = isUserInteracting, seekbarStyle = SeekbarStyle.Standard, onSeek = { newPos -> if (!isUserInteracting) isUserInteracting = true; userPosition = newPos; onValueChange(newPos) }, onSeekFinished = { scope.launch { animatedPosition.snapTo(userPosition) }; isUserInteracting = false; onValueChangeFinished() }, loopStart = loopStart, loopEnd = loopEnd)
-                SeekbarStyle.Thick -> StandardSeekbar(position = currentPos, duration = duration, chapters = chapters, isPaused = paused, isScrubbing = isUserInteracting, seekbarStyle = SeekbarStyle.Thick, onSeek = { newPos -> if (!isUserInteracting) isUserInteracting = true; userPosition = newPos; onValueChange(newPos) }, onSeekFinished = { scope.launch { animatedPosition.snapTo(userPosition) }; isUserInteracting = false; onValueChangeFinished() }, loopStart = loopStart, loopEnd = loopEnd)
-            }
+            // animatedPosition changes on every frame of the 1 s glide between position ticks.
+            // Reading it here re-ran this whole composable (timers, gesture modifiers and all)
+            // at the display refresh rate while the controls were visible. It's now read only
+            // inside AnimatedSeekbar, so just the seekbar itself recomposes per frame.
+            AnimatedSeekbar(
+                position = { if (isUserInteracting) userPosition else animatedPosition.value },
+                duration = duration,
+                chapters = chapters,
+                isPaused = paused,
+                isScrubbing = isUserInteracting,
+                seekbarStyle = seekbarStyle,
+                onSeek = { newPos -> if (!isUserInteracting) isUserInteracting = true; userPosition = newPos; onValueChange(newPos) },
+                onSeekFinished = { scope.launch { animatedPosition.snapTo(userPosition) }; isUserInteracting = false; onValueChangeFinished() },
+                loopStart = loopStart,
+                loopEnd = loopEnd,
+            )
         }
 
         VideoTimer(
@@ -173,6 +183,34 @@ fun SeekbarWithTimers(
             modifier = Modifier.widthIn(min = 72.dp),
         )
     }
+}
+
+/** Reads the (per-frame) animated position in its own recomposition scope. */
+@Composable
+private fun AnimatedSeekbar(
+    position: () -> Float,
+    duration: Float,
+    chapters: ImmutableList<Segment>,
+    isPaused: Boolean,
+    isScrubbing: Boolean,
+    seekbarStyle: SeekbarStyle,
+    onSeek: (Float) -> Unit,
+    onSeekFinished: () -> Unit,
+    loopStart: Float?,
+    loopEnd: Float?,
+) {
+    StandardSeekbar(
+        position = position(),
+        duration = duration,
+        chapters = chapters,
+        isPaused = isPaused,
+        isScrubbing = isScrubbing,
+        seekbarStyle = seekbarStyle,
+        onSeek = onSeek,
+        onSeekFinished = onSeekFinished,
+        loopStart = loopStart,
+        loopEnd = loopEnd,
+    )
 }
 
 @Composable

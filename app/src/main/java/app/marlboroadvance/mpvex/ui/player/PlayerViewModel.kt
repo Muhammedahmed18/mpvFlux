@@ -336,11 +336,29 @@ class PlayerViewModel(
   private val _videoHash = MutableStateFlow<String?>(null)
   val videoHash: StateFlow<String?> = _videoHash.asStateFlow()
 
+  // The file the hash belongs to. The hash itself (reads 128 KB of the file) is only needed
+  // by the online subtitle search, so it's computed on the first search instead of on
+  // every file load.
+  @Volatile
+  private var videoHashSourceUri: Uri? = null
+
   fun calculateVideoHash(uri: Uri) {
-    viewModelScope.launch(Dispatchers.IO) {
-      _videoHash.value = SubtitleHashUtils.computeHash(host.context, uri)
-      Log.d(TAG, "Computed video hash: ${_videoHash.value}")
+    videoHashSourceUri = uri
+    _videoHash.value = null
+  }
+
+  private suspend fun videoHashForSearch(): String? {
+    _videoHash.value?.let { return it }
+    val uri = videoHashSourceUri ?: return null
+    val hash = withContext(Dispatchers.IO) {
+      runCatching { SubtitleHashUtils.computeHash(host.context, uri) }.getOrNull()
     }
+    // Only keep it if the same file is still loaded.
+    if (videoHashSourceUri == uri) {
+      _videoHash.value = hash
+      Log.d(TAG, "Computed video hash: $hash")
+    }
+    return hash
   }
 
   // External subtitle tracking
@@ -795,7 +813,7 @@ class PlayerViewModel(
   fun searchSubtitles(query: String, season: Int? = null, episode: Int? = null, year: String? = null) {
      viewModelScope.launch {
          _isSearchingSub.value = true
-         wyzieRepository.search(query, season, episode, year, movieHash = _videoHash.value)
+         wyzieRepository.search(query, season, episode, year, movieHash = videoHashForSearch())
              .onSuccess { results ->
                  _wyzieSearchResults.value = results
              }
@@ -871,8 +889,8 @@ class PlayerViewModel(
 
   // ==================== Playback Control ====================
 
-  // Callback for progress saving when pause is triggered from ViewModel
-  var onPauseCallback: (() -> Unit)? = null
+  // Progress is saved by PlayerActivity when mpv reports the pause (handlePauseStateChange),
+  // so these functions only change the pause state and audio focus.
 
   fun pauseUnpause() {
     viewModelScope.launch(Dispatchers.IO) {
@@ -882,8 +900,6 @@ class PlayerViewModel(
         withContext(Dispatchers.Main) { host.requestAudioFocus() }
         MPVLib.setPropertyBoolean("pause", false)
       } else {
-        // We are about to pause - trigger progress save callback
-        onPauseCallback?.invoke()
         MPVLib.setPropertyBoolean("pause", true)
         withContext(Dispatchers.Main) { host.abandonAudioFocus() }
       }
@@ -892,8 +908,6 @@ class PlayerViewModel(
 
   fun pause() {
     viewModelScope.launch(Dispatchers.IO) {
-      // Trigger progress save callback before pausing
-      onPauseCallback?.invoke()
       MPVLib.setPropertyBoolean("pause", true)
       withContext(Dispatchers.Main) { host.abandonAudioFocus() }
     }
@@ -2020,9 +2034,6 @@ class PlayerViewModel(
     _externalSubtitles.clear()
     mpvPathToUriMap.clear()
     metadataCache.evictAll()
-
-    // Reset callback to prevent holding activity reference
-    onPauseCallback = null
   }
 }
 

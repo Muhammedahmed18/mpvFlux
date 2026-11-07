@@ -52,7 +52,7 @@
             android:autoRemoveFromRecents="true"
             android:noHistory="false"
             android:excludeFromRecents="false"
-            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|uiMode|screenSize|smallestScreenSize|fontScale|locale|layoutDirection|density|colorMode"
             android:exported="true"
             android:launchMode="singleTask"
             android:documentLaunchMode="never"

@@ -28,6 +28,7 @@ import org.koin.core.annotation.KoinExperimentalAPI
 class App : Application() {
   private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private val metadataCache: VideoMetadataCacheRepository by inject()
+  private val launchScanRequested = java.util.concurrent.atomic.AtomicBoolean(false)
 
   override fun onCreate() {
     super.onCreate()
@@ -58,7 +59,18 @@ class App : Application() {
       }
     }
     
-    // Trigger media scan on app launch to detect new videos
+    // The launch media scan is no longer started here: App.onCreate also runs when the
+    // process starts just to play a video opened from another app, where a scan of the
+    // whole storage competed with playback start-up. MainActivity starts it instead
+    // (see runLaunchMediaScanIfDue).
+  }
+
+  /**
+   * Starts the launch media scan (still at most once every [LAUNCH_SCAN_INTERVAL_MS]) the
+   * first time the library is shown in this process. Called from MainActivity.
+   */
+  fun runLaunchMediaScanIfDue() {
+    if (!launchScanRequested.compareAndSet(false, true)) return
     applicationScope.launch {
       runCatching {
         triggerMediaScanOnLaunch()

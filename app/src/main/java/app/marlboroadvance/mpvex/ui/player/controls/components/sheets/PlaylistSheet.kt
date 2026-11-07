@@ -82,6 +82,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -612,11 +614,20 @@ fun PlayingAnimationIndicator(
     horizontalArrangement = Arrangement.spacedBy(2.dp),
     verticalAlignment     = Alignment.Bottom,
   ) {
-    Box(Modifier.width(3.dp).fillMaxHeight(bar1.value).background(color, RoundedCornerShape(1.5.dp)))
-    Box(Modifier.width(3.dp).fillMaxHeight(bar2.value).background(color, RoundedCornerShape(1.5.dp)))
-    Box(Modifier.width(3.dp).fillMaxHeight(bar3.value).background(color, RoundedCornerShape(1.5.dp)))
+    // The bar heights are applied as a bottom-anchored scale in the draw layer. Feeding
+    // them to fillMaxHeight() re-ran composition and layout on every animation frame.
+    Box(Modifier.width(3.dp).fillMaxHeight().barScale { bar1.value }.background(color, RoundedCornerShape(1.5.dp)))
+    Box(Modifier.width(3.dp).fillMaxHeight().barScale { bar2.value }.background(color, RoundedCornerShape(1.5.dp)))
+    Box(Modifier.width(3.dp).fillMaxHeight().barScale { bar3.value }.background(color, RoundedCornerShape(1.5.dp)))
   }
 }
+
+/** Scales a bar vertically from its bottom edge; [fraction] is read during drawing only. */
+private fun Modifier.barScale(fraction: () -> Float): Modifier =
+  graphicsLayer {
+    scaleY = fraction()
+    transformOrigin = TransformOrigin(0.5f, 1f)
+  }
 
 // ---------------------------------------------------------------------------
 // WatchedCheckBadge — filled circular check for finished items

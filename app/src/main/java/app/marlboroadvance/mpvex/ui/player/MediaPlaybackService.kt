@@ -11,7 +11,9 @@ import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.os.Binder
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -72,6 +74,20 @@ class MediaPlaybackService :
   private var mediaArtist = ""
   private var paused = false
 
+  private val mainHandler = Handler(Looper.getMainLooper())
+
+  /** Whether the player screen is visible (started). Set by PlayerActivity. */
+  private var uiVisible = true
+
+  /** Whether the service currently holds foreground state (main thread only). */
+  private var isForeground = false
+
+  /**
+   * Called right before the process is killed in [onTaskRemoved], so the player can save
+   * the playback position synchronously. Set by PlayerActivity while it's bound.
+   */
+  var onTaskRemovedSave: (() -> Unit)? = null
+
   inner class MediaPlaybackBinder : Binder() {
     fun getService() = this@MediaPlaybackService
   }
@@ -90,10 +106,16 @@ class MediaPlaybackService :
     // Only add MPV observer if MPV is initialized
     try {
       MPVLib.addObserver(this)
-      // Observe properties
-      MPVLib.observeProperty("pause", MPVLib.MpvFormat.MPV_FORMAT_FLAG)
-      MPVLib.observeProperty("media-title", MPVLib.MpvFormat.MPV_FORMAT_STRING)
-      MPVLib.observeProperty("metadata/artist", MPVLib.MpvFormat.MPV_FORMAT_STRING)
+      // Make sure these properties are observed, without registering them twice.
+      // Calling MPVLib.observeProperty() directly added a new mpv registration every time
+      // the service was created, on top of the ones the player already had, so each change
+      // arrived several times (several notification rebuilds per pause). The shared
+      // property flows register a property only on first use and are re-registered for
+      // every new mpv instance, so reading them here is idempotent. Events still reach
+      // this service through the EventObserver callbacks below.
+      MPVLib.propBoolean["pause"]
+      MPVLib.propString["media-title"]
+      MPVLib.propString["metadata/artist"]
       // NOTE: time-pos is intentionally NOT observed. The MediaSession reports a
       // position + playback speed once per real transition (play/pause/seek) and the
       // system media controls extrapolate the elapsed time from there. Observing
@@ -106,6 +128,54 @@ class MediaPlaybackService :
   }
 
   override fun onBind(intent: Intent): IBinder = binder
+
+  private fun promoteToForeground() {
+    try {
+      val type =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+          ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+        } else {
+          0
+        }
+      ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), type)
+      isForeground = true
+      Log.d(TAG, "Foreground service started successfully")
+    } catch (e: Exception) {
+      Log.e(TAG, "Error starting foreground service", e)
+    }
+  }
+
+  /**
+   * PlayerActivity reports whether its screen is visible. Together with the pause state this
+   * decides whether the service needs to stay in the foreground.
+   */
+  fun setUiVisible(visible: Boolean) {
+    mainHandler.post {
+      uiVisible = visible
+      updateForegroundState()
+    }
+  }
+
+  /**
+   * While playback is paused and the player isn't on screen, nothing needs to run, so the
+   * service leaves the foreground but keeps its notification (DETACH). The system may then
+   * reclaim the memory held by mpv and the decoder instead of keeping the process pinned
+   * indefinitely. Playing again (notification, headset, lock screen or the player)
+   * promotes it back. Runs on the main thread.
+   */
+  private fun updateForegroundState() {
+    if (paused && !uiVisible) {
+      if (isForeground) {
+        runCatching { ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH) }
+          .onSuccess {
+            isForeground = false
+            Log.d(TAG, "Paused in background: left foreground, notification kept")
+          }.onFailure { e -> Log.e(TAG, "Error leaving foreground", e) }
+      }
+    } else if (!paused && !isForeground) {
+      promoteToForeground()
+    }
+  }
 
   @SuppressLint("ForegroundServiceType")
   override fun onStartCommand(
@@ -130,29 +200,24 @@ class MediaPlaybackService :
       }
     }
 
-    // Fallback: Read current state from MPV if not provided via intent
-    if (mediaTitle.isBlank()) {
-      mediaTitle = MPVLib.getPropertyString("media-title") ?: ""
-      mediaArtist = MPVLib.getPropertyString("metadata/artist") ?: ""
+    if (MpvSession.isAlive) {
+      // Fallback: Read current state from MPV if not provided via intent
+      if (mediaTitle.isBlank()) {
+        mediaTitle = MPVLib.getPropertyString("media-title") ?: ""
+        mediaArtist = MPVLib.getPropertyString("metadata/artist") ?: ""
+      }
+
+      paused = MPVLib.getPropertyBoolean("pause") == true
     }
-    
-    paused = MPVLib.getPropertyBoolean("pause") == true
 
     updateMediaSession()
 
-    // Always start as foreground service with notification (like YouTube)
-    try {
-      val type =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-          ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-        } else {
-          0
-        }
-      ServiceCompat.startForeground(this, NOTIFICATION_ID, buildNotification(), type)
-      Log.d(TAG, "Foreground service started successfully")
-    } catch (e: Exception) {
-      Log.e(TAG, "Error starting foreground service", e)
-    }
+    // Always start as foreground service with notification (like YouTube). startForeground()
+    // must follow startForegroundService() even if playback is paused right now.
+    promoteToForeground()
+    // Media-button intents also arrive here; if playback is paused in the background,
+    // leave the foreground again right away.
+    updateForegroundState()
 
     // Return START_NOT_STICKY so service doesn't restart if killed
     return START_NOT_STICKY
@@ -198,11 +263,13 @@ class MediaPlaybackService :
           object : MediaSessionCompat.Callback() {
             override fun onPlay() {
               Log.d(TAG, "onPlay called")
+              if (!MpvSession.isAlive) return
               MPVLib.setPropertyBoolean("pause", false)
             }
 
             override fun onPause() {
               Log.d(TAG, "onPause called")
+              if (!MpvSession.isAlive) return
               MPVLib.setPropertyBoolean("pause", true)
             }
 
@@ -213,6 +280,7 @@ class MediaPlaybackService :
 
             override fun onSkipToNext() {
               Log.d(TAG, "onSkipToNext called")
+              if (!MpvSession.isAlive) return
               // Use precise seeking for videos shorter than 2 minutes (120 seconds) or if preference is enabled
               val duration = MPVLib.getPropertyInt("duration") ?: 0
               val shouldUsePreciseSeeking = playerPreferences.usePreciseSeeking.get() || duration < 120
@@ -222,6 +290,7 @@ class MediaPlaybackService :
 
             override fun onSkipToPrevious() {
               Log.d(TAG, "onSkipToPrevious called")
+              if (!MpvSession.isAlive) return
               // Use precise seeking for videos shorter than 2 minutes (120 seconds) or if preference is enabled
               val duration = MPVLib.getPropertyInt("duration") ?: 0
               val shouldUsePreciseSeeking = playerPreferences.usePreciseSeeking.get() || duration < 120
@@ -231,6 +300,7 @@ class MediaPlaybackService :
 
             override fun onSeekTo(pos: Long) {
               Log.d(TAG, "onSeekTo called: $pos")
+              if (!MpvSession.isAlive) return
               MPVLib.setPropertyDouble("time-pos", pos / 1000.0)
             }
           },
@@ -252,8 +322,9 @@ class MediaPlaybackService :
       // Ensure we have valid media title
       val title = mediaTitle.ifBlank { "Unknown Video" }
       
-      // Update metadata
-      val duration = runCatching { 
+      // Update metadata. mpv may already be torn down while the service is stopping.
+      val mpvAlive = MpvSession.isAlive
+      val duration = if (!mpvAlive) 0L else runCatching { 
         MPVLib.getPropertyDouble("duration")?.times(1000)?.toLong() 
       }.getOrNull() ?: 0L
       
@@ -274,11 +345,11 @@ class MediaPlaybackService :
       // Update playback state. Capture the position at this instant and report the
       // real playback speed; the system extrapolates the live position from these,
       // so we don't need to re-push state every second.
-      val position = runCatching {
+      val position = if (!mpvAlive) 0L else runCatching {
         MPVLib.getPropertyDouble("time-pos")?.times(1000)?.toLong()
       }.getOrNull() ?: 0L
 
-      val playbackSpeed = runCatching {
+      val playbackSpeed = if (!mpvAlive) 1.0f else runCatching {
         MPVLib.getPropertyDouble("speed")?.toFloat()
       }.getOrNull() ?: 1.0f
 
@@ -397,8 +468,11 @@ class MediaPlaybackService :
     value: Boolean,
   ) {
     if (property == "pause") {
+      // Rebuilding the session and notification is only needed on a real change.
+      if (value == paused) return
       paused = value
       updateMediaSession()
+      mainHandler.post { updateForegroundState() }
     }
   }
 
@@ -408,14 +482,16 @@ class MediaPlaybackService :
   ) {
     when (property) {
       "media-title" -> {
-        if (value.isNotBlank()) {
+        if (value.isNotBlank() && value != mediaTitle) {
           mediaTitle = value
           updateMediaSession()
         }
       }
       "metadata/artist" -> {
-        mediaArtist = value
-        updateMediaSession()
+        if (value != mediaArtist) {
+          mediaArtist = value
+          updateMediaSession()
+        }
       }
     }
   }
@@ -442,6 +518,8 @@ class MediaPlaybackService :
       Log.d(TAG, "Service destroyed")
 
       isServiceRunning = false
+      mainHandler.removeCallbacksAndMessages(null)
+      onTaskRemovedSave = null
       
       // Remove MPV observer safely
       try {
@@ -492,9 +570,14 @@ class MediaPlaybackService :
   override fun onTaskRemoved(rootIntent: Intent?) {
     Log.d(TAG, "Task removed - killing playback and cleaning up service")
     try {
+      // Save the playback position first: the process is killed below, so nothing that
+      // runs asynchronously (like the player's usual save on exit) would get to finish.
+      runCatching { onTaskRemovedSave?.invoke() }
+        .onFailure { e -> Log.e(TAG, "Error saving progress on task removal", e) }
+
       // Kill MPV playback immediately when task is removed
       try {
-        MPVLib.command("quit")
+        if (MpvSession.isAlive) MPVLib.command("quit")
         Log.d(TAG, "MPV quit command sent")
       } catch (e: Exception) {
         Log.e(TAG, "Error sending quit command to MPV", e)

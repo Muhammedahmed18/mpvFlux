@@ -13,6 +13,7 @@ import app.marlboroadvance.mpvex.ui.browser.base.BaseBrowserViewModel
 import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
 import app.marlboroadvance.mpvex.utils.media.MediaLibraryEvents
 import app.marlboroadvance.mpvex.utils.media.MetadataRetrieval
+import app.marlboroadvance.mpvex.utils.media.PlaybackProgressEvents
 import app.marlboroadvance.mpvex.utils.storage.FolderViewScanner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -122,6 +123,16 @@ class VideoListViewModel(
         // Clear cache when media library changes
         MediaFileRepository.clearCache()
         loadVideos()
+      }
+    }
+
+    // Saved playback progress changed (the player paused, finished or closed): refresh only
+    // the progress bars and watched badges from the database. The file list itself didn't
+    // change, so don't rescan storage or clear any caches.
+    viewModelScope.launch(Dispatchers.IO) {
+      PlaybackProgressEvents.changes.collectLatest {
+        val videos = _videos.value
+        if (videos.isNotEmpty()) loadPlaybackInfo(videos)
       }
     }
   }

@@ -47,6 +47,47 @@ object MediaInfoOps {
     }
 
   /**
+   * Reads the structured data and the full text report with a single open of the file.
+   * The media info screen used to call [getMediaInfo] and [generateTextOutput] one after
+   * the other, which opened and parsed the whole file twice.
+   *
+   * @return the parsed data and MediaInfo's plain-text report (without any banner)
+   */
+  suspend fun getMediaInfoWithReport(
+    context: Context,
+    uri: Uri,
+    fileName: String,
+  ): Result<Pair<MediaInfoData, String>> =
+    withContext(Dispatchers.IO) {
+      runCatching {
+        val pfd =
+          context.contentResolver.openFileDescriptor(uri, "r")
+            ?: error("Could not open file")
+
+        val fd = pfd.detachFd()
+        val mi = MediaInfo()
+
+        try {
+          mi.Open(fd, fileName)
+
+          val data =
+            MediaInfoData(
+              general = extractGeneralInfo(mi),
+              videoStreams = extractVideoStreams(mi),
+              audioStreams = extractAudioStreams(mi),
+              textStreams = extractTextStreams(mi),
+            )
+
+          mi.Option("Inform", "Text")
+          data to mi.Inform()
+        } finally {
+          mi.Close()
+          pfd.close()
+        }
+      }
+    }
+
+  /**
    * Generate formatted text output from MediaInfoData using native MediaInfo Text format
    */
   suspend fun generateTextOutput(

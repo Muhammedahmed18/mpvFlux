@@ -32,6 +32,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.documentfile.provider.DocumentFile
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import app.marlboroadvance.mpvex.database.entities.PlaybackStateEntity
 import app.marlboroadvance.mpvex.databinding.PlayerLayoutBinding
@@ -75,13 +76,10 @@ class PlayerActivity :
   private val viewModel: PlayerViewModel by viewModels<PlayerViewModel> {
     PlayerViewModelProviderFactory(this)
   }
-  
-  // Initialize ViewModel callback for progress saving on pause
-  private fun setupViewModelCallbacks() {
-    viewModel.onPauseCallback = {
-      saveVideoProgress(isImmediate = true)
-    }
-  }
+
+  // Progress is saved on pause by handlePauseStateChange(), which reacts to mpv's "pause"
+  // property. The ViewModel used to save as well (onPauseCallback) right before pausing,
+  // which wrote the same position to the database twice per pause.
 
   /**
    * Binding for the player layout.
@@ -209,10 +207,12 @@ class PlayerActivity :
 
   private var isReady = false
   private var isUserFinishing = false
-  private var isManualBackgroundPlayback = false
   private var noisyReceiverRegistered = false
   private var mpvInitialized = false
   private var wasPlayingBeforePause = false
+
+  /** Last pause value handled by [handlePauseStateChange], used to skip repeated events. */
+  private var lastPauseState: Boolean? = null
 
   // ==================== Progress Save Management ====================
 
@@ -278,12 +278,18 @@ class PlayerActivity :
   private val audioFocusChangeListener =
     AudioManager.OnAudioFocusChangeListener { focusChange ->
       when (focusChange) {
-        AudioManager.AUDIOFOCUS_LOSS,
-        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT,
-          -> {
+        AudioManager.AUDIOFOCUS_LOSS -> {
+          // Permanent loss (another app started playing): pause and give focus up.
+          viewModel.pause()
+        }
+
+        AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+          // Temporary loss (a call, a navigation prompt): pause but keep the focus request,
+          // so AUDIOFOCUS_GAIN is delivered afterwards and playback resumes. viewModel.pause()
+          // abandons focus, which meant the gain never arrived and playback never resumed.
           val oldRestore = restoreAudioFocus
           val wasPlayerPaused = viewModel.paused ?: false
-          viewModel.pause()
+          if (mpvInitialized) runCatching { MPVLib.setPropertyBoolean("pause", true) }
           restoreAudioFocus = {
             oldRestore()
             if (!wasPlayerPaused) viewModel.unpause()
@@ -322,7 +328,6 @@ class PlayerActivity :
     setupBackPressHandler()
     setupPlayerControls()
     setupPipHelper()
-    setupViewModelCallbacks()
 
     lifecycleScope.launch {
       playerPreferences.showFileExtension.changes().collect {
@@ -537,19 +542,24 @@ class PlayerActivity :
     runCatching {
       isReady = false
 
-      if ((isUserFinishing || isFinishing) && !isManualBackgroundPlayback) {
-        if (serviceBound) {
-          runCatching { unbindService(serviceConnection) }
-          serviceBound = false
-        }
-        stopService(Intent(this, MediaPlaybackService::class.java))
-        mediaPlaybackService = null
+      if (!isFinishing) {
+        // The system is recreating this Activity (a configuration change that isn't handled
+        // in place). The mpv instance is torn down below and the new Activity starts a fresh
+        // one, so save the position now: the new instance resumes from it. finish() already
+        // saves on the normal exit path.
+        if (mpvInitialized) saveVideoProgress(isImmediate = true)
+        // The retained PlayerViewModel holds this Activity and the old mpv instance's state.
+        // Drop it so the recreated Activity builds a new one for the new instance.
+        viewModelStore.clear()
       }
 
       // We no longer cancel all pending saves here because "Immediate" saves
       // use NonCancellable and separate jobs to ensure they finish during destruction.
       // progressSaveManager.cancelPendingSave() // REMOVED to allow final save to finish
 
+      // Always a full teardown. Previously a non-finishing destroy stopped the service but
+      // left mpv running with this Activity still registered as its observer (a leak), and
+      // the recreated Activity then crashed creating a second mpv instance.
       cleanupMPV()
       cleanupAudio()
       cleanupReceivers()
@@ -568,34 +578,40 @@ class PlayerActivity :
 
       endBackgroundPlayback()
 
-      if (!isFinishing || isManualBackgroundPlayback) return@time
+      runCatching { MPVLib.removeObserver(playerObserver) }
+        .onFailure { e -> Log.e(TAG, "Error removing MPV observer", e) }
 
-      runCatching {
-        MPVLib.removeObserver(playerObserver)
+      // The surface callbacks call into mpv; make sure none can arrive once it's gone.
+      runCatching { player.holder.removeCallback(player) }
 
-        if (isReady) {
-          MPVLib.setPropertyBoolean("pause", true)
-          MPVLib.command("quit")
-          Thread.sleep(100)
-        }
+      mpvInitialized = false
 
+      // mpv_terminate_destroy() waits for the playback core and MediaCodec to shut down,
+      // which can take well over 100 ms. It used to run here on the main thread (after a
+      // fixed Thread.sleep(100)), freezing the UI on every exit. It now runs on the mpv
+      // worker thread; a player opened right after waits for it in setupMPV().
+      MpvSession.teardown {
         MPVLib.destroy()
-        mpvInitialized = false
-      }.onFailure { e ->
-        Log.e(TAG, "Error cleaning up MPV", e)
       }
     }
   }
 
   override fun abandonAudioFocus() {
-    if (restoreAudioFocus != {}) {
-      audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
-      restoreAudioFocus = {}
-    }
+    // The old check `restoreAudioFocus != {}` compared against a brand-new lambda, so it was
+    // always true; this is the same behaviour, written plainly.
+    audioFocusRequest?.let { audioManager.abandonAudioFocusRequest(it) }
+    restoreAudioFocus = {}
   }
 
   private fun cleanupAudio() {
     abandonAudioFocus()
+  }
+
+  private fun registerNoisyReceiver() {
+    if (noisyReceiverRegistered) return
+    val filter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
+    registerReceiver(noisyReceiver, filter)
+    noisyReceiverRegistered = true
   }
 
   private fun cleanupReceivers() {
@@ -611,10 +627,9 @@ class PlayerActivity :
   override fun onPause() {
     runCatching {
       val isInPip = isInPictureInPictureMode
-      val shouldPause = (!audioPreferences.automaticBackgroundPlayback.get() && !isManualBackgroundPlayback) ||
-                        (isUserFinishing && !isManualBackgroundPlayback)
+      val shouldPause = !audioPreferences.automaticBackgroundPlayback.get() || isUserFinishing
 
-      if (isFinishing && !isManualBackgroundPlayback) {
+      if (isFinishing) {
         viewModel.pause()
         MPVLib.command("stop")
       } else if (!isInPip && shouldPause) {
@@ -622,7 +637,7 @@ class PlayerActivity :
         viewModel.pause()
       }
 
-      if (isUserFinishing && !isInPip && !isManualBackgroundPlayback) {
+      if (isUserFinishing && !isInPip) {
         restoreSystemUI()
       }
     }.onFailure { e ->
@@ -668,13 +683,13 @@ class PlayerActivity :
     runCatching {
       pipHelper.onStop()
 
-      if (noisyReceiverRegistered) {
-        unregisterReceiver(noisyReceiver)
-        noisyReceiverRegistered = false
-      }
+      // The becoming-noisy receiver stays registered while stopped (it's unregistered in
+      // onDestroy): during background playback, unplugging headphones must still pause
+      // instead of continuing through the speaker. It costs nothing until it fires.
 
-      val shouldAllowBackgroundPlayback = isManualBackgroundPlayback ||
-                                          audioPreferences.automaticBackgroundPlayback.get()
+      mediaPlaybackService?.setUiVisible(false)
+
+      val shouldAllowBackgroundPlayback = audioPreferences.automaticBackgroundPlayback.get()
 
       if (!shouldAllowBackgroundPlayback && (isUserFinishing || isFinishing)) {
         viewModel.pause()
@@ -698,11 +713,8 @@ class PlayerActivity :
       setupWindowFlags()
       setupSystemUI()
 
-      if (!noisyReceiverRegistered) {
-        val filter = IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
-        registerReceiver(noisyReceiver, filter)
-        noisyReceiverRegistered = true
-      }
+      registerNoisyReceiver()
+      mediaPlaybackService?.setUiVisible(true)
 
       if (playerPreferences.rememberBrightness.get()) {
         val brightness = playerPreferences.defaultBrightness.get()
@@ -711,7 +723,6 @@ class PlayerActivity :
         }
       }
 
-      isManualBackgroundPlayback = false
       restoreVideoAfterBackground()
     }.onFailure { e ->
       Log.e(TAG, "Error during onStart", e)
@@ -813,8 +824,13 @@ class PlayerActivity :
       Log.e(TAG, "Error copying MPV config and scripts", e)
     }
 
+    // If the previous player is still shutting down mpv in the background, wait for it:
+    // creating a second instance while the old one exists kills the process.
+    MpvSession.awaitPendingTeardown()
+
     player.initialize(filesDir.path, cacheDir.path)
     mpvInitialized = true
+    MpvSession.markCreated()
     Log.d(TAG, "MPV initialized")
 
     MPVLib.addObserver(playerObserver)
@@ -1236,6 +1252,12 @@ class PlayerActivity :
   }
 
   private fun handlePauseStateChange(isPaused: Boolean) {
+    // Each pause/play is handled once. This is the only place that saves progress on pause
+    // (PlayerViewModel no longer saves before pausing), so a repeated event with the same
+    // value must not trigger another save or window-flag change.
+    if (lastPauseState == isPaused) return
+    lastPauseState = isPaused
+
     if (isPaused) {
       saveVideoProgress(isImmediate = true)
 
@@ -1354,13 +1376,23 @@ class PlayerActivity :
   /**
    * Grab a small frame of the current file for the media notification / lock screen.
    * Done on the first playback restart (a frame has been decoded by then) rather than
-   * at file load, and at 512px: notification art is shown far smaller than the old
-   * 1080px grab, which cost a noticeable hitch at the start of every episode.
+   * at file load.
+   *
+   * The grab takes a full-resolution screenshot (about 33 MB for a 4K frame, read back from
+   * the GPU) and scales it down, so it runs on the mpv worker thread instead of the main
+   * thread, where it caused a hitch at the start of every episode. Running it on that thread
+   * also guarantees it can't overlap mpv's teardown. 256 px is plenty for notification and
+   * lock-screen art.
    */
   private fun refreshNotificationArtwork() {
-    val artwork = runCatching { MPVLib.grabThumbnail(NOTIFICATION_ARTWORK_SIZE) }.getOrNull() ?: return
-    MediaPlaybackService.thumbnail = artwork
-    mediaPlaybackService?.setArtwork(artwork)
+    MpvSession.runIfAlive {
+      val artwork = MPVLib.grabThumbnail(NOTIFICATION_ARTWORK_SIZE) ?: return@runIfAlive
+      runOnUiThread {
+        if (isDestroyed || !mpvInitialized) return@runOnUiThread
+        MediaPlaybackService.thumbnail = artwork
+        mediaPlaybackService?.setArtwork(artwork)
+      }
+    }
   }
 
   /**
@@ -1669,17 +1701,23 @@ class PlayerActivity :
   private fun saveVideoProgress(isImmediate: Boolean = false) {
     val snapshot = capturePlaybackSnapshot() ?: return
 
-    lifecycleScope.launch(Dispatchers.IO) {
-      val oldState = runCatching {
-        playbackStateRepository.getVideoDataByTitle(snapshot.mediaIdentifier)
-      }.getOrNull()
+    // The previous database row is looked up inside the save job, on the save manager's own
+    // scope. Using lifecycleScope here meant a save requested during onDestroy never ran.
+    progressSaveManager.saveProgress(
+      snapshot = snapshot,
+      isImmediate = isImmediate,
+      lookupOldState = true,
+    )
+  }
 
-      progressSaveManager.saveProgress(
-        snapshot = snapshot,
-        oldState = oldState,
-        isImmediate = isImmediate
-      )
-    }
+  /**
+   * Saves synchronously. Only used when the process is about to be killed (the task was
+   * swiped away from Recents during background playback), where an async save never runs.
+   */
+  private fun saveVideoProgressBlocking() {
+    if (!mpvInitialized) return
+    val snapshot = runCatching { capturePlaybackSnapshot() }.getOrNull() ?: return
+    progressSaveManager.saveProgressBlocking(snapshot)
   }
 
   private suspend fun loadVideoPlaybackState(): Boolean {
@@ -2084,8 +2122,11 @@ class PlayerActivity :
         service: IBinder?,
       ) {
         val binder = service as? MediaPlaybackService.MediaPlaybackBinder ?: return
-        mediaPlaybackService = binder.getService()
+        val playbackService = binder.getService()
+        mediaPlaybackService = playbackService
         serviceBound = true
+        playbackService.onTaskRemovedSave = { saveVideoProgressBlocking() }
+        playbackService.setUiVisible(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
       }
 
       override fun onServiceDisconnected(name: ComponentName?) {
@@ -2127,6 +2168,7 @@ class PlayerActivity :
   }
 
   private fun endBackgroundPlayback() {
+    mediaPlaybackService?.onTaskRemovedSave = null
     if (serviceBound) {
       try {
         unbindService(serviceConnection)
@@ -2587,7 +2629,7 @@ class PlayerActivity :
     private const val SID_OFF_BY_USER = -2
     private const val DEFAULT_PLAYBACK_SPEED = 1.0
     private const val DEFAULT_SUB_SPEED = 1.0
-    private const val NOTIFICATION_ARTWORK_SIZE = 512
+    private const val NOTIFICATION_ARTWORK_SIZE = 256
     const val TAG = "mpvex"
   }
 }

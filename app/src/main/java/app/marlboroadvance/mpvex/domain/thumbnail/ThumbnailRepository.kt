@@ -3,6 +3,8 @@ package app.marlboroadvance.mpvex.domain.thumbnail
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
+import android.provider.MediaStore
 import android.util.LruCache
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.utils.media.MediaInfoOps
@@ -25,6 +27,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.max
 
 class ThumbnailRepository(
@@ -52,6 +55,15 @@ class ThumbnailRepository(
   // reaps any orphans (deleted/edited videos, rename stragglers) automatically.
   private val maxDiskCacheBytes = 256L * 1024L * 1024L
   private val diskTrimLock = Any()
+
+  // Checking the disk budget means listing and stat-ing every cached file, so it runs once
+  // at startup and then every DISK_TRIM_INTERVAL writes instead of after every single write
+  // (which made batch generation of a big folder quadratic in the cache size). The cache
+  // can briefly exceed the budget by at most that many thumbnails.
+  private val writesSinceTrim = AtomicInteger(0)
+
+  // Rotation per video. Looked up once instead of for every generated thumbnail.
+  private val rotationCache = ConcurrentHashMap<String, Int>()
   private val memoryCache: LruCache<String, Bitmap>
   private val diskDir: File = File(context.filesDir, "thumbnails").apply { mkdirs() }
   private val ongoingOperations = ConcurrentHashMap<String, Deferred<Bitmap?>>()
@@ -90,7 +102,10 @@ class ThumbnailRepository(
 
   init {
     val maxMemoryKb = (Runtime.getRuntime().maxMemory() / 1024L).toInt()
-    val cacheSizeKb = maxMemoryKb / 6
+    // An eighth of the heap, capped at 32 MB. A sixth of the heap became ~85 MB with
+    // android:largeHeap on devices with a 512 MB heap limit, far more than a screen of cards
+    // needs; the disk cache still keeps every thumbnail.
+    val cacheSizeKb = minOf(maxMemoryKb / 8, MAX_MEMORY_CACHE_KB)
     memoryCache =
       object : LruCache<String, Bitmap>(cacheSizeKb) {
         override fun sizeOf(
@@ -100,6 +115,7 @@ class ThumbnailRepository(
       }
 
     migrateDiskCacheIfNeeded()
+    repositoryScope.launch { trimDiskCacheIfNeeded() }
   }
 
   /**
@@ -309,6 +325,7 @@ class ThumbnailRepository(
     folderRequests.clear()
     ongoingOperations.clear()
     useMediaStoreForVideo.clear()
+    rotationCache.clear()
 
     synchronized(memoryCache) {
       memoryCache.evictAll()
@@ -437,7 +454,10 @@ class ThumbnailRepository(
         out.flush()
       }
     }
-    trimDiskCacheIfNeeded()
+    if (writesSinceTrim.incrementAndGet() >= DISK_TRIM_INTERVAL) {
+      writesSinceTrim.set(0)
+      trimDiskCacheIfNeeded()
+    }
   }
 
   /**
@@ -464,11 +484,44 @@ class ThumbnailRepository(
     video: Video,
     bitmap: Bitmap
   ): Bitmap {
-    val rotation = MediaInfoOps.getRotation(context, video.uri, video.displayName)
+    val rotation = rotationFor(video)
     if (rotation == 0) return bitmap
     val matrix = android.graphics.Matrix()
     matrix.postRotate(rotation.toFloat())
     return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+  }
+
+  /**
+   * The video's rotation. MediaStore already stores it (Android 11+), which is a cheap
+   * database read; opening the whole file again with MediaInfo, for every generated
+   * thumbnail, is now only the fallback for files MediaStore doesn't know about.
+   */
+  private suspend fun rotationFor(video: Video): Int {
+    val key = "${video.uri}|${videoBaseKey(video)}"
+    rotationCache[key]?.let { return it }
+    val rotation = rotationFromMediaStore(video)
+      ?: MediaInfoOps.getRotation(context, video.uri, video.displayName)
+    rotationCache[key] = rotation
+    return rotation
+  }
+
+  private fun rotationFromMediaStore(video: Video): Int? {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+    val uri = video.uri
+    if (uri.scheme != "content" || uri.authority != MediaStore.AUTHORITY) return null
+    return runCatching {
+      context.contentResolver.query(
+        uri,
+        arrayOf(MediaStore.Video.VideoColumns.ORIENTATION),
+        null,
+        null,
+        null,
+      )?.use { cursor ->
+        if (!cursor.moveToFirst()) return@use null
+        val index = cursor.getColumnIndex(MediaStore.Video.VideoColumns.ORIENTATION)
+        if (index < 0 || cursor.isNull(index)) null else cursor.getInt(index)
+      }
+    }.getOrNull()
   }
 
   private suspend fun generateWithFastThumbnails(
@@ -624,5 +677,10 @@ class ThumbnailRepository(
       md.update(";".toByteArray())
     }
     return md.digest().joinToString("") { b -> "%02x".format(b) }
+  }
+
+  private companion object {
+    const val MAX_MEMORY_CACHE_KB = 32 * 1024
+    const val DISK_TRIM_INTERVAL = 25
   }
 }

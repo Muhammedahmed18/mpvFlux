@@ -59,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -532,22 +533,22 @@ private fun ThumbnailShimmer(modifier: Modifier = Modifier) {
     MaterialTheme.colorScheme.surfaceContainerLow,
   )
 
-  BoxWithConstraints(modifier = modifier) {
-    val widthPx = with(LocalDensity.current) { maxWidth.toPx() }
-    val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
-
-    val brush = Brush.linearGradient(
-      colors = colors,
-      start = Offset(xOffset * widthPx - widthPx, 0f),
-      end = Offset(xOffset * widthPx, heightPx)
-    )
-
-    Box(
-      modifier = Modifier
-        .fillMaxSize()
-        .background(brush)
-    )
-  }
+  // The animated offset is read inside drawBehind, so each frame only redraws this box.
+  // Building the brush in composition (inside BoxWithConstraints) re-ran composition and
+  // subcomposition for every loading card on every frame.
+  Box(
+    modifier = modifier.drawBehind {
+      val widthPx = size.width
+      val heightPx = size.height
+      drawRect(
+        brush = Brush.linearGradient(
+          colors = colors,
+          start = Offset(xOffset * widthPx - widthPx, 0f),
+          end = Offset(xOffset * widthPx, heightPx),
+        ),
+      )
+    },
+  )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

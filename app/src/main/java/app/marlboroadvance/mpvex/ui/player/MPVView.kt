@@ -113,10 +113,17 @@ class MPVView(
       MPVLib.setOptionString("vf", "format=yuv420p")
     }
     
-    // Cap demuxer cache for mobile to prevent memory issues
-    val cacheMegs = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) 64 else 32
+    // Cap the demuxer cache for mobile. It only fills for network streams (local files don't
+    // use the cache), where forward + back buffers together used to allow 128 MB of native
+    // memory on every device (the old O_MR1 check was always true with minSdk 26). Low-RAM
+    // devices get half, and the back buffer (only used for seeking backwards inside a
+    // stream) is half of the forward one.
+    val isLowRam = runCatching {
+      (context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager).isLowRamDevice
+    }.getOrDefault(false)
+    val cacheMegs = if (isLowRam) 32 else 64
     MPVLib.setOptionString("demuxer-max-bytes", "${cacheMegs * 1024 * 1024}")
-    MPVLib.setOptionString("demuxer-max-back-bytes", "${cacheMegs * 1024 * 1024}")
+    MPVLib.setOptionString("demuxer-max-back-bytes", "${cacheMegs / 2 * 1024 * 1024}")
     
     val logLevel = if (advancedPreferences.verboseLogging.get()) "v" else "warn"
     MPVLib.setOptionString("msg-level", "all=$logLevel")
@@ -204,10 +211,15 @@ class MPVView(
     return true
   }
 
+  // "pause" and "paused-for-cache" are deliberately NOT registered here. They are observed
+  // through the shared MPVLib.propBoolean flows (PlayerViewModel, PlayerControls), which
+  // register each property with mpv exactly once and re-register it for every new mpv
+  // instance (BaseMPVView.reobserveAllProperties). libmpv sends one change event per
+  // registration, and MPVLib forwards every event to every EventObserver, so a second
+  // registration here doubled every pause event (extra progress saves and notification
+  // rebuilds). The Activity and the service still receive these events as before.
   private val observedProps =
     mapOf(
-      "pause" to MPVLib.MpvFormat.MPV_FORMAT_FLAG,
-      "paused-for-cache" to MPVLib.MpvFormat.MPV_FORMAT_FLAG,
       "video-params/aspect" to MPVLib.MpvFormat.MPV_FORMAT_DOUBLE,
       "video-params/w" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
       "video-params/h" to MPVLib.MpvFormat.MPV_FORMAT_INT64,
