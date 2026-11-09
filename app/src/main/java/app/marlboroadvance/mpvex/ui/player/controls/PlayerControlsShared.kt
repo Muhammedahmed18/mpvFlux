@@ -8,6 +8,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.material.icons.outlined.FitScreen
+import androidx.compose.material.icons.outlined.ZoomOutMap
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalViewConfiguration
+import app.marlboroadvance.mpvex.ui.player.VideoAspect
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -481,19 +491,58 @@ fun RenderPlayerButton(
 
     // ------------------------------------------------------------------
     // ASPECT RATIO — FilledTonalIconButton
+    // Tap cycles Fit → Stretch → Crop (as in mpvEx); long-press opens the ratio sheet.
     // ------------------------------------------------------------------
     PlayerButton.ASPECT_RATIO -> {
+      val aspect by viewModel.videoAspect.collectAsState()
+      val customRatio by viewModel.currentAspectRatio.collectAsState()
+      val haptic = LocalHapticFeedback.current
+      val longPressTimeout = LocalViewConfiguration.current.longPressTimeoutMillis
+      val interactionSource = remember { MutableInteractionSource() }
+      var longPressHandled by remember { mutableStateOf(false) }
+
+      // The button has no long-click of its own, so watch its presses: a press held past the
+      // system long-press time opens the sheet, and the click that follows is ignored.
+      LaunchedEffect(interactionSource) {
+        interactionSource.interactions.collectLatest { interaction ->
+          if (interaction is PressInteraction.Press) {
+            longPressHandled = false
+            delay(longPressTimeout)
+            longPressHandled = true
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            clickEvent()
+            onOpenSheet(Sheets.AspectRatios)
+          }
+        }
+      }
+
       FilledTonalIconButton(
         onClick  = {
-          clickEvent()
-          onOpenSheet(Sheets.AspectRatios)
+          if (longPressHandled) {
+            longPressHandled = false
+          } else {
+            clickEvent()
+            val next = when {
+              customRatio > 0 -> VideoAspect.Fit // leave a custom ratio (e.g. 21:9) back to Fit
+              aspect == VideoAspect.Fit -> VideoAspect.Stretch
+              aspect == VideoAspect.Stretch -> VideoAspect.Crop
+              else -> VideoAspect.Fit
+            }
+            viewModel.changeVideoAspect(next)
+          }
         },
-        modifier = modifier.size(buttonSize),
-        shapes   = expressiveShapes,
-        colors   = glassIconButtonColors(hideBackground),
+        modifier          = modifier.size(buttonSize),
+        shapes            = expressiveShapes,
+        colors            = glassIconButtonColors(hideBackground),
+        interactionSource = interactionSource,
       ) {
         Icon(
-          imageVector        = Icons.Outlined.AspectRatio,
+          imageVector        = when {
+            customRatio > 0 -> Icons.Outlined.AspectRatio
+            aspect == VideoAspect.Stretch -> Icons.Outlined.ZoomOutMap
+            aspect == VideoAspect.Crop -> Icons.Outlined.FitScreen
+            else -> Icons.Outlined.AspectRatio
+          },
           contentDescription = null,
         )
       }

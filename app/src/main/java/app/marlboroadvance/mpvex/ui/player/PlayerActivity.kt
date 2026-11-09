@@ -1211,7 +1211,14 @@ class PlayerActivity :
 
   private fun handleConfigurationChange() {
     if (!isInPictureInPictureMode) {
-      // Configuration changes don't affect aspect ratio
+      // Stretch is worked out from the screen's shape, so redo it after a rotation (posted
+      // so the display already reports the new size). Fit, Crop and fixed ratios adapt
+      // on their own.
+      if (viewModel.videoAspect.value == VideoAspect.Stretch && viewModel.currentAspectRatio.value <= 0) {
+        window.decorView.post {
+          if (!isFinishing) viewModel.changeVideoAspect(VideoAspect.Stretch, showUpdate = false)
+        }
+      }
     } else {
       viewModel.hideControls()
     }
