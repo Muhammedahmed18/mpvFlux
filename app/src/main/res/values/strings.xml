@@ -692,4 +692,14 @@
   <string name="media_info_expand_all">Expand all</string>
   <string name="media_info_collapse_all">Collapse all</string>
   <string name="media_info_no_matches">No properties match “%1$s”</string>
+  <!-- About → Community -->
+  <string name="about_community">Community</string>
+  <string name="about_report_bug">Report a bug</string>
+  <string name="about_request_feature">Request a feature</string>
+  <string name="about_discussions">Discussions</string>
+  <string name="about_whats_new">What\'s new</string>
+  <string name="about_star_github">Star on GitHub</string>
+  <string name="about_source_code">Source code</string>
+  <string name="about_debug_info_copied">Debug info copied. Paste it into the bug report.</string>
+  <string name="about_no_browser">No browser found to open the link</string>
 </resources>

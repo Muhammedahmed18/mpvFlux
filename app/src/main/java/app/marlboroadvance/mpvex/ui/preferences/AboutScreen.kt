@@ -1,6 +1,11 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.widget.Toast
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -12,14 +17,19 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.DeveloperBoard
+import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Movie
+import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -32,8 +42,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -52,13 +63,33 @@ import org.koin.compose.koinInject
 object AboutScreen : Screen {
 
     private const val GITHUB_URL = "https://github.com/Muhammedahmed18/mpvFlux"
+    private const val DISCUSSIONS_URL = "$GITHUB_URL/discussions"
+    private const val LATEST_RELEASE_URL = "$GITHUB_URL/releases/latest"
+    private const val FEATURE_REQUEST_URL = "$GITHUB_URL/issues/new?template=feature_request.md"
+
+    /** New bug report with the template and the app version already in the title. */
+    private fun bugReportUrl(): String {
+        val version = BuildConfig.VERSION_NAME.substringBefore('-')
+        return "$GITHUB_URL/issues/new?template=bug_report.md&title=" + Uri.encode("[v$version] ")
+    }
+
+    /** Opens a link in the browser; shows a short message instead of crashing if none exists. */
+    private fun openLink(context: Context, url: String) {
+        try {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, context.getString(R.string.about_no_browser), Toast.LENGTH_SHORT).show()
+        }
+    }
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val backstack = LocalBackStack.current
         val clipboard = LocalClipboard.current
-        val uriHandler = LocalUriHandler.current
+        val context = LocalContext.current
         val scope = rememberCoroutineScope()
 
         val backgroundColor = rememberPreferenceBackgroundColor()
@@ -112,12 +143,57 @@ object AboutScreen : Screen {
                     item { SectionHeader(text = "Core Highlights") }
                     item { HighlightsGrid() }
 
-                    item { SectionHeader(text = "Connect & Share") }
+                    item { SectionHeader(text = stringResource(R.string.about_community)) }
+                    item {
+                        val copiedMessage = stringResource(R.string.about_debug_info_copied)
+                        ActionRow(
+                            icon = Icons.Outlined.BugReport,
+                            label = stringResource(R.string.about_report_bug),
+                            onClick = {
+                                // Copy debug info first so it can be pasted into the report.
+                                scope.launch {
+                                    clipboard.setClipEntry(
+                                        ClipEntry(ClipData.newPlainText("Debug Info", collectDeviceInfo())),
+                                    )
+                                    Toast.makeText(context, copiedMessage, Toast.LENGTH_LONG).show()
+                                    openLink(context, bugReportUrl())
+                                }
+                            },
+                        )
+                    }
+                    item {
+                        ActionRow(
+                            icon = Icons.Outlined.Lightbulb,
+                            label = stringResource(R.string.about_request_feature),
+                            onClick = { openLink(context, FEATURE_REQUEST_URL) },
+                        )
+                    }
+                    item {
+                        ActionRow(
+                            icon = Icons.Outlined.Forum,
+                            label = stringResource(R.string.about_discussions),
+                            onClick = { openLink(context, DISCUSSIONS_URL) },
+                        )
+                    }
+                    item {
+                        ActionRow(
+                            icon = Icons.Outlined.NewReleases,
+                            label = stringResource(R.string.about_whats_new),
+                            onClick = { openLink(context, LATEST_RELEASE_URL) },
+                        )
+                    }
+                    item {
+                        ActionRow(
+                            icon = Icons.Outlined.StarOutline,
+                            label = stringResource(R.string.about_star_github),
+                            onClick = { openLink(context, GITHUB_URL) },
+                        )
+                    }
                     item {
                         ActionRow(
                             icon = Icons.Outlined.Code,
-                            label = "Explore GitHub Source Code",
-                            onClick = { uriHandler.openUri(GITHUB_URL) },
+                            label = stringResource(R.string.about_source_code),
+                            onClick = { openLink(context, GITHUB_URL) },
                         )
                     }
 
