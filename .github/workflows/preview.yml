@@ -37,16 +37,16 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build with Gradle
-        run: ./gradlew assembleStandardPreview
+        run: ./gradlew assemblePreview
 
       - name: Sign APKs
         run: |
           set -e
-          PREVIEW_DIR="app/build/outputs/apk/standard/preview"
+          PREVIEW_DIR="app/build/outputs/apk/preview"
           
           echo "${{ secrets.SIGNING_KEYSTORE }}" | base64 -d > release.keystore
           
-          APK_COUNT=$(find "$PREVIEW_DIR" -name "app-standard-*-preview-unsigned.apk" -type f | wc -l)
+          APK_COUNT=$(find "$PREVIEW_DIR" -name "app-*-preview-unsigned.apk" -type f | wc -l)
           if [ "$APK_COUNT" -eq 0 ]; then
             echo "No unsigned preview APK files found"
             ls -lah "$PREVIEW_DIR"
@@ -54,7 +54,7 @@ jobs:
             exit 1
           fi
           
-          find "$PREVIEW_DIR" -name "app-standard-*-preview-unsigned.apk" -type f | while read -r apk; do
+          find "$PREVIEW_DIR" -name "app-*-preview-unsigned.apk" -type f | while read -r apk; do
             signed_apk="${apk/-unsigned/}"
           
             $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
@@ -70,7 +70,7 @@ jobs:
           done
           
           rm release.keystore
-          ls -lh "$PREVIEW_DIR"/app-standard-*-preview.apk
+          ls -lh "$PREVIEW_DIR"/app-*-preview.apk
 
       - name: Copy build artifacts
         id: set_commit
@@ -87,7 +87,7 @@ jobs:
           declare -a file_sizes=()
           
           for arch in "${apks[@]}"; do
-            src="app/build/outputs/apk/standard/preview/app-standard-${arch}-preview.apk"
+            src="app/build/outputs/apk/preview/app-${arch}-preview.apk"
             dest="output/mpvFlux-preview-r${commit_count}-${arch}.apk"
             cp "$src" "$dest"
           

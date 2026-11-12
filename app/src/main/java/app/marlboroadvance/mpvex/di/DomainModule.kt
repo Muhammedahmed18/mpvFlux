@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex.di
 
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieSearchRepository
+import app.marlboroadvance.mpvex.update.UpdateManager
 import okhttp3.OkHttpClient
 import org.koin.dsl.module
 import org.koin.android.ext.koin.androidContext
@@ -15,4 +16,5 @@ val domainModule = module {
             .build()
     }
     single { WyzieSearchRepository(androidContext(), get(), get(), get(), get()) }
+    single { UpdateManager(androidContext(), get(), get()) }
 }

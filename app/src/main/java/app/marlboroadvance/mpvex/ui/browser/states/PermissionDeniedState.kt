@@ -63,7 +63,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import app.marlboroadvance.mpvex.BuildConfig
 import app.marlboroadvance.mpvex.R
 
 @SuppressLint("UseKtx")
@@ -75,8 +74,6 @@ fun PermissionDeniedState(
   val context = LocalContext.current
   var showExplanationDialog by remember { mutableStateOf(false) }
 
-  // Determine if we're using MANAGE_EXTERNAL_STORAGE or scoped storage permissions
-  val isPlayStoreBuild = remember { BuildConfig.SCOPED_STORAGE_ONLY }
 
   // Colors based on the provided image
   val backgroundColor = Color(0xFF0D1117)
@@ -154,15 +151,7 @@ fun PermissionDeniedState(
 
       // Description
       Text(
-        text = if (isPlayStoreBuild) {
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            "MpvFlux needs \"Photos and videos\" permission to access and play your video files stored on your device."
-          } else {
-            "MpvFlux needs \"Storage\" permission to access and play your media files stored on your device."
-          }
-        } else {
-          "MpvFlux needs \"All file access\" to discover media and subtitles across your device."
-        },
+        text = "MpvFlux needs \"All file access\" to discover media and subtitles across your device.",
         style = MaterialTheme.typography.bodyLarge,
         color = Color.White.copy(alpha = 0.7f),
         textAlign = TextAlign.Center,
@@ -174,21 +163,17 @@ fun PermissionDeniedState(
       // Grant Access Button
       Button(
         onClick = {
-          if (isPlayStoreBuild) {
-            onRequestPermission()
-          } else {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-              try {
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-                intent.data = Uri.parse("package:${context.packageName}")
-                context.startActivity(intent)
-              } catch (_: Exception) {
-                val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                context.startActivity(intent)
-              }
-            } else {
-              onRequestPermission()
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+              val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+              intent.data = Uri.parse("package:${context.packageName}")
+              context.startActivity(intent)
+            } catch (_: Exception) {
+              val intent = Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
+              context.startActivity(intent)
             }
+          } else {
+            onRequestPermission()
           }
         },
         modifier =
@@ -262,50 +247,21 @@ fun PermissionDeniedState(
               .verticalScroll(rememberScrollState()),
           verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-          if (isPlayStoreBuild) {
-            // Play Store build explanation
-            Text(text = stringResource(R.string.perm_why_intro),
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+          // Standard build explanation
+          Text(text = stringResource(R.string.perm_why_history),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
 
-            Text(
-              text = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                "On Android 13 and above, this permission allows the app to read video files from your device's storage, including Downloads, Movies, and DCIM folders."
-              } else {
-                "This permission allows the app to read media files from your device's storage to play videos and audio."
-              },
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+          Text(text = stringResource(R.string.perm_why_policy),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
 
-            Text(text = stringResource(R.string.perm_why_used_for),
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-              fontWeight = FontWeight.Medium,
-            )
-
-            Text(text = stringResource(R.string.perm_why_uses),
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          } else {
-            // Standard build explanation
-            Text(text = stringResource(R.string.perm_why_history),
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Text(text = stringResource(R.string.perm_why_policy),
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-
-            Text(text = stringResource(R.string.perm_why_scope),
-              style = MaterialTheme.typography.bodyMedium,
-              color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-          }
+          Text(text = stringResource(R.string.perm_why_scope),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
 
           Text(text = stringResource(R.string.perm_why_open_source),
             style = MaterialTheme.typography.bodyMedium,

@@ -82,8 +82,7 @@ object CopyPasteOps {
     }
 
   /**
-   * Check if we can use direct file operations
-   * Play Store flavor uses scoped/SAF path; other flavors keep classic direct file behavior.
+   * Check if we can use direct file operations (needs "All files access" on Android 11+).
    */
   fun canUseDirectFileOperations(): Boolean =
     hasManageStoragePermission()

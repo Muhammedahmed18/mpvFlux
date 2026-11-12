@@ -24,8 +24,8 @@ android {
     applicationId = "app.marlboroadvance.mpvflux"
     minSdk = 26
     targetSdk = 36
-    versionCode = 143
-    versionName = "1.4.3"
+    versionCode = 144
+    versionName = "1.4.4"
 
     vectorDrawables {
       useSupportLibrary = true
@@ -33,31 +33,6 @@ android {
 
     buildConfigField("String", "GIT_SHA", "\"${getCommitSha()}\"")
     buildConfigField("int", "GIT_COUNT", getCommitCount())
-  }
-
-  flavorDimensions += "distribution"
-
-  productFlavors {
-    create("standard") {
-      dimension = "distribution"
-      buildConfigField("boolean", "SCOPED_STORAGE_ONLY", "false")
-    }
-
-    create("playstore") {
-      dimension = "distribution"
-      versionNameSuffix = "-playstore"
-      buildConfigField("boolean", "SCOPED_STORAGE_ONLY", "true")
-    }
-
-    create("fdroid") {
-      dimension = "distribution"
-      versionNameSuffix = "-fdroid"
-      buildConfigField("boolean", "SCOPED_STORAGE_ONLY", "false")
-
-      ndk {
-        abiFilters += listOf("arm64-v8a", "x86_64")
-      }
-    }
   }
 
   dependenciesInfo {
@@ -151,14 +126,12 @@ androidComponents {
     }
 
     // Local release builds: the final APKs themselves are named mpvFlux-<abi>-v<version>.apk
-    // (one set of files, in app/build/outputs/apk/<flavor>/release/ or the folder picked in
+    // (one set of files, in app/build/outputs/apk/release/ or the folder picked in
     // "Generate Signed APK"). Uses AGP 9's artifact transform API, since outputFileName no
     // longer exists. Skipped on CI (CI=true), where the workflows sign and rename by the
-    // original app-<flavor>-<abi>-release names.
+    // original app-<abi>-release names.
     if (variant.buildType == "release" && System.getenv("CI") == null) {
-      val renameTask = tasks.register<RenameApksTask>("renameApksFor${variant.name.replaceFirstChar { it.uppercase() }}") {
-        flavor.set(variant.flavorName ?: "")
-      }
+      val renameTask = tasks.register<RenameApksTask>("renameApksFor${variant.name.replaceFirstChar { it.uppercase() }}")
       val request = variant.artifacts.use(renameTask)
         .wiredWithDirectories(RenameApksTask::input, RenameApksTask::output)
         .toTransformMany(SingleArtifact.APK)
@@ -251,8 +224,7 @@ dependencies {
 /* ---------------- Git helpers ---------------- */
 
 /**
- * Renames each built APK to "mpvFlux-<abi>-v<version>.apk" (standard flavor) or
- * "mpvFlux-<flavor>-<abi>-v<version>.apk" (playstore / fdroid). Universal APKs use "universal".
+ * Renames each built APK to "mpvFlux-<abi>-v<version>.apk". Universal APKs use "universal".
  * Android Studio and the output-metadata.json see only the renamed files.
  * Pattern from Google's gradle-recipes "workerEnabledTransformation" (AGP 9.1).
  */
@@ -268,14 +240,8 @@ abstract class RenameApksTask @Inject constructor(
   @get:Internal
   abstract val transformationRequest: Property<ArtifactTransformationRequest<RenameApksTask>>
 
-  @get:Input
-  abstract val flavor: Property<String>
-
   @TaskAction
   fun rename() {
-    val flavorName = flavor.get()
-    val prefix = if (flavorName.isEmpty() || flavorName == "standard") "mpvFlux" else "mpvFlux-$flavorName"
-
     // Remove APKs from earlier versions (e.g. mpvFlux-arm64-v8a-v1.3.5.apk) so the folder
     // only holds the current build. Gradle/Android Studio never delete them because the
     // version is part of the file name.
@@ -291,10 +257,9 @@ abstract class RenameApksTask @Inject constructor(
       val abi = apk.filters
         .find { it.filterType == FilterConfiguration.FilterType.ABI }
         ?.identifier ?: "universal"
-      // versionName carries the flavor suffix ("1.3.5-playstore"); strip it for the file name.
-      val version = (apk.versionName ?: "").removeSuffix("-$flavorName")
+      val version = apk.versionName ?: ""
       params.inputApkFile.set(File(apk.outputFile))
-      params.outputApkFile.set(File(outputLocation.asFile, "$prefix-$abi-v$version.apk"))
+      params.outputApkFile.set(File(outputLocation.asFile, "mpvFlux-$abi-v$version.apk"))
       params.outputApkFile.get().asFile
     }
   }

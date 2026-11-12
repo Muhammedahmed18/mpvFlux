@@ -86,6 +86,12 @@ object PreferencesScreen : Screen {
                 )
             ) {
                 item {
+                    app.marlboroadvance.mpvex.ui.update.UpdateSettingsCard(
+                        onClick = { backstack.add(UpdatesScreen) },
+                    )
+                }
+
+                item {
                     SearchPill(onClick = { backstack.add(SettingsSearchScreen) })
                 }
 

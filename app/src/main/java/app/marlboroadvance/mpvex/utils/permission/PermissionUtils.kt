@@ -2,7 +2,6 @@ package app.marlboroadvance.mpvex.utils.permission
 
 import android.app.Activity
 import android.content.Context
-import android.content.ContentValues
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
@@ -23,7 +22,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
-import app.marlboroadvance.mpvex.BuildConfig
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
 import app.marlboroadvance.mpvex.utils.media.MediaLibraryEvents
@@ -171,7 +169,7 @@ object PermissionUtils {
     // Wrap permission state to consider MANAGE_EXTERNAL_STORAGE on Android 11+
     val effectivePermissionState =
       remember(permissionState.status, lifecycleTrigger) {
-        if (!BuildConfig.SCOPED_STORAGE_ONLY && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
           if (android.os.Environment.isExternalStorageManager()) {
             object : PermissionState {
               override val permission = permissionState.permission
@@ -225,16 +223,6 @@ object PermissionUtils {
     private const val TAG = "StorageOps"
 
     /**
-     * Check if MANAGE_EXTERNAL_STORAGE permission is available and granted
-     */
-    private fun hasManageStoragePermission(): Boolean =
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-        android.os.Environment.isExternalStorageManager()
-      } else {
-        true // Pre-Android 11 devices don't need this permission
-      }
-
-    /**
      * Delete videos using direct file operations (requires MANAGE_EXTERNAL_STORAGE on Android 11+)
      */
     suspend fun deleteVideos(
@@ -242,11 +230,7 @@ object PermissionUtils {
       videos: List<Video>,
     ): Pair<Int, Int> =
       withContext(Dispatchers.IO) {
-        if (!BuildConfig.SCOPED_STORAGE_ONLY || hasManageStoragePermission()) {
-          deleteVideosDirectly(context, videos)
-        } else {
-          deleteVideosScoped(context, videos)
-        }
+        deleteVideosDirectly(context, videos)
       }
 
     /**
@@ -290,81 +274,6 @@ object PermissionUtils {
       }
 
     /**
-     * Delete videos via scoped storage (Play Store flavor / no MANAGE_EXTERNAL_STORAGE)
-     */
-    private suspend fun deleteVideosScoped(
-      context: Context,
-      videos: List<Video>,
-    ): Pair<Int, Int> =
-      withContext(Dispatchers.IO) {
-        var deleted = 0
-        var failed = 0
-
-        val contentVideos = videos.filter { it.uri.scheme == "content" }
-        val fileVideos = videos.filter { it.uri.scheme != "content" }
-
-        if (contentVideos.isNotEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-          val granted = requestDeleteAccess(context, contentVideos.map { it.uri })
-          if (granted) {
-            contentVideos.forEach { video ->
-              deleted++
-              RecentlyPlayedOps.onVideoDeleted(video.path)
-              PlaybackStateOps.onVideoDeleted(video.path)
-              Log.d(TAG, "✓ Deleted (scoped request): ${video.displayName}")
-            }
-          } else {
-            failed += contentVideos.size
-            Log.w(TAG, "✗ Delete request denied/cancelled for ${contentVideos.size} item(s)")
-          }
-        } else {
-          for (video in contentVideos) {
-            try {
-              val rows = context.contentResolver.delete(video.uri, null, null)
-              if (rows > 0) {
-                deleted++
-                RecentlyPlayedOps.onVideoDeleted(video.path)
-                PlaybackStateOps.onVideoDeleted(video.path)
-                Log.d(TAG, "✓ Deleted (scoped): ${video.displayName}")
-              } else {
-                failed++
-                Log.w(TAG, "✗ Failed to delete (scoped): ${video.displayName}")
-              }
-            } catch (e: Exception) {
-              failed++
-              Log.e(TAG, "✗ Error deleting (scoped) ${video.displayName}", e)
-            }
-          }
-        }
-
-        for (video in fileVideos) {
-          try {
-            val file = File(video.path)
-            if (!file.exists() || file.delete()) {
-              deleted++
-              RecentlyPlayedOps.onVideoDeleted(video.path)
-              PlaybackStateOps.onVideoDeleted(video.path)
-              Log.d(TAG, "✓ Deleted (file fallback): ${video.displayName}")
-              
-              // Notify MediaStore immediately
-              android.media.MediaScannerConnection.scanFile(context, arrayOf(video.path), null, null)
-            } else {
-              failed++
-              Log.w(TAG, "✗ Failed to delete (file fallback): ${video.displayName}")
-            }
-          } catch (e: Exception) {
-            failed++
-            Log.e(TAG, "✗ Error deleting (file fallback) ${video.displayName}", e)
-          }
-        }
-
-        if (deleted > 0) {
-          MediaLibraryEvents.notifyChanged()
-        }
-
-        Pair(deleted, failed)
-      }
-
-    /**
      * Rename video using direct file operations (requires MANAGE_EXTERNAL_STORAGE on Android 11+)
      */
     suspend fun renameVideo(
@@ -373,11 +282,7 @@ object PermissionUtils {
       newDisplayName: String,
     ): Result<Unit> =
       withContext(Dispatchers.IO) {
-        if (!BuildConfig.SCOPED_STORAGE_ONLY || hasManageStoragePermission()) {
-          renameVideoDirectly(context, video, newDisplayName)
-        } else {
-          renameVideoScoped(context, video, newDisplayName)
-        }
+        renameVideoDirectly(context, video, newDisplayName)
       }
 
     /**
@@ -419,55 +324,6 @@ object PermissionUtils {
           }
         } catch (e: Exception) {
           Log.e(TAG, "✗ Error renaming ${video.displayName}", e)
-          Result.failure(e)
-        }
-      }
-
-    /**
-     * Rename video via MediaStore update (scoped storage path)
-     */
-    private suspend fun renameVideoScoped(
-      context: Context,
-      video: Video,
-      newDisplayName: String,
-    ): Result<Unit> =
-      withContext(Dispatchers.IO) {
-        try {
-          if (video.uri.scheme != "content") {
-            return@withContext renameVideoDirectly(context, video, newDisplayName)
-          }
-
-          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val granted = requestWriteAccess(context, listOf(video.uri))
-            if (!granted) {
-              Log.w(TAG, "✗ Rename request denied/cancelled: ${video.displayName}")
-              return@withContext Result.failure(SecurityException("Rename permission denied"))
-            }
-          }
-
-          val values =
-            ContentValues().apply {
-              put(MediaStore.MediaColumns.DISPLAY_NAME, newDisplayName)
-            }
-
-          val updated = context.contentResolver.update(video.uri, values, null, null)
-          if (updated > 0) {
-            val oldPath = video.path
-            val parent = File(oldPath).parentFile
-            val newPath = parent?.let { File(it, newDisplayName).absolutePath } ?: oldPath
-
-            RecentlyPlayedOps.onVideoRenamed(oldPath, newPath)
-            PlaybackStateOps.onVideoRenamed(oldPath, newPath)
-            MediaLibraryEvents.notifyChanged()
-
-            Log.d(TAG, "✓ Renamed (scoped): ${video.displayName} -> $newDisplayName")
-            Result.success(Unit)
-          } else {
-            Log.w(TAG, "✗ Rename failed (scoped): ${video.displayName}")
-            Result.failure(IllegalStateException("Rename operation failed"))
-          }
-        } catch (e: Exception) {
-          Log.e(TAG, "✗ Error renaming (scoped) ${video.displayName}", e)
           Result.failure(e)
         }
       }

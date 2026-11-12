@@ -80,8 +80,6 @@ Get the latest APK from the [**Releases page**](https://github.com/Muhammedahmed
 | `mpvFlux-armeabi-v7a-vX.Y.Z.apk` | Older 32-bit phones |
 | `mpvFlux-x86_64-vX.Y.Z.apk` / `mpvFlux-x86-vX.Y.Z.apk` | Emulators, Chromebooks |
 | `mpvFlux-universal-vX.Y.Z.apk` | Not sure? This one works everywhere |
-| `mpvFlux-playstore-vX.Y.Z.apk` | Play Store build |
-| `mpvFlux-fdroid-vX.Y.Z.apk` | F-Droid build |
 
 **Requires Android 8.0 (API 26) or newer.**
 
@@ -98,18 +96,12 @@ Get the latest APK from the [**Releases page**](https://github.com/Muhammedahmed
 ```bash
 git clone https://github.com/Muhammedahmed18/mpvFlux.git
 cd mpvFlux
-./gradlew assembleStandardDebug
+./gradlew assembleDebug
 ```
 
-The debug APK ends up in `app/build/outputs/apk/standard/debug/`.
+The debug APK ends up in `app/build/outputs/apk/debug/`.
 
-Release builds (`./gradlew assembleStandardRelease`, or **Build → Generate Signed APK** in Android Studio) are named like the GitHub releases, e.g. `mpvFlux-arm64-v8a-v1.3.9.apk`, in `app/build/outputs/apk/standard/release/` or the destination folder you choose.
-
-| Build flavour | Purpose |
-|---|---|
-| `standard` | GitHub releases (per-ABI + universal APKs) |
-| `playstore` | Play Store build |
-| `fdroid` | F-Droid build |
+Release builds (`./gradlew assembleRelease`, or **Build → Generate Signed APK** in Android Studio) are named like the GitHub releases, e.g. `mpvFlux-arm64-v8a-v1.3.9.apk`, in `app/build/outputs/apk/release/` or the destination folder you choose.
 
 ---
 

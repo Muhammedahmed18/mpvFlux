@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.toArgb
@@ -56,6 +57,13 @@ import androidx.navigation3.scene.Scene
 class MainActivity : ComponentActivity() {
   private val appearancePreferences by inject<AppearancePreferences>()
   private val thumbnailRepository by inject<app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository>()
+  private val updateManager by inject<app.marlboroadvance.mpvex.update.UpdateManager>()
+
+  // Incremented when the "update ready" notification asks to open Settings → Updates.
+  private val openUpdatesRequests = kotlinx.coroutines.flow.MutableStateFlow(0)
+
+  // Release notes to show once after an in-app update ("What's new"), if any.
+  private var whatsNew: Pair<String, String>? = null
 
   // Create a coroutine scope tied to the activity lifecycle
   private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -71,6 +79,11 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     
     PermissionUtils.setMediaAccessLauncher(mediaAccessLauncher)
+
+    if (savedInstanceState == null) {
+      whatsNew = updateManager.consumeWhatsNew()
+      handleUpdateIntent(intent)
+    }
 
     // Storage-wide media scan (rate-limited to once every 12 h). Started here rather than in
     // App.onCreate so that opening a video straight from another app doesn't scan storage.
@@ -114,6 +127,21 @@ class MainActivity : ComponentActivity() {
     app.marlboroadvance.mpvex.utils.media.MediaStoreWatcher.start(this)
     // Continue folder thumbnail batches paused while a video was playing.
     thumbnailRepository.resumeFolderGeneration()
+    // At most one small request to GitHub a day (only if auto-check is on).
+    updateManager.checkIfDue()
+  }
+
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    handleUpdateIntent(intent)
+  }
+
+  private fun handleUpdateIntent(intent: android.content.Intent?) {
+    if (intent?.getBooleanExtra(app.marlboroadvance.mpvex.update.UpdateManager.EXTRA_OPEN_UPDATES, false) == true) {
+      intent.removeExtra(app.marlboroadvance.mpvex.update.UpdateManager.EXTRA_OPEN_UPDATES)
+      openUpdatesRequests.value += 1
+    }
   }
 
   override fun onStop() {
@@ -197,6 +225,56 @@ class MainActivity : ComponentActivity() {
         popTransitionSpec = popTransitionSpec,
         transitionSpec = transitionSpec,
         predictivePopTransitionSpec = predictivePopTransitionSpec,
+      )
+      UpdatePrompts(typedBackstack)
+    }
+  }
+
+  /**
+   * Update popups over the app: "What's new" once after an in-app update, the one-time
+   * "update available" sheet, and opening Settings → Updates from the notification.
+   */
+  @Composable
+  private fun UpdatePrompts(backstack: NavBackStack<Screen>) {
+    val updatesScreen = app.marlboroadvance.mpvex.ui.preferences.UpdatesScreen
+
+    val openRequests by openUpdatesRequests.collectAsState()
+    LaunchedEffect(openRequests) {
+      if (openRequests > 0 && backstack.lastOrNull() != updatesScreen) backstack.add(updatesScreen)
+    }
+
+    var whatsNewState by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(whatsNew) }
+    whatsNewState?.let { (version, notes) ->
+      app.marlboroadvance.mpvex.ui.update.WhatsNewSheet(version, notes) { whatsNewState = null }
+    }
+
+    val state by updateManager.state.collectAsState()
+    val available = state as? app.marlboroadvance.mpvex.update.UpdateState.Available
+    var popupFor by androidx.compose.runtime.remember {
+      androidx.compose.runtime.mutableStateOf<app.marlboroadvance.mpvex.update.ReleaseInfo?>(null)
+    }
+    LaunchedEffect(available?.release?.version) {
+      val release = available?.release ?: return@LaunchedEffect
+      if (available.skipped || updateManager.wasNotified(release)) return@LaunchedEffect
+      if (backstack.lastOrNull() == updatesScreen) {
+        // Already looking at it (manual check): no popup needed.
+        updateManager.markNotified(release)
+      } else if (whatsNewState == null) {
+        popupFor = release
+      }
+    }
+    popupFor?.let { release ->
+      app.marlboroadvance.mpvex.ui.update.UpdateAvailableSheet(
+        release = release,
+        onLater = {
+          updateManager.markNotified(release)
+          popupFor = null
+        },
+        onView = {
+          updateManager.markNotified(release)
+          popupFor = null
+          backstack.add(updatesScreen)
+        },
       )
     }
   }

@@ -192,11 +192,14 @@ private fun NormalTopBar(
       }
       if (onSettingsClick != null) {
         IconButton(onClick = onSettingsClick) {
-          Icon(
-            Icons.Rounded.Settings,
-            contentDescription = stringResource(R.string.settings),
-            tint = MaterialTheme.colorScheme.secondary,
-          )
+          // Small dot when an app update is waiting.
+          app.marlboroadvance.mpvex.ui.update.SettingsIconWithUpdateDot {
+            Icon(
+              Icons.Rounded.Settings,
+              contentDescription = stringResource(R.string.settings),
+              tint = MaterialTheme.colorScheme.secondary,
+            )
+          }
         }
       }
     }
