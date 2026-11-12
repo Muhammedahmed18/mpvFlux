@@ -1,5 +1,8 @@
 package app.marlboroadvance.mpvex.ui.preferences.components
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,11 +27,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.rotate
 import app.marlboroadvance.mpvex.preferences.PlayerButton
+import app.marlboroadvance.mpvex.preferences.icon
 import app.marlboroadvance.mpvex.preferences.getPlayerButtonLabel
 
 /**
  * A simple "Quick Settings" style chip for a player button.
  * Renders text or icons based on the button type.
+ */
+/**
+ * Tile for one player button in Settings → Player layout. Uses the same icon as the player
+ * ([PlayerButton.icon]). [badgeIcon] sits on the bottom-right corner (add / remove);
+ * [elevation] lifts the tile while it is dragged.
  */
 @Composable
 fun PlayerButtonChip(
@@ -37,27 +46,35 @@ fun PlayerButtonChip(
   onClick: (() -> Unit)? = null,
   badgeIcon: ImageVector? = null,
   badgeColor: Color? = null,
+  elevation: Dp = 0.dp,
 ) {
   val label = getPlayerButtonLabel(button) // Kept for accessibility
+  val shape = MaterialTheme.shapes.large
 
   Box(
-    modifier = Modifier.padding(4.dp), // Padding for the badge
+    // Room around the tile so the corner badge is never cut off.
+    modifier = Modifier.padding(6.dp),
   ) {
     Card(
-      modifier = Modifier, // Let the card wrap its content
-      shape = MaterialTheme.shapes.medium,
-      elevation = CardDefaults.cardElevation(defaultElevation = if (enabled) 1.dp else 0.dp),
+      modifier = Modifier,
+      shape = shape,
+      // A brighter tile plus a thin outline keeps the edges visible on dark and black themes.
+      border = BorderStroke(
+        1.dp,
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (enabled) 1f else 0.4f),
+      ),
+      elevation = CardDefaults.cardElevation(defaultElevation = elevation),
       colors =
         CardDefaults.cardColors(
           containerColor =
             if (enabled) {
-              MaterialTheme.colorScheme.surfaceVariant
+              MaterialTheme.colorScheme.surfaceContainerHighest
             } else {
-              MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+              MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.4f)
             },
           contentColor =
             if (enabled) {
-              MaterialTheme.colorScheme.onSurfaceVariant
+              MaterialTheme.colorScheme.onSurface
             } else {
               MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
             },
@@ -65,13 +82,11 @@ fun PlayerButtonChip(
       onClick = { onClick?.invoke() },
       enabled = enabled && onClick != null,
     ) {
-      // Use a Box to center content and set size constraints
       Box(
         modifier =
           Modifier
-            .defaultMinSize(minWidth = 56.dp, minHeight = 56.dp) // Smaller min size
+            .defaultMinSize(minWidth = 56.dp, minHeight = 56.dp)
             .padding(horizontal = 12.dp, vertical = 8.dp),
-        // Padding inside the card
         contentAlignment = Alignment.Center,
       ) {
         when (button) {
@@ -116,7 +131,7 @@ fun PlayerButtonChip(
       }
     }
 
-    // Badge Icon Overlay
+    // Badge on the tile's bottom-right corner, with a ring in the card colour behind it.
     if (badgeIcon != null && badgeColor != null) {
       Icon(
         imageVector = badgeIcon,
@@ -124,9 +139,11 @@ fun PlayerButtonChip(
         tint = badgeColor,
         modifier =
           Modifier
-            .size(20.dp)
             .align(Alignment.BottomEnd)
-            .background(MaterialTheme.colorScheme.surface, CircleShape),
+            .offset(x = 4.dp, y = 4.dp)
+            .size(22.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainerLow, CircleShape)
+            .padding(1.dp),
       )
     }
   }

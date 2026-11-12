@@ -2,119 +2,91 @@ package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
 import android.graphics.Bitmap
 import android.net.Uri
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyGridState
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ViewList
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.outlined.Check
-import androidx.compose.material.icons.outlined.Movie
-import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.Badge
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledIconToggleButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
-import org.koin.compose.koinInject
+import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.presentation.components.PlayerSheet
-import app.marlboroadvance.mpvex.preferences.preference.collectAsState
-import `is`.xyz.mpv.MPVLib
-import app.marlboroadvance.mpvex.ui.theme.spacing
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
-import java.io.File
-import java.net.URLDecoder
-import java.nio.charset.StandardCharsets
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.compose.koinInject
+import java.io.File
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 
 // ---------------------------------------------------------------------------
-// Data & cache
+// Data
 // ---------------------------------------------------------------------------
 
 data class PlaylistItem(
@@ -129,11 +101,29 @@ data class PlaylistItem(
   val resolution: String = "",
 )
 
+/** Which part of the playlist the list shows. */
+private enum class PlaylistFilter(val labelRes: Int) {
+  All(R.string.playlist_filter_all),
+  UpNext(R.string.playlist_filter_up_next),
+  Watched(R.string.playlist_filter_watched),
+}
+
 // ---------------------------------------------------------------------------
-// PlaylistSheet — sheet container
+// PlaylistSheet
 // ---------------------------------------------------------------------------
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Playlist for the player.
+ *
+ * Portrait: bottom sheet. Landscape: side sheet from the right, so the video stays visible.
+ * Layout: header with the episode count and an *All · Up next · Watched* segmented button,
+ * a "Now playing" card, then one row per episode (thumbnail with duration and progress, a
+ * cleaned-up title, resolution · length, watched check). Opens scrolled to the current
+ * episode. Watched episodes are always reachable (they used to be hidden in portrait).
+ *
+ * [playerPreferences] is kept for the call site; the old grid view is gone.
+ */
+@Suppress("UNUSED_PARAMETER")
 @Composable
 fun PlaylistSheet(
   playlist: ImmutableList<PlaylistItem>,
@@ -144,1416 +134,510 @@ fun PlaylistSheet(
   isM3UPlaylist: Boolean = false,
   loadingItemIndex: Int = -1,
 ) {
-  val configuration = LocalConfiguration.current
-  val accentColor   = MaterialTheme.colorScheme.primary
-  val isPortrait    = configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
-
-  val isListModePreference by playerPreferences.playlistViewMode.collectAsState()
-  var isListMode by remember { mutableStateOf(if (isPortrait) true else isListModePreference) }
-
-  LaunchedEffect(isPortrait) { if (isPortrait && !isListMode) isListMode = true }
-  LaunchedEffect(isListMode) {
-    if (!isPortrait && isListMode != isListModePreference) playerPreferences.playlistViewMode.set(isListMode)
-  }
-
-  val thumbnailRepository = koinInject<ThumbnailRepository>()
-  val lazyListState       = rememberLazyListState()
-  val lazyGridState       = rememberLazyGridState()
-
-  val currentItem = remember(playlist) { playlist.find { it.isPlaying } }
-  
-  // Logic for toggling watched view
-  var isShowingWatched by remember { mutableStateOf(false) }
-  
-  val queue = remember(playlist) {
-    playlist.filterNot { it.isPlaying || it.isWatched }.toImmutableList()
-  }
-  
-  val watchedList = remember(playlist) {
-    playlist.filter { it.isWatched && !it.isPlaying }.toImmutableList()
-  }
-
-  val density    = LocalDensity.current
+  val isPortrait =
+    LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
   val windowSize = LocalWindowInfo.current.containerSize
-  val screenWidth  = with(density) { windowSize.width.toDp() }
+  val density = LocalDensity.current
+  val screenWidth = with(density) { windowSize.width.toDp() }
   val screenHeight = with(density) { windowSize.height.toDp() }
 
-  val sheetWidth = if (isListMode) {
-    if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE) 640.dp else 420.dp
-  } else screenWidth * 0.85f
-
-  // Two-panel only in landscape when something is playing
-  val useTwoPanelLayout = !isPortrait && currentItem != null
-
-  PlayerSheet(
-    onDismissRequest = onDismissRequest,
-    modifier         = Modifier.fillMaxWidth(),
-    customMaxWidth   = sheetWidth,
-    customMaxHeight  = if (isPortrait) screenHeight * 0.7f else screenHeight * 0.85f,
-  ) {
-    // ── Drag handle — always full-width at the very top ──────────────────────
-    Box(
-      modifier         = Modifier.fillMaxWidth().padding(vertical = MaterialTheme.spacing.medium),
-      contentAlignment = Alignment.Center,
+  if (isPortrait) {
+    PlayerSheet(
+      onDismissRequest = onDismissRequest,
+      modifier = Modifier.fillMaxWidth(),
+      customMaxWidth = 560.dp,
+      customMaxHeight = screenHeight * 0.75f,
     ) {
-      Box(
-        modifier = Modifier
-          .width(32.dp)
-          .height(4.dp)
-          .clip(RoundedCornerShape(2.dp))
-          .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+      Column(modifier = modifier) {
+        DragHandle()
+        PlaylistContent(playlist, onItemClick, isM3UPlaylist, loadingItemIndex)
+      }
+    }
+  } else {
+    PlaylistSideSheet(
+      onDismissRequest = onDismissRequest,
+      width = minOf(400.dp, screenWidth * 0.45f),
+    ) {
+      PlaylistContent(playlist, onItemClick, isM3UPlaylist, loadingItemIndex, Modifier.padding(top = 12.dp))
+    }
+  }
+}
+
+@Composable
+private fun PlaylistContent(
+  playlist: ImmutableList<PlaylistItem>,
+  onItemClick: (PlaylistItem) -> Unit,
+  skipThumbnails: Boolean,
+  loadingItemIndex: Int,
+  modifier: Modifier = Modifier,
+) {
+  val thumbnailRepository = koinInject<ThumbnailRepository>()
+  val current = remember(playlist) { playlist.firstOrNull { it.isPlaying } }
+  var filter by rememberSaveable { mutableStateOf(PlaylistFilter.All) }
+
+  val visible = remember(playlist, filter, current) {
+    when (filter) {
+      PlaylistFilter.All -> playlist.filterNot { it.isPlaying }
+      PlaylistFilter.UpNext -> playlist.filter {
+        !it.isPlaying && (if (current != null) it.index > current.index else !it.isWatched)
+      }
+      PlaylistFilter.Watched -> playlist.filter { it.isWatched && !it.isPlaying }
+    }
+  }
+
+  // Open (and switch filters) with the episode after the current one at the top.
+  val listState = rememberLazyListState()
+  LaunchedEffect(filter, current?.index) {
+    val target = if (filter == PlaylistFilter.All && current != null) {
+      visible.indexOfFirst { it.index > current.index }.takeIf { it > 0 } ?: 0
+    } else {
+      0
+    }
+    listState.scrollToItem(target)
+  }
+
+  Column(modifier = modifier.fillMaxWidth()) {
+    PlaylistHeader(count = playlist.size)
+
+    SingleChoiceSegmentedButtonRow(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+      PlaylistFilter.entries.forEachIndexed { i, option ->
+        SegmentedButton(
+          selected = filter == option,
+          onClick = { filter = option },
+          shape = SegmentedButtonDefaults.itemShape(index = i, count = PlaylistFilter.entries.size),
+          label = { Text(stringResource(option.labelRes), maxLines = 1) },
+        )
+      }
+    }
+
+    if (current != null) {
+      NowPlayingCard(
+        item = current,
+        thumbnailRepository = thumbnailRepository,
+        skipThumbnail = skipThumbnails,
+        onClick = { onItemClick(current) },
       )
     }
 
-    if (useTwoPanelLayout) {
-      // ── Landscape: hero card left | queue right ───────────────────────────
-      Row(
-        modifier = modifier
-          .fillMaxWidth()
-          .fillMaxHeight()
-          .padding(bottom = MaterialTheme.spacing.smaller),
-      ) {
-        // Left panel: sidebar + One UI Toggle Pill
-        Column(
-          modifier         = Modifier
-            .weight(0.38f)
-            .fillMaxHeight()
-            .padding(
-              top    = MaterialTheme.spacing.small,
-              bottom = MaterialTheme.spacing.medium,
-            ),
-          horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-          PlaylistNowPlayingPanel(
-            item                = currentItem!!,
-            thumbnailRepository = thumbnailRepository,
-            onClick             = { onItemClick(currentItem) },
-            accentColor         = accentColor,
-            skipThumbnail       = isM3UPlaylist,
-          )
-          
-          Spacer(modifier = Modifier.weight(1f))
-          
-          if (watchedList.isNotEmpty()) {
-            OneUI8TogglePill(
-              isShowingWatched = isShowingWatched,
-              onClick = { isShowingWatched = !isShowingWatched }
-            )
-          }
-        }
-
-        VerticalDivider(
-          modifier  = Modifier
-            .fillMaxHeight()
-            .padding(vertical = MaterialTheme.spacing.medium),
-          thickness = 1.dp,
-          color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-        )
-
-        // Right panel: header + scrollable content
-        Column(
-          modifier = Modifier
-            .weight(0.62f)
-            .fillMaxHeight(),
-        ) {
-          val activeList = if (isShowingWatched) watchedList else queue
-          val headerTitle = when {
-            isShowingWatched -> "Watched"
-            currentItem != null -> "Up Next"
-            else -> "Playlist"
-          }
-
-          PlaylistQueueHeader(
-            count       = activeList.size,
-            title       = headerTitle,
-            isListMode  = isListMode,
-            isPortrait  = false,
-            onListMode  = { isListMode = it },
-          )
-          PlaylistQueueContent(
-            modifier            = Modifier.weight(1f),
-            queue               = activeList,
-            isListMode          = isListMode,
-            lazyListState       = lazyListState,
-            lazyGridState       = lazyGridState,
-            thumbnailRepository = thumbnailRepository,
-            accentColor         = accentColor,
-            isM3UPlaylist       = isM3UPlaylist,
-            loadingItemIndex    = loadingItemIndex,
-            onItemClick         = onItemClick,
-          )
-        }
-      }
+    if (visible.isEmpty()) {
+      EmptyState(filter)
     } else {
-      // ── Portrait (or landscape with nothing playing): single column ────────
-      Column(
-        modifier = modifier
-          .padding(bottom = MaterialTheme.spacing.smaller)
-          .animateContentSize(),
+      LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
       ) {
-        AnimatedVisibility(
-          visible = currentItem != null,
-          enter   = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) + expandVertically(
-            spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
-          ),
-          exit    = fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) + shrinkVertically(
-            spring(stiffness = Spring.StiffnessMediumLow),
-          ),
-        ) {
-          currentItem?.let {
-            PlaylistHeroCard(
-              item                = it,
-              thumbnailRepository = thumbnailRepository,
-              onClick             = { onItemClick(it) },
-              accentColor         = accentColor,
-              skipThumbnail       = isM3UPlaylist,
-            )
-          }
-        }
-
-        if (currentItem != null) {
-          HorizontalDivider(
-            modifier  = Modifier.padding(horizontal = MaterialTheme.spacing.medium, vertical = 4.dp),
-            thickness = 1.dp,
-            color     = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+        items(visible, key = { it.index }) { item ->
+          PlaylistRow(
+            item = item,
+            thumbnailRepository = thumbnailRepository,
+            skipThumbnail = skipThumbnails,
+            isLoading = item.index == loadingItemIndex,
+            onClick = { onItemClick(item) },
           )
         }
-
-        PlaylistQueueHeader(
-          count       = queue.size,
-          title       = if (currentItem != null) "Up Next" else "Playlist",
-          isListMode  = isListMode,
-          isPortrait  = isPortrait,
-          onListMode  = { isListMode = it },
-        )
-
-        PlaylistQueueContent(
-          queue               = queue,
-          isListMode          = isListMode,
-          lazyListState       = lazyListState,
-          lazyGridState       = lazyGridState,
-          thumbnailRepository = thumbnailRepository,
-          accentColor         = accentColor,
-          isM3UPlaylist       = isM3UPlaylist,
-          loadingItemIndex    = loadingItemIndex,
-          onItemClick         = onItemClick,
-        )
       }
     }
   }
 }
 
 // ---------------------------------------------------------------------------
-// OneUI8TogglePill — Stylish pill-shaped switcher
+// Pieces
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun OneUI8TogglePill(
-  isShowingWatched: Boolean,
+private fun DragHandle() {
+  Box(
+    modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+    contentAlignment = Alignment.Center,
+  ) {
+    Box(
+      modifier = Modifier
+        .width(32.dp)
+        .height(4.dp)
+        .clip(CircleShape)
+        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+    )
+  }
+}
+
+@Composable
+private fun PlaylistHeader(count: Int) {
+  Row(
+    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(10.dp),
+  ) {
+    Text(
+      text = stringResource(R.string.playlist_title),
+      style = MaterialTheme.typography.titleLargeEmphasized,
+      color = MaterialTheme.colorScheme.onSurface,
+    )
+    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+      Text(
+        text = count.toString(),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSecondaryContainer,
+        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+      )
+    }
+  }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun NowPlayingCard(
+  item: PlaylistItem,
+  thumbnailRepository: ThumbnailRepository,
+  skipThumbnail: Boolean,
   onClick: () -> Unit,
-  modifier: Modifier = Modifier,
 ) {
+  val thumbnail = rememberPlaylistThumbnail(item, thumbnailRepository, skipThumbnail)
   val haptics = LocalHapticFeedback.current
   Surface(
     onClick = {
       haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
       onClick()
     },
-    modifier     = modifier
-      .height(48.dp)
-      .padding(horizontal = 16.dp),
-    shape        = CircleShape,
-    color        = MaterialTheme.colorScheme.secondaryContainer,
-    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-    shadowElevation = 4.dp,
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+    shape = MaterialTheme.shapes.extraLarge,
+    color = MaterialTheme.colorScheme.primaryContainer,
+    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
   ) {
     Row(
-      modifier              = Modifier.padding(horizontal = 20.dp),
-      verticalAlignment     = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      modifier = Modifier.padding(10.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-      Icon(
-        imageVector = if (isShowingWatched) Icons.AutoMirrored.Default.ViewList else Icons.Outlined.Check,
-        contentDescription = null,
-        modifier = Modifier.size(18.dp),
+      Thumbnail(
+        bitmap = thumbnail,
+        duration = "",
+        progressPercent = item.progressPercent,
+        modifier = Modifier.width(128.dp),
       )
-      Text(
-        text  = if (isShowingWatched) "Next Up" else "Watched",
-        style = MaterialTheme.typography.labelLargeEmphasized,
-      )
+      Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+          text = stringResource(R.string.playlist_now_playing).uppercase(),
+          style = MaterialTheme.typography.labelSmall,
+          color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+          text = remember(item.title) { cleanVideoTitle(item.title) },
+          style = MaterialTheme.typography.titleSmallEmphasized,
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis,
+        )
+        DetailsLine(item, MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f))
+      }
     }
   }
 }
 
-// ---------------------------------------------------------------------------
-// PlaylistQueueHeader — "Up Next" / "Playlist" row with badge and view toggles
-// ---------------------------------------------------------------------------
-
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun PlaylistQueueHeader(
-  count: Int,
-  title: String,
-  isListMode: Boolean,
-  isPortrait: Boolean,
-  onListMode: (Boolean) -> Unit,
+private fun PlaylistRow(
+  item: PlaylistItem,
+  thumbnailRepository: ThumbnailRepository,
+  skipThumbnail: Boolean,
+  isLoading: Boolean,
+  onClick: () -> Unit,
 ) {
-  Row(
-    modifier              = Modifier
-      .fillMaxWidth()
-      .padding(horizontal = MaterialTheme.spacing.medium, vertical = MaterialTheme.spacing.small),
-    verticalAlignment     = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.SpaceBetween,
+  val thumbnail = rememberPlaylistThumbnail(item, thumbnailRepository, skipThumbnail)
+  val haptics = LocalHapticFeedback.current
+  Surface(
+    onClick = {
+      haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+      onClick()
+    },
+    modifier = Modifier.fillMaxWidth(),
+    shape = MaterialTheme.shapes.large,
+    color = Color.Transparent,
   ) {
     Row(
-      verticalAlignment     = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+      modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-      Text(
-        text  = title,
-        style = MaterialTheme.typography.titleSmallEmphasized,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      Thumbnail(
+        bitmap = thumbnail,
+        duration = item.duration,
+        progressPercent = item.progressPercent,
+        modifier = Modifier.width(120.dp),
+        dimmed = item.isWatched,
       )
-      Badge(
-        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor   = MaterialTheme.colorScheme.onSecondaryContainer,
+      Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+          text = remember(item.title) { cleanVideoTitle(item.title) },
+          style = MaterialTheme.typography.bodyLarge,
+          color = if (item.isWatched) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+          } else {
+            MaterialTheme.colorScheme.onSurface
+          },
+          maxLines = 2,
+          overflow = TextOverflow.Ellipsis,
+        )
+        DetailsLine(item, MaterialTheme.colorScheme.onSurfaceVariant)
+      }
+      when {
+        isLoading -> LoadingIndicator(modifier = Modifier.size(24.dp))
+        item.isWatched -> Icon(
+          imageVector = ImageVector.vectorResource(R.drawable.ic_sym_check_circle_fill),
+          contentDescription = stringResource(R.string.playlist_filter_watched),
+          tint = MaterialTheme.colorScheme.primary,
+          modifier = Modifier.size(22.dp),
+        )
+      }
+    }
+  }
+}
+
+/** "1080p · 23:40" under a title; leaves out parts that are unknown. */
+@Composable
+private fun DetailsLine(item: PlaylistItem, color: Color) {
+  val text = listOf(item.resolution, item.duration).filter { it.isNotBlank() }.joinToString(" · ")
+  if (text.isNotEmpty()) {
+    Text(text = text, style = MaterialTheme.typography.labelMedium, color = color, maxLines = 1)
+  }
+}
+
+/** 16:9 thumbnail with an optional duration badge and a progress line along the bottom. */
+@Composable
+private fun Thumbnail(
+  bitmap: Bitmap?,
+  duration: String,
+  progressPercent: Float,
+  modifier: Modifier = Modifier,
+  dimmed: Boolean = false,
+) {
+  Box(
+    modifier = modifier
+      .aspectRatio(16f / 9f)
+      .clip(MaterialTheme.shapes.medium)
+      .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+    contentAlignment = Alignment.Center,
+  ) {
+    if (bitmap != null) {
+      Image(
+        bitmap = bitmap.asImageBitmap(),
+        contentDescription = null,
+        modifier = Modifier
+          .fillMaxSize()
+          .graphicsLayer { alpha = if (dimmed) 0.6f else 1f },
+        contentScale = ContentScale.Crop,
+      )
+    } else {
+      Icon(
+        imageVector = ImageVector.vectorResource(R.drawable.ic_sym_movie),
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.size(24.dp),
+      )
+    }
+
+    if (duration.isNotEmpty()) {
+      Surface(
+        modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
+        shape = CircleShape,
+        color = Color.Black.copy(alpha = 0.65f),
+        contentColor = Color.White,
       ) {
         Text(
-          text  = "$count",
-          style = MaterialTheme.typography.labelMediumEmphasized,
+          text = duration,
+          style = MaterialTheme.typography.labelSmall,
+          modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
         )
       }
     }
 
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-      FilledIconToggleButton(
-        checked         = isListMode,
-        onCheckedChange = { if (!isPortrait && !isListMode) onListMode(true) },
-        enabled         = !isPortrait,
-        modifier        = Modifier.size(40.dp),
-      ) {
-        Icon(
-          imageVector        = Icons.AutoMirrored.Default.ViewList,
-          contentDescription = "List view",
-          modifier           = Modifier.size(18.dp),
-        )
-      }
-      FilledIconToggleButton(
-        checked         = !isListMode,
-        onCheckedChange = { if (!isPortrait && isListMode) onListMode(false) },
-        enabled         = !isPortrait,
-        modifier        = Modifier.size(40.dp),
-      ) {
-        Icon(
-          imageVector        = Icons.Default.GridView,
-          contentDescription = "Grid view",
-          modifier           = Modifier.size(18.dp),
-        )
-      }
+    if (progressPercent > 0f) {
+      LinearProgressIndicator(
+        progress = { (progressPercent / 100f).coerceIn(0f, 1f) },
+        modifier = Modifier
+          .align(Alignment.BottomCenter)
+          .fillMaxWidth()
+          .height(3.dp),
+        color = MaterialTheme.colorScheme.primary,
+        trackColor = Color.White.copy(alpha = 0.25f),
+        strokeCap = StrokeCap.Butt,
+        gapSize = 0.dp,
+        drawStopIndicator = {},
+      )
     }
   }
 }
 
-// ---------------------------------------------------------------------------
-// PlaylistQueueContent — animated list / grid switcher
-// ---------------------------------------------------------------------------
-
 @Composable
-private fun PlaylistQueueContent(
-  queue: ImmutableList<PlaylistItem>,
-  isListMode: Boolean,
-  lazyListState: LazyListState,
-  lazyGridState: LazyGridState,
-  thumbnailRepository: ThumbnailRepository,
-  accentColor: Color,
-  isM3UPlaylist: Boolean,
-  loadingItemIndex: Int,
-  onItemClick: (PlaylistItem) -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  AnimatedContent(
-    targetState    = isListMode,
-    modifier       = modifier,
-    transitionSpec = {
-      val enter = fadeIn(spring(stiffness = Spring.StiffnessMediumLow)) +
-        slideInVertically(
-          spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow),
-        ) { 16 }
-      val exit = fadeOut(spring(stiffness = Spring.StiffnessMediumLow)) +
-        slideOutVertically(spring(stiffness = Spring.StiffnessMediumLow)) { -16 }
-      enter togetherWith exit
-    },
-    label = "view-mode-switch",
-  ) { listMode ->
-    if (listMode) {
-      LazyColumn(
-        state    = lazyListState,
-        modifier = Modifier.fillMaxWidth(),
-      ) {
-        if (queue.isEmpty()) {
-          item(key = "up-next-empty") {
-            AllCaughtUpHint(accentColor = accentColor, modifier = Modifier.animateItem())
-          }
-        }
-        itemsIndexed(queue, key = { _, item -> item.index }) { position, item ->
-          PlaylistTrackListItem(
-            item                = item,
-            thumbnailRepository = thumbnailRepository,
-            onClick             = { onItemClick(item) },
-            accentColor         = accentColor,
-            modifier            = Modifier.animateItem(),
-            skipThumbnail       = isM3UPlaylist,
-            isLoading           = item.index == loadingItemIndex,
-            queuePosition       = position,
-          )
-        }
-      }
-    } else {
-      LazyVerticalGrid(
-        state                 = lazyGridState,
-        columns               = GridCells.Adaptive(minSize = 200.dp),
-        contentPadding        = PaddingValues(
-          horizontal = MaterialTheme.spacing.medium,
-          vertical   = MaterialTheme.spacing.small,
-        ),
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
-        verticalArrangement   = Arrangement.spacedBy(MaterialTheme.spacing.small),
-      ) {
-        if (queue.isEmpty()) {
-          item(key = "up-next-empty", span = { GridItemSpan(maxLineSpan) }) {
-            AllCaughtUpHint(accentColor = accentColor, modifier = Modifier.animateItem())
-          }
-        }
-        itemsIndexed(queue, key = { _, item -> item.index }) { position, item ->
-          PlaylistTrackGridItem(
-            item                = item,
-            thumbnailRepository = thumbnailRepository,
-            onClick             = { onItemClick(item) },
-            accentColor         = accentColor,
-            modifier            = Modifier.animateItem(),
-            skipThumbnail       = isM3UPlaylist,
-            isLoading           = item.index == loadingItemIndex,
-            queuePosition       = position,
-          )
-        }
-      }
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// AllCaughtUpHint — shown when nothing is left in "Up Next"
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun AllCaughtUpHint(
-  accentColor: Color,
-  modifier: Modifier = Modifier,
-) {
-  Row(
-    modifier              = modifier
-      .fillMaxWidth()
-      .padding(horizontal = MaterialTheme.spacing.medium, vertical = MaterialTheme.spacing.small),
-    verticalAlignment     = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.small),
+private fun EmptyState(filter: PlaylistFilter) {
+  Box(
+    modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp, horizontal = 24.dp),
+    contentAlignment = Alignment.Center,
   ) {
-    Icon(
-      imageVector        = Icons.Outlined.Check,
-      contentDescription = null,
-      tint               = accentColor,
-      modifier           = Modifier.size(18.dp),
-    )
     Text(
-      text  = "Nothing here yet",
-      style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+      text = stringResource(
+        when (filter) {
+          PlaylistFilter.Watched -> R.string.playlist_empty_watched
+          else -> R.string.playlist_empty_up_next
+        },
+      ),
+      style = MaterialTheme.typography.bodyMedium,
       color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
   }
 }
 
 // ---------------------------------------------------------------------------
-// PlayingAnimationIndicator — three animated bars
+// Landscape side sheet
 // ---------------------------------------------------------------------------
 
+/**
+ * Side sheet sliding in from the right edge, full height. Tap outside, or Back, to close.
+ * Used in landscape so the playlist doesn't cover most of the video.
+ */
 @Composable
-fun PlayingAnimationIndicator(
-  color: Color,
-  modifier: Modifier = Modifier,
+private fun PlaylistSideSheet(
+  onDismissRequest: () -> Unit,
+  width: androidx.compose.ui.unit.Dp,
+  content: @Composable ColumnScope.() -> Unit,
 ) {
-  val bar1 = remember { Animatable(0.3f) }
-  val bar2 = remember { Animatable(0.55f) }
-  val bar3 = remember { Animatable(0.2f) }
-
-  // Only animate while actually playing: when paused the bars freeze in place instead of
-  // keeping the UI redrawing every frame for as long as the sheet is open.
-  val paused by MPVLib.propBoolean["pause"].collectAsState()
-
-  LaunchedEffect(paused) {
-    if (paused == true) return@LaunchedEffect
-    launch {
-      while (true) {
-        bar1.animateTo(0.85f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow))
-        bar1.animateTo(0.30f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessLow))
-      }
-    }
-    launch {
-      while (true) {
-        bar2.animateTo(0.95f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMediumLow))
-        bar2.animateTo(0.45f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMediumLow))
-      }
-    }
-    launch {
-      while (true) {
-        bar3.animateTo(0.75f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMedium))
-        bar3.animateTo(0.20f, spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMedium))
+  val scope = rememberCoroutineScope()
+  // 1 = fully off screen to the right, 0 = fully shown.
+  val hidden = remember { Animatable(1f) }
+  var closing by remember { mutableStateOf(false) }
+  LaunchedEffect(Unit) {
+    hidden.animateTo(0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow))
+  }
+  val dismiss: () -> Unit = {
+    if (!closing) {
+      closing = true
+      scope.launch {
+        hidden.animateTo(1f, tween(200))
+        onDismissRequest()
       }
     }
   }
+  BackHandler(onBack = dismiss)
 
-  Row(
-    modifier              = modifier.height(14.dp),
-    horizontalArrangement = Arrangement.spacedBy(2.dp),
-    verticalAlignment     = Alignment.Bottom,
-  ) {
-    // The bar heights are applied as a bottom-anchored scale in the draw layer. Feeding
-    // them to fillMaxHeight() re-ran composition and layout on every animation frame.
-    Box(Modifier.width(3.dp).fillMaxHeight().barScale { bar1.value }.background(color, RoundedCornerShape(1.5.dp)))
-    Box(Modifier.width(3.dp).fillMaxHeight().barScale { bar2.value }.background(color, RoundedCornerShape(1.5.dp)))
-    Box(Modifier.width(3.dp).fillMaxHeight().barScale { bar3.value }.background(color, RoundedCornerShape(1.5.dp)))
-  }
-}
-
-/** Scales a bar vertically from its bottom edge; [fraction] is read during drawing only. */
-private fun Modifier.barScale(fraction: () -> Float): Modifier =
-  graphicsLayer {
-    scaleY = fraction()
-    transformOrigin = TransformOrigin(0.5f, 1f)
-  }
-
-// ---------------------------------------------------------------------------
-// WatchedCheckBadge — filled circular check for finished items
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun WatchedCheckBadge(modifier: Modifier = Modifier) {
-  var visible by remember { mutableStateOf(false) }
-  LaunchedEffect(Unit) { visible = true }
-  val scale by animateFloatAsState(
-    targetValue   = if (visible) 1f else 0f,
-    animationSpec = spring(
-      dampingRatio = Spring.DampingRatioMediumBouncy,
-      stiffness    = Spring.StiffnessMedium,
-    ),
-    label = "watched-scale",
-  )
   Box(
-    modifier         = modifier
-      .size(20.dp)
-      .scale(scale)
-      .clip(CircleShape)
-      .background(MaterialTheme.colorScheme.primary),
-    contentAlignment = Alignment.Center,
+    modifier = Modifier
+      .fillMaxSize()
+      .background(Color.Black.copy(alpha = 0.4f * (1f - hidden.value)))
+      .clickable(
+        interactionSource = remember { MutableInteractionSource() },
+        indication = null,
+        onClick = dismiss,
+      ),
   ) {
-    Icon(
-      imageVector        = Icons.Outlined.Check,
-      contentDescription = "Watched",
-      tint               = MaterialTheme.colorScheme.onPrimary,
-      modifier           = Modifier.size(13.dp),
-    )
+    Surface(
+      modifier = Modifier
+        .align(Alignment.CenterEnd)
+        .fillMaxHeight()
+        .width(width)
+        .graphicsLayer { translationX = size.width * hidden.value }
+        .clickable(
+          interactionSource = remember { MutableInteractionSource() },
+          indication = null,
+          onClick = {},
+        ),
+      shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp),
+      color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+      Column(
+        modifier = Modifier.windowInsetsPadding(
+          WindowInsets.safeDrawing.only(WindowInsetsSides.Vertical + WindowInsetsSides.End),
+        ),
+        content = content,
+      )
+    }
   }
 }
 
 // ---------------------------------------------------------------------------
-// rememberPlaylistVideo — build a Video stub from a PlaylistItem
+// Helpers
 // ---------------------------------------------------------------------------
-// Reads size + last-modified from the file at the item's path so the thumbnail key
-// (size|dateModified) matches the one the browser computes — restoring cross-screen
-// thumbnail reuse. Falls back to 0 for content URIs / network / missing files.
+
+/**
+ * Loads the thumbnail for a playlist item from the shared cache (the same one the browser
+ * uses), generating it only if it isn't cached yet.
+ */
+@Composable
+private fun rememberPlaylistThumbnail(
+  item: PlaylistItem,
+  thumbnailRepository: ThumbnailRepository,
+  skipThumbnail: Boolean,
+): Bitmap? {
+  val video = rememberPlaylistVideo(item)
+  val density = LocalDensity.current
+  val widthPx = with(density) { 160.dp.roundToPx() }
+  val heightPx = with(density) { 90.dp.roundToPx() }
+  val key = remember(video.id, video.path) { thumbnailRepository.thumbnailKey(video) }
+  var thumbnail by remember(key) { mutableStateOf(thumbnailRepository.getThumbnailFromMemory(video)) }
+
+  LaunchedEffect(key) {
+    thumbnailRepository.thumbnailReadyKeys.filter { it == key }.collect {
+      thumbnail = thumbnailRepository.getThumbnailFromMemory(video)
+    }
+  }
+  LaunchedEffect(key, skipThumbnail) {
+    if (skipThumbnail) {
+      thumbnail = null
+      return@LaunchedEffect
+    }
+    if (thumbnail != null) return@LaunchedEffect
+    val loaded = withContext(Dispatchers.IO) { thumbnailRepository.getThumbnail(video, widthPx, heightPx) }
+    if (loaded != null) thumbnail = loaded
+  }
+  return thumbnail
+}
+
+// Reads size + last-modified from the file so the thumbnail key (size|dateModified) matches
+// the one the browser computes, which lets the playlist reuse the browser's thumbnails.
 @Composable
 private fun rememberPlaylistVideo(item: PlaylistItem): Video =
   remember(item.uri, item.path, item.title, item.index) {
     val cleanPath = run {
       val withoutPrefix = item.path.removePrefix("file://")
-      try { URLDecoder.decode(withoutPrefix, StandardCharsets.UTF_8.toString()) }
-      catch (_: Exception) { withoutPrefix }
+      try {
+        URLDecoder.decode(withoutPrefix, StandardCharsets.UTF_8.toString())
+      } catch (_: Exception) {
+        withoutPrefix
+      }
     }
     val file = runCatching { File(cleanPath) }.getOrNull()
     val exists = file?.exists() == true
-    val size = if (exists) file!!.length() else 0L
-    val dateModified = if (exists) file!!.lastModified() / 1000 else 0L
     Video(
       id = item.index.toLong(), uri = item.uri, displayName = item.title,
       title = item.title.substringBeforeLast("."), path = cleanPath,
-      duration = 0L, durationFormatted = item.duration, size = size, sizeFormatted = "",
-      dateModified = dateModified, dateAdded = 0L, mimeType = "", bucketId = "", bucketDisplayName = "",
+      duration = 0L, durationFormatted = item.duration,
+      size = if (exists) file!!.length() else 0L, sizeFormatted = "",
+      dateModified = if (exists) file!!.lastModified() / 1000 else 0L,
+      dateAdded = 0L, mimeType = "", bucketId = "", bucketDisplayName = "",
       width = 0, height = 0, fps = 0f, resolution = item.resolution,
       subtitleCodec = "", hasEmbeddedSubtitles = false,
     )
   }
 
-// ---------------------------------------------------------------------------
-// PlaylistHeroCard — large "now playing" card pinned at the top / left panel
-// ---------------------------------------------------------------------------
+private val LEADING_TAGS = Regex("^\\s*(\\[[^\\]]*]\\s*)+")
+private val TRAILING_TAGS = Regex("(\\s*[\\[(][^\\])]*[\\])])+\\s*$")
+private val FILE_EXTENSION = Regex("\\.[A-Za-z0-9]{2,4}$")
+private val SPACES = Regex("\\s{2,}")
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun PlaylistHeroCard(
-  item: PlaylistItem,
-  thumbnailRepository: ThumbnailRepository,
-  onClick: () -> Unit,
-  accentColor: Color,
-  skipThumbnail: Boolean,
-) {
-  val video = rememberPlaylistVideo(item)
-
-  val thumbWidthPx  = with(LocalDensity.current) { 400.dp.roundToPx() }
-  val thumbHeightPx = with(LocalDensity.current) { 225.dp.roundToPx() }
-  val thumbnailKey  = remember(video.id, video.path) {
-    thumbnailRepository.thumbnailKey(video)
-  }
-  var thumbnail by remember(thumbnailKey) {
-    mutableStateOf(thumbnailRepository.getThumbnailFromMemory(video))
-  }
-  LaunchedEffect(thumbnailKey) {
-    thumbnailRepository.thumbnailReadyKeys.filter { it == thumbnailKey }.collect {
-      thumbnail = thumbnailRepository.getThumbnailFromMemory(video)
-    }
-  }
-  LaunchedEffect(thumbnailKey, skipThumbnail) {
-    if (skipThumbnail) { thumbnail = null; return@LaunchedEffect }
-    val mem = thumbnailRepository.getThumbnailFromMemory(video)
-    if (mem != null) { thumbnail = mem; return@LaunchedEffect }
-    val loaded = withContext(Dispatchers.IO) { thumbnailRepository.getThumbnail(video, thumbWidthPx, thumbHeightPx) }
-    if (loaded != null) thumbnail = loaded
-  }
-
-  val haptics = LocalHapticFeedback.current
-  val onClickWithHaptic = {
-    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-    onClick()
-  }
-
-  Card(
-    onClick   = onClickWithHaptic,
-    modifier  = Modifier
-      .fillMaxWidth()
-      .padding(horizontal = MaterialTheme.spacing.medium, vertical = 6.dp),
-    shape     = RoundedCornerShape(28.dp),
-    colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    border    = BorderStroke(1.5.dp, accentColor),
-  ) {
-    Box(
-      modifier         = Modifier
-        .fillMaxWidth()
-        .padding(10.dp)
-        .aspectRatio(16f / 9f)
-        // outer 28dp − 10dp padding = 18dp for perfect nested radius
-        .clip(RoundedCornerShape(18.dp))
-        .background(MaterialTheme.colorScheme.surfaceContainer)
-        .border(
-          width = 1.dp,
-          color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-          shape = RoundedCornerShape(18.dp),
-        ),
-      contentAlignment = Alignment.Center,
-    ) {
-      thumbnail?.let { bmp ->
-        Image(
-          bitmap             = bmp.asImageBitmap(),
-          contentDescription = null,
-          modifier           = Modifier.matchParentSize(),
-          contentScale       = ContentScale.Crop,
-        )
-      } ?: Icon(
-        imageVector        = Icons.Outlined.Movie,
-        contentDescription = null,
-        tint               = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier           = Modifier.size(48.dp),
-      )
-
-      Box(
-        modifier = Modifier
-          .align(Alignment.BottomCenter)
-          .fillMaxWidth()
-          .fillMaxHeight(0.65f)
-          .background(
-            Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f))),
-          ),
-      )
-
-      // NOW PLAYING eyebrow + equalizer — top-start
-      Surface(
-        modifier     = Modifier.align(Alignment.TopStart).padding(10.dp),
-        color        = Color.Black.copy(alpha = 0.55f),
-        contentColor = Color.White,
-        shape        = CircleShape,
-      ) {
-        Row(
-          modifier              = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-          verticalAlignment     = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-          PlayingAnimationIndicator(color = Color.White)
-          Text(
-            text  = "NOW PLAYING",
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontWeight    = FontWeight.Bold,
-              letterSpacing = 1.5.sp,
-            ),
-          )
-        }
-      }
-
-      // Duration pill — top-end
-      if (item.duration.isNotEmpty()) {
-        Surface(
-          modifier     = Modifier.align(Alignment.TopEnd).padding(10.dp),
-          color        = Color.Black.copy(alpha = 0.55f),
-          contentColor = Color.White,
-          shape        = CircleShape,
-        ) {
-          Row(
-            modifier              = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-          ) {
-            Icon(
-              imageVector        = Icons.Outlined.Schedule,
-              contentDescription = null,
-              modifier           = Modifier.size(12.dp),
-            )
-            Text(
-              text  = item.duration,
-              style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-            )
-          }
-        }
-      }
-
-      // Title + resolution — bottom-start over scrim
-      Column(
-        modifier            = Modifier
-          .align(Alignment.BottomStart)
-          .padding(start = 16.dp, end = 16.dp, bottom = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
-      ) {
-        Text(
-          text     = item.title,
-          style    = MaterialTheme.typography.titleLargeEmphasized,
-          color    = Color.White,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-        )
-        if (item.resolution.isNotEmpty()) {
-          Text(
-            text  = item.resolution,
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White.copy(alpha = 0.8f),
-          )
-        }
-      }
-
-      // Progress bar — flush to bottom edge, inset horizontally only
-      if (item.progressPercent > 0f) {
-        LinearProgressIndicator(
-          progress   = { item.progressPercent / 100f },
-          modifier   = Modifier
-            .fillMaxWidth()
-            .height(4.dp)
-            .padding(start = 4.dp, end = 4.dp)
-            .align(Alignment.BottomCenter),
-          color      = accentColor,
-          trackColor = Color.White.copy(alpha = 0.25f),
-          strokeCap  = StrokeCap.Round,
-        )
-      }
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// PlaylistNowPlayingPanel — compact landscape sidebar card (thumbnail + info)
-// ---------------------------------------------------------------------------
-
-@Composable
-private fun PlaylistNowPlayingPanel(
-  item: PlaylistItem,
-  thumbnailRepository: ThumbnailRepository,
-  onClick: () -> Unit,
-  accentColor: Color,
-  skipThumbnail: Boolean,
-) {
-  val video = rememberPlaylistVideo(item)
-
-  val thumbWidthPx  = with(LocalDensity.current) { 300.dp.roundToPx() }
-  val thumbHeightPx = with(LocalDensity.current) { 169.dp.roundToPx() }
-  val thumbnailKey  = remember(video.id, video.path) {
-    thumbnailRepository.thumbnailKey(video)
-  }
-  var thumbnail by remember(thumbnailKey) {
-    mutableStateOf(thumbnailRepository.getThumbnailFromMemory(video))
-  }
-  LaunchedEffect(thumbnailKey) {
-    thumbnailRepository.thumbnailReadyKeys.filter { it == thumbnailKey }.collect {
-      thumbnail = thumbnailRepository.getThumbnailFromMemory(video)
-    }
-  }
-  LaunchedEffect(thumbnailKey, skipThumbnail) {
-    if (skipThumbnail) { thumbnail = null; return@LaunchedEffect }
-    val mem = thumbnailRepository.getThumbnailFromMemory(video)
-    if (mem != null) { thumbnail = mem; return@LaunchedEffect }
-    val loaded = withContext(Dispatchers.IO) { thumbnailRepository.getThumbnail(video, thumbWidthPx, thumbHeightPx) }
-    if (loaded != null) thumbnail = loaded
-  }
-
-  val haptics = LocalHapticFeedback.current
-  val onClickWithHaptic = {
-    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-    onClick()
-  }
-
-  Card(
-    onClick   = onClickWithHaptic,
-    modifier  = Modifier
-      .fillMaxWidth()
-      .padding(horizontal = MaterialTheme.spacing.medium),
-    shape     = RoundedCornerShape(20.dp),
-    colors    = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    border    = BorderStroke(1.5.dp, accentColor),
-  ) {
-    Column {
-      // ── Thumbnail — fills card width, flush at bottom to meet info section ──
-      Box(
-        modifier         = Modifier
-          .fillMaxWidth()
-          .padding(top = 8.dp, start = 8.dp, end = 8.dp)
-          .aspectRatio(16f / 9f)
-          // outer 20dp card − 8dp padding = 12dp top, 0dp bottom (flush to info)
-          .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 0.dp, bottomEnd = 0.dp))
-          .background(MaterialTheme.colorScheme.surfaceContainer)
-          .border(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-            shape = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp, bottomStart = 0.dp, bottomEnd = 0.dp),
-          ),
-        contentAlignment = Alignment.Center,
-      ) {
-        thumbnail?.let { bmp ->
-          Image(
-            bitmap             = bmp.asImageBitmap(),
-            contentDescription = null,
-            modifier           = Modifier.matchParentSize(),
-            contentScale       = ContentScale.Crop,
-          )
-        } ?: Icon(
-          imageVector        = Icons.Outlined.Movie,
-          contentDescription = null,
-          tint               = MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier           = Modifier.size(32.dp),
-        )
-
-        // Progress bar — flush to thumbnail bottom edge
-        if (item.progressPercent > 0f) {
-          LinearProgressIndicator(
-            progress   = { item.progressPercent / 100f },
-            modifier   = Modifier
-              .fillMaxWidth()
-              .height(3.dp)
-              .padding(horizontal = 2.dp)
-              .align(Alignment.BottomCenter),
-            color      = accentColor,
-            trackColor = Color.White.copy(alpha = 0.25f),
-            strokeCap  = StrokeCap.Round,
-          )
-        }
-      }
-
-      // ── Info section — all metadata below the thumbnail, never overlaid ────
-      Column(
-        modifier            = Modifier
-          .fillMaxWidth()
-          .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-      ) {
-        // NOW PLAYING row with equalizer
-        Row(
-          verticalAlignment     = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-          PlayingAnimationIndicator(color = accentColor)
-          Text(
-            text  = "NOW PLAYING",
-            style = MaterialTheme.typography.labelSmall.copy(
-              fontWeight    = FontWeight.Bold,
-              letterSpacing = 1.5.sp,
-            ),
-            color = accentColor,
-          )
-        }
-
-        // Title
-        Text(
-          text     = item.title,
-          style    = MaterialTheme.typography.titleSmallEmphasized,
-          color    = MaterialTheme.colorScheme.onPrimaryContainer,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-        )
-
-        // Resolution + duration on a single line, separated by a dot
-        if (item.resolution.isNotEmpty() || item.duration.isNotEmpty()) {
-          Row(
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-          ) {
-            if (item.resolution.isNotEmpty()) {
-              Text(
-                text  = item.resolution,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-              )
-            }
-            if (item.resolution.isNotEmpty() && item.duration.isNotEmpty()) {
-              Box(
-                modifier = Modifier
-                  .size(3.dp)
-                  .clip(CircleShape)
-                  .background(MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.4f)),
-              )
-            }
-            if (item.duration.isNotEmpty()) {
-              Row(
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-              ) {
-                Icon(
-                  imageVector        = Icons.Outlined.Schedule,
-                  contentDescription = null,
-                  tint               = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                  modifier           = Modifier.size(10.dp),
-                )
-                Text(
-                  text  = item.duration,
-                  style = MaterialTheme.typography.labelSmall,
-                  color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f),
-                )
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// PlaylistTrackListItem — M3 Card-based list row
-// ---------------------------------------------------------------------------
-
-@Composable
-fun PlaylistTrackListItem(
-  item: PlaylistItem,
-  thumbnailRepository: ThumbnailRepository,
-  onClick: () -> Unit,
-  accentColor: Color,
-  modifier: Modifier = Modifier,
-  skipThumbnail: Boolean = false,
-  isLoading: Boolean = false,
-  queuePosition: Int = 0,
-) {
-  val itemAlpha = if (item.isWatched && !item.isPlaying) 0.7f else 1f
-
-  val video = rememberPlaylistVideo(item)
-
-  val thumbWidthPx  = with(LocalDensity.current) { 120.dp.roundToPx() }
-  val thumbHeightPx = with(LocalDensity.current) { 68.dp.roundToPx() }
-  val thumbnailKey  = remember(video.id, video.path) {
-    thumbnailRepository.thumbnailKey(video)
-  }
-  var thumbnail by remember(thumbnailKey) {
-    mutableStateOf(thumbnailRepository.getThumbnailFromMemory(video))
-  }
-  LaunchedEffect(thumbnailKey) {
-    thumbnailRepository.thumbnailReadyKeys.filter { it == thumbnailKey }.collect {
-      thumbnail = thumbnailRepository.getThumbnailFromMemory(video)
-    }
-  }
-  LaunchedEffect(thumbnailKey, skipThumbnail) {
-    if (skipThumbnail) { thumbnail = null; return@LaunchedEffect }
-    val mem = thumbnailRepository.getThumbnailFromMemory(video)
-    if (mem != null) { thumbnail = mem; return@LaunchedEffect }
-    val loaded = withContext(Dispatchers.IO) { thumbnailRepository.getThumbnail(video, thumbWidthPx, thumbHeightPx) }
-    if (loaded != null) thumbnail = loaded
-  }
-
-  val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
-  val baseScale by animateFloatAsState(
-    targetValue   = when {
-      isPressed      -> 0.98f
-      item.isPlaying -> 1.02f
-      else           -> 1f
-    },
-    animationSpec = spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMediumLow),
-    label         = "list-card-scale",
-  )
-
-  // Enter animation — staggered by visual queue position, not playlist index
-  var entered by remember { mutableStateOf(false) }
-  LaunchedEffect(Unit) {
-    delay((queuePosition * 30L).coerceAtMost(180L))
-    entered = true
-  }
-  val enterScale by animateFloatAsState(
-    targetValue   = if (entered) 1f else 0.92f,
-    animationSpec = spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMedium),
-    label         = "list-enter-scale",
-  )
-  val enterAlpha by animateFloatAsState(
-    targetValue   = if (entered) 1f else 0f,
-    animationSpec = spring(stiffness = Spring.StiffnessMedium),
-    label         = "list-enter-alpha",
-  )
-
-  val pulse = remember { Animatable(1f) }
-  LaunchedEffect(item.isPlaying) {
-    if (item.isPlaying) {
-      pulse.snapTo(1f)
-      pulse.animateTo(1.04f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium))
-      pulse.animateTo(1f,    spring(Spring.DampingRatioLowBouncy,   Spring.StiffnessMediumLow))
-    }
-  }
-
-  val haptics = LocalHapticFeedback.current
-  val onClickWithHaptic = {
-    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-    onClick()
-  }
-
-  val finalScale = enterScale * baseScale * pulse.value
-  val finalAlpha = enterAlpha * itemAlpha
-
-  val cardModifier = modifier
-    .fillMaxWidth()
-    .padding(horizontal = MaterialTheme.spacing.medium, vertical = 6.dp)
-    .scale(finalScale)
-    .alpha(finalAlpha)
-
-  if (item.isPlaying) {
-    Card(
-      onClick           = onClickWithHaptic,
-      modifier          = cardModifier,
-      shape             = RoundedCornerShape(20.dp),
-      colors            = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-      elevation         = CardDefaults.cardElevation(defaultElevation = 0.dp),
-      border            = BorderStroke(1.5.dp, accentColor),
-      interactionSource = interactionSource,
-    ) {
-      PlaylistListItemContent(item, thumbnail, accentColor, isLoading)
-    }
-  } else {
-    Card(
-      onClick           = onClickWithHaptic,
-      modifier          = cardModifier,
-      shape             = RoundedCornerShape(20.dp),
-      colors            = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-      elevation         = CardDefaults.cardElevation(defaultElevation = 0.dp),
-      interactionSource = interactionSource,
-    ) {
-      PlaylistListItemContent(item, thumbnail, accentColor, isLoading)
-    }
-  }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun PlaylistListItemContent(
-  item: PlaylistItem,
-  thumbnail: Bitmap?,
-  accentColor: Color,
-  isLoading: Boolean,
-) {
-  Row(
-    modifier              = Modifier.fillMaxWidth().padding(10.dp),
-    verticalAlignment     = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(14.dp),
-  ) {
-    // Thumbnail — 120×68dp, outer card 20dp − 10dp padding = 10dp ideal; 12dp is a good visual balance
-    Box(
-      modifier         = Modifier
-        .width(120.dp)
-        .height(68.dp)
-        .clip(RoundedCornerShape(12.dp))
-        .background(MaterialTheme.colorScheme.surfaceContainer)
-        .border(
-          width = 1.dp,
-          color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-          shape = RoundedCornerShape(12.dp),
-        ),
-      contentAlignment = Alignment.Center,
-    ) {
-      thumbnail?.let { bmp ->
-        Image(
-          bitmap             = bmp.asImageBitmap(),
-          contentDescription = null,
-          modifier           = Modifier.matchParentSize(),
-          contentScale       = ContentScale.Crop,
-        )
-      } ?: Icon(
-        imageVector        = Icons.Outlined.Movie,
-        contentDescription = null,
-        tint               = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier           = Modifier.size(24.dp),
-      )
-
-      // Index pill — unified dark scrim style (same in both playing/non-playing states)
-      Surface(
-        modifier     = Modifier.align(Alignment.TopStart).padding(6.dp),
-        color        = Color.Black.copy(alpha = 0.55f),
-        contentColor = Color.White,
-        shape        = CircleShape,
-      ) {
-        Text(
-          text     = "${item.index + 1}",
-          modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-          style    = MaterialTheme.typography.labelSmallEmphasized,
-        )
-      }
-
-      if (item.duration.isNotEmpty()) {
-        Surface(
-          modifier     = Modifier.align(Alignment.BottomEnd).padding(4.dp),
-          color        = MaterialTheme.colorScheme.scrim.copy(alpha = 0.7f),
-          contentColor = Color.White,
-          shape        = CircleShape,
-        ) {
-          Row(
-            modifier              = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
-          ) {
-            Icon(
-              imageVector        = Icons.Outlined.Schedule,
-              contentDescription = null,
-              modifier           = Modifier.size(10.dp),
-            )
-            Text(
-              text  = item.duration,
-              style = MaterialTheme.typography.labelSmall,
-            )
-          }
-        }
-      }
-
-      // Progress bar — flush to bottom edge
-      if (item.progressPercent > 0f) {
-        LinearProgressIndicator(
-          progress   = { item.progressPercent / 100f },
-          modifier   = Modifier
-            .fillMaxWidth()
-            .height(3.dp)
-            .padding(start = 2.dp, end = 2.dp)
-            .align(Alignment.BottomCenter),
-          color      = accentColor,
-          trackColor = Color.White.copy(alpha = 0.2f),
-          strokeCap  = StrokeCap.Round,
-        )
-      }
-    }
-
-    Column(
-      modifier            = Modifier.weight(1f),
-      verticalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-      Text(
-        text     = item.title,
-        style    = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
-        color    = if (item.isPlaying) MaterialTheme.colorScheme.onPrimaryContainer
-                   else MaterialTheme.colorScheme.onSurface,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
-      if (item.resolution.isNotEmpty()) {
-        Text(
-          text  = item.resolution,
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-      }
-    }
-
-    if (isLoading) {
-      LoadingIndicator(modifier = Modifier.size(24.dp), color = accentColor)
-    } else if (item.isPlaying) {
-      PlayingAnimationIndicator(color = accentColor)
-    } else if (item.isWatched) {
-      WatchedCheckBadge()
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// PlaylistTrackGridItem — M3 Card-based grid card
-// ---------------------------------------------------------------------------
-
-@Composable
-fun PlaylistTrackGridItem(
-  item: PlaylistItem,
-  thumbnailRepository: ThumbnailRepository,
-  onClick: () -> Unit,
-  accentColor: Color,
-  modifier: Modifier = Modifier,
-  skipThumbnail: Boolean = false,
-  isLoading: Boolean = false,
-  queuePosition: Int = 0,
-) {
-  val itemAlpha = if (item.isWatched && !item.isPlaying) 0.7f else 1f
-
-  val video = rememberPlaylistVideo(item)
-
-  val thumbWidthPx  = with(LocalDensity.current) { 200.dp.roundToPx() }
-  val thumbHeightPx = with(LocalDensity.current) { 112.dp.roundToPx() }
-  val thumbnailKey  = remember(video.id, video.path) {
-    thumbnailRepository.thumbnailKey(video)
-  }
-  var thumbnail by remember(thumbnailKey) {
-    mutableStateOf(thumbnailRepository.getThumbnailFromMemory(video))
-  }
-  LaunchedEffect(thumbnailKey) {
-    thumbnailRepository.thumbnailReadyKeys.filter { it == thumbnailKey }.collect {
-      thumbnail = thumbnailRepository.getThumbnailFromMemory(video)
-    }
-  }
-  LaunchedEffect(thumbnailKey, skipThumbnail) {
-    if (skipThumbnail) { thumbnail = null; return@LaunchedEffect }
-    val mem = thumbnailRepository.getThumbnailFromMemory(video)
-    if (mem != null) { thumbnail = mem; return@LaunchedEffect }
-    val loaded = withContext(Dispatchers.IO) { thumbnailRepository.getThumbnail(video, thumbWidthPx, thumbHeightPx) }
-    if (loaded != null) thumbnail = loaded
-  }
-
-  val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
-  val baseScale by animateFloatAsState(
-    targetValue   = when {
-      isPressed      -> 0.98f
-      item.isPlaying -> 1.02f
-      else           -> 1f
-    },
-    animationSpec = spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMediumLow),
-    label         = "grid-card-scale",
-  )
-
-  // Enter animation — staggered by visual queue position
-  var entered by remember { mutableStateOf(false) }
-  LaunchedEffect(Unit) {
-    delay((queuePosition * 30L).coerceAtMost(180L))
-    entered = true
-  }
-  val enterScale by animateFloatAsState(
-    targetValue   = if (entered) 1f else 0.92f,
-    animationSpec = spring(Spring.DampingRatioLowBouncy, Spring.StiffnessMedium),
-    label         = "grid-enter-scale",
-  )
-  val enterAlpha by animateFloatAsState(
-    targetValue   = if (entered) 1f else 0f,
-    animationSpec = spring(stiffness = Spring.StiffnessMedium),
-    label         = "grid-enter-alpha",
-  )
-
-  val pulse = remember { Animatable(1f) }
-  LaunchedEffect(item.isPlaying) {
-    if (item.isPlaying) {
-      pulse.snapTo(1f)
-      pulse.animateTo(1.04f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium))
-      pulse.animateTo(1f,    spring(Spring.DampingRatioLowBouncy,   Spring.StiffnessMediumLow))
-    }
-  }
-
-  val haptics = LocalHapticFeedback.current
-  val onClickWithHaptic = {
-    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-    onClick()
-  }
-
-  val finalScale = enterScale * baseScale * pulse.value
-  val finalAlpha = enterAlpha * itemAlpha
-
-  val cardModifier = modifier
-    .fillMaxWidth()
-    .scale(finalScale)
-    .alpha(finalAlpha)
-
-  if (item.isPlaying) {
-    Card(
-      onClick           = onClickWithHaptic,
-      modifier          = cardModifier,
-      shape             = RoundedCornerShape(28.dp),
-      colors            = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
-      elevation         = CardDefaults.cardElevation(defaultElevation = 0.dp),
-      border            = BorderStroke(1.5.dp, accentColor),
-      interactionSource = interactionSource,
-    ) {
-      PlaylistGridItemContent(item, thumbnail, accentColor, isLoading)
-    }
-  } else {
-    Card(
-      onClick           = onClickWithHaptic,
-      modifier          = cardModifier,
-      shape             = RoundedCornerShape(24.dp),
-      colors            = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-      elevation         = CardDefaults.cardElevation(defaultElevation = 0.dp),
-      interactionSource = interactionSource,
-    ) {
-      PlaylistGridItemContent(item, thumbnail, accentColor, isLoading)
-    }
-  }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun PlaylistGridItemContent(
-  item: PlaylistItem,
-  thumbnail: Bitmap?,
-  accentColor: Color,
-  isLoading: Boolean,
-) {
-  Column(
-    modifier            = Modifier.padding(8.dp),
-    verticalArrangement = Arrangement.spacedBy(8.dp),
-  ) {
-    Box(
-      modifier         = Modifier
-        .fillMaxWidth()
-        .aspectRatio(16f / 9f)
-        .clip(RoundedCornerShape(20.dp))
-        .background(MaterialTheme.colorScheme.surfaceContainer)
-        .border(
-          width = 1.dp,
-          color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
-          shape = RoundedCornerShape(20.dp),
-        ),
-      contentAlignment = Alignment.Center,
-    ) {
-      thumbnail?.let { bmp ->
-        Image(
-          bitmap             = bmp.asImageBitmap(),
-          contentDescription = null,
-          modifier           = Modifier.matchParentSize(),
-          contentScale       = ContentScale.Crop,
-        )
-      } ?: Icon(
-        imageVector        = Icons.Outlined.Movie,
-        contentDescription = null,
-        tint               = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier           = Modifier.size(32.dp),
-      )
-
-      Box(
-        modifier = Modifier
-          .align(Alignment.BottomCenter)
-          .fillMaxWidth()
-          .fillMaxHeight(0.6f)
-          .background(
-            Brush.verticalGradient(colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))),
-          ),
-      )
-
-      // Index pill — unified dark scrim style
-      Surface(
-        modifier     = Modifier.align(Alignment.TopStart).padding(8.dp),
-        color        = Color.Black.copy(alpha = 0.55f),
-        contentColor = Color.White,
-        shape        = CircleShape,
-      ) {
-        Text(
-          text     = "${item.index + 1}",
-          modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-          style    = MaterialTheme.typography.labelSmallEmphasized,
-        )
-      }
-
-      if (item.duration.isNotEmpty()) {
-        Surface(
-          modifier     = Modifier.align(Alignment.TopEnd).padding(8.dp),
-          color        = Color.Black.copy(alpha = 0.55f),
-          contentColor = Color.White,
-          shape        = CircleShape,
-        ) {
-          Row(
-            modifier              = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp),
-          ) {
-            Icon(
-              imageVector        = Icons.Outlined.Schedule,
-              contentDescription = null,
-              modifier           = Modifier.size(10.dp),
-            )
-            Text(
-              text  = item.duration,
-              style = MaterialTheme.typography.labelSmall,
-            )
-          }
-        }
-      }
-
-      Text(
-        text     = item.title,
-        modifier = Modifier
-          .align(Alignment.BottomStart)
-          .padding(start = 10.dp, end = 10.dp, bottom = 12.dp),
-        style    = MaterialTheme.typography.titleSmallEmphasized,
-        color    = Color.White,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
-
-      // Progress bar — flush to bottom edge
-      if (item.progressPercent > 0f) {
-        LinearProgressIndicator(
-          progress   = { item.progressPercent / 100f },
-          modifier   = Modifier
-            .fillMaxWidth()
-            .height(3.dp)
-            .padding(start = 2.dp, end = 2.dp)
-            .align(Alignment.BottomCenter),
-          color      = accentColor,
-          trackColor = Color.White.copy(alpha = 0.2f),
-          strokeCap  = StrokeCap.Round,
-        )
-      }
-    }
-
-    Row(
-      modifier              = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-      verticalAlignment     = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.SpaceBetween,
-    ) {
-      if (item.resolution.isNotEmpty()) {
-        Surface(
-          color        = MaterialTheme.colorScheme.surfaceContainerHigh,
-          contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-          shape        = CircleShape,
-        ) {
-          Text(
-            text     = item.resolution,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            style    = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-          )
-        }
-      } else {
-        Spacer(modifier = Modifier.width(1.dp))
-      }
-
-      if (isLoading) {
-        LoadingIndicator(modifier = Modifier.size(20.dp), color = accentColor)
-      } else if (item.isPlaying) {
-        PlayingAnimationIndicator(color = accentColor)
-      } else if (item.isWatched) {
-        WatchedCheckBadge()
-      }
-    }
-  }
+/**
+ * Turns a release file name into a readable title:
+ * "[SubsPlease] Frieren - 05 (1080p) [A1B2C3D4].mkv" → "Frieren - 05".
+ * Falls back to the original name if nothing is left.
+ */
+internal fun cleanVideoTitle(raw: String): String {
+  var t = raw.replace(FILE_EXTENSION, "")
+  t = t.replace(LEADING_TAGS, "")
+  t = t.replace(TRAILING_TAGS, "")
+  // Names like "Frieren.S01E05.1080p" or "Frieren_-_05" use dots/underscores as spaces.
+  if (!t.contains(' ')) t = t.replace('_', ' ').replace('.', ' ')
+  t = t.replace(SPACES, " ").trim()
+  return t.ifBlank { raw }
 }

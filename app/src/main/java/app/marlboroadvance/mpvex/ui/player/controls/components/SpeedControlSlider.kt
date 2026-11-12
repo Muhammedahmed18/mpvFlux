@@ -1,5 +1,8 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
+import app.marlboroadvance.mpvex.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
@@ -25,8 +28,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -169,7 +170,7 @@ fun SpeedControlSlider(
           horizontalArrangement = Arrangement.Center,
         ) {
           Icon(
-            imageVector = Icons.Filled.FastForward,
+            imageVector = ImageVector.vectorResource(R.drawable.ic_sym_fast_forward_fill),
             contentDescription = null,
             modifier = Modifier.size(16.dp),
           )
@@ -213,7 +214,7 @@ fun CompactSpeedIndicator(
       .padding(horizontal = MaterialTheme.spacing.medium, vertical = MaterialTheme.spacing.small)
   ) {
     Icon(
-      imageVector = Icons.Filled.FastForward,
+      imageVector = ImageVector.vectorResource(R.drawable.ic_sym_fast_forward_fill),
       contentDescription = null,
       modifier = Modifier.size(16.dp),
       tint = MaterialTheme.colorScheme.onSurface 

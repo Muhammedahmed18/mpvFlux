@@ -1,13 +1,13 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
+import app.marlboroadvance.mpvex.R
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
@@ -245,7 +245,7 @@ fun ThumbZoneUnlock(
         label = "LockIconTransition",
       ) { unlocked ->
         Icon(
-          imageVector        = if (unlocked) Icons.Outlined.LockOpen else Icons.Outlined.Lock,
+          imageVector        = if (unlocked) ImageVector.vectorResource(R.drawable.ic_sym_lock_open_fill) else ImageVector.vectorResource(R.drawable.ic_sym_lock),
           contentDescription = null,
           tint               = if (unlocked) unlockedIconTint else lockedIconTint,
           modifier           = Modifier

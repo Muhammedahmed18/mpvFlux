@@ -1,5 +1,7 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components
 
+import androidx.compose.ui.res.vectorResource
+import app.marlboroadvance.mpvex.R
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -20,14 +22,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.VolumeDown
-import androidx.compose.material.icons.automirrored.rounded.VolumeMute
-import androidx.compose.material.icons.automirrored.rounded.VolumeOff
-import androidx.compose.material.icons.automirrored.rounded.VolumeUp
-import androidx.compose.material.icons.rounded.BrightnessHigh
-import androidx.compose.material.icons.rounded.BrightnessLow
-import androidx.compose.material.icons.rounded.BrightnessMedium
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -215,10 +209,10 @@ fun BrightnessSlider(
     modifier = modifier,
     label = (percentage * 100).toInt().toString(),
     icon = when (percentage) {
-      in 0f..0.3f -> Icons.Rounded.BrightnessLow
-      in 0.3f..0.6f -> Icons.Rounded.BrightnessMedium
-      in 0.6f..1f -> Icons.Rounded.BrightnessHigh
-      else -> Icons.Rounded.BrightnessMedium
+      in 0f..0.3f -> ImageVector.vectorResource(R.drawable.ic_sym_brightness_low_fill)
+      in 0.3f..0.6f -> ImageVector.vectorResource(R.drawable.ic_sym_brightness_medium_fill)
+      in 0.6f..1f -> ImageVector.vectorResource(R.drawable.ic_sym_brightness_high_fill)
+      else -> ImageVector.vectorResource(R.drawable.ic_sym_brightness_medium_fill)
     },
     isZero = percentage == 0f,
   )
@@ -244,10 +238,10 @@ fun VolumeSlider(
     modifier = modifier,
     label = label,
     icon = when {
-      mpvVolume == 0 -> Icons.AutoMirrored.Rounded.VolumeOff
-      mpvVolume in 1..30 -> Icons.AutoMirrored.Rounded.VolumeMute
-      mpvVolume in 31..60 -> Icons.AutoMirrored.Rounded.VolumeDown
-      else -> Icons.AutoMirrored.Rounded.VolumeUp
+      mpvVolume == 0 -> ImageVector.vectorResource(R.drawable.ic_sym_volume_off_fill)
+      mpvVolume in 1..30 -> ImageVector.vectorResource(R.drawable.ic_sym_volume_mute_fill)
+      mpvVolume in 31..60 -> ImageVector.vectorResource(R.drawable.ic_sym_volume_down_fill)
+      else -> ImageVector.vectorResource(R.drawable.ic_sym_volume_up_fill)
     },
     overflowValue = if (mpvVolume > 100) boostVolume.toFloat() else null,
     overflowRange = boostRange?.let { it.start.toFloat()..it.endInclusive.toFloat() },

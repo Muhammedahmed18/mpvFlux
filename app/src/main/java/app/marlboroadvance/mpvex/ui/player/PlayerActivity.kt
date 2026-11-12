@@ -207,6 +207,8 @@ class PlayerActivity :
 
   private var isReady = false
   private var isUserFinishing = false
+  // Set by the "Background playback" button; cleared when the player is visible again.
+  private var isManualBackgroundPlayback = false
   private var noisyReceiverRegistered = false
   private var mpvInitialized = false
   private var wasPlayingBeforePause = false
@@ -627,7 +629,8 @@ class PlayerActivity :
   override fun onPause() {
     runCatching {
       val isInPip = isInPictureInPictureMode
-      val shouldPause = !audioPreferences.automaticBackgroundPlayback.get() || isUserFinishing
+      val shouldPause =
+        (!audioPreferences.automaticBackgroundPlayback.get() && !isManualBackgroundPlayback) || isUserFinishing
 
       if (isFinishing) {
         viewModel.pause()
@@ -689,7 +692,8 @@ class PlayerActivity :
 
       mediaPlaybackService?.setUiVisible(false)
 
-      val shouldAllowBackgroundPlayback = audioPreferences.automaticBackgroundPlayback.get()
+      val shouldAllowBackgroundPlayback =
+        audioPreferences.automaticBackgroundPlayback.get() || isManualBackgroundPlayback
 
       if (!shouldAllowBackgroundPlayback && (isUserFinishing || isFinishing)) {
         viewModel.pause()
@@ -708,6 +712,8 @@ class PlayerActivity :
   @RequiresApi(Build.VERSION_CODES.P)
   override fun onStart() {
     super.onStart()
+    // Back in the app: the one-off background playback from the player button is over.
+    isManualBackgroundPlayback = false
 
     runCatching {
       setupWindowFlags()
@@ -791,6 +797,25 @@ class PlayerActivity :
         View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
         View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or
         if (playerPreferences.showSystemStatusBar.get()) 0 else View.SYSTEM_UI_FLAG_LOW_PROFILE
+  }
+
+  /**
+   * "Background playback" player button: keep playing audio and go to the home screen, as
+   * if automatic background playback were on, for this time only.
+   */
+  fun triggerBackgroundPlayback() {
+    if (fileName.isBlank() || !isReady) {
+      Log.w(TAG, "Cannot trigger background playback: video not ready")
+      return
+    }
+    isManualBackgroundPlayback = true
+    restoreSystemUI()
+    startActivity(
+      Intent(Intent.ACTION_MAIN).apply {
+        addCategory(Intent.CATEGORY_HOME)
+        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+      },
+    )
   }
 
   private fun restoreSystemUI() {

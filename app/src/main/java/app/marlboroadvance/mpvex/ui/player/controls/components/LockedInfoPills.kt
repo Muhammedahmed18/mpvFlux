@@ -1,5 +1,8 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
+import app.marlboroadvance.mpvex.R
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -13,9 +16,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BatteryChargingFull
-import androidx.compose.material.icons.filled.BatteryAlert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -90,7 +90,7 @@ fun LockedInfoPill(
           // Icon only when it says something: charging, or low battery.
           if (battery.charging || lowBattery) {
             Icon(
-              imageVector = if (battery.charging) Icons.Filled.BatteryChargingFull else Icons.Filled.BatteryAlert,
+              imageVector = if (battery.charging) ImageVector.vectorResource(R.drawable.ic_sym_battery_charging_full_fill) else ImageVector.vectorResource(R.drawable.ic_sym_battery_alert_fill),
               contentDescription = null,
               tint = batteryColor,
               modifier = Modifier.size(16.dp),

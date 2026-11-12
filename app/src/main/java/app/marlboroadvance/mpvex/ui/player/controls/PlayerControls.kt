@@ -1,5 +1,8 @@
 package app.marlboroadvance.mpvex.ui.player.controls
 
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
+import app.marlboroadvance.mpvex.R
 import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedContent
@@ -52,11 +55,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Pause
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.SkipNext
-import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -632,7 +630,7 @@ fun PlayerControls(
                   contentAlignment = Alignment.Center,
                 ) {
                   Icon(
-                    imageVector        = Icons.Rounded.SkipPrevious,
+                    imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_skip_previous_fill),
                     contentDescription = null,
                     tint               = if (hideBackground) onSurfaceColor else Color.White,
                     modifier           = Modifier.size(26.dp),
@@ -715,7 +713,7 @@ fun PlayerControls(
                     label = "play_pause_icon",
                   ) { playing ->
                     Icon(
-                      imageVector        = if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow,
+                      imageVector        = if (playing) ImageVector.vectorResource(R.drawable.ic_sym_pause_fill) else ImageVector.vectorResource(R.drawable.ic_sym_play_arrow_fill),
                       contentDescription = null,
                       tint               = if (hideBackground) primaryColor else onPrimaryColor,
                       modifier           = Modifier.size(44.dp),
@@ -755,7 +753,7 @@ fun PlayerControls(
                   contentAlignment = Alignment.Center,
                 ) {
                   Icon(
-                    imageVector        = Icons.Rounded.SkipNext,
+                    imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_skip_next_fill),
                     contentDescription = null,
                     tint               = if (hideBackground) onSurfaceColor else Color.White,
                     modifier           = Modifier.size(26.dp),

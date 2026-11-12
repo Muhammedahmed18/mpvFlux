@@ -702,4 +702,12 @@
   <string name="about_source_code">Source code</string>
   <string name="about_debug_info_copied">Debug info copied. Paste it into the bug report.</string>
   <string name="about_no_browser">No browser found to open the link</string>
+  <!-- Player playlist sheet -->
+  <string name="playlist_title">Playlist</string>
+  <string name="playlist_filter_all">All</string>
+  <string name="playlist_filter_up_next">Up next</string>
+  <string name="playlist_filter_watched">Watched</string>
+  <string name="playlist_now_playing">Now playing</string>
+  <string name="playlist_empty_up_next">You\'re all caught up</string>
+  <string name="playlist_empty_watched">Nothing watched yet</string>
 </resources>

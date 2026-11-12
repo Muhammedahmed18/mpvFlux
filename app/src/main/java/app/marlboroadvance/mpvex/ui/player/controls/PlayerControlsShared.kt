@@ -9,8 +9,6 @@ import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.PressInteraction
-import androidx.compose.material.icons.outlined.FitScreen
-import androidx.compose.material.icons.outlined.ZoomOutMap
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -33,35 +31,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.AspectRatio
-import androidx.compose.material.icons.outlined.Audiotrack
-import androidx.compose.material.icons.outlined.Bookmarks
-import androidx.compose.material.icons.outlined.CameraAlt
-import androidx.compose.material.icons.outlined.Flip
-import androidx.compose.material.icons.outlined.LockOpen
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.PictureInPictureAlt
-import androidx.compose.material.icons.outlined.Repeat
-import androidx.compose.material.icons.outlined.RepeatOn
-import androidx.compose.material.icons.outlined.RepeatOne
-import androidx.compose.material.icons.outlined.ScreenRotation
-import androidx.compose.material.icons.outlined.Shuffle
-import androidx.compose.material.icons.outlined.ShuffleOn
-import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.outlined.Subtitles
-import androidx.compose.material.icons.outlined.ZoomIn
-import androidx.compose.material3.ElevatedFilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -85,6 +60,17 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.ConfigurationCompat
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
+import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.preferences.PlayerPreferences
+import app.marlboroadvance.mpvex.preferences.icon
+import `is`.xyz.mpv.MPVLib
+import org.koin.compose.koinInject
 import app.marlboroadvance.mpvex.preferences.PlayerButton
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
 import app.marlboroadvance.mpvex.ui.player.PlayerViewModel
@@ -183,7 +169,7 @@ fun RenderPlayerButton(
         colors   = glassIconButtonColors(hideBackground),
       ) {
         Icon(
-          imageVector        = Icons.AutoMirrored.Outlined.ArrowBack,
+          imageVector        = PlayerButton.BACK_ARROW.icon,
           contentDescription = null,
         )
       }
@@ -358,23 +344,20 @@ fun RenderPlayerButton(
     }
 
     // ------------------------------------------------------------------
-    // BOOKMARKS / CHAPTERS — FilledTonalIconButton (hidden when no chapters)
+    // All icon buttons below share PlayerIconButton (round tonal button, glass colours,
+    // primary container when "on"); value buttons share PlayerValueChip (same height,
+    // pill shape). Icons are Material Symbols Rounded, see PlayerButton.iconRes.
     // ------------------------------------------------------------------
+
     PlayerButton.BOOKMARKS_CHAPTERS -> {
       if (chapters.isNotEmpty()) {
-        FilledTonalIconButton(
-          onClick  = {
-            clickEvent()
-            onOpenSheet(Sheets.Chapters)
-          },
-          modifier = modifier.size(buttonSize),
-          shapes   = expressiveShapes,
-        ) {
-          Icon(
-            imageVector        = Icons.Outlined.Bookmarks,
-            contentDescription = null,
-          )
-        }
+        PlayerIconButton(
+          icon           = button.icon,
+          onClick        = { onOpenSheet(Sheets.Chapters) },
+          hideBackground = hideBackground,
+          buttonSize     = buttonSize,
+          modifier       = modifier,
+        )
       }
     }
 
@@ -394,398 +377,515 @@ fun RenderPlayerButton(
       }
     }
 
-    // ------------------------------------------------------------------
-    // PLAYBACK SPEED
-    //   inactive → SuggestionChip (icon only, neutral)
-    //   active   → SuggestionChip with primary tint + speed value
-    // ------------------------------------------------------------------
     PlayerButton.PLAYBACK_SPEED -> {
-      val speedText = remember(playbackSpeed, locale) {
-        String.format(locale, "%.2fx", playbackSpeed)
-      }
-
       if (isSpeedNonOne) {
-        SuggestionChip(
-          onClick = {
-            clickEvent()
-            onOpenSheet(Sheets.PlaybackSpeed)
-          },
-          label   = {
-            Text(
-              text  = speedText,
-              style = chipValueLabelStyle(),
-            )
-          },
-          modifier    = modifier,
-          icon        = {
-            Icon(
-              imageVector        = Icons.Outlined.Speed,
-              contentDescription = null,
-              modifier           = Modifier.size(18.dp),
-            )
-          },
-          colors = SuggestionChipDefaults.suggestionChipColors(
-            containerColor    = MaterialTheme.colorScheme.primaryContainer,
-            labelColor        = MaterialTheme.colorScheme.onPrimaryContainer,
-            iconContentColor  = MaterialTheme.colorScheme.onPrimaryContainer,
-          ),
-          elevation = SuggestionChipDefaults.suggestionChipElevation(elevation = 2.dp),
+        val speedText = remember(playbackSpeed, locale) {
+          String.format(locale, "%.2fx", playbackSpeed)
+        }
+        PlayerValueChip(
+          icon           = button.icon,
+          text           = speedText,
+          onClick        = { onOpenSheet(Sheets.PlaybackSpeed) },
+          hideBackground = hideBackground,
+          buttonSize     = buttonSize,
+          modifier       = modifier,
+          highlighted    = true,
         )
       } else {
-        // Neutral chip when speed == 1x
-        FilledTonalIconButton(
-          onClick  = {
-            clickEvent()
-            onOpenSheet(Sheets.PlaybackSpeed)
-          },
-          modifier = modifier.size(buttonSize),
-          shapes   = expressiveShapes,
-        ) {
-          Icon(
-            imageVector        = Icons.Outlined.Speed,
-            contentDescription = null,
-          )
-        }
+        PlayerIconButton(
+          icon           = button.icon,
+          onClick        = { onOpenSheet(Sheets.PlaybackSpeed) },
+          hideBackground = hideBackground,
+          buttonSize     = buttonSize,
+          modifier       = modifier,
+        )
       }
     }
 
-    // ------------------------------------------------------------------
-    // SUBTITLES — FilledTonalIconButton
-    // ------------------------------------------------------------------
     PlayerButton.SUBTITLES -> {
-      FilledTonalIconButton(
-        onClick  = {
-          clickEvent()
-          onOpenSheet(Sheets.SubtitleTracks)
+      // Filled CC icon while a subtitle track is showing.
+      val sid by MPVLib.propInt["sid"].collectAsState()
+      val subtitlesOn = (sid ?: 0) > 0
+      PlayerIconButton(
+        icon           = if (subtitlesOn) {
+          ImageVector.vectorResource(R.drawable.ic_sym_closed_caption_fill)
+        } else {
+          button.icon
         },
-        modifier = modifier.size(buttonSize),
-        shapes   = expressiveShapes,
-        colors   = glassIconButtonColors(hideBackground),
-      ) {
-        Icon(
-          imageVector        = Icons.Outlined.Subtitles,
-          contentDescription = null,
-        )
-      }
+        onClick        = { onOpenSheet(Sheets.SubtitleTracks) },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+      )
     }
 
-    // ------------------------------------------------------------------
-    // AUDIO TRACK — FilledTonalIconButton
-    // ------------------------------------------------------------------
     PlayerButton.AUDIO_TRACK -> {
-      FilledTonalIconButton(
-        onClick  = {
-          clickEvent()
-          onOpenSheet(Sheets.AudioTracks)
-        },
-        modifier = modifier.size(buttonSize),
-        shapes   = expressiveShapes,
-        colors   = glassIconButtonColors(hideBackground),
-      ) {
-        Icon(
-          imageVector        = Icons.Outlined.Audiotrack,
-          contentDescription = null,
-        )
-      }
+      PlayerIconButton(
+        icon           = button.icon,
+        onClick        = { onOpenSheet(Sheets.AudioTracks) },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+      )
     }
 
-    // ------------------------------------------------------------------
-    // ASPECT RATIO — FilledTonalIconButton
     // Tap cycles Fit → Stretch → Crop (as in mpvEx); long-press opens the ratio sheet.
-    // ------------------------------------------------------------------
     PlayerButton.ASPECT_RATIO -> {
       val aspect by viewModel.videoAspect.collectAsState()
       val customRatio by viewModel.currentAspectRatio.collectAsState()
-      val haptic = LocalHapticFeedback.current
-      val longPressTimeout = LocalViewConfiguration.current.longPressTimeoutMillis
-      val interactionSource = remember { MutableInteractionSource() }
-      var longPressHandled by remember { mutableStateOf(false) }
-
-      // The button has no long-click of its own, so watch its presses: a press held past the
-      // system long-press time opens the sheet, and the click that follows is ignored.
-      LaunchedEffect(interactionSource) {
-        interactionSource.interactions.collectLatest { interaction ->
-          if (interaction is PressInteraction.Press) {
-            longPressHandled = false
-            delay(longPressTimeout)
-            longPressHandled = true
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-            clickEvent()
-            onOpenSheet(Sheets.AspectRatios)
-          }
-        }
-      }
-
-      FilledTonalIconButton(
-        onClick  = {
-          if (longPressHandled) {
-            longPressHandled = false
-          } else {
-            clickEvent()
-            val next = when {
-              customRatio > 0 -> VideoAspect.Fit // leave a custom ratio (e.g. 21:9) back to Fit
-              aspect == VideoAspect.Fit -> VideoAspect.Stretch
-              aspect == VideoAspect.Stretch -> VideoAspect.Crop
-              else -> VideoAspect.Fit
-            }
-            viewModel.changeVideoAspect(next)
-          }
-        },
-        modifier          = modifier.size(buttonSize),
-        shapes            = expressiveShapes,
-        colors            = glassIconButtonColors(hideBackground),
-        interactionSource = interactionSource,
-      ) {
-        Icon(
-          imageVector        = when {
-            customRatio > 0 -> Icons.Outlined.AspectRatio
-            aspect == VideoAspect.Stretch -> Icons.Outlined.ZoomOutMap
-            aspect == VideoAspect.Crop -> Icons.Outlined.FitScreen
-            else -> Icons.Outlined.AspectRatio
+      PlayerIconButton(
+        icon           = ImageVector.vectorResource(
+          when {
+            customRatio > 0 -> R.drawable.ic_sym_aspect_ratio
+            aspect == VideoAspect.Stretch -> R.drawable.ic_sym_open_in_full
+            aspect == VideoAspect.Crop -> R.drawable.ic_sym_fit_screen
+            else -> R.drawable.ic_sym_aspect_ratio
           },
-          contentDescription = null,
-        )
-      }
+        ),
+        onClick        = {
+          val next = when {
+            customRatio > 0 -> VideoAspect.Fit // leave a custom ratio (e.g. 21:9) back to Fit
+            aspect == VideoAspect.Fit -> VideoAspect.Stretch
+            aspect == VideoAspect.Stretch -> VideoAspect.Crop
+            else -> VideoAspect.Fit
+          }
+          viewModel.changeVideoAspect(next)
+        },
+        onLongClick    = { onOpenSheet(Sheets.AspectRatios) },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+      )
     }
 
-    // ------------------------------------------------------------------
-    // DECODER — SuggestionChip with text label
-    // ------------------------------------------------------------------
     PlayerButton.DECODER -> {
-      val decoderName = remember(decoder, locale) { decoder.title }
-
-      SuggestionChip(
-        onClick = {
-          clickEvent()
-          onOpenSheet(Sheets.Decoders)
-        },
-        label   = {
-          Text(
-            text  = decoderName,
-            style = chipValueLabelStyle(),
-          )
-        },
-        modifier = modifier,
-        icon     = {
-          Icon(
-            imageVector        = Icons.Outlined.Memory,
-            contentDescription = null,
-            modifier           = Modifier.size(18.dp),
-          )
-        },
-        colors = SuggestionChipDefaults.suggestionChipColors(
-          containerColor   = if (hideBackground)
-            Color.Transparent
-          else
-            MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
-          labelColor       = MaterialTheme.colorScheme.onSurface,
-          iconContentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        elevation = SuggestionChipDefaults.suggestionChipElevation(
-          elevation = if (hideBackground) 0.dp else 2.dp,
-        ),
+      PlayerValueChip(
+        icon           = button.icon,
+        text           = remember(decoder, locale) { decoder.title },
+        onClick        = { onOpenSheet(Sheets.Decoders) },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
       )
     }
 
-    // ------------------------------------------------------------------
-    // PICTURE IN PICTURE — FilledTonalIconButton
-    // ------------------------------------------------------------------
     PlayerButton.PICTURE_IN_PICTURE -> {
-      FilledTonalIconButton(
-        onClick  = { activity.enterPipModeHidingOverlay() },
-        modifier = modifier.size(buttonSize),
-        shapes   = expressiveShapes,
-        colors   = glassIconButtonColors(hideBackground),
-      ) {
-        Icon(
-          imageVector        = Icons.Outlined.PictureInPictureAlt,
-          contentDescription = null,
-        )
-      }
-    }
-
-    // ------------------------------------------------------------------
-    // SCREEN ROTATION — FilledTonalIconButton
-    // ------------------------------------------------------------------
-    PlayerButton.SCREEN_ROTATION -> {
-      FilledTonalIconButton(
-        onClick  = { viewModel.cycleScreenRotations() },
-        modifier = modifier.size(buttonSize),
-        shapes   = expressiveShapes,
-        colors   = glassIconButtonColors(hideBackground),
-      ) {
-        Icon(
-          imageVector        = Icons.Outlined.ScreenRotation,
-          contentDescription = null,
-        )
-      }
-    }
-
-    // ------------------------------------------------------------------
-    // LOCK CONTROLS — FilledTonalIconButton
-    // ------------------------------------------------------------------
-    PlayerButton.LOCK_CONTROLS -> {
-      FilledTonalIconButton(
-        onClick  = { viewModel.lockControls() },
-        modifier = modifier.size(buttonSize),
-        shapes   = expressiveShapes,
-        colors   = glassIconButtonColors(hideBackground),
-      ) {
-        Icon(
-          imageVector        = Icons.Outlined.LockOpen,
-          contentDescription = null,
-        )
-      }
-    }
-
-    // ------------------------------------------------------------------
-    // FRAME NAVIGATION / SNAPSHOT — FilledTonalIconButton
-    // ------------------------------------------------------------------
-    PlayerButton.FRAME_NAVIGATION -> {
-      FilledTonalIconButton(
-        onClick  = { viewModel.takeSnapshot(context) },
-        modifier = modifier.size(buttonSize),
-        shapes   = expressiveShapes,
-        colors   = glassIconButtonColors(hideBackground),
-      ) {
-        Icon(
-          imageVector        = Icons.Outlined.CameraAlt,
-          contentDescription = null,
-        )
-      }
-    }
-
-    // ------------------------------------------------------------------
-    // VIDEO ZOOM — SuggestionChip with zoom % value
-    // ------------------------------------------------------------------
-    PlayerButton.VIDEO_ZOOM -> {
-      val zoomText = remember(currentZoom, locale) {
-        String.format(locale, "%.0f%%", currentZoom * 100)
-      }
-
-      SuggestionChip(
-        onClick = {
-          clickEvent()
-          onOpenSheet(Sheets.VideoZoom)
-        },
-        label   = {
-          Text(
-            text  = zoomText,
-            style = chipValueLabelStyle(),
-          )
-        },
-        modifier = modifier,
-        icon     = {
-          Icon(
-            imageVector        = Icons.Outlined.ZoomIn,
-            contentDescription = null,
-            modifier           = Modifier.size(18.dp),
-          )
-        },
-        colors = SuggestionChipDefaults.suggestionChipColors(
-          containerColor   = if (hideBackground)
-            Color.Transparent
-          else
-            MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
-          labelColor       = MaterialTheme.colorScheme.onSurface,
-          iconContentColor = MaterialTheme.colorScheme.onSurface,
-        ),
-        elevation = SuggestionChipDefaults.suggestionChipElevation(
-          elevation = if (hideBackground) 0.dp else 2.dp,
-        ),
+      PlayerIconButton(
+        icon           = button.icon,
+        onClick        = { activity.enterPipModeHidingOverlay() },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
       )
     }
 
-    // ------------------------------------------------------------------
-    // SHUFFLE — ElevatedFilterChip (selected state = M3 checked visual)
-    // ------------------------------------------------------------------
+    PlayerButton.SCREEN_ROTATION -> {
+      PlayerIconButton(
+        icon           = button.icon,
+        onClick        = { viewModel.cycleScreenRotations() },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+      )
+    }
+
+    PlayerButton.LOCK_CONTROLS -> {
+      PlayerIconButton(
+        icon           = button.icon,
+        onClick        = { viewModel.lockControls() },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+      )
+    }
+
+    // Tap expands to  ‹ previous frame · screenshot · next frame ›  (collapses on its own
+    // after a few seconds); long-press opens the frame navigation sheet.
+    PlayerButton.FRAME_NAVIGATION -> {
+      val isExpanded by viewModel.isFrameNavigationExpanded.collectAsState()
+      val isSnapshotLoading by viewModel.isSnapshotLoading.collectAsState()
+      if (isExpanded) {
+        PlayerButtonGroup(hideBackground = hideBackground, buttonSize = buttonSize, modifier = modifier) {
+          PlayerGroupIconButton(
+            icon       = ImageVector.vectorResource(R.drawable.ic_sym_chevron_left),
+            onClick    = {
+              viewModel.frameStepBackward()
+              viewModel.resetFrameNavigationTimer()
+            },
+            buttonSize = buttonSize,
+          )
+          if (isSnapshotLoading) {
+            Box(modifier = Modifier.size(buttonSize - 8.dp), contentAlignment = Alignment.Center) {
+              CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            }
+          } else {
+            PlayerGroupIconButton(
+              icon       = ImageVector.vectorResource(R.drawable.ic_sym_photo_camera),
+              onClick    = {
+                viewModel.takeSnapshot(context)
+                viewModel.resetFrameNavigationTimer()
+              },
+              buttonSize = buttonSize,
+            )
+          }
+          PlayerGroupIconButton(
+            icon       = ImageVector.vectorResource(R.drawable.ic_sym_chevron_right),
+            onClick    = {
+              viewModel.frameStepForward()
+              viewModel.resetFrameNavigationTimer()
+            },
+            buttonSize = buttonSize,
+          )
+        }
+      } else {
+        PlayerIconButton(
+          icon           = button.icon,
+          onClick        = { viewModel.toggleFrameNavigationExpanded() },
+          onLongClick    = { onOpenSheet(Sheets.FrameNavigation) },
+          hideBackground = hideBackground,
+          buttonSize     = buttonSize,
+          modifier       = modifier,
+        )
+      }
+    }
+
+    PlayerButton.VIDEO_ZOOM -> {
+      PlayerValueChip(
+        icon           = button.icon,
+        text           = remember(currentZoom, locale) { String.format(locale, "%.0f%%", currentZoom * 100) },
+        onClick        = { onOpenSheet(Sheets.VideoZoom) },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+      )
+    }
+
     PlayerButton.SHUFFLE -> {
       val isShuffle by viewModel.shuffleEnabled.collectAsState()
-
-      ElevatedFilterChip(
-        selected = isShuffle,
-        onClick  = {
-          clickEvent()
-          viewModel.toggleShuffle()
-        },
-        label    = {
-          Icon(
-            imageVector        = if (isShuffle) Icons.Outlined.ShuffleOn else Icons.Outlined.Shuffle,
-            contentDescription = null,
-            modifier           = Modifier.size(20.dp),
-          )
-        },
-        modifier = modifier.size(buttonSize),
-        colors   = FilterChipDefaults.elevatedFilterChipColors(
-          selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-          selectedLabelColor     = MaterialTheme.colorScheme.onPrimaryContainer,
-        ),
-        elevation = FilterChipDefaults.elevatedFilterChipElevation(elevation = 2.dp),
+      PlayerIconButton(
+        icon           = button.icon,
+        onClick        = { viewModel.toggleShuffle() },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+        checked        = isShuffle,
       )
     }
 
-    // ------------------------------------------------------------------
-    // REPEAT MODE — ElevatedFilterChip cycling OFF → ONE → ALL
-    // ------------------------------------------------------------------
+    // Cycles OFF → ONE → ALL; highlighted while repeating.
     PlayerButton.REPEAT_MODE -> {
       val repeatMode by viewModel.repeatMode.collectAsState()
-      val isEnabled  = repeatMode != RepeatMode.OFF
-      val icon = when (repeatMode) {
-        RepeatMode.OFF -> Icons.Outlined.Repeat
-        RepeatMode.ONE -> Icons.Outlined.RepeatOne
-        RepeatMode.ALL -> Icons.Outlined.RepeatOn
-      }
-
-      ElevatedFilterChip(
-        selected = isEnabled,
-        onClick  = {
-          clickEvent()
-          viewModel.cycleRepeatMode()
+      PlayerIconButton(
+        icon           = if (repeatMode == RepeatMode.ONE) {
+          ImageVector.vectorResource(R.drawable.ic_sym_repeat_one)
+        } else {
+          button.icon
         },
-        label    = {
-          Icon(
-            imageVector        = icon,
-            contentDescription = null,
-            modifier           = Modifier.size(20.dp),
-          )
-        },
-        modifier = modifier.size(buttonSize),
-        colors   = FilterChipDefaults.elevatedFilterChipColors(
-          selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-          selectedLabelColor     = MaterialTheme.colorScheme.onPrimaryContainer,
-        ),
-        elevation = FilterChipDefaults.elevatedFilterChipElevation(elevation = 2.dp),
+        onClick        = { viewModel.cycleRepeatMode() },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+        checked        = repeatMode != RepeatMode.OFF,
       )
     }
 
-    // ------------------------------------------------------------------
-    // MIRROR — ElevatedFilterChip
-    // ------------------------------------------------------------------
     PlayerButton.MIRROR -> {
       val isMirrored by viewModel.isMirrored.collectAsState()
-
-      ElevatedFilterChip(
-        selected = isMirrored,
-        onClick  = {
-          clickEvent()
-          viewModel.toggleMirroring()
-        },
-        label    = {
-          Icon(
-            imageVector        = Icons.Outlined.Flip,
-            contentDescription = null,
-            modifier           = Modifier.size(20.dp),
-          )
-        },
-        modifier = modifier.size(buttonSize),
-        colors   = FilterChipDefaults.elevatedFilterChipColors(
-          selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-          selectedLabelColor     = MaterialTheme.colorScheme.onPrimaryContainer,
-        ),
-        elevation = FilterChipDefaults.elevatedFilterChipElevation(elevation = 2.dp),
+      PlayerIconButton(
+        icon           = button.icon,
+        onClick        = { viewModel.toggleMirroring() },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+        checked        = isMirrored,
       )
     }
 
-    else -> {}
+    PlayerButton.VERTICAL_FLIP -> {
+      val isVerticalFlipped by viewModel.isVerticalFlipped.collectAsState()
+      PlayerIconButton(
+        icon           = button.icon,
+        onClick        = { viewModel.toggleVerticalFlip() },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+        checked        = isVerticalFlipped,
+        iconModifier   = Modifier.rotate(90f),
+      )
+    }
+
+    // Tap expands to  A · ✕ · B ; set A and B to loop that part, ✕ clears and closes.
+    PlayerButton.AB_LOOP -> {
+      val isExpanded by viewModel.isABLoopExpanded.collectAsState()
+      val loopA by viewModel.abLoopA.collectAsState()
+      val loopB by viewModel.abLoopB.collectAsState()
+      if (isExpanded) {
+        PlayerButtonGroup(hideBackground = hideBackground, buttonSize = buttonSize, modifier = modifier) {
+          PlayerGroupTextButton(
+            text       = loopA?.let { viewModel.formatTimestamp(it) } ?: "A",
+            active     = loopA != null,
+            onClick    = { viewModel.setLoopA() },
+            buttonSize = buttonSize,
+          )
+          PlayerGroupIconButton(
+            icon       = ImageVector.vectorResource(R.drawable.ic_sym_close),
+            onClick    = {
+              viewModel.clearABLoop()
+              viewModel.toggleABLoopExpanded()
+            },
+            buttonSize = buttonSize,
+          )
+          PlayerGroupTextButton(
+            text       = loopB?.let { viewModel.formatTimestamp(it) } ?: "B",
+            active     = loopB != null,
+            onClick    = { viewModel.setLoopB() },
+            buttonSize = buttonSize,
+          )
+        }
+      } else {
+        PlayerIconButton(
+          icon           = button.icon,
+          onClick        = { viewModel.toggleABLoopExpanded() },
+          hideBackground = hideBackground,
+          buttonSize     = buttonSize,
+          modifier       = modifier,
+          checked        = loopA != null && loopB != null,
+        )
+      }
+    }
+
+    // Skips ahead by the custom duration from Settings → Player (default 90 s, e.g. an OP).
+    PlayerButton.CUSTOM_SKIP -> {
+      val playerPreferences = koinInject<PlayerPreferences>()
+      PlayerIconButton(
+        icon           = button.icon,
+        onClick        = { viewModel.seekBy(playerPreferences.customSkipDuration.get()) },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+      )
+    }
+
+    PlayerButton.BACKGROUND_PLAYBACK -> {
+      PlayerIconButton(
+        icon           = button.icon,
+        onClick        = { activity.triggerBackgroundPlayback() },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+      )
+    }
+
+    PlayerButton.MORE_OPTIONS -> {
+      PlayerIconButton(
+        icon           = button.icon,
+        onClick        = { onOpenSheet(Sheets.More) },
+        hideBackground = hideBackground,
+        buttonSize     = buttonSize,
+        modifier       = modifier,
+      )
+    }
+
+    PlayerButton.BACK_ARROW, PlayerButton.VIDEO_TITLE, PlayerButton.NONE -> {}
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Shared player button styles
+// ---------------------------------------------------------------------------
+
+/**
+ * Round tonal icon button used by every icon-only player button. [checked] shows the
+ * "on" state (primary container). [onLongClick] adds a long-press: M3 icon buttons have
+ * no long-click of their own, so presses are watched and a press held past the system
+ * long-press time runs [onLongClick] instead of [onClick].
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun PlayerIconButton(
+  icon: ImageVector,
+  onClick: () -> Unit,
+  hideBackground: Boolean,
+  buttonSize: Dp,
+  modifier: Modifier = Modifier,
+  checked: Boolean = false,
+  onLongClick: (() -> Unit)? = null,
+  contentDescription: String? = null,
+  iconModifier: Modifier = Modifier,
+) {
+  val clickEvent = LocalPlayerButtonsClickEvent.current
+  val haptic = LocalHapticFeedback.current
+  val longPressTimeout = LocalViewConfiguration.current.longPressTimeoutMillis
+  val interactionSource = remember { MutableInteractionSource() }
+  var longPressHandled by remember { mutableStateOf(false) }
+
+  if (onLongClick != null) {
+    val currentOnLongClick by rememberUpdatedState(onLongClick)
+    LaunchedEffect(interactionSource) {
+      interactionSource.interactions.collectLatest { interaction ->
+        if (interaction is PressInteraction.Press) {
+          longPressHandled = false
+          delay(longPressTimeout)
+          longPressHandled = true
+          haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+          clickEvent()
+          currentOnLongClick()
+        }
+      }
+    }
+  }
+
+  FilledTonalIconButton(
+    onClick           = {
+      if (longPressHandled) {
+        longPressHandled = false
+      } else {
+        clickEvent()
+        onClick()
+      }
+    },
+    modifier          = modifier.size(buttonSize),
+    shapes            = IconButtonDefaults.shapes(),
+    colors            = if (checked) {
+      IconButtonDefaults.filledTonalIconButtonColors(
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor   = MaterialTheme.colorScheme.onPrimaryContainer,
+      )
+    } else {
+      glassIconButtonColors(hideBackground)
+    },
+    interactionSource = interactionSource,
+  ) {
+    Icon(
+      imageVector        = icon,
+      contentDescription = contentDescription,
+      modifier           = iconModifier,
+    )
+  }
+}
+
+/**
+ * Pill button showing a value next to its icon (speed, decoder, zoom). Same height and
+ * glass colours as [PlayerIconButton]; [highlighted] uses the primary container.
+ */
+@Composable
+internal fun PlayerValueChip(
+  icon: ImageVector,
+  text: String,
+  onClick: () -> Unit,
+  hideBackground: Boolean,
+  buttonSize: Dp,
+  modifier: Modifier = Modifier,
+  highlighted: Boolean = false,
+) {
+  val clickEvent = LocalPlayerButtonsClickEvent.current
+  Surface(
+    onClick      = {
+      clickEvent()
+      onClick()
+    },
+    modifier     = modifier.height(buttonSize),
+    shape        = CircleShape,
+    color        = when {
+      highlighted -> MaterialTheme.colorScheme.primaryContainer
+      hideBackground -> Color.Transparent
+      else -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
+    },
+    contentColor = if (highlighted) {
+      MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+      MaterialTheme.colorScheme.onSurface
+    },
+  ) {
+    Row(
+      modifier              = Modifier.padding(start = 12.dp, end = 16.dp),
+      verticalAlignment     = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+      Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(20.dp))
+      Text(text = text, style = chipValueLabelStyle(), maxLines = 1)
+    }
+  }
+}
+
+/** Pill container for expanded buttons (frame navigation, A-B loop). */
+@Composable
+private fun PlayerButtonGroup(
+  hideBackground: Boolean,
+  buttonSize: Dp,
+  modifier: Modifier = Modifier,
+  content: @Composable () -> Unit,
+) {
+  Surface(
+    modifier     = modifier.height(buttonSize),
+    shape        = CircleShape,
+    color        = if (hideBackground) {
+      Color.Transparent
+    } else {
+      MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
+    },
+    contentColor = MaterialTheme.colorScheme.onSurface,
+  ) {
+    Row(
+      modifier              = Modifier.padding(horizontal = 4.dp),
+      verticalAlignment     = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+      content()
+    }
+  }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PlayerGroupIconButton(
+  icon: ImageVector,
+  onClick: () -> Unit,
+  buttonSize: Dp,
+) {
+  val clickEvent = LocalPlayerButtonsClickEvent.current
+  IconButton(
+    onClick  = {
+      clickEvent()
+      onClick()
+    },
+    modifier = Modifier.size(buttonSize - 8.dp),
+    shapes   = IconButtonDefaults.shapes(),
+  ) {
+    Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(20.dp))
+  }
+}
+
+/** "A" / "B" (or the set time) inside the A-B loop group; tertiary container once set. */
+@Composable
+private fun PlayerGroupTextButton(
+  text: String,
+  active: Boolean,
+  onClick: () -> Unit,
+  buttonSize: Dp,
+) {
+  val clickEvent = LocalPlayerButtonsClickEvent.current
+  Surface(
+    onClick      = {
+      clickEvent()
+      onClick()
+    },
+    modifier     = Modifier
+      .height(buttonSize - 8.dp)
+      .widthIn(min = buttonSize - 8.dp),
+    shape        = CircleShape,
+    color        = if (active) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
+    contentColor = if (active) {
+      MaterialTheme.colorScheme.onTertiaryContainer
+    } else {
+      MaterialTheme.colorScheme.onSurface
+    },
+  ) {
+    Box(
+      modifier         = Modifier.padding(horizontal = if (active) 10.dp else 0.dp),
+      contentAlignment = Alignment.Center,
+    ) {
+      Text(text = text, style = chipValueLabelStyle())
+    }
   }
 }

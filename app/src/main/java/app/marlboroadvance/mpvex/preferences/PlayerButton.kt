@@ -1,64 +1,48 @@
 package app.marlboroadvance.mpvex.preferences
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Segment
-import androidx.compose.material.icons.outlined.AspectRatio
-import androidx.compose.material.icons.outlined.Audiotrack
-import androidx.compose.material.icons.outlined.Bookmarks
-import androidx.compose.material.icons.outlined.Camera
-import androidx.compose.material.icons.outlined.LockOpen
-import androidx.compose.material.icons.outlined.Memory
-import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.PictureInPictureAlt
-import androidx.compose.material.icons.outlined.ScreenRotation
-import androidx.compose.material.icons.outlined.Speed
-import androidx.compose.material.icons.outlined.Subtitles
-import androidx.compose.material.icons.outlined.Title
-import androidx.compose.material.icons.outlined.Flip
-import androidx.compose.material.icons.outlined.Repeat
-import androidx.compose.material.icons.outlined.Autorenew
-import androidx.compose.material.icons.outlined.Segment
-import androidx.compose.material.icons.outlined.ZoomIn
-import androidx.compose.material.icons.outlined.FastForward
-import androidx.compose.material.icons.outlined.Shuffle
-import androidx.compose.material.icons.outlined.SwapVert
-import androidx.compose.material.icons.outlined.PlayCircle
-import androidx.compose.material.icons.outlined.Headset
+import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
+import app.marlboroadvance.mpvex.R
 
 /**
  * Represents a customizable button in the player controls.
- * Now includes an icon for the preference UI.
+ *
+ * [iconRes] is a Material Symbols Rounded drawable; the same icon is used in the player and
+ * in Settings → Player layout so both always match.
  */
 enum class PlayerButton(
-  val icon: ImageVector,
+  @DrawableRes val iconRes: Int,
 ) {
-  BACK_ARROW(Icons.AutoMirrored.Outlined.ArrowBack),
-  VIDEO_TITLE(Icons.Outlined.Title),
-  BOOKMARKS_CHAPTERS(Icons.Outlined.Bookmarks),
-  PLAYBACK_SPEED(Icons.Outlined.Speed),
-  DECODER(Icons.Outlined.Memory),
-  SCREEN_ROTATION(Icons.Outlined.ScreenRotation),
-  FRAME_NAVIGATION(Icons.Outlined.Camera),
-  VIDEO_ZOOM(Icons.Outlined.ZoomIn),
-  PICTURE_IN_PICTURE(Icons.Outlined.PictureInPictureAlt),
-  ASPECT_RATIO(Icons.Outlined.AspectRatio),
-  LOCK_CONTROLS(Icons.Outlined.LockOpen),
-  AUDIO_TRACK(Icons.Outlined.Audiotrack),
-  SUBTITLES(Icons.Outlined.Subtitles),
-  MORE_OPTIONS(Icons.Outlined.MoreVert),
-  CURRENT_CHAPTER(Icons.Outlined.Bookmarks), // <-- CHANGED ICON
-  REPEAT_MODE(Icons.Outlined.Repeat),
-  SHUFFLE(Icons.Outlined.Shuffle),
-  MIRROR(Icons.Outlined.Flip),
-  VERTICAL_FLIP(Icons.Outlined.Flip),
-  AB_LOOP(Icons.Outlined.Autorenew),
-  CUSTOM_SKIP(Icons.Outlined.FastForward),
-  BACKGROUND_PLAYBACK(Icons.Outlined.Headset),
-  NONE(Icons.Outlined.Bookmarks),
+  BACK_ARROW(R.drawable.ic_sym_arrow_back),
+  VIDEO_TITLE(R.drawable.ic_sym_title),
+  BOOKMARKS_CHAPTERS(R.drawable.ic_sym_toc),
+  PLAYBACK_SPEED(R.drawable.ic_sym_speed),
+  DECODER(R.drawable.ic_sym_memory),
+  SCREEN_ROTATION(R.drawable.ic_sym_screen_rotation),
+  FRAME_NAVIGATION(R.drawable.ic_sym_filter_frames),
+  VIDEO_ZOOM(R.drawable.ic_sym_zoom_in),
+  PICTURE_IN_PICTURE(R.drawable.ic_sym_picture_in_picture_alt),
+  ASPECT_RATIO(R.drawable.ic_sym_aspect_ratio),
+  LOCK_CONTROLS(R.drawable.ic_sym_lock_open),
+  AUDIO_TRACK(R.drawable.ic_sym_music_note),
+  SUBTITLES(R.drawable.ic_sym_closed_caption),
+  MORE_OPTIONS(R.drawable.ic_sym_more_vert),
+  CURRENT_CHAPTER(R.drawable.ic_sym_bookmark),
+  REPEAT_MODE(R.drawable.ic_sym_repeat),
+  SHUFFLE(R.drawable.ic_sym_shuffle),
+  MIRROR(R.drawable.ic_sym_flip),
+  VERTICAL_FLIP(R.drawable.ic_sym_flip), // drawn rotated 90°
+  AB_LOOP(R.drawable.ic_sym_laps),
+  CUSTOM_SKIP(R.drawable.ic_sym_fast_forward),
+  BACKGROUND_PLAYBACK(R.drawable.ic_sym_headphones),
+  NONE(R.drawable.ic_sym_block),
 }
+
+/** The button's icon as an [ImageVector] (Material Symbols Rounded). */
+val PlayerButton.icon: ImageVector
+  @Composable get() = ImageVector.vectorResource(iconRes)
 
 /**
  * A list of all buttons that the user can choose from in the customization menu.

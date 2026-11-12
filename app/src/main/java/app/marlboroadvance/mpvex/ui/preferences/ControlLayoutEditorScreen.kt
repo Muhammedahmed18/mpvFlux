@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.PlayerButton
+import app.marlboroadvance.mpvex.preferences.icon
 import app.marlboroadvance.mpvex.preferences.allPlayerButtons
 import app.marlboroadvance.mpvex.preferences.preference.Preference
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
@@ -279,13 +280,13 @@ data class ControlLayoutEditorScreen(
                                label = "drag_elevation"
                            )
                            
-                           Surface(
+                           // No clipping wrapper here: a rounded clip around the tile used to cut off
+                           // its corners and the red remove badge. The drag shadow is drawn by the
+                           // tile itself, in its own shape.
+                           Box(
                                modifier = Modifier
                                    .draggableHandle()
                                    .then(if (button == PlayerButton.CURRENT_CHAPTER || button == PlayerButton.VIDEO_TITLE) Modifier.wrapContentWidth(Alignment.Start) else Modifier),
-                               shape = MaterialTheme.shapes.extraLarge,
-                               shadowElevation = elevation.dp,
-                               color = Color.Transparent
                            ) {
                                 PlayerButtonChip(
                                     button = button,
@@ -293,6 +294,7 @@ data class ControlLayoutEditorScreen(
                                     onClick = { selectedButtons = selectedButtons - button },
                                     badgeIcon = Icons.Rounded.RemoveCircle,
                                     badgeColor = MaterialTheme.colorScheme.error,
+                                    elevation = elevation.dp,
                                 )
                            }
                         }
