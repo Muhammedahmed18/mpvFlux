@@ -746,7 +746,7 @@ private fun VideoSortBottomSheet(
     },
     visibilityToggles = listOf(
       VisibilityToggle(label = "Thumbnails", checked = showThumbnails, onCheckedChange = { browserPreferences.showVideoThumbnails.set(it) }),
-      VisibilityToggle(label = "Extension", checked = showVideoExtension, onCheckedChange = { browserPreferences.showVideoExtension.set(it) }),
+      VisibilityToggle(label = "Full file names", checked = showVideoExtension, onCheckedChange = { browserPreferences.showVideoExtension.set(it) }),
       VisibilityToggle(label = "Subtitles", checked = showSubtitleIndicator, onCheckedChange = { browserPreferences.showSubtitleIndicator.set(it) }),
       VisibilityToggle(label = "Full Name", checked = unlimitedNameLines, onCheckedChange = { appearancePreferences.unlimitedNameLines.set(it) }),
       VisibilityToggle(label = "Size", checked = showSizeChip, onCheckedChange = { browserPreferences.showSizeChip.set(it) }),

@@ -41,9 +41,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -65,11 +65,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -79,6 +82,7 @@ import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import app.marlboroadvance.mpvex.ui.utils.cleanVideoTitle
 import org.koin.compose.koinInject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -130,11 +134,9 @@ fun VideoCard(
   }
 
   val displayTitle = remember(video.displayName, settings.showVideoExtension) {
-    if (settings.showVideoExtension) {
-      video.displayName
-    } else {
-      video.displayName.substringBeforeLast('.')
-    }
+    // "Full file names" on: the file name as is. Off: a readable title,
+    // e.g. "[SubsPlease] Frieren - 05 (1080p) [A1B2C3D4].mkv" -> "Frieren - 05".
+    if (settings.showVideoExtension) video.displayName else cleanVideoTitle(video.displayName)
   }
 
   val showSizeChip = overrideShowSizeChip ?: settings.showSizeChip
@@ -194,19 +196,21 @@ fun VideoCard(
         allowThumbnailGeneration = allowThumbnailGeneration,
         onThumbClick = onThumbClick,
         onLongClick = onLongClick,
+        // About 40% of the card so titles have room.
         modifier = Modifier
-          .weight(1.3f)
-          .widthIn(min = 170.dp)
+          .fillMaxWidth(0.4f)
+          .widthIn(min = 128.dp, max = 160.dp)
           .aspectRatio(16f / 9f)
       )
 
-      Spacer(modifier = Modifier.width(16.dp))
+      Spacer(modifier = Modifier.width(14.dp))
 
       VideoInfoPanel(
         displayTitle = displayTitle,
         isSelected = isSelected,
         isWatched = isWatched,
-        isRecentlyPlayed = isRecentlyPlayed,
+        isNew = isNew,
+        progressPercentage = if (settings.showProgressBar) progressPercentage else null,
         video = video,
         showSubtitleIndicator = showSubtitleIndicator,
         showSizeChip = showSizeChip,
@@ -225,7 +229,8 @@ private fun VideoInfoPanel(
   displayTitle: String,
   isSelected: Boolean,
   isWatched: Boolean,
-  isRecentlyPlayed: Boolean,
+  isNew: Boolean,
+  progressPercentage: Float?,
   video: Video,
   showSubtitleIndicator: Boolean,
   showSizeChip: Boolean,
@@ -236,17 +241,13 @@ private fun VideoInfoPanel(
   modifier: Modifier = Modifier
 ) {
   Column(
-    modifier = if (isWatched) modifier.alpha(0.55f) else modifier,
+    modifier = modifier,
     verticalArrangement = Arrangement.spacedBy(8.dp)
   ) {
     Text(
       text = displayTitle,
       style = MaterialTheme.typography.titleMediumEmphasized,
-      color = when {
-        isSelected -> MaterialTheme.colorScheme.primary
-        isRecentlyPlayed -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.onSurface
-      },
+      color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
       maxLines = if (unlimitedNameLines) Int.MAX_VALUE else 2,
       overflow = TextOverflow.Ellipsis,
     )
@@ -258,6 +259,60 @@ private fun VideoInfoPanel(
       showResolutionChip = showResolutionChip,
       showFramerate = showFramerate,
       showDateChip = showDateChip
+    )
+
+    VideoStatusLine(
+      video = video,
+      isWatched = isWatched,
+      isNew = isNew,
+      progressPercentage = progressPercentage,
+    )
+  }
+}
+
+/** "12:32 left" while partly watched, "Watched" when finished, or a NEW chip. */
+@Composable
+private fun VideoStatusLine(
+  video: Video,
+  isWatched: Boolean,
+  isNew: Boolean,
+  progressPercentage: Float?,
+) {
+  val inProgress = !isWatched && progressPercentage != null && progressPercentage > 0f && video.duration > 0
+  when {
+    isWatched -> StatusLabel(
+      icon = R.drawable.ic_sym_check_circle_fill,
+      text = stringResource(R.string.video_status_watched),
+    )
+    inProgress -> {
+      val left = remember(video.duration, progressPercentage) {
+        formatRemaining((video.duration * (1f - progressPercentage!!)).toLong())
+      }
+      StatusLabel(
+        icon = R.drawable.ic_sym_play_arrow_fill,
+        text = stringResource(R.string.video_status_left, left),
+      )
+    }
+    isNew -> UnifiedChip(text = stringResource(R.string.video_label_new), isPrimary = true, compact = true)
+  }
+}
+
+@Composable
+private fun StatusLabel(icon: Int, text: String) {
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(4.dp),
+  ) {
+    Icon(
+      imageVector = ImageVector.vectorResource(icon),
+      contentDescription = null,
+      tint = MaterialTheme.colorScheme.primary,
+      modifier = Modifier.size(16.dp),
+    )
+    Text(
+      text = text,
+      style = MaterialTheme.typography.labelLarge,
+      color = MaterialTheme.colorScheme.primary,
     )
   }
 }
@@ -280,7 +335,8 @@ fun VideoThumbnail(
   val isInspection = LocalInspectionMode.current
   val thumbnailRepository = if (isInspection) null else koinInject<ThumbnailRepository>()
   val density = LocalDensity.current
-  val shape = MaterialTheme.shapes.medium
+  // Card corner (extraLarge, 28dp) minus the card's 12dp padding, so the corners line up.
+  val shape = RoundedCornerShape(16.dp)
 
   Box(modifier = modifier) {
     BoxWithConstraints(
@@ -362,140 +418,86 @@ fun VideoThumbnail(
             contentDescription = null,
             modifier = Modifier
               .matchParentSize()
-              .alpha(imageAlpha * (if (isWatched) 0.4f else 1f)),
+              .alpha(imageAlpha * (if (isWatched) 0.6f else 1f)),
             contentScale = ContentScale.Crop,
           )
         } else if (!isLoading || loadFailed) {
           Icon(
-            imageVector = Icons.Filled.PlayArrow,
+            imageVector = ImageVector.vectorResource(R.drawable.ic_sym_movie),
             contentDescription = null,
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(32.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }
       } else {
         Icon(
-          imageVector = Icons.Filled.PlayArrow,
+          imageVector = ImageVector.vectorResource(R.drawable.ic_sym_movie),
           contentDescription = null,
-          modifier = Modifier.size(40.dp),
+          modifier = Modifier.size(32.dp),
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
 
-      // Status Badge (Top Right)
-      Box(
-        modifier = Modifier
-          .align(Alignment.TopEnd)
-          .padding(8.dp),
-      ) {
-        if (isWatched) {
-          Surface(
-            shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-          ) {
-            Icon(
-              imageVector = Icons.Filled.Check,
-              contentDescription = "Watched",
-              modifier = Modifier
-                .padding(horizontal = 6.dp, vertical = 4.dp)
-                .size(12.dp),
-              tint = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-          }
-        } else if (isNew) {
-          Surface(
-            shape = MaterialTheme.shapes.small,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-          ) {
-            Text(
-              text = stringResource(R.string.video_label_new),
-              style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-              color = MaterialTheme.colorScheme.onSecondaryContainer,
-              modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-          }
-        }
-      }
-
-      // Bottom overlay: a duration / remaining-time pill stacked above an inset,
-      // fully-rounded capsule progress bar. The pill reads "-12:32" while a video
-      // is partially watched and the total duration once completed or unwatched.
-      val showProgressFill =
-        progressPercentage != null && showProgressBar && !isWatched && video.duration > 0
-      if (showProgressFill || video.durationFormatted.isNotBlank()) {
-        val chipLabel = remember(video.duration, video.durationFormatted, progressPercentage, showProgressFill) {
-          if (showProgressFill) {
-            val remaining = (video.duration * (1f - progressPercentage)).toLong()
-            "-${formatRemaining(remaining)}"
-          } else {
-            // Completed / unwatched videos show total duration instead.
-            video.durationFormatted
-          }
-        }
-
+      // Bottom overlay: length pill (bottom-right) and, while partly watched, an M3 progress
+      // bar (rounded, with the track gap and end dot) inset above the bottom edge.
+      val showProgress =
+        progressPercentage != null && progressPercentage > 0f && showProgressBar && !isWatched && video.duration > 0
+      if (showProgress || video.durationFormatted.isNotBlank()) {
         Column(
           modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
+            .padding(8.dp),
+          horizontalAlignment = Alignment.End,
+          verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-          if (chipLabel.isNotBlank()) {
+          if (video.durationFormatted.isNotBlank()) {
             Surface(
-              color = MaterialTheme.colorScheme.surfaceContainerHigh,
-              shape = MaterialTheme.shapes.small,
-              modifier = Modifier.padding(start = 8.dp, bottom = 6.dp)
+              color = Color.Black.copy(alpha = 0.65f),
+              contentColor = Color.White,
+              shape = CircleShape,
             ) {
               Text(
-                text = chipLabel,
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                text = video.durationFormatted,
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
               )
             }
           }
 
-          if (showProgressFill) {
+          if (showProgress) {
             val animatedProgress by animateFloatAsState(
-              targetValue = progressPercentage,
-              label = "VideoProgressAnimation"
+              targetValue = progressPercentage!!.coerceIn(0f, 1f),
+              label = "VideoProgressAnimation",
             )
-            // Inset, fully-rounded capsule bar floated off the thumbnail's bottom
-            // edge: a dimmed scrim track with a primary fill, both with circular
-            // caps so it reads as a polished pill rather than a flush strip.
-            Box(
+            LinearProgressIndicator(
+              progress = { animatedProgress },
               modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 8.dp, end = 8.dp, bottom = 8.dp)
-                .height(5.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.25f))
-            ) {
-              Box(
-                modifier = Modifier
-                  .fillMaxHeight()
-                  .fillMaxWidth(animatedProgress)
-                  .clip(CircleShape)
-                  .background(MaterialTheme.colorScheme.primary)
-              )
-            }
+                .height(4.dp),
+              color = MaterialTheme.colorScheme.primary,
+              trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+              strokeCap = StrokeCap.Round,
+            )
           }
         }
       }
     }
 
-    // Selection Check Badge (Bottom End)
+    // Selection check badge (top end, clear of the length pill)
     AnimatedVisibility(
       visible = isSelected,
       enter = fadeIn(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleIn(
         spring(dampingRatio = Spring.DampingRatioNoBouncy),
-        transformOrigin = TransformOrigin(1f, 1f)
+        transformOrigin = TransformOrigin(1f, 0f)
       ),
       exit = fadeOut(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleOut(
         spring(dampingRatio = Spring.DampingRatioNoBouncy),
-        transformOrigin = TransformOrigin(1f, 1f)
+        transformOrigin = TransformOrigin(1f, 0f)
       ),
       modifier = Modifier
-        .align(Alignment.BottomEnd)
-        .padding(bottom = 8.dp, end = 8.dp),
+        .align(Alignment.TopEnd)
+        .padding(top = 8.dp, end = 8.dp),
     ) {
       Surface(
         color = MaterialTheme.colorScheme.primaryContainer,
@@ -504,7 +506,7 @@ fun VideoThumbnail(
         border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
       ) {
         Icon(
-          imageVector = Icons.Filled.Check,
+          imageVector = Icons.Rounded.Check,
           contentDescription = "Selected",
           modifier = Modifier.padding(3.dp),
           tint = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -566,9 +568,7 @@ fun VideoMetadataChips(
   // field, so HDR is intentionally out of scope until MediaStore provides it.
   val is4K = video.width >= 3840 || video.height >= 2160
 
-  // Passive attributes collapse into a single muted, dot-separated line. Resolution
-  // joins this line only when it is NOT 4K, since 4K is promoted to its own badge below
-  // and would otherwise read twice.
+  // Resolution as a normal chip; 4K gets its own highlighted chip instead.
   val resolutionLabel = if (showResolutionChip && video.height > 0 && !is4K) {
     val baseRes = when {
       video.width >= 2560 || video.height >= 1440 -> "1440p"
@@ -579,12 +579,6 @@ fun VideoMetadataChips(
     }
     if (showFramerate && video.fps > 0) "$baseRes@${video.fps.roundToInt()}" else baseRes
   } else null
-
-  val attributeParts = buildList {
-    resolutionLabel?.let { add(it) }
-    if (showSizeChip && video.size > 0) add(video.sizeFormatted)
-    if (showDateChip && video.dateModified > 0) add(formatDate(video.dateModified))
-  }
 
   // 4K becomes an emphasized "is this the version I want" badge, gated by the same
   // resolution toggle. Framerate rides along when the user opts in.
@@ -600,44 +594,23 @@ fun VideoMetadataChips(
     emptyList()
   }
 
-  if (attributeParts.isEmpty() && qualityLabel == null && subtitleCodecs.isEmpty()) return
+  if (resolutionLabel == null && qualityLabel == null && subtitleCodecs.isEmpty() &&
+    !(showSizeChip && video.size > 0) && !(showDateChip && video.dateModified > 0)
+  ) return
 
-  Column(
+  // One row of pills, the same chips as the folder card; wraps on narrow screens.
+  FlowRow(
     modifier = modifier,
-    verticalArrangement = Arrangement.spacedBy(8.dp)
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
+    verticalArrangement = Arrangement.spacedBy(6.dp),
   ) {
-    if (attributeParts.isNotEmpty()) {
-      Text(
-        text = attributeParts.joinToString("  ·  "),
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
+    qualityLabel?.let { UnifiedChip(text = it, isAccent = true, compact = true) }
+    resolutionLabel?.let { UnifiedChip(text = it, compact = true) }
+    if (showSizeChip && video.size > 0) UnifiedChip(text = video.sizeFormatted, compact = true)
+    if (showDateChip && video.dateModified > 0) {
+      UnifiedChip(text = remember(video.dateModified) { formatDate(video.dateModified) }, compact = true)
     }
-
-    // Quality badge row — accent-colored, kept separate so it reads as status, not
-    // attribute. Stays a FlowRow so HDR and friends can slot in later.
-    if (qualityLabel != null) {
-      FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-      ) {
-        UnifiedChip(text = qualityLabel, isAccent = true, compact = true)
-      }
-    }
-
-    // Subtitle chips get their own row — bold primaryContainer "available formats".
-    if (subtitleCodecs.isNotEmpty()) {
-      FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
-      ) {
-        subtitleCodecs.forEach { codec ->
-          SubtitleChip(text = codec)
-        }
-      }
-    }
+    if (subtitleCodecs.isNotEmpty()) UnifiedChip(text = subtitleCodecs.joinToString(" · "), compact = true)
   }
 }
 

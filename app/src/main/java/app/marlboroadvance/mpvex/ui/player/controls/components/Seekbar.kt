@@ -221,13 +221,14 @@ fun VideoTimer(
     onClick: () -> Unit = {},
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    val shape = RoundedCornerShape(14.dp)
+    // Same round tonal pill as the player's icon buttons.
+    val shape = CircleShape
     Box(
         modifier = modifier
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.4f), shape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f), shape)
             .clickable(interactionSource = interactionSource, indication = ripple(), onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -247,6 +248,9 @@ fun VideoTimer(
 @Composable
 fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Segment>, isPaused: Boolean = false, isScrubbing: Boolean = false, seekbarStyle: SeekbarStyle = SeekbarStyle.Standard, onSeek: (Float) -> Unit, onSeekFinished: () -> Unit, loopStart: Float? = null, loopEnd: Float? = null, modifier: Modifier = Modifier) {
     val primaryColor = MaterialTheme.colorScheme.primary
+    // M3 slider: inactive track in secondaryContainer, small inner corners at the thumb gap,
+    // a stop dot at the end and a tall thin thumb.
+    val inactiveColor = MaterialTheme.colorScheme.secondaryContainer
     val interactionSource = remember { MutableInteractionSource() }
     // Reuse a single Animatable across pause/scrub toggles instead of allocating a new
     // one each time the effect re-runs.
@@ -266,8 +270,8 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
                 val playedPx = size.width * ((sliderState.value - sliderState.valueRange.start) / range).coerceIn(0f, 1f)
                 val trackHeight = size.height
                 val outerRadius = trackHeight / 2f
-                val innerRadius = if (isThick) outerRadius else 2.dp.toPx()
-                val gapHalf = 7.dp.toPx()
+                val innerRadius = 2.dp.toPx()
+                val gapHalf = 6.dp.toPx()
                 val thumbGapStart = (playedPx - gapHalf).coerceIn(0f, size.width)
                 val thumbGapEnd = (playedPx + gapHalf).coerceIn(0f, size.width)
                 fun drawSegment(startX: Float, endX: Float, color: Color) {
@@ -278,8 +282,14 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
                     path.addRoundRect(androidx.compose.ui.geometry.RoundRect(left = startX, top = 0f, right = endX, bottom = trackHeight, topLeftCornerRadius = cornerRadiusLeft, bottomLeftCornerRadius = cornerRadiusLeft, topRightCornerRadius = cornerRadiusRight, bottomRightCornerRadius = cornerRadiusRight))
                     drawPath(path, color)
                 }
-                drawSegment(thumbGapEnd, size.width, primaryColor.copy(alpha = 0.3f))
+                drawSegment(thumbGapEnd, size.width, inactiveColor)
                 if (thumbGapStart > 0) drawSegment(0f, thumbGapStart, primaryColor)
+                // Stop indicator: a small dot at the end of the track while there is track left.
+                val dotRadius = 2.dp.toPx()
+                val dotX = size.width - outerRadius
+                if (thumbGapEnd < dotX - dotRadius) {
+                    drawCircle(color = primaryColor, radius = dotRadius, center = Offset(dotX, trackHeight / 2f))
+                }
                 if (loopStart != null || loopEnd != null) {
                     val loopColor = Color(0xFFFFB300)
                     if (loopStart != null) { val startPx = (loopStart / duration).coerceIn(0f, 1f) * size.width; drawLine(color = loopColor, start = Offset(startPx, 0f), end = Offset(startPx, size.height), strokeWidth = 2.dp.toPx()) }
@@ -288,6 +298,6 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
                 }
             }
         },
-        thumb = { Box(modifier = Modifier.width(6.dp).height(if (isThick) 16.dp else 24.dp).background(primaryColor, if (isThick) RoundedCornerShape(3.dp) else CircleShape)) }
+        thumb = { Box(modifier = Modifier.width(4.dp).height(if (isThick) 32.dp else 24.dp).background(primaryColor, CircleShape)) }
     )
 }

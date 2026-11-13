@@ -37,6 +37,8 @@
   <string name="pref_appearance_watched_threshold_title">Watched threshold</string>
   <string name="pref_appearance_watched_threshold_summary">Mark video as watched when playback reaches %d%%</string>
   <string name="video_label_new">NEW</string>
+  <string name="video_status_left">%1$s left</string>
+  <string name="video_status_watched">Watched</string>
   <!-- Theme names -->
   <string name="theme_default">Default</string>
   <string name="theme_dynamic">Dynamic</string>
