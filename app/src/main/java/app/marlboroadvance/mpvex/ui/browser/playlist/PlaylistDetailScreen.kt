@@ -400,7 +400,6 @@ private fun PlaylistVideoListContent(
                       hasPrevious = index > 0,
                       hasNext = index < videoItems.lastIndex,
                     ),
-                    showMenu = !selectionManager.isInSelectionMode && !isReorderMode,
                     inSelectionMode = selectionManager.isInSelectionMode,
                   )
 

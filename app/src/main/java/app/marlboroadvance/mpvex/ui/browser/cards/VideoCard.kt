@@ -5,9 +5,13 @@
 
 package app.marlboroadvance.mpvex.ui.browser.cards
 
-import android.content.Intent
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -38,15 +42,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.CheckCircleOutline
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Subtitles
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
@@ -72,7 +69,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
@@ -86,7 +82,6 @@ import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
-import app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import app.marlboroadvance.mpvex.ui.utils.videoFileTitle
@@ -132,9 +127,7 @@ fun VideoCard(
   allowThumbnailGeneration: Boolean = true,
   // Kept for API compatibility; rows no longer draw a grouped background.
   groupPosition: VideoCardGroupPosition = VideoCardGroupPosition.Single,
-  // Show the ⋮ menu (Play / Info / Select). Pass false while multi-select is active.
-  showMenu: Boolean = true,
-  // True while multi-select is active: unselected rows show an empty check circle.
+  // True while multi-select is active: every row shows a selection circle at its end.
   inSelectionMode: Boolean = false,
 ) {
   val isNew = remember(video.dateModified, settings.showUnplayedOldVideoLabel, isOldAndUnplayed, settings.unplayedOldVideoDays) {
@@ -203,14 +196,13 @@ fun VideoCard(
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(start = 8.dp, top = 8.dp, bottom = 8.dp, end = if (showMenu) 0.dp else 8.dp),
+        .padding(8.dp),
       verticalAlignment = Alignment.Top,
     ) {
       VideoThumbnail(
         video = video,
         isNew = isNew,
         isSelected = isSelected,
-        inSelectionMode = inSelectionMode,
         isWatched = isWatched,
         progressPercentage = progressPercentage,
         showThumbnails = settings.showThumbnails,
@@ -251,8 +243,19 @@ fun VideoCard(
         }
       }
 
-      if (showMenu) {
-        VideoCardMenu(video = video, onPlay = onClick, onSelect = onLongClick, tint = supportingColor)
+      // Selection lives at the row's end, away from the thumbnail's watched tick.
+      // It is shown when either flag is set, so the long-pressed row appears already
+      // checked instead of flashing empty first; the fill change is animated.
+      AnimatedVisibility(
+        visible = inSelectionMode || isSelected,
+        enter = fadeIn(tween(150)) + expandHorizontally(tween(150), expandFrom = Alignment.Start),
+        exit = fadeOut(tween(150)) + shrinkHorizontally(tween(150), shrinkTowards = Alignment.Start),
+        modifier = Modifier.align(Alignment.CenterVertically),
+      ) {
+        SelectionCircle(
+          checked = isSelected,
+          modifier = Modifier.padding(start = 12.dp, end = 4.dp),
+        )
       }
     }
   }
@@ -269,56 +272,41 @@ fun videoCardGroupPosition(hasPrevious: Boolean, hasNext: Boolean): VideoCardGro
   else -> VideoCardGroupPosition.Single
 }
 
-/** ⋮ button with the per-video menu: Play, Info, Select (enters multi-select). */
+/** Material 3 style round checkbox: outlined when off, filled primary with a check when on. */
 @Composable
-private fun VideoCardMenu(
-  video: Video,
-  onPlay: () -> Unit,
-  onSelect: (() -> Unit)?,
-  tint: Color,
-) {
-  val context = LocalContext.current
-  var expanded by remember { mutableStateOf(false) }
-  Box {
-    IconButton(onClick = { expanded = true }) {
-      Icon(
-        imageVector = Icons.Rounded.MoreVert,
-        contentDescription = stringResource(R.string.cd_more_options),
-        tint = tint,
-      )
-    }
-    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-      DropdownMenuItem(
-        text = { Text(stringResource(R.string.cd_play)) },
-        leadingIcon = { Icon(Icons.Rounded.PlayArrow, contentDescription = null) },
-        onClick = {
-          expanded = false
-          onPlay()
-        },
-      )
-      DropdownMenuItem(
-        text = { Text(stringResource(R.string.info)) },
-        leadingIcon = { Icon(Icons.Rounded.Info, contentDescription = null) },
-        onClick = {
-          expanded = false
-          val intent = Intent(context, MediaInfoActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-            data = video.uri
-          }
-          context.startActivity(intent)
-        },
-      )
-      if (onSelect != null) {
-        DropdownMenuItem(
-          text = { Text(stringResource(R.string.select)) },
-          leadingIcon = { Icon(Icons.Rounded.CheckCircleOutline, contentDescription = null) },
-          onClick = {
-            expanded = false
-            onSelect()
-          },
-        )
-      }
-    }
+private fun SelectionCircle(checked: Boolean, modifier: Modifier = Modifier) {
+  val colors = MaterialTheme.colorScheme
+  val fill by animateColorAsState(
+    targetValue = if (checked) colors.primary else Color.Transparent,
+    animationSpec = tween(150),
+    label = "selection_fill",
+  )
+  val outline by animateColorAsState(
+    targetValue = if (checked) colors.primary else colors.outline,
+    animationSpec = tween(150),
+    label = "selection_outline",
+  )
+  val checkAlpha by animateFloatAsState(
+    targetValue = if (checked) 1f else 0f,
+    animationSpec = tween(150),
+    label = "selection_check",
+  )
+  Box(
+    modifier = modifier
+      .size(24.dp)
+      .clip(CircleShape)
+      .background(fill)
+      .border(2.dp, outline, CircleShape),
+    contentAlignment = Alignment.Center,
+  ) {
+    Icon(
+      imageVector = Icons.Rounded.Check,
+      contentDescription = if (checked) stringResource(R.string.card_cd_selected) else null,
+      tint = colors.onPrimary,
+      modifier = Modifier
+        .size(16.dp)
+        .alpha(checkAlpha),
+    )
   }
 }
 
@@ -387,18 +375,11 @@ fun VideoThumbnail(
   onLongClick: (() -> Unit)?,
   modifier: Modifier = Modifier,
   aspect: Float = 16f / 9f,
-  inSelectionMode: Boolean = false,
 ) {
   val isInspection = LocalInspectionMode.current
   val thumbnailRepository = if (isInspection) null else koinInject<ThumbnailRepository>()
   val density = LocalDensity.current
   val shape = MaterialTheme.shapes.medium
-  // Selection fades in a border and check; the thumbnail never changes size.
-  val selectionAlpha by animateFloatAsState(
-    targetValue = if (isSelected) 1f else 0f,
-    animationSpec = tween(durationMillis = 150),
-    label = "thumbnail_selection",
-  )
   // Vertical videos (phone recordings) are fitted on black instead of cropped.
   val isPortrait = video.width > 0 && video.height > video.width
 
@@ -505,7 +486,7 @@ fun VideoThumbnail(
       val showProgress =
         progressPercentage != null && progressPercentage > 0f && showProgressBar && !isWatched && video.duration > 0
       // Top start: NEW pill (the selection check takes this corner while selected).
-      if (isNew && !isWatched && !isSelected && !inSelectionMode) {
+      if (isNew && !isWatched) {
         ThumbnailPill(
           text = stringResource(R.string.video_status_new).uppercase(Locale.getDefault()),
           container = MaterialTheme.colorScheme.primary,
@@ -567,52 +548,6 @@ fun VideoThumbnail(
       }
     }
 
-    // Selection border, drawn inside the thumbnail's rounded corners.
-    if (selectionAlpha > 0f) {
-      Box(
-        modifier = Modifier
-          .matchParentSize()
-          .alpha(selectionAlpha)
-          .border(3.dp, MaterialTheme.colorScheme.primary, shape),
-      )
-    }
-
-    // Top start: filled check when selected, empty circle for other rows in selection mode.
-    if (isSelected || inSelectionMode) {
-      Box(
-        modifier = Modifier
-          .align(Alignment.TopStart)
-          .padding(top = 6.dp, start = 6.dp)
-          .size(24.dp),
-      ) {
-        if (selectionAlpha < 1f) {
-          Box(
-            modifier = Modifier
-              .matchParentSize()
-              .alpha(1f - selectionAlpha)
-              .clip(CircleShape)
-              .background(Color.Black.copy(alpha = 0.32f))
-              .border(2.dp, Color.White, CircleShape),
-          )
-        }
-        if (selectionAlpha > 0f) {
-          Surface(
-            color = MaterialTheme.colorScheme.primary,
-            shape = CircleShape,
-            modifier = Modifier
-              .matchParentSize()
-              .alpha(selectionAlpha),
-          ) {
-            Icon(
-              imageVector = Icons.Rounded.Check,
-              contentDescription = stringResource(R.string.card_cd_selected),
-              modifier = Modifier.padding(4.dp),
-              tint = MaterialTheme.colorScheme.onPrimary,
-            )
-          }
-        }
-      }
-    }
   }
 }
 

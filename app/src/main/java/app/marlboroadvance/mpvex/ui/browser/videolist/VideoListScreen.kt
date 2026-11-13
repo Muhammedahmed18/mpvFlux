@@ -694,7 +694,6 @@ private fun VideoListContent(
                     hasPrevious = index > 0,
                     hasNext = index < videosWithInfo.lastIndex,
                   ),
-                  showMenu = !selectionManager.isInSelectionMode,
                   inSelectionMode = selectionManager.isInSelectionMode,
                 )
               }
