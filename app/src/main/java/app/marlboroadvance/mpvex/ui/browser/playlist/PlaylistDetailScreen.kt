@@ -365,7 +365,7 @@ private fun PlaylistVideoListContent(
         state = listState,
         modifier = Modifier.fillMaxSize().readableContentWidth(),
         contentPadding = PaddingValues(top = 12.dp, start = 8.dp, end = 8.dp, bottom = 32.dp),
-        // Connected list: 2dp between rows; the cards round only the group's ends.
+        // Video rows carry their own 8dp padding, so only a small gap is needed.
         verticalArrangement = Arrangement.spacedBy(2.dp),
       ) {
         items(count = videoItems.size, key = { videoItems[it].playlistItem.id }) { index ->
@@ -401,6 +401,7 @@ private fun PlaylistVideoListContent(
                       hasNext = index < videoItems.lastIndex,
                     ),
                     showMenu = !selectionManager.isInSelectionMode && !isReorderMode,
+                    inSelectionMode = selectionManager.isInSelectionMode,
                   )
 
                   if (isReorderMode) {

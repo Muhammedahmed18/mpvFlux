@@ -7,22 +7,17 @@ package app.marlboroadvance.mpvex.ui.browser.cards
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -41,7 +36,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircleOutline
@@ -74,11 +68,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -139,10 +130,12 @@ fun VideoCard(
   overrideShowResolutionChip: Boolean? = null,
   useFolderNameStyle: Boolean = false, // Ignored, kept for API compatibility
   allowThumbnailGeneration: Boolean = true,
-  // Position inside a run of consecutive video rows (Material 3 connected list).
+  // Kept for API compatibility; rows no longer draw a grouped background.
   groupPosition: VideoCardGroupPosition = VideoCardGroupPosition.Single,
   // Show the ⋮ menu (Play / Info / Select). Pass false while multi-select is active.
   showMenu: Boolean = true,
+  // True while multi-select is active: unselected rows show an empty check circle.
+  inSelectionMode: Boolean = false,
 ) {
   val isNew = remember(video.dateModified, settings.showUnplayedOldVideoLabel, isOldAndUnplayed, settings.unplayedOldVideoDays) {
     if (settings.showUnplayedOldVideoLabel && isOldAndUnplayed) {
@@ -160,13 +153,17 @@ fun VideoCard(
   val showSizeChip = overrideShowSizeChip ?: settings.showSizeChip
   val showResolutionChip = overrideShowResolutionChip ?: settings.showResolutionChip
 
-  // Material 3 media list item. The thumbnail carries playback state (NEW, length,
-  // progress, watched); the text side has the file name and a row of pill labels.
+  // Material 3 media list item with no container: rows sit directly on the screen.
+  // Selection adds a soft accent highlight behind the row; nothing changes size.
   val colors = MaterialTheme.colorScheme
-  val containerColor = if (isSelected) colors.secondaryContainer else colors.surfaceContainer
-  val contentColor = if (isSelected) colors.onSecondaryContainer else colors.onSurface
-  val supportingColor = if (isSelected) colors.onSecondaryContainer else colors.onSurfaceVariant
-  val shape = groupShape(groupPosition)
+  val containerColor by animateColorAsState(
+    targetValue = if (isSelected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
+    animationSpec = tween(durationMillis = 150),
+    label = "video_row_selection",
+  )
+  val contentColor = colors.onSurface
+  val supportingColor = colors.onSurfaceVariant
+  val shape = MaterialTheme.shapes.large
 
   val date = if (settings.showDateChip && video.dateModified > 0) {
     remember(video.dateModified) { formatDate(video.dateModified) }
@@ -206,13 +203,14 @@ fun VideoCard(
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = if (showMenu) 0.dp else 12.dp),
+        .padding(start = 8.dp, top = 8.dp, bottom = 8.dp, end = if (showMenu) 0.dp else 8.dp),
       verticalAlignment = Alignment.Top,
     ) {
       VideoThumbnail(
         video = video,
         isNew = isNew,
         isSelected = isSelected,
+        inSelectionMode = inSelectionMode,
         isWatched = isWatched,
         progressPercentage = progressPercentage,
         showThumbnails = settings.showThumbnails,
@@ -220,10 +218,10 @@ fun VideoCard(
         allowThumbnailGeneration = allowThumbnailGeneration,
         onThumbClick = onThumbClick,
         onLongClick = onLongClick,
-        // Large enough (about half the row, 144–220dp) for the badges and progress bar to read.
+        // Steady size: 160dp wide (90dp tall) on phones, never below 144dp on very narrow screens.
         modifier = Modifier
-          .fillMaxWidth(0.46f)
-          .widthIn(min = 144.dp, max = 220.dp)
+          .fillMaxWidth(0.5f)
+          .widthIn(min = 144.dp, max = 160.dp)
           .aspectRatio(16f / 9f),
       )
 
@@ -238,7 +236,7 @@ fun VideoCard(
         Text(
           text = displayTitle,
           style = MaterialTheme.typography.titleMedium,
-          color = if (isWatched && !isSelected) supportingColor else contentColor,
+          color = if (isWatched) supportingColor else contentColor,
           maxLines = if (settings.unlimitedNameLines) Int.MAX_VALUE else 2,
           overflow = TextOverflow.Ellipsis,
         )
@@ -269,22 +267,6 @@ fun videoCardGroupPosition(hasPrevious: Boolean, hasNext: Boolean): VideoCardGro
   hasPrevious -> VideoCardGroupPosition.Last
   hasNext -> VideoCardGroupPosition.First
   else -> VideoCardGroupPosition.Single
-}
-
-private val GroupOuterCorner = 24.dp
-private val GroupInnerCorner = 4.dp
-
-private fun groupShape(position: VideoCardGroupPosition): Shape = when (position) {
-  VideoCardGroupPosition.Single -> RoundedCornerShape(GroupOuterCorner)
-  VideoCardGroupPosition.First -> RoundedCornerShape(
-    topStart = GroupOuterCorner, topEnd = GroupOuterCorner,
-    bottomStart = GroupInnerCorner, bottomEnd = GroupInnerCorner,
-  )
-  VideoCardGroupPosition.Middle -> RoundedCornerShape(GroupInnerCorner)
-  VideoCardGroupPosition.Last -> RoundedCornerShape(
-    topStart = GroupInnerCorner, topEnd = GroupInnerCorner,
-    bottomStart = GroupOuterCorner, bottomEnd = GroupOuterCorner,
-  )
 }
 
 /** ⋮ button with the per-video menu: Play, Info, Select (enters multi-select). */
@@ -405,27 +387,27 @@ fun VideoThumbnail(
   onLongClick: (() -> Unit)?,
   modifier: Modifier = Modifier,
   aspect: Float = 16f / 9f,
+  inSelectionMode: Boolean = false,
 ) {
   val isInspection = LocalInspectionMode.current
   val thumbnailRepository = if (isInspection) null else koinInject<ThumbnailRepository>()
   val density = LocalDensity.current
   val shape = MaterialTheme.shapes.medium
-  // Selected thumbnails shrink a little (as in Google Photos) so the check reads clearly.
-  val selectionScale by animateFloatAsState(
-    targetValue = if (isSelected) 0.86f else 1f,
-    label = "thumbnail_selection_scale",
+  // Selection fades in a border and check; the thumbnail never changes size.
+  val selectionAlpha by animateFloatAsState(
+    targetValue = if (isSelected) 1f else 0f,
+    animationSpec = tween(durationMillis = 150),
+    label = "thumbnail_selection",
   )
+  // Vertical videos (phone recordings) are fitted on black instead of cropped.
+  val isPortrait = video.width > 0 && video.height > video.width
 
   Box(modifier = modifier) {
     BoxWithConstraints(
       modifier = Modifier
         .fillMaxSize()
-        .graphicsLayer {
-          scaleX = selectionScale
-          scaleY = selectionScale
-        }
         .clip(shape)
-        .background(MaterialTheme.colorScheme.surfaceVariant)
+        .background(if (isPortrait) Color.Black else MaterialTheme.colorScheme.surfaceVariant)
         .combinedClickable(
           onClick = onThumbClick,
           onLongClick = onLongClick,
@@ -501,7 +483,7 @@ fun VideoThumbnail(
             modifier = Modifier
               .matchParentSize()
               .alpha(imageAlpha * (if (isWatched) 0.6f else 1f)),
-            contentScale = ContentScale.Crop,
+            contentScale = if (isPortrait) ContentScale.Fit else ContentScale.Crop,
           )
         } else if (!isLoading || loadFailed) {
           Icon(
@@ -523,7 +505,7 @@ fun VideoThumbnail(
       val showProgress =
         progressPercentage != null && progressPercentage > 0f && showProgressBar && !isWatched && video.duration > 0
       // Top start: NEW pill (the selection check takes this corner while selected).
-      if (isNew && !isWatched && !isSelected) {
+      if (isNew && !isWatched && !isSelected && !inSelectionMode) {
         ThumbnailPill(
           text = stringResource(R.string.video_status_new).uppercase(Locale.getDefault()),
           container = MaterialTheme.colorScheme.primary,
@@ -585,32 +567,50 @@ fun VideoThumbnail(
       }
     }
 
-    // Selection check (top start; the length badge sits bottom end)
-    AnimatedVisibility(
-      visible = isSelected,
-      enter = fadeIn(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleIn(
-        spring(dampingRatio = Spring.DampingRatioNoBouncy),
-        transformOrigin = TransformOrigin(0f, 0f)
-      ),
-      exit = fadeOut(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleOut(
-        spring(dampingRatio = Spring.DampingRatioNoBouncy),
-        transformOrigin = TransformOrigin(0f, 0f)
-      ),
-      modifier = Modifier
-        .align(Alignment.TopStart)
-        .padding(top = 6.dp, start = 6.dp),
-    ) {
-      Surface(
-        color = MaterialTheme.colorScheme.primary,
-        shape = CircleShape,
-        modifier = Modifier.size(24.dp),
+    // Selection border, drawn inside the thumbnail's rounded corners.
+    if (selectionAlpha > 0f) {
+      Box(
+        modifier = Modifier
+          .matchParentSize()
+          .alpha(selectionAlpha)
+          .border(3.dp, MaterialTheme.colorScheme.primary, shape),
+      )
+    }
+
+    // Top start: filled check when selected, empty circle for other rows in selection mode.
+    if (isSelected || inSelectionMode) {
+      Box(
+        modifier = Modifier
+          .align(Alignment.TopStart)
+          .padding(top = 6.dp, start = 6.dp)
+          .size(24.dp),
       ) {
-        Icon(
-          imageVector = Icons.Rounded.Check,
-          contentDescription = stringResource(R.string.card_cd_selected),
-          modifier = Modifier.padding(4.dp),
-          tint = MaterialTheme.colorScheme.onPrimary,
-        )
+        if (selectionAlpha < 1f) {
+          Box(
+            modifier = Modifier
+              .matchParentSize()
+              .alpha(1f - selectionAlpha)
+              .clip(CircleShape)
+              .background(Color.Black.copy(alpha = 0.32f))
+              .border(2.dp, Color.White, CircleShape),
+          )
+        }
+        if (selectionAlpha > 0f) {
+          Surface(
+            color = MaterialTheme.colorScheme.primary,
+            shape = CircleShape,
+            modifier = Modifier
+              .matchParentSize()
+              .alpha(selectionAlpha),
+          ) {
+            Icon(
+              imageVector = Icons.Rounded.Check,
+              contentDescription = stringResource(R.string.card_cd_selected),
+              modifier = Modifier.padding(4.dp),
+              tint = MaterialTheme.colorScheme.onPrimary,
+            )
+          }
+        }
       }
     }
   }

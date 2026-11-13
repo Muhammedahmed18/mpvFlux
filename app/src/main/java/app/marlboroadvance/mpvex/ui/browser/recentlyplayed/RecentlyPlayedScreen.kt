@@ -352,6 +352,7 @@ private fun RecentItemsContent(
                     hasNext = recentItems.getOrNull(index + 1) is RecentlyPlayedItem.VideoItem,
                   ),
                   showMenu = !selectionManager.isInSelectionMode,
+                  inSelectionMode = selectionManager.isInSelectionMode,
                 )
               }
 

@@ -646,7 +646,7 @@ private fun VideoListContent(
               state = listState,
               modifier = Modifier.fillMaxSize().readableContentWidth(),
               contentPadding = PaddingValues(top = 8.dp, start = 8.dp, end = 8.dp, bottom = if (showFloatingBottomBar) 88.dp else 16.dp),
-              // Connected list: 2dp between rows; the cards round only the group's ends.
+              // Video rows carry their own 8dp padding, so only a small gap is needed.
               verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
               items(
@@ -695,6 +695,7 @@ private fun VideoListContent(
                     hasNext = index < videosWithInfo.lastIndex,
                   ),
                   showMenu = !selectionManager.isInSelectionMode,
+                  inSelectionMode = selectionManager.isInSelectionMode,
                 )
               }
             }

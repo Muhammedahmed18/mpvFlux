@@ -974,6 +974,7 @@ private fun FileSystemBrowserContent(
                   hasNext = videoIndex < videoEntries.lastIndex,
                 ),
                 showMenu = !videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode,
+                inSelectionMode = videoSelectionManager.isInSelectionMode,
               )
             }
           }
