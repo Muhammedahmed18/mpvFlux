@@ -1,12 +1,19 @@
 package app.marlboroadvance.mpvex.ui.browser
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +35,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,11 +50,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.browser.folderlist.FolderListScreen
 import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistScreen
 import app.marlboroadvance.mpvex.ui.browser.recentlyplayed.RecentlyPlayedScreen
+import app.marlboroadvance.mpvex.ui.utils.WindowWidthClass
+import app.marlboroadvance.mpvex.ui.utils.currentWindowWidthClass
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
@@ -69,23 +83,28 @@ object MainScreen : Screen {
 
     val navItems = remember {
       listOf(
-        NavItem(Icons.Filled.Home, Icons.Outlined.Home, "Home", "Home"),
-        NavItem(Icons.Filled.History, Icons.Outlined.History, "Recents", "Recents"),
+        NavItem(Icons.Filled.Home, Icons.Outlined.Home, R.string.home),
+        NavItem(Icons.Filled.History, Icons.Outlined.History, R.string.recents),
         NavItem(
           Icons.AutoMirrored.Filled.PlaylistPlay,
           Icons.AutoMirrored.Outlined.PlaylistPlay,
-          "Playlists",
-          "Playlists"
+          R.string.playlists,
         )
       )
     }
+
+    // Material 3 adaptive navigation: the floating bar on phones in portrait, a navigation
+    // rail on wider windows (landscape phones, tablets, foldables, split screen) so the
+    // bar doesn't eat vertical space and content isn't stretched under it.
+    val useRail = currentWindowWidthClass() != WindowWidthClass.Compact
+    val showNavigation = !hideNavigationBarState && !isPermissionDeniedState
 
     Scaffold(
       modifier = Modifier.fillMaxSize(),
       contentWindowInsets = WindowInsets(0, 0, 0, 0),
       bottomBar = {
         AnimatedVisibility(
-          visible = !hideNavigationBarState && !isPermissionDeniedState,
+          visible = !useRail && showNavigation,
           enter = slideInVertically(
             animationSpec = spring(
               dampingRatio = Spring.DampingRatioNoBouncy,
@@ -112,7 +131,6 @@ object MainScreen : Screen {
               shape = CircleShape,
               color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
               shadowElevation = 8.dp,
-              tonalElevation = 2.dp
             ) {
               NavigationBar(
                 modifier = Modifier.height(72.dp),
@@ -132,11 +150,12 @@ object MainScreen : Screen {
                     icon = {
                       Icon(
                         imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                        contentDescription = item.contentDescription
+                        contentDescription = null
                       )
                     },
-                    label = { Text(item.label) },
-                    alwaysShowLabel = false,
+                    label = { Text(stringResource(item.labelRes)) },
+                    // Material 3: navigation bar destinations always show their label.
+                    alwaysShowLabel = true,
                     colors = NavigationBarItemDefaults.colors(
                       selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                       selectedTextColor = MaterialTheme.colorScheme.primary,
@@ -152,18 +171,79 @@ object MainScreen : Screen {
         }
       }
     ) { paddingValues ->
+      // Screens pad their lists/FABs by this. With the rail there is no bottom bar, so
+      // only the system navigation bar needs to be cleared.
+      val bottomInset = if (useRail) {
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+      } else {
+        paddingValues.calculateBottomPadding()
+      }
       CompositionLocalProvider(
-        LocalNavigationBarHeight provides paddingValues.calculateBottomPadding()
+        LocalNavigationBarHeight provides bottomInset
       ) {
-        HorizontalPager(
-          state = pagerState,
-          modifier = Modifier.fillMaxSize(),
-          beyondViewportPageCount = 1
-        ) { targetTab ->
-          when (targetTab) {
-            0 -> FolderListScreen.Content()
-            1 -> RecentlyPlayedScreen.Content()
-            2 -> PlaylistScreen.Content()
+        Row(modifier = Modifier.fillMaxSize()) {
+          AnimatedVisibility(
+            visible = useRail && showNavigation,
+            enter = slideInHorizontally(
+              animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMedium
+              ),
+              initialOffsetX = { fullWidth -> -fullWidth }
+            ),
+            exit = slideOutHorizontally(
+              animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMedium
+              ),
+              targetOffsetX = { fullWidth -> -fullWidth }
+            )
+          ) {
+            NavigationRail(
+              containerColor = MaterialTheme.colorScheme.surface,
+            ) {
+              Spacer(Modifier.weight(1f))
+              navItems.forEachIndexed { index, item ->
+                val selected = pagerState.currentPage == index
+                NavigationRailItem(
+                  selected = selected,
+                  onClick = {
+                    scope.launch {
+                      pagerState.animateScrollToPage(index)
+                    }
+                  },
+                  icon = {
+                    Icon(
+                      imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                      contentDescription = null
+                    )
+                  },
+                  label = { Text(stringResource(item.labelRes)) },
+                  alwaysShowLabel = true,
+                  colors = NavigationRailItemDefaults.colors(
+                    selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    selectedTextColor = MaterialTheme.colorScheme.primary,
+                    indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                  )
+                )
+              }
+              Spacer(Modifier.weight(1f))
+            }
+          }
+          HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+              .weight(1f)
+              .fillMaxHeight(),
+            beyondViewportPageCount = 1
+          ) { targetTab ->
+            when (targetTab) {
+              0 -> FolderListScreen.Content()
+              1 -> RecentlyPlayedScreen.Content()
+              2 -> PlaylistScreen.Content()
+            }
           }
         }
       }
@@ -176,6 +256,5 @@ val LocalNavigationBarHeight = compositionLocalOf { 0.dp }
 private data class NavItem(
   val selectedIcon: ImageVector,
   val unselectedIcon: ImageVector,
-  val label: String,
-  val contentDescription: String
+  @StringRes val labelRes: Int,
 )

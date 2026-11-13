@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex.ui.browser.sheets
 
+import androidx.compose.ui.res.stringResource
 import app.marlboroadvance.mpvex.R
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
@@ -150,7 +151,7 @@ private fun MainOptionsContent(
     verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     Text(
-      text = "Playlist Options",
+      text = stringResource(R.string.playlist_options),
       style = MaterialTheme.typography.headlineSmall,
       fontWeight = FontWeight.Medium,
       color = MaterialTheme.colorScheme.onSurface,
@@ -180,12 +181,12 @@ private fun MainOptionsContent(
         )
         Column(modifier = Modifier.weight(1f)) {
           Text(
-            text = "Create Empty Playlist",
+            text = stringResource(R.string.create_empty_playlist),
             style = MaterialTheme.typography.bodyLarge,
             fontWeight = FontWeight.Medium,
           )
           Text(
-            text = "Create a new blank playlist",
+            text = stringResource(R.string.create_empty_playlist_desc),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -215,11 +216,11 @@ private fun CreatePlaylistContent(
       verticalAlignment = Alignment.CenterVertically,
     ) {
       IconButton(onClick = onBack) {
-        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
       }
       
       Text(
-        text = "Create Playlist",
+        text = stringResource(R.string.create_playlist),
         style = MaterialTheme.typography.headlineSmallEmphasized,
         modifier = Modifier.weight(1f)
       )
@@ -233,13 +234,13 @@ private fun CreatePlaylistContent(
         enabled = playlistName.isNotBlank(),
         colors = IconButtonDefaults.filledIconButtonColors(
           containerColor = MaterialTheme.colorScheme.primaryContainer,
-          contentColor = MaterialTheme.colorScheme.primary,
+          contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         ),
         modifier = Modifier.size(56.dp)
       ) {
         Icon(
           imageVector = Icons.Default.Check,
-          contentDescription = "Create",
+          contentDescription = stringResource(R.string.create),
           modifier = Modifier.size(32.dp)
         )
       }
@@ -248,7 +249,7 @@ private fun CreatePlaylistContent(
     OutlinedTextField(
       value = playlistName,
       onValueChange = { playlistName = it },
-      label = { Text("Playlist Name") },
+      label = { Text(stringResource(R.string.playlist_name_label)) },
       singleLine = true,
       modifier = Modifier.fillMaxWidth(),
       shape = MaterialTheme.shapes.extraLarge,

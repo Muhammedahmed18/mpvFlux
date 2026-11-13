@@ -74,6 +74,8 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -307,7 +309,7 @@ fun SheetHeader(
 @Composable
 fun TrackCountPill(count: Int) {
   Surface(
-    shape = RoundedCornerShape(8.dp),
+    shape = MaterialTheme.shapes.small,
     color = MaterialTheme.colorScheme.surfaceContainerHigh,
   ) {
     Text(
@@ -420,6 +422,7 @@ fun TrackSelectableBar(
     enabled           = enabled,
     modifier          = modifier
       .fillMaxWidth()
+      .semantics { selected = isSelected }
       .graphicsLayer {
         scaleX = pressScale
         scaleY = pressScale
@@ -556,7 +559,7 @@ fun TrackMetadataTag(
   // Mini-tag: 8dp rounded, no border, compact padding, Medium weight (drops the old Black)
   Surface(
     color = backgroundColor,
-    shape = RoundedCornerShape(8.dp),
+    shape = MaterialTheme.shapes.small,
   ) {
     Text(
       text       = metadata.text.uppercase(),
@@ -615,7 +618,7 @@ fun TrackActionsRow(
 private fun ActionChip(action: TrackAction) {
   val haptic = LocalHapticFeedback.current
   val chipShapes = IconButtonDefaults.shapes(
-    shape        = RoundedCornerShape(12.dp),
+    shape        = MaterialTheme.shapes.medium,
     pressedShape = CircleShape,
   )
   val tooltipState = rememberTooltipState()

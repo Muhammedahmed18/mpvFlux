@@ -41,10 +41,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.utils.media.CopyPasteOps
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -67,15 +69,14 @@ fun FileOperationProgressDialog(
   )
 
   val operationName = when (operationType) {
-    is CopyPasteOps.OperationType.Copy -> "Copying"
-    is CopyPasteOps.OperationType.Move -> "Moving"
+    is CopyPasteOps.OperationType.Copy -> stringResource(R.string.copy_op_copying)
+    is CopyPasteOps.OperationType.Move -> stringResource(R.string.copy_op_moving)
   }
 
   ModalBottomSheet(
     onDismissRequest = { if (isOperationComplete) onDismiss() },
     sheetState = sheetState,
     dragHandle = { BottomSheetDefaults.DragHandle() },
-    containerColor = MaterialTheme.colorScheme.surface,
     modifier = modifier,
   ) {
     Column(
@@ -98,7 +99,7 @@ fun FileOperationProgressDialog(
           )
           if (!isOperationComplete) {
             Text(
-              text = "File ${progress.currentFileIndex} of ${progress.totalFiles}",
+              text = stringResource(R.string.copy_op_file_progress, progress.currentFileIndex, progress.totalFiles),
               style = MaterialTheme.typography.bodyMedium,
               color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -113,7 +114,7 @@ fun FileOperationProgressDialog(
           ) {
             Icon(
               imageVector = Icons.Default.Close,
-              contentDescription = "Cancel",
+              contentDescription = stringResource(R.string.generic_cancel),
               tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
           }
@@ -130,13 +131,13 @@ fun FileOperationProgressDialog(
                 onClick = onDismiss,
                 colors = IconButtonDefaults.filledIconButtonColors(
                   containerColor = MaterialTheme.colorScheme.primaryContainer,
-                  contentColor = MaterialTheme.colorScheme.primary,
+                  contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 ),
                 modifier = Modifier.size(56.dp)
               ) {
                 Icon(
                   imageVector = Icons.Default.Check,
-                  contentDescription = "Done",
+                  contentDescription = stringResource(R.string.done),
                   modifier = Modifier.size(32.dp)
                 )
               }
@@ -148,7 +149,7 @@ fun FileOperationProgressDialog(
             ) {
               Icon(
                 imageVector = Icons.Default.Close,
-                contentDescription = "Dismiss",
+                contentDescription = stringResource(R.string.dismiss),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
               )
             }
@@ -172,7 +173,7 @@ fun FileOperationProgressDialog(
           }
           progress.isCancelled -> {
             StatusCard(
-              message = "Operation cancelled",
+              message = stringResource(R.string.copy_op_cancelled),
               containerColor = MaterialTheme.colorScheme.surfaceVariant,
               contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
               icon = Icons.Default.Info
@@ -180,7 +181,7 @@ fun FileOperationProgressDialog(
           }
           progress.isComplete -> {
             StatusCard(
-              message = "Operation completed successfully!",
+              message = stringResource(R.string.copy_op_completed),
               containerColor = MaterialTheme.colorScheme.primaryContainer,
               contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
               icon = Icons.Default.CheckCircle
@@ -197,7 +198,7 @@ fun FileOperationProgressDialog(
 
             // Overall Progress Section - Refactored for Draw-phase updates
             ProgressSection(
-              label = "Overall Progress",
+              label = stringResource(R.string.copy_op_overall_progress),
               progressProvider = { progress.overallProgress },
               detailsProvider = { "${CopyPasteOps.formatBytes(progress.bytesProcessed)} / ${CopyPasteOps.formatBytes(progress.totalBytes)}" }
             )
@@ -207,11 +208,11 @@ fun FileOperationProgressDialog(
         if (isOperationComplete) {
           Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SummaryRow(
-              label = "Total Files",
+              label = stringResource(R.string.copy_op_total_files),
               value = progress.totalFiles.toString(),
             )
             SummaryRow(
-              label = "Total size",
+              label = stringResource(R.string.copy_op_total_size),
               value = CopyPasteOps.formatBytes(progress.totalBytes),
             )
           }
@@ -233,7 +234,6 @@ fun LoadingDialog(
   ModalBottomSheet(
     onDismissRequest = onDismissRequest,
     dragHandle = { BottomSheetDefaults.DragHandle() },
-    containerColor = MaterialTheme.colorScheme.surface,
   ) {
     Column(
       modifier = Modifier

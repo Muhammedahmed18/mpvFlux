@@ -73,16 +73,16 @@ fun ThemePreviewCard(
                 .size(width = 90.dp, height = 140.dp)
                 .shadow(
                     elevation = elevation,
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.medium,
                     ambientColor = if (isSelected) selectionColor.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.2f),
                     spotColor = if (isSelected) selectionColor.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.2f),
                 )
-                .clip(RoundedCornerShape(12.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .background(colorScheme.surface)
                 .border(
                     width = borderWidth,
                     color = borderColor,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = MaterialTheme.shapes.medium
                 ),
         ) {
             // Inner content
@@ -100,7 +100,7 @@ fun ThemePreviewCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(16.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(MaterialTheme.shapes.extraSmall)
                         .background(colorScheme.surfaceVariant)
                 )
                 
@@ -141,7 +141,7 @@ fun ThemePreviewCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(14.dp)
-                        .clip(RoundedCornerShape(4.dp))
+                        .clip(MaterialTheme.shapes.extraSmall)
                         .background(colorScheme.surfaceVariant)
                 )
                 

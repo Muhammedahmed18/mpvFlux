@@ -368,38 +368,43 @@ enum class AppTheme(
   );
 
   /**
-   * Get the light color scheme for this theme
+   * Light color scheme. Accent and neutral roles come from [lightRoles] (generated with
+   * HCT so every pair meets WCAG AA); the background and the tinted surface containers
+   * keep this theme's own colors.
    */
   fun getLightColorScheme(): ColorScheme {
+    val r = lightRoles()
     val surfaceTint = primaryLight.copy(alpha = 0.05f).compositeOver(backgroundLight)
     return lightColorScheme(
-      primary = primaryLight,
-      onPrimary = Color.White,
-      primaryContainer = primaryLight.copy(alpha = 0.15f).compositeOver(Color.White),
-      onPrimaryContainer = primaryLight.darken(0.3f),
-      secondary = secondaryLight,
-      onSecondary = Color.White,
-      secondaryContainer = secondaryLight.copy(alpha = 0.15f).compositeOver(Color.White),
-      onSecondaryContainer = secondaryLight.darken(0.3f),
-      tertiary = tertiaryLight,
-      onTertiary = Color.White,
-      tertiaryContainer = tertiaryLight.copy(alpha = 0.15f).compositeOver(Color.White),
-      onTertiaryContainer = tertiaryLight.darken(0.3f),
+      primary = r.primary,
+      onPrimary = r.onPrimary,
+      primaryContainer = r.primaryContainer,
+      onPrimaryContainer = r.onPrimaryContainer,
+      secondary = r.secondary,
+      onSecondary = r.onSecondary,
+      secondaryContainer = r.secondaryContainer,
+      onSecondaryContainer = r.onSecondaryContainer,
+      tertiary = r.tertiary,
+      onTertiary = r.onTertiary,
+      tertiaryContainer = r.tertiaryContainer,
+      onTertiaryContainer = r.onTertiaryContainer,
       error = Color(0xFFBA1A1A),
       onError = Color.White,
       errorContainer = Color(0xFFFFDAD6),
       onErrorContainer = Color(0xFF93000A),
       background = backgroundLight,
-      onBackground = Color(0xFF1C1B1F),
+      onBackground = r.onSurface,
       surface = backgroundLight,
-      onSurface = Color(0xFF1C1B1F),
-      surfaceVariant = primaryLight.copy(alpha = 0.08f).compositeOver(Color(0xFFF0F0F0)),
-      onSurfaceVariant = Color(0xFF49454F),
-      outline = secondaryLight.copy(alpha = 0.5f).compositeOver(Color(0xFF79747E)),
-      outlineVariant = primaryLight.copy(alpha = 0.12f).compositeOver(Color(0xFFCAC4D0)),
-      inverseSurface = backgroundDark,
-      inverseOnSurface = Color(0xFFF4EFF4),
-      inversePrimary = primaryDark,
+      onSurface = r.onSurface,
+      surfaceVariant = r.surfaceVariant,
+      onSurfaceVariant = r.onSurfaceVariant,
+      outline = r.outline,
+      outlineVariant = r.outlineVariant,
+      inverseSurface = r.inverseSurface,
+      inverseOnSurface = r.inverseOnSurface,
+      inversePrimary = r.inversePrimary,
+      surfaceDim = r.surfaceDim,
+      surfaceBright = r.surfaceBright,
       surfaceContainerLowest = backgroundLight,
       surfaceContainerLow = surfaceTint,
       surfaceContainer = primaryLight.copy(alpha = 0.06f).compositeOver(backgroundLight),
@@ -409,38 +414,42 @@ enum class AppTheme(
   }
 
   /**
-   * Get the dark color scheme for this theme
+   * Dark color scheme. Accent and neutral roles come from [darkRoles]; the background and
+   * the tinted surface containers keep this theme's own colors.
    */
   fun getDarkColorScheme(): ColorScheme {
+    val r = darkRoles()
     val surfaceTint = primaryDark.copy(alpha = 0.05f).compositeOver(backgroundDark)
     return darkColorScheme(
-      primary = primaryDark,
-      onPrimary = primaryLight.darken(0.5f),
-      primaryContainer = primaryLight.darken(0.3f),
-      onPrimaryContainer = primaryDark.lighten(0.1f),
-      secondary = secondaryDark,
-      onSecondary = secondaryLight.darken(0.5f),
-      secondaryContainer = secondaryLight.darken(0.3f),
-      onSecondaryContainer = secondaryDark.lighten(0.1f),
-      tertiary = tertiaryDark,
-      onTertiary = tertiaryLight.darken(0.5f),
-      tertiaryContainer = tertiaryLight.darken(0.3f),
-      onTertiaryContainer = tertiaryDark.lighten(0.1f),
+      primary = r.primary,
+      onPrimary = r.onPrimary,
+      primaryContainer = r.primaryContainer,
+      onPrimaryContainer = r.onPrimaryContainer,
+      secondary = r.secondary,
+      onSecondary = r.onSecondary,
+      secondaryContainer = r.secondaryContainer,
+      onSecondaryContainer = r.onSecondaryContainer,
+      tertiary = r.tertiary,
+      onTertiary = r.onTertiary,
+      tertiaryContainer = r.tertiaryContainer,
+      onTertiaryContainer = r.onTertiaryContainer,
       error = Color(0xFFFFB4AB),
       onError = Color(0xFF690005),
       errorContainer = Color(0xFF93000A),
       onErrorContainer = Color(0xFFFFDAD6),
       background = backgroundDark,
-      onBackground = Color(0xFFE6E1E5),
+      onBackground = r.onSurface,
       surface = backgroundDark,
-      onSurface = Color(0xFFE6E1E5),
-      surfaceVariant = primaryDark.copy(alpha = 0.12f).compositeOver(Color(0xFF2A2A2A)),
-      onSurfaceVariant = Color(0xFFCAC4D0),
-      outline = secondaryDark.copy(alpha = 0.4f).compositeOver(Color(0xFF938F99)),
-      outlineVariant = primaryDark.copy(alpha = 0.15f).compositeOver(Color(0xFF49454F)),
-      inverseSurface = backgroundLight,
-      inverseOnSurface = Color(0xFF313033),
-      inversePrimary = primaryLight,
+      onSurface = r.onSurface,
+      surfaceVariant = r.surfaceVariant,
+      onSurfaceVariant = r.onSurfaceVariant,
+      outline = r.outline,
+      outlineVariant = r.outlineVariant,
+      inverseSurface = r.inverseSurface,
+      inverseOnSurface = r.inverseOnSurface,
+      inversePrimary = r.inversePrimary,
+      surfaceDim = r.surfaceDim,
+      surfaceBright = r.surfaceBright,
       surfaceContainerLowest = backgroundDark.darken(0.2f),
       surfaceContainerLow = surfaceTint,
       surfaceContainer = primaryDark.copy(alpha = 0.05f).compositeOver(backgroundDark),
@@ -472,15 +481,6 @@ private fun Color.darken(factor: Float): Color {
     red = (red * (1 - factor)).coerceIn(0f, 1f),
     green = (green * (1 - factor)).coerceIn(0f, 1f),
     blue = (blue * (1 - factor)).coerceIn(0f, 1f),
-    alpha = alpha
-  )
-}
-
-private fun Color.lighten(factor: Float): Color {
-  return Color(
-    red = (red + (1 - red) * factor).coerceIn(0f, 1f),
-    green = (green + (1 - green) * factor).coerceIn(0f, 1f),
-    blue = (blue + (1 - blue) * factor).coerceIn(0f, 1f),
     alpha = alpha
   )
 }

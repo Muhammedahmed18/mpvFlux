@@ -30,6 +30,7 @@ import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.player.PlayerOrientation
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.ListPreference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
@@ -71,7 +72,7 @@ object PlayerPreferencesScreen : Screen {
               IconButton(onClick = backstack::removeLastOrNull) {
                 Icon(
                   Icons.AutoMirrored.Rounded.ArrowBack,
-                  contentDescription = null,
+                  contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary,
                 )
               }
@@ -83,7 +84,7 @@ object PlayerPreferencesScreen : Screen {
       ) { padding ->
         ProvidePreferenceLocals {
           LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().readableContentWidth(),
             contentPadding = PaddingValues(
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 24.dp,
@@ -92,7 +93,7 @@ object PlayerPreferencesScreen : Screen {
             )
           ) {
             item {
-              PreferenceSectionHeader(title = "Playback")
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_playback))
             }
 
             item {
@@ -126,7 +127,7 @@ object PlayerPreferencesScreen : Screen {
             }
 
             item {
-              PreferenceSectionHeader(title = "Playlist & Autoplay")
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_playlist_autoplay))
             }
 
             item {
@@ -137,16 +138,16 @@ object PlayerPreferencesScreen : Screen {
                   onValueChange = preferences.autoplayNextVideo::set,
                   title = {
                     Text(
-                      text = "Autoplay next video",
+                      text = stringResource(R.string.pref_autoplay_next_video_title),
                       style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
                     Text(
                       text = if (autoplayNextVideo)
-                        "Automatically play next video when current ends"
+                        stringResource(R.string.pref_autoplay_next_video_summary)
                       else
-                        "Stay on current video when it ends",
+                        stringResource(R.string.pref_autoplay_next_video_summary_off),
                       style = MaterialTheme.typography.bodyMedium,
                       color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -161,16 +162,16 @@ object PlayerPreferencesScreen : Screen {
                   onValueChange = preferences.playlistMode::set,
                   title = {
                     Text(
-                      text = "Enable next/previous navigation",
+                      text = stringResource(R.string.pref_autoplay_title),
                       style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
                     Text(
                       text = if (playlistMode)
-                        "Show next/previous buttons for all videos in folder"
+                        stringResource(R.string.pref_autoplay_summary)
                       else
-                        "Play videos individually (select multiple for playlist)",
+                        stringResource(R.string.pref_autoplay_summary_off),
                       style = MaterialTheme.typography.bodyMedium,
                       color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -180,7 +181,7 @@ object PlayerPreferencesScreen : Screen {
             }
 
             item {
-              PreferenceSectionHeader(title = "Display & Screen")
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_display_screen))
             }
 
             item {
@@ -228,16 +229,16 @@ object PlayerPreferencesScreen : Screen {
                   onValueChange = preferences.keepScreenOnWhenPaused::set,
                   title = {
                     Text(
-                      text = "Keep screen on when paused",
+                      text = stringResource(R.string.pref_player_keep_screen_on_paused_title),
                       style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
                     Text(
                       text = if (keepScreenOnWhenPaused)
-                        "Screen stays awake while video is paused"
+                        stringResource(R.string.pref_player_keep_screen_on_paused_summary_on)
                       else
-                        "Screen can turn off while video is paused",
+                        stringResource(R.string.pref_player_keep_screen_on_paused_summary_off),
                       style = MaterialTheme.typography.bodyMedium,
                       color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -247,7 +248,7 @@ object PlayerPreferencesScreen : Screen {
             }
 
             item {
-              PreferenceSectionHeader(title = "Picture-in-Picture")
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_pip))
             }
 
             item {
@@ -258,13 +259,13 @@ object PlayerPreferencesScreen : Screen {
                   onValueChange = preferences.autoPiPOnNavigation::set,
                   title = {
                     Text(
-                      text = "Auto Picture-in-Picture",
+                      text = stringResource(R.string.pref_auto_pip_title),
                       style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
                     Text(
-                      text = "Automatically enter PIP mode when pressing home or back",
+                      text = stringResource(R.string.pref_auto_pip_summary),
                       style = MaterialTheme.typography.bodyMedium,
                       color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -436,7 +437,17 @@ object PlayerPreferencesScreen : Screen {
                   summary = {
                     val sensitivityPercent = (horizontalSwipeSensitivity * 1000).toInt()
                     Text(
-                      text = "Current: ${sensitivityPercent}/100 (${if (sensitivityPercent < 30) "Low" else if (sensitivityPercent < 55) "Medium" else "High"})",
+                      text = stringResource(
+                        R.string.pref_player_gestures_horizontal_swipe_sensitivity_current_summary,
+                        sensitivityPercent,
+                        stringResource(
+                          when {
+                            sensitivityPercent < 30 -> R.string.pref_player_gestures_horizontal_swipe_sensitivity_low
+                            sensitivityPercent < 55 -> R.string.pref_player_gestures_horizontal_swipe_sensitivity_medium
+                            else -> R.string.pref_player_gestures_horizontal_swipe_sensitivity_high
+                          },
+                        ),
+                      ),
                       style = MaterialTheme.typography.bodyMedium,
                       color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -481,13 +492,13 @@ object PlayerPreferencesScreen : Screen {
                   onValueChange = preferences.showDynamicSpeedOverlay::set,
                   title = { 
                     Text(
-                      text = "Dynamic Speed Overlay",
+                      text = stringResource(R.string.pref_dynamic_speed_overlay_title),
                       style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
                     Text(
-                      text = "Show advance overlay for speed control during long press and swipe",
+                      text = stringResource(R.string.pref_dynamic_speed_overlay_summary),
                       style = MaterialTheme.typography.bodyMedium,
                       color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 

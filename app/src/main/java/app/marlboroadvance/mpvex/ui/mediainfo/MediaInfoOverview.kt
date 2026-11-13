@@ -168,7 +168,7 @@ private fun BadgeRow(badges: List<InfoBadge>) {
   ) {
     badges.forEach { badge ->
       Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         color =
           if (badge.highlighted) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.secondaryContainer,
         contentColor =
@@ -313,12 +313,12 @@ private fun ValueTile(field: InfoField, copyActions: CopyActions, modifier: Modi
   Surface(
     modifier =
       modifier
-        .clip(RoundedCornerShape(16.dp))
+        .clip(MaterialTheme.shapes.large)
         .combinedClickable(
           onClick = {},
           onLongClick = { copyActions.copyValue(field.label, field.value) },
         ),
-    shape = RoundedCornerShape(16.dp),
+    shape = MaterialTheme.shapes.large,
     color = MaterialTheme.colorScheme.surfaceContainerHigh,
   ) {
     Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
@@ -412,7 +412,7 @@ private fun TrackRowItem(track: TrackRow, copyActions: CopyActions) {
     modifier =
       Modifier
         .fillMaxWidth()
-        .clip(RoundedCornerShape(12.dp))
+        .clip(MaterialTheme.shapes.medium)
         .combinedClickable(
           onClick = {},
           onLongClick = { copyActions.copyValue(track.headline, track.copyText) },
@@ -474,7 +474,7 @@ private fun TrackTagChip(tag: TrackTag) {
           MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
-  Surface(shape = RoundedCornerShape(8.dp), color = container, contentColor = content) {
+  Surface(shape = MaterialTheme.shapes.small, color = container, contentColor = content) {
     Text(
       text = label,
       style = MaterialTheme.typography.labelSmall,
@@ -499,7 +499,7 @@ private fun FileSection(fields: List<InfoField>, copyActions: CopyActions) {
         modifier =
           Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
             .combinedClickable(
               // Values here (file name, location) are long: a single tap copies them.
               onClick = { copyActions.copyValue(field.label, field.value) },

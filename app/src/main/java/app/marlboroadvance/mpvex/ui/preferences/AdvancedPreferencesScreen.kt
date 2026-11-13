@@ -18,7 +18,10 @@ import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material.icons.rounded.FileUpload
 import androidx.compose.material3.*
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -41,6 +44,7 @@ import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.ConfirmDialog
 import app.marlboroadvance.mpvex.presentation.crash.CrashActivity
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
 import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
 import kotlinx.coroutines.Dispatchers
@@ -63,6 +67,8 @@ object AdvancedPreferencesScreen : Screen {
     val subtitlesPreferences = koinInject<SubtitlesPreferences>()
     val settingsManager = koinInject<SettingsManager>()
     val scope = rememberCoroutineScope()
+    // Errors use a Snackbar (themed, stays on this screen) instead of a Toast.
+    val snackbarHostState = remember { SnackbarHostState() }
     var showImportDialog by remember { mutableStateOf(false) }
     var showExportDialog by remember { mutableStateOf(false) }
     var importStats by remember { mutableStateOf<SettingsManager.ImportStats?>(null) }
@@ -78,7 +84,7 @@ object AdvancedPreferencesScreen : Screen {
           scope.launch {
             settingsManager.exportSettings(it).fold(
               onSuccess = { stats -> exportStats = stats; showExportDialog = true },
-              onFailure = { error -> Toast.makeText(context, "Export failed: ${error.message}", Toast.LENGTH_LONG).show() },
+              onFailure = { error -> snackbarHostState.showSnackbar(context.getString(R.string.export_failed, error.message.orEmpty())) },
             )
           }
         }
@@ -89,7 +95,7 @@ object AdvancedPreferencesScreen : Screen {
           scope.launch {
             settingsManager.importSettings(it).fold(
               onSuccess = { stats -> importStats = stats; showImportDialog = true },
-              onFailure = { error -> Toast.makeText(context, "Import failed: ${error.message}", Toast.LENGTH_LONG).show() },
+              onFailure = { error -> snackbarHostState.showSnackbar(context.getString(R.string.import_failed, error.message.orEmpty())) },
             )
           }
         }
@@ -111,10 +117,12 @@ object AdvancedPreferencesScreen : Screen {
         title = { Text(stringResource(R.string.dialog_import_complete), style = MaterialTheme.typography.headlineSmallEmphasized) },
         text = {
           Text(
-            "Successfully imported: ${importStats?.imported}\n" +
-              "Failed: ${importStats?.failed}\n" +
-              "Version: ${importStats?.version}\n\n" +
-              "Please restart the app for all changes to take effect.",
+            stringResource(
+              R.string.import_result,
+              importStats?.imported.toString(),
+              importStats?.failed.toString(),
+              importStats?.version.toString(),
+            ),
             style = MaterialTheme.typography.bodyMedium
           )
         },
@@ -130,6 +138,7 @@ object AdvancedPreferencesScreen : Screen {
       Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
           PreferenceTopBar(
             title = { 
@@ -143,7 +152,7 @@ object AdvancedPreferencesScreen : Screen {
               IconButton(onClick = backStack::removeLastOrNull) {
                 Icon(
                   Icons.AutoMirrored.Rounded.ArrowBack, 
-                  contentDescription = null,
+                  contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary
                 )
               }
@@ -173,14 +182,14 @@ object AdvancedPreferencesScreen : Screen {
                     if (tree.listFiles().none { it.isFile && it.name?.equals("mpv.conf", ignoreCase = true) == true }) {
                       tree.createFile("application/octet-stream", "mpv.conf")
                     }
-                    withContext(Dispatchers.Main) { Toast.makeText(context, "MPV directory ready ✓", Toast.LENGTH_SHORT).show() }
+                    withContext(Dispatchers.Main) { Toast.makeText(context, context.getString(R.string.mpv_directory_ready), Toast.LENGTH_SHORT).show() }
                   }
                 }
               }
             }
           val mpvConfStorageLocation by preferences.mpvConfStorageUri.collectAsState()
           LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().readableContentWidth(),
             contentPadding = PaddingValues(
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 24.dp,
@@ -188,26 +197,26 @@ object AdvancedPreferencesScreen : Screen {
                 end = 8.dp
             )
           ) {
-            item { PreferenceSectionHeader(title = "Backup & Restore") }
+            item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_backup_restore)) }
             item {
               PreferenceCard {
                 PreferenceItem(
-                  title = "Export Settings",
-                  summary = "Export settings to an XML file",
+                  title = stringResource(R.string.pref_export_settings_title),
+                  summary = stringResource(R.string.pref_export_settings_summary),
                   icon = { PreferenceIcon(Icons.Rounded.FileUpload, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
                   onClick = { exportLauncher.launch(settingsManager.getDefaultExportFilename()) },
                 )
                 PreferenceDivider()
                 PreferenceItem(
-                  title = "Import Settings",
-                  summary = "Import settings from an XML file",
+                  title = stringResource(R.string.pref_import_settings_title),
+                  summary = stringResource(R.string.pref_import_settings_summary),
                   icon = { PreferenceIcon(Icons.Rounded.FileDownload, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
                   onClick = { importLauncher.launch(arrayOf("text/xml", "application/xml", "*/*")) },
                 )
               }
             }
             
-            item { PreferenceSectionHeader(title = "MPV Configuration") }
+            item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_mpv_configuration)) }
             item {
               PreferenceCard {
                 var mpvConf by remember { mutableStateOf(preferences.mpvConf.get()) }
@@ -230,7 +239,7 @@ object AdvancedPreferencesScreen : Screen {
                 
                 PreferenceItem(
                   title = stringResource(R.string.pref_advanced_mpv_conf),
-                  summary = mpvConf.lines().firstOrNull()?.ifBlank { "Tap to edit configuration" } ?: "Tap to edit configuration",
+                  summary = mpvConf.lines().firstOrNull()?.ifBlank { stringResource(R.string.tap_to_edit_configuration) } ?: stringResource(R.string.tap_to_edit_configuration),
                   onClick = { backStack.add(ConfigEditorScreen(ConfigEditorScreen.ConfigType.MPV_CONF)) },
                 )
                 
@@ -238,13 +247,13 @@ object AdvancedPreferencesScreen : Screen {
                 
                 PreferenceItem(
                   title = stringResource(R.string.pref_advanced_input_conf),
-                  summary = inputConf.lines().firstOrNull()?.ifBlank { "Tap to edit configuration" } ?: "Tap to edit configuration",
+                  summary = inputConf.lines().firstOrNull()?.ifBlank { stringResource(R.string.tap_to_edit_configuration) } ?: stringResource(R.string.tap_to_edit_configuration),
                   onClick = { backStack.add(ConfigEditorScreen(ConfigEditorScreen.ConfigType.INPUT_CONF)) },
                 )
               }
             }
             
-            item { PreferenceSectionHeader(title = "History") }
+            item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_history)) }
             item {
               PreferenceCard {
                 val mpvexDatabase = koinInject<MpvExDatabase>()
@@ -262,7 +271,7 @@ object AdvancedPreferencesScreen : Screen {
                 
                 PreferenceItem(
                   title = stringResource(R.string.pref_advanced_clear_playback_history),
-                  summary = "Remove all playback history and positions",
+                  summary = stringResource(R.string.pref_clear_history_summary),
                   onClick = { isConfirmDialogShown = true },
                 )
                 
@@ -289,7 +298,7 @@ object AdvancedPreferencesScreen : Screen {
               }
             }
             
-            item { PreferenceSectionHeader(title = "Logging") }
+            item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_logging)) }
             item {
               PreferenceCard {
                 val activity = LocalActivity.current!!

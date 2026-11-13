@@ -155,11 +155,11 @@ private fun AudioTracksSheetContent(
           ) {
             Icon(
               imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
-              contentDescription = null,
+              contentDescription = stringResource(R.string.back),
             )
           }
           Text(
-            text  = "Channels",
+            text  = stringResource(R.string.audio_channels),
             style = MaterialTheme.typography.headlineSmallEmphasized,
             color = MaterialTheme.colorScheme.onSurface,
           )
@@ -199,7 +199,7 @@ private fun AudioTracksSheetContent(
       ) {
         Column {
           SheetHeader(
-            title = "Audio",
+            title = stringResource(R.string.pref_audio),
             trailing = {
               AudioChannelBadge(
                 channelName = stringResource(audioChannels.title),
@@ -209,14 +209,16 @@ private fun AudioTracksSheetContent(
           )
 
           // Leading: add (intent = "get more audio"). Trailing: configure (timing).
-          val leadingAudioActions = remember {
+          val addTrackLabel = stringResource(R.string.track_action_add_track)
+          val syncDelayLabel = stringResource(R.string.track_action_sync_delay)
+          val leadingAudioActions = remember(addTrackLabel) {
             listOf(
-              TrackAction(label = "Add Track", icon = Icons.Default.Add, onClick = onAddAudioTrack),
+              TrackAction(label = addTrackLabel, icon = Icons.Default.Add, onClick = onAddAudioTrack),
             )
           }
-          val trailingAudioActions = remember {
+          val trailingAudioActions = remember(syncDelayLabel) {
             listOf(
-              TrackAction(label = "Sync Delay", icon = Icons.Default.MoreTime, onClick = onOpenDelayPanel),
+              TrackAction(label = syncDelayLabel, icon = Icons.Default.MoreTime, onClick = onOpenDelayPanel),
             )
           }
           TrackActionsRow(
@@ -225,18 +227,20 @@ private fun AudioTracksSheetContent(
           )
         }
 
-        val audioItems = remember(tracks) {
+        val embeddedLabel = stringResource(R.string.track_header_embedded)
+        val externalLabel = stringResource(R.string.track_header_external)
+        val audioItems = remember(tracks, embeddedLabel, externalLabel) {
           val list = mutableListOf<AudioItem>()
           val internal = tracks.filter { it.external != true }
           val external = tracks.filter { it.external == true }
 
           if (internal.isNotEmpty()) {
-            list.add(AudioItem.Header("EMBEDDED"))
+            list.add(AudioItem.Header(embeddedLabel))
             list.addAll(internal.map { AudioItem.Track(it) })
           }
 
           if (external.isNotEmpty()) {
-            list.add(AudioItem.Header("EXTERNAL"))
+            list.add(AudioItem.Header(externalLabel))
             list.addAll(external.map { AudioItem.Track(it) })
           }
 

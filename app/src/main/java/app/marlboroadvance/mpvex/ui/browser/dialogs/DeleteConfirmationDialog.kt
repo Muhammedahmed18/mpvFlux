@@ -4,29 +4,29 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material3.BottomSheetDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +46,6 @@ fun DeleteConfirmationDialog(
     onDismissRequest = onDismiss,
     sheetState = sheetState,
     dragHandle = { BottomSheetDefaults.DragHandle() },
-    containerColor = MaterialTheme.colorScheme.surface,
   ) {
     val itemText = if (itemCount == 1) itemType else "${itemType}s"
 
@@ -57,36 +56,12 @@ fun DeleteConfirmationDialog(
         .padding(bottom = 32.dp),
       verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-      // Header Section with Title and Delete Icon in Top Right
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Text(
-          text = "Delete $itemCount $itemText?",
-          style = MaterialTheme.typography.headlineSmallEmphasized,
-          modifier = Modifier.weight(1f)
-        )
-
-        IconButton(
-          onClick = {
-            onConfirm()
-            onDismiss()
-          },
-          colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer,
-            contentColor = MaterialTheme.colorScheme.error,
-          ),
-          modifier = Modifier.size(56.dp)
-        ) {
-          Icon(
-            imageVector = Icons.Default.DeleteForever,
-            contentDescription = "Confirm Delete",
-            modifier = Modifier.size(32.dp)
-          )
-        }
-      }
+      // Title. The confirm action now lives in a labelled button row at the bottom
+      // (a corner icon read as "close" and made permanent delete easy to mis-tap).
+      Text(
+        text = "Delete $itemCount $itemText?",
+        style = MaterialTheme.typography.headlineSmallEmphasized,
+      )
 
       // Warning Card
       Card(
@@ -98,7 +73,7 @@ fun DeleteConfirmationDialog(
         modifier = Modifier.fillMaxWidth(),
       ) {
         Text(
-          text = "This action cannot be undone. The selected item${if (itemCount == 1) "" else "s"} will be permanently deleted.",
+          text = pluralStringResource(R.plurals.delete_dialog_warning, itemCount),
           style = MaterialTheme.typography.bodyLarge,
           fontWeight = FontWeight.Medium,
           color = MaterialTheme.colorScheme.onErrorContainer,
@@ -150,6 +125,60 @@ fun DeleteConfirmationDialog(
           }
         }
       }
+
+      DeleteActionRow(
+        confirmLabel = stringResource(R.string.delete),
+        destructive = true,
+        onCancel = onDismiss,
+        onConfirm = {
+          onConfirm()
+          onDismiss()
+        },
+      )
+    }
+  }
+}
+
+/**
+ * Cancel / confirm buttons shared by the delete sheets. The confirm button uses the error
+ * colors when the action is destructive (permanent delete), primary otherwise.
+ */
+@Composable
+internal fun DeleteActionRow(
+  confirmLabel: String,
+  destructive: Boolean,
+  onCancel: () -> Unit,
+  onConfirm: () -> Unit,
+) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(top = 8.dp),
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+  ) {
+    OutlinedButton(
+      onClick = onCancel,
+      modifier = Modifier
+        .weight(1f)
+        .height(48.dp),
+    ) {
+      Text(stringResource(R.string.generic_cancel))
+    }
+    Button(
+      onClick = onConfirm,
+      modifier = Modifier
+        .weight(1f)
+        .height(48.dp),
+      colors = if (destructive) {
+        ButtonDefaults.buttonColors(
+          containerColor = MaterialTheme.colorScheme.error,
+          contentColor = MaterialTheme.colorScheme.onError,
+        )
+      } else {
+        ButtonDefaults.buttonColors()
+      },
+    ) {
+      Text(confirmLabel)
     }
   }
 }

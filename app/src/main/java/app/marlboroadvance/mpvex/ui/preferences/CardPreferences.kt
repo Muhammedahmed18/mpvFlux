@@ -2,11 +2,9 @@ package app.marlboroadvance.mpvex.ui.preferences
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -14,10 +12,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
-import app.marlboroadvance.mpvex.preferences.preference.collectAsState
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
-import org.koin.compose.koinInject
 
 /**
  * Modern Material 3 Expressive Icon Container.
@@ -62,7 +56,6 @@ fun PreferenceCard(
             .padding(horizontal = 12.dp, vertical = 6.dp),
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
-        tonalElevation = 1.dp // Subtle depth
     ) {
         Column(
             modifier = Modifier
@@ -158,22 +151,12 @@ fun PreferenceSectionHeader(
 }
 
 /**
- * Resolves the background color shared by preference screens:
- * pure black in dark mode (OLED-friendly), surface otherwise.
- * Centralizes the darkMode branch that was duplicated across every screen.
+ * Background color shared by preference screens: the theme surface, same as the library.
+ * Pure black comes from the AMOLED option (which sets surface to black), so Settings no
+ * longer jumps to black when the user picked the tinted dark theme.
  */
 @Composable
-fun rememberPreferenceBackgroundColor(): Color {
-    val appPreferences = koinInject<AppearancePreferences>()
-    val darkMode by appPreferences.darkMode.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val isDark = when (darkMode) {
-        DarkMode.Dark -> true
-        DarkMode.Light -> false
-        DarkMode.System -> systemDarkTheme
-    }
-    return if (isDark) Color.Black else MaterialTheme.colorScheme.surface
-}
+fun rememberPreferenceBackgroundColor(): Color = MaterialTheme.colorScheme.surface
 
 /**
  * Shared Material 3 top app bar for preference screens.

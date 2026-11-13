@@ -57,6 +57,7 @@ import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.PlaylistActionSheet
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
@@ -160,7 +161,7 @@ object PlaylistScreen : Screen {
           val listState = rememberLazyListState()
           LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().readableContentWidth(),
             contentPadding = PaddingValues(
               start = 8.dp,
               top = 8.dp,

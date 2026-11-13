@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -102,6 +103,8 @@ fun ControlsButton(
 
     val baseContentColor = color ?: when {
         type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.onPrimary
+        // No fill when backgrounds are hidden: keep the glyph light over the video.
+        hideBackground -> Color.White
         type == ControlsButtonType.Tonal -> MaterialTheme.colorScheme.onSurface
         else -> controlColor
     }
@@ -129,13 +132,13 @@ fun ControlsButton(
                     onClick()
                 },
                 onLongClick = onLongClick,
+                role = Role.Button,
                 interactionSource = interactionSource,
                 indication = ripple(color = Color.White),
             ),
         shape = RoundedCornerShape(24.dp), // Static shape for shadow/surface identity
         color = Color.Transparent, // Draw background manually to avoid recomposition
         contentColor = contentColor,
-        tonalElevation = 2.dp,
     ) {
         Box(
             contentAlignment = Alignment.Center,

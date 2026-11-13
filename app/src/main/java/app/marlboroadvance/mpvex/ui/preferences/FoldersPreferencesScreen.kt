@@ -71,6 +71,7 @@ import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionState
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -159,7 +160,7 @@ object FoldersPreferencesScreen : Screen {
           )
         } else {
           LazyColumn(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).readableContentWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
           ) {
             items(blacklistedFoldersList) { folderPath ->
@@ -204,7 +205,6 @@ object FoldersPreferencesScreen : Screen {
             },
             color = MaterialTheme.colorScheme.primaryContainer,
             shape = MaterialTheme.shapes.extraLarge,
-            tonalElevation = 4.dp
           ) {
             Row(
               modifier = Modifier.fillMaxSize(),
@@ -297,7 +297,6 @@ private fun BlacklistedFolderItem(
         .scale(scale),
     shape = MaterialTheme.shapes.large,
     color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-    tonalElevation = if (isSelected) 4.dp else 1.dp
   ) {
     Row(
       modifier = Modifier

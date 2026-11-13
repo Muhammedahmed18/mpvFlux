@@ -8,6 +8,13 @@ private val FILE_EXTENSION = Regex("\\.[A-Za-z0-9]{2,4}$")
 private val SPACES = Regex("\\s{2,}")
 
 /**
+ * The video's file name as stored on disk. With [showExtension] off, only a trailing
+ * extension such as ".mkv" or ".mp4" is dropped; the rest of the name is left untouched.
+ */
+fun videoFileTitle(fileName: String, showExtension: Boolean): String =
+  if (showExtension) fileName else fileName.replace(FILE_EXTENSION, "").ifBlank { fileName }
+
+/**
  * Turns a release file name into a readable title:
  * "[SubsPlease] Frieren - 05 (1080p) [A1B2C3D4].mkv" → "Frieren - 05".
  * Falls back to the original name if nothing is left.

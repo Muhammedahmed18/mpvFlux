@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -46,6 +47,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
@@ -57,6 +59,7 @@ import app.marlboroadvance.mpvex.ui.update.ReleaseNotes
 import app.marlboroadvance.mpvex.ui.update.formatBytes
 import app.marlboroadvance.mpvex.ui.update.updateErrorText
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.update.ApkInstaller
 import app.marlboroadvance.mpvex.update.GitHubReleases
 import app.marlboroadvance.mpvex.update.ReleaseInfo
@@ -121,7 +124,7 @@ object UpdatesScreen : Screen {
             IconButton(onClick = backstack::removeLastOrNull) {
               Icon(
                 ImageVector.vectorResource(R.drawable.ic_sym_arrow_back),
-                contentDescription = null,
+                contentDescription = stringResource(R.string.back),
                 tint = MaterialTheme.colorScheme.secondary,
               )
             }
@@ -132,7 +135,7 @@ object UpdatesScreen : Screen {
       },
     ) { padding ->
       LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().readableContentWidth(),
         contentPadding = PaddingValues(
           top = padding.calculateTopPadding(),
           bottom = padding.calculateBottomPadding() + 24.dp,
@@ -450,15 +453,19 @@ private fun SwitchRow(
   checked: Boolean,
   onCheckedChange: (Boolean) -> Unit,
 ) {
+  // The whole row toggles, and TalkBack reads title + summary + on/off as one switch.
   Row(
-    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
+      .padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
       Text(title, style = MaterialTheme.typography.titleMediumEmphasized)
       Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    Switch(checked = checked, onCheckedChange = onCheckedChange)
+    Switch(checked = checked, onCheckedChange = null)
   }
 }
 

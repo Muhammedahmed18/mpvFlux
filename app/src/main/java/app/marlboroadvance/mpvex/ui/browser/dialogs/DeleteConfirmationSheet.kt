@@ -5,15 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -25,8 +19,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,7 +43,6 @@ fun DeleteConfirmationSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         dragHandle = { BottomSheetDefaults.DragHandle() },
-        containerColor = MaterialTheme.colorScheme.surface,
         modifier = modifier,
     ) {
         Column(
@@ -64,31 +60,13 @@ fun DeleteConfirmationSheet(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = if (deleteFiles) "Delete Files" else "Remove from History",
+                        text = stringResource(if (deleteFiles) R.string.delete_sheet_title_files else R.string.delete_sheet_title_history),
                         style = MaterialTheme.typography.headlineSmallEmphasized,
                     )
                     Text(
-                        text = if (selectedCount == 1) "1 item selected" else "$selectedCount items selected",
+                        text = pluralStringResource(R.plurals.delete_sheet_selected_count, selectedCount, selectedCount),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-
-                IconButton(
-                    onClick = {
-                        onConfirm(deleteFiles)
-                        onDismiss()
-                    },
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = if (deleteFiles) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceVariant,
-                        contentColor = if (deleteFiles) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                    ),
-                    modifier = Modifier.size(48.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteForever,
-                        contentDescription = "Confirm",
-                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
@@ -96,9 +74,9 @@ fun DeleteConfirmationSheet(
             // Warning Text
             Text(
                 text = if (deleteFiles) {
-                    "This will permanently delete the original video file(s) from your device storage. This action cannot be undone."
+                    stringResource(R.string.delete_sheet_warning_files)
                 } else {
-                    "This will remove the selected items from your recently played list. The original video files will not be deleted."
+                    stringResource(R.string.delete_sheet_warning_history)
                 },
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -114,11 +92,21 @@ fun DeleteConfirmationSheet(
                     onCheckedChange = { deleteFiles = it },
                 )
                 Text(
-                    text = "Also delete original file(s)",
+                    text = stringResource(R.string.delete_sheet_also_delete_files),
                     modifier = Modifier.padding(start = 8.dp),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
+
+            DeleteActionRow(
+                confirmLabel = stringResource(if (deleteFiles) R.string.delete else R.string.remove),
+                destructive = deleteFiles,
+                onCancel = onDismiss,
+                onConfirm = {
+                    onConfirm(deleteFiles)
+                    onDismiss()
+                },
+            )
         }
     }
 }

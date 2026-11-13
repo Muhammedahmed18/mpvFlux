@@ -10,6 +10,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.lazy.itemsIndexed
+import app.marlboroadvance.mpvex.ui.browser.cards.videoCardGroupPosition
+import app.marlboroadvance.mpvex.ui.browser.sheets.rememberSortOrderLabels
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,7 +25,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Close
@@ -392,7 +395,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
           title = if (isAtRoot) {
             stringResource(R.string.app_name)
           } else {
-            breadcrumbs.lastOrNull()?.name ?: "Tree View"
+            breadcrumbs.lastOrNull()?.name ?: stringResource(R.string.tree_view)
           },
           isInSelectionMode = isInSelectionMode,
           selectedCount = selectedCount,
@@ -641,7 +644,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
     FolderPickerDialog(
       isOpen = folderPickerOpen.value,
       currentPath = currentPath,
-      titlePrefix = if (operationType.value is CopyPasteOps.OperationType.Copy) "Copy to" else "Move to",
+      titlePrefix = stringResource(if (operationType.value is CopyPasteOps.OperationType.Copy) R.string.copy_to else R.string.move_to),
       onDismiss = { folderPickerOpen.value = false },
       onFolderSelected = { destinationPath ->
         folderPickerOpen.value = false
@@ -838,7 +841,7 @@ private fun FileSystemBrowserContent(
     error != null -> {
       EmptyState(
         icon = Icons.Filled.Folder,
-        title = "Error loading directory",
+        title = stringResource(R.string.error_loading_directory),
         message = error,
         modifier = modifier.fillMaxSize(),
       )
@@ -847,8 +850,8 @@ private fun FileSystemBrowserContent(
     items.isEmpty() && !isLoading && !isAtRoot -> {
       EmptyState(
         icon = Icons.Filled.FolderOpen,
-        title = "Empty folder",
-        message = "This folder contains no videos or subfolders",
+        title = stringResource(R.string.empty_folder),
+        message = stringResource(R.string.empty_folder_message),
         modifier = modifier.fillMaxSize(),
       )
     }
@@ -887,22 +890,25 @@ private fun FileSystemBrowserContent(
         ) {
           LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().readableContentWidth(),
             contentPadding = PaddingValues(
               top = 8.dp,
               start = 8.dp,
               end = 8.dp,
               bottom = navigationBarHeight
             ),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            // 2dp so video rows join into one group; folders and breadcrumbs add their own 6dp.
+            verticalArrangement = Arrangement.spacedBy(2.dp),
           ) {
             // Breadcrumb navigation (if not at root)
             if (!isAtRoot && breadcrumbs.isNotEmpty()) {
               item {
-                BreadcrumbNavigation(
-                  breadcrumbs = breadcrumbs,
-                  onBreadcrumbClick = onBreadcrumbClick,
-                )
+                Box(modifier = Modifier.padding(bottom = 6.dp)) {
+                  BreadcrumbNavigation(
+                    breadcrumbs = breadcrumbs,
+                    onBreadcrumbClick = onBreadcrumbClick,
+                  )
+                }
               }
             }
 
@@ -927,6 +933,7 @@ private fun FileSystemBrowserContent(
               FolderCard(
                 folder = folderModel,
                 settings = folderCardSettings,
+                modifier = Modifier.padding(bottom = 6.dp),
                 isSelected = isSelected,
                 onClick = { onFolderClick(folder) },
                 onLongClick = { onFolderLongClick(folder) },
@@ -939,10 +946,10 @@ private fun FileSystemBrowserContent(
             }
 
             // Videos second
-            items(
+            itemsIndexed(
               items = videoEntries,
-              key = { "${it.video.id}_${it.video.path}" },
-            ) { videoFile ->
+              key = { _, it -> "${it.video.id}_${it.video.path}" },
+            ) { videoIndex, videoFile ->
               val isSelected by remember(videoSelectionManager, videoFile.video.id) {
                 derivedStateOf { videoSelectionManager.isSelected(videoFile.video) }
               }
@@ -962,6 +969,11 @@ private fun FileSystemBrowserContent(
                 showSubtitleIndicator = showSubtitleIndicator,
                 overrideShowSizeChip = null,
                 overrideShowResolutionChip = null,
+                groupPosition = videoCardGroupPosition(
+                  hasPrevious = videoIndex > 0,
+                  hasNext = videoIndex < videoEntries.lastIndex,
+                ),
+                showMenu = !videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode,
               )
             }
           }
@@ -1010,10 +1022,11 @@ fun FileSystemSortBottomSheet(
   val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
   val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
 
+  val sortLabels = rememberSortOrderLabels()
   SortBottomSheet(
     isOpen = isOpen,
     onDismiss = onDismiss,
-    title = "Sort & View Options",
+    title = stringResource(R.string.sort_view_options),
     sortType = folderSortType.displayName,
     onSortTypeChange = { typeName ->
       app.marlboroadvance.mpvex.preferences.FolderSortType.entries.find { it.displayName == typeName }?.let {
@@ -1058,70 +1071,70 @@ fun FileSystemSortBottomSheet(
     getLabelForType = { type, _ ->
       when (type) {
         app.marlboroadvance.mpvex.preferences.FolderSortType.Title.displayName -> Pair("A-Z", "Z-A")
-        app.marlboroadvance.mpvex.preferences.FolderSortType.Date.displayName -> Pair("Oldest", "Newest")
-        app.marlboroadvance.mpvex.preferences.FolderSortType.Size.displayName -> Pair("Smallest", "Largest")
-        app.marlboroadvance.mpvex.preferences.FolderSortType.VideoCount.displayName -> Pair("Fewest", "Most")
-        else -> Pair("Asc", "Desc")
+        app.marlboroadvance.mpvex.preferences.FolderSortType.Date.displayName -> Pair(sortLabels.oldest, sortLabels.newest)
+        app.marlboroadvance.mpvex.preferences.FolderSortType.Size.displayName -> Pair(sortLabels.smallest, sortLabels.largest)
+        app.marlboroadvance.mpvex.preferences.FolderSortType.VideoCount.displayName -> Pair(sortLabels.fewest, sortLabels.most)
+        else -> Pair(sortLabels.asc, sortLabels.desc)
       }
     },
     visibilityToggles = listOf(
       VisibilityToggle(
-        label = "Video Thumbnails",
+        label = stringResource(R.string.view_toggle_video_thumbnails),
         checked = showVideoThumbnails,
         onCheckedChange = { browserPreferences.showVideoThumbnails.set(it) },
       ),
       VisibilityToggle(
-        label = "Original file names",
+        label = stringResource(R.string.view_toggle_show_extension),
         checked = showVideoExtension,
         onCheckedChange = { browserPreferences.showVideoExtension.set(it) },
       ),
       VisibilityToggle(
-        label = "Full Name",
+        label = stringResource(R.string.view_toggle_full_name),
         checked = unlimitedNameLines,
         onCheckedChange = { appearancePreferences.unlimitedNameLines.set(it) },
       ),
       VisibilityToggle(
-        label = "Path",
+        label = stringResource(R.string.path),
         checked = showFolderPath,
         onCheckedChange = { browserPreferences.showFolderPath.set(it) },
       ),
       VisibilityToggle(
-        label = "Total Videos",
+        label = stringResource(R.string.view_toggle_total_videos),
         checked = showTotalVideosChip,
         onCheckedChange = { browserPreferences.showTotalVideosChip.set(it) },
       ),
       VisibilityToggle(
-        label = "Total Duration",
+        label = stringResource(R.string.view_toggle_total_duration),
         checked = showTotalDurationChip,
         onCheckedChange = { browserPreferences.showTotalDurationChip.set(it) },
       ),
       VisibilityToggle(
-        label = "Folder Size",
+        label = stringResource(R.string.view_toggle_folder_size),
         checked = showTotalSizeChip,
         onCheckedChange = { browserPreferences.showTotalSizeChip.set(it) },
       ),
       VisibilityToggle(
-        label = "Size",
+        label = stringResource(R.string.media_info_size),
         checked = showSizeChip,
         onCheckedChange = { browserPreferences.showSizeChip.set(it) },
       ),
       VisibilityToggle(
-        label = "Resolution",
+        label = stringResource(R.string.media_info_resolution),
         checked = showResolutionChip,
         onCheckedChange = { browserPreferences.showResolutionChip.set(it) },
       ),
       VisibilityToggle(
-        label = "Framerate",
+        label = stringResource(R.string.view_toggle_framerate),
         checked = showFramerateInResolution,
         onCheckedChange = { browserPreferences.showFramerateInResolution.set(it) },
       ),
       VisibilityToggle(
-        label = "Subtitles",
+        label = stringResource(R.string.pref_subtitles),
         checked = showSubtitleIndicator,
         onCheckedChange = { browserPreferences.showSubtitleIndicator.set(it) },
       ),
       VisibilityToggle(
-        label = "Progress Bar",
+        label = stringResource(R.string.view_toggle_progress_bar),
         checked = showProgressBar,
         onCheckedChange = { browserPreferences.showProgressBar.set(it) },
       ),
@@ -1148,7 +1161,7 @@ private fun BreadcrumbNavigation(
       androidx.compose.material3.TextButton(
         onClick = { onBreadcrumbClick(component) },
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(8.dp),
+        shape = MaterialTheme.shapes.small,
         colors = androidx.compose.material3.ButtonDefaults.textButtonColors(
           contentColor = MaterialTheme.colorScheme.primary
         )

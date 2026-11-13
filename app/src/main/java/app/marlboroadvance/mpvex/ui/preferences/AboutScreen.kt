@@ -48,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import app.marlboroadvance.mpvex.BuildConfig
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.presentation.Screen
@@ -55,6 +56,7 @@ import app.marlboroadvance.mpvex.presentation.crash.CrashActivity.Companion.coll
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import `is`.xyz.mpv.Utils
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
@@ -77,7 +79,7 @@ object AboutScreen : Screen {
     private fun openLink(context: Context, url: String) {
         try {
             context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                Intent(Intent.ACTION_VIEW, url.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
         } catch (_: ActivityNotFoundException) {
             Toast.makeText(context, context.getString(R.string.about_no_browser), Toast.LENGTH_SHORT).show()
@@ -106,7 +108,7 @@ object AboutScreen : Screen {
                     PreferenceTopBar(
                         title = {
                             Text(
-                                text = "About",
+                                text = stringResource(R.string.pref_about_title),
                                 style = MaterialTheme.typography.titleLargeEmphasized,
                                 color = MaterialTheme.colorScheme.primary,
                             )
@@ -115,7 +117,7 @@ object AboutScreen : Screen {
                             IconButton(onClick = backstack::removeLastOrNull) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = "Back",
+                                    contentDescription = stringResource(R.string.back),
                                     tint = MaterialTheme.colorScheme.secondary,
                                 )
                             }
@@ -128,7 +130,8 @@ object AboutScreen : Screen {
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .navigationBarsPadding(),
+                        .navigationBarsPadding()
+                        .readableContentWidth(),
                     contentPadding = PaddingValues(
                         start = 20.dp,
                         end = 20.dp,
@@ -140,7 +143,7 @@ object AboutScreen : Screen {
                     item { HeroSection() }
                     item { DescriptionCard() }
 
-                    item { SectionHeader(text = "Core Highlights") }
+                    item { SectionHeader(text = stringResource(R.string.about_core_highlights)) }
                     item { HighlightsGrid() }
 
                     item { SectionHeader(text = stringResource(R.string.about_community)) }
@@ -197,7 +200,7 @@ object AboutScreen : Screen {
                         )
                     }
 
-                    item { SectionHeader(text = "System Info") }
+                    item { SectionHeader(text = stringResource(R.string.about_system_info)) }
                     item { SystemGrid() }
                     item { LibPlaceboCard() }
 
@@ -223,14 +226,14 @@ object AboutScreen : Screen {
                             )
                             Spacer(modifier = Modifier.width(10.dp))
                             Text(
-                                text = "Copy Debug Info",
+                                text = stringResource(R.string.about_copy_debug_info),
                                 style = MaterialTheme.typography.titleMedium,
                             )
                         }
                     }
                     item {
                         Text(
-                            text = "Forked from marlboro-advance/mpvEx",
+                            text = stringResource(R.string.about_forked_from),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                             textAlign = TextAlign.Center,
@@ -278,7 +281,7 @@ object AboutScreen : Screen {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             painter = painterResource(id = R.drawable.ic_launcher_monochrome),
-                            contentDescription = "App Icon",
+                            contentDescription = stringResource(R.string.about_app_icon),
                             tint = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.size(56.dp),
                         )
@@ -293,7 +296,7 @@ object AboutScreen : Screen {
             )
             Spacer(modifier = Modifier.height(10.dp))
             val cleanVersion = BuildConfig.VERSION_NAME.substringBefore('-')
-            val channel = if (BuildConfig.DEBUG) "Debug" else "Stable"
+            val channel = stringResource(if (BuildConfig.DEBUG) R.string.about_channel_debug else R.string.about_channel_stable)
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
@@ -312,9 +315,7 @@ object AboutScreen : Screen {
     private fun DescriptionCard() {
         OutlinedCard(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = "mpvFlux is a fast, modern video player built on libmpv — with " +
-                    "hardware-accelerated decoding, libplacebo GPU rendering, and a clean " +
-                    "Material You interface tuned for AMOLED black.",
+                text = stringResource(R.string.about_description),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -348,13 +349,13 @@ object AboutScreen : Screen {
                     modifier = Modifier.weight(1f),
                     icon = Icons.Outlined.Bolt,
                     title = "High-Performance",
-                    subtitle = "libmpv hardware decoding",
+                    subtitle = stringResource(R.string.about_highlight_libmpv),
                 )
                 HighlightCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Outlined.AutoAwesome,
                     title = "libplacebo",
-                    subtitle = "GPU shaders & HDR",
+                    subtitle = stringResource(R.string.about_highlight_libplacebo),
                 )
             }
             Row(
@@ -366,14 +367,14 @@ object AboutScreen : Screen {
                 HighlightCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Outlined.Movie,
-                    title = "Format Support",
+                    title = stringResource(R.string.about_highlight_formats),
                     subtitle = "MKV · MP4 · AVI · HEVC · AV1",
                 )
                 HighlightCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Outlined.Palette,
                     title = "Material You",
-                    subtitle = "Dynamic, AMOLED-black UI",
+                    subtitle = stringResource(R.string.about_highlight_material_you),
                 )
             }
         }
@@ -467,14 +468,14 @@ object AboutScreen : Screen {
                     MetricCell(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Outlined.Android,
-                        label = "Android",
+                        label = stringResource(R.string.about_metric_android),
                         value = "${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}",
                     )
                     VerticalDivider(color = dividerColor)
                     MetricCell(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Outlined.PhoneAndroid,
-                        label = "Device",
+                        label = stringResource(R.string.about_metric_device),
                         value = Build.MODEL,
                     )
                 }
@@ -487,7 +488,7 @@ object AboutScreen : Screen {
                     MetricCell(
                         modifier = Modifier.weight(1f),
                         icon = Icons.Outlined.Memory,
-                        label = "Hardware",
+                        label = stringResource(R.string.about_metric_hardware),
                         value = Build.HARDWARE,
                     )
                     VerticalDivider(color = dividerColor)

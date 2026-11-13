@@ -76,7 +76,7 @@ fun SpeedControlSlider(
   val onSurfaceColor = MaterialTheme.colorScheme.onSurface
   // Use a Surface with less rounded corners instead of CircleShape
   Surface(
-    shape = RoundedCornerShape(12.dp),
+    shape = MaterialTheme.shapes.medium,
     color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.55f),
     contentColor = MaterialTheme.colorScheme.onSurface,
     tonalElevation = 0.dp,

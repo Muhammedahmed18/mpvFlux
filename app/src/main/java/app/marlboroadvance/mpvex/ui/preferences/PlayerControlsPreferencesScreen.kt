@@ -1,7 +1,6 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -54,8 +53,8 @@ import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.SeekbarStyle
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.ListPreference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
@@ -82,14 +81,8 @@ object PlayerControlsPreferencesScreen : Screen {
     val bottomLeftButtons = remember(bottomLState) { appearancePrefs.parseButtons(bottomLState, mutableSetOf()) }
     val portraitBottomButtons = remember(portraitBottomState) { appearancePrefs.parseButtons(portraitBottomState, mutableSetOf()) }
 
-    val darkMode by appearancePrefs.darkMode.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val isDark = when (darkMode) {
-      DarkMode.Dark -> true
-      DarkMode.Light -> false
-      DarkMode.System -> systemDarkTheme
-    }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+    // Settings follow the theme surface; the AMOLED option already makes it pure black.
+    val backgroundColor = MaterialTheme.colorScheme.surface
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Surface(
@@ -112,7 +105,7 @@ object PlayerControlsPreferencesScreen : Screen {
               IconButton(onClick = backstack::removeLastOrNull) {
                 Icon(
                   Icons.AutoMirrored.Rounded.ArrowBack, 
-                  contentDescription = null,
+                  contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary,
                 )
               }
@@ -124,7 +117,7 @@ object PlayerControlsPreferencesScreen : Screen {
       ) { padding ->
         ProvidePreferenceLocals {
           LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().readableContentWidth(),
             contentPadding = PaddingValues(
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 24.dp,
@@ -133,7 +126,7 @@ object PlayerControlsPreferencesScreen : Screen {
             )
           ) {
             item {
-              PreferenceSectionHeader(title = "Landscape Controls")
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_landscape_controls))
             }
             
             item {
@@ -169,7 +162,7 @@ object PlayerControlsPreferencesScreen : Screen {
             }
             
             item {
-              PreferenceSectionHeader(title = "Portrait Controls")
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_portrait_controls))
             }
 
             item {
@@ -185,7 +178,7 @@ object PlayerControlsPreferencesScreen : Screen {
             }
             
             item {
-              PreferenceSectionHeader(title = "Seekbar Style")
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_seekbar_style))
             }
 
             item {
@@ -217,7 +210,7 @@ object PlayerControlsPreferencesScreen : Screen {
             }
             
             item {
-              PreferenceSectionHeader(title = "Appearance")
+              PreferenceSectionHeader(title = stringResource(R.string.pref_appearance_title))
             }
             
             item {
@@ -266,7 +259,7 @@ object PlayerControlsPreferencesScreen : Screen {
                   title = { Text(text = stringResource(R.string.pref_player_display_hide_player_control_time), style = MaterialTheme.typography.titleMediumEmphasized) },
                   summary = {
                     Text(
-                      text = if (isCustomTimeValue) "Custom ($playerTimeToDisappear ms)" else "$playerTimeToDisappear ms",
+                      text = if (isCustomTimeValue) stringResource(R.string.custom_ms_value, playerTimeToDisappear) else stringResource(R.string.value_ms, playerTimeToDisappear),
                       style = MaterialTheme.typography.bodyMedium,
                       color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -337,7 +330,7 @@ object PlayerControlsPreferencesScreen : Screen {
       IconButton(onClick = onClick) {
         Icon(
           imageVector = Icons.Rounded.Edit,
-          contentDescription = "Edit $title",
+          contentDescription = stringResource(R.string.edit_item, title),
           tint = MaterialTheme.colorScheme.primary,
         )
       }
@@ -354,7 +347,7 @@ object PlayerControlsPreferencesScreen : Screen {
     ) {
       if (buttons.isEmpty()) {
         Text(
-          "None",
+          stringResource(R.string.pref_gesture_double_tap_none),
           style = MaterialTheme.typography.bodyMedium,
           color = MaterialTheme.colorScheme.outline,
         )

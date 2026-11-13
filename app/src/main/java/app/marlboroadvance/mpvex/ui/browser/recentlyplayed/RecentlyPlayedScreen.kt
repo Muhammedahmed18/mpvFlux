@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
@@ -39,6 +42,7 @@ import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefresh
 import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
+import app.marlboroadvance.mpvex.ui.browser.cards.videoCardGroupPosition
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationSheet
 import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistDetailScreen
@@ -46,6 +50,7 @@ import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -159,7 +164,7 @@ object RecentlyPlayedScreen : Screen {
   Scaffold(
         topBar = {
           BrowserTopBar(
-            title = "Recently Played",
+            title = stringResource(R.string.pref_advanced_enable_recently_played_title),
             isInSelectionMode = selectionManager.isInSelectionMode,
             selectedCount = selectionManager.selectedCount,
             totalCount = recentItems.size,
@@ -184,8 +189,8 @@ object RecentlyPlayedScreen : Screen {
         !enableRecentlyPlayed -> {
           EmptyState(
             icon = Icons.Filled.History,
-            title = "History is disabled",
-            message = "Enable it in Advanced Settings to track your playback history",
+            title = stringResource(R.string.history_disabled),
+            message = stringResource(R.string.history_disabled_message),
             modifier = Modifier.fillMaxSize().padding(padding),
           )
         }
@@ -199,8 +204,8 @@ object RecentlyPlayedScreen : Screen {
         recentItems.isEmpty() -> {
           EmptyState(
             icon = Icons.Filled.History,
-            title = "No recent items",
-            message = "Videos and playlists you play will appear here",
+            title = stringResource(R.string.no_recent_items),
+            message = stringResource(R.string.no_recent_items_message),
             modifier = Modifier.fillMaxSize().padding(padding),
           )
         }
@@ -304,9 +309,10 @@ private fun RecentItemsContent(
       ) {
         LazyColumn(
           state = listState,
-          modifier = Modifier.fillMaxSize(),
+          modifier = Modifier.fillMaxSize().readableContentWidth(),
           contentPadding = PaddingValues(top = 8.dp, start = 8.dp, end = 8.dp, bottom = 16.dp),
-          verticalArrangement = Arrangement.spacedBy(10.dp),
+          // Consecutive videos join into one group (2dp gaps); playlist cards add their own spacing.
+          verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
           items(
             count = recentItems.size,
@@ -341,6 +347,11 @@ private fun RecentItemsContent(
                     else onVideoClick(item.video)
                   },
                   showSubtitleIndicator = showSubtitleIndicator,
+                  groupPosition = videoCardGroupPosition(
+                    hasPrevious = recentItems.getOrNull(index - 1) is RecentlyPlayedItem.VideoItem,
+                    hasNext = recentItems.getOrNull(index + 1) is RecentlyPlayedItem.VideoItem,
+                  ),
+                  showMenu = !selectionManager.isInSelectionMode,
                 )
               }
 
@@ -360,6 +371,7 @@ private fun RecentItemsContent(
                 FolderCard(
                    folder = folderModel,
                    settings = folderCardSettings,
+                   modifier = Modifier.padding(vertical = 4.dp),
                    isSelected = isSelected,
                    onClick = {
                     if (selectionManager.isInSelectionMode) selectionManager.toggle(item)

@@ -612,7 +612,7 @@ object SearchablePreferences {
             val title = (if (pref.titleRes != null) getStringRes(pref.titleRes) else pref.title ?: "").lowercase()
             val summary = (if (pref.summaryRes != null) getStringRes(pref.summaryRes) else pref.summary ?: "").lowercase()
             val keywords = pref.keywords.joinToString(" ").lowercase()
-            val category = pref.category.lowercase()
+            val category = (searchCategoryTitleRes(pref.category)?.let(getStringRes) ?: pref.category).lowercase()
 
             title.contains(normalizedQuery) ||
                     summary.contains(normalizedQuery) ||
@@ -620,4 +620,23 @@ object SearchablePreferences {
                     category.contains(normalizedQuery)
         }
     }
+}
+
+/**
+ * Localized display name for a [SearchablePreference.category] key. The keys stay English
+ * (they are identifiers); unknown keys fall back to the key itself.
+ */
+@StringRes
+fun searchCategoryTitleRes(category: String): Int? = when (category) {
+    "About" -> R.string.pref_about_title
+    "Advanced" -> R.string.pref_advanced
+    "Appearance" -> R.string.pref_appearance_title
+    "Audio" -> R.string.pref_audio
+    "Decoder" -> R.string.pref_decoder
+    "Folders" -> R.string.pref_folders_title
+    "Gestures" -> R.string.pref_gesture
+    "Player" -> R.string.pref_player
+    "Storage" -> R.string.pref_storage_title
+    "Subtitles" -> R.string.pref_subtitles
+    else -> null
 }

@@ -59,7 +59,7 @@ fun FolderPickerDialog(
   modifier: Modifier = Modifier,
   isOpen: Boolean,
   currentPath: String = Environment.getExternalStorageDirectory().absolutePath,
-  titlePrefix: String = "Move to",
+  titlePrefix: String = stringResource(R.string.move_to),
   onDismiss: () -> Unit,
   onFolderSelected: (String) -> Unit,
 ) {
@@ -100,12 +100,13 @@ fun FolderPickerDialog(
     selectedPath != null && selectedPath == currentPath
   }
 
-  val displayName = remember(selectedPath, storageVolumes) {
+  val selectStorageLabel = stringResource(R.string.select_storage_location)
+  val displayName = remember(selectedPath, storageVolumes, selectStorageLabel) {
     val volume = storageVolumes.find { StorageVolumeUtils.getVolumePath(it) == selectedPath }
     if (volume != null) {
       volume.getDescription(context)
     } else {
-      selectedPath?.let { File(it).name } ?: "Select a storage location"
+      selectedPath?.let { File(it).name } ?: selectStorageLabel
     }
   }
 
@@ -124,7 +125,6 @@ fun FolderPickerDialog(
     onDismissRequest = onDismiss,
     sheetState = sheetState,
     dragHandle = { BottomSheetDefaults.DragHandle() },
-    containerColor = MaterialTheme.colorScheme.surface,
   ) {
     @Suppress("DEPRECATION")
     Column(
@@ -166,7 +166,7 @@ fun FolderPickerDialog(
         ) {
           Icon(
             imageVector = Icons.Default.Check,
-            contentDescription = "Confirm Selection",
+            contentDescription = stringResource(R.string.confirm_selection),
             modifier = Modifier.size(32.dp)
           )
         }
@@ -174,7 +174,7 @@ fun FolderPickerDialog(
 
       if (isSameAsSource) {
         Text(
-          text = "Cannot select the same folder",
+          text = stringResource(R.string.cannot_select_same_folder),
           style = MaterialTheme.typography.bodyMediumEmphasized,
           color = MaterialTheme.colorScheme.error,
         )
@@ -193,7 +193,7 @@ fun FolderPickerDialog(
               containerColor = MaterialTheme.colorScheme.secondaryContainer,
             )
           ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
           }
         }
 
@@ -204,7 +204,7 @@ fun FolderPickerDialog(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
           )
         ) {
-          Icon(Icons.Default.Home, "Home")
+          Icon(Icons.Default.Home, stringResource(R.string.home))
         }
 
         FilledTonalIconButton(
@@ -215,7 +215,7 @@ fun FolderPickerDialog(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
           )
         ) {
-          Icon(Icons.Default.CreateNewFolder, "New Folder")
+          Icon(Icons.Default.CreateNewFolder, stringResource(R.string.new_folder))
         }
       }
 
@@ -248,7 +248,7 @@ fun FolderPickerDialog(
           if (folders.isEmpty()) {
             item {
               Text(
-                text = "No subfolders",
+                text = stringResource(R.string.no_subfolders),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(16.dp),
@@ -342,6 +342,8 @@ private fun CreateFolderDialog(
 ) {
   var folderName by remember { mutableStateOf("") }
   var error by remember { mutableStateOf<String?>(null) }
+  val folderExistsError = stringResource(R.string.folder_error_exists)
+  val folderCreateError = stringResource(R.string.folder_error_create_failed)
 
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -375,11 +377,11 @@ private fun CreateFolderDialog(
           if (folderName.isBlank()) return@Button
           val newFolder = File(parentPath, folderName)
           if (newFolder.exists()) {
-            error = "Folder already exists"
+            error = folderExistsError
             return@Button
           }
           if (newFolder.mkdirs()) onFolderCreated(newFolder.absolutePath)
-          else error = "Failed to create folder"
+          else error = folderCreateError
         },
         shape = MaterialTheme.shapes.extraLarge,
       ) {

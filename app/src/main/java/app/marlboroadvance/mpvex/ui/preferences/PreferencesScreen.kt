@@ -3,7 +3,6 @@ package app.marlboroadvance.mpvex.ui.preferences
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -13,24 +12,20 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ViewQuilt
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
-import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 
 @Serializable
 object PreferencesScreen : Screen {
@@ -38,21 +33,12 @@ object PreferencesScreen : Screen {
     @Composable
     override fun Content() {
         val backstack = LocalBackStack.current
-        val preferences = koinInject<AppearancePreferences>()
-
-        val darkMode by preferences.darkMode.collectAsState()
-        val systemDarkTheme = isSystemInDarkTheme()
-        val isDark = when (darkMode) {
-            DarkMode.Dark -> true
-            DarkMode.Light -> false
-            DarkMode.System -> systemDarkTheme
-        }
 
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-            containerColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface,
+            containerColor = MaterialTheme.colorScheme.surface,
             topBar = {
                 PreferenceTopBar(
                     title = {
@@ -66,18 +52,18 @@ object PreferencesScreen : Screen {
                         IconButton(onClick = backstack::removeLastOrNull) {
                             Icon(
                                 Icons.AutoMirrored.Rounded.ArrowBack, 
-                                contentDescription = "Back",
+                                contentDescription = stringResource(R.string.back),
                                 tint = MaterialTheme.colorScheme.secondary
                             )
                         }
                     },
                     scrollBehavior = scrollBehavior,
-                    containerColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface,
+                    containerColor = MaterialTheme.colorScheme.surface,
                 )
             }
         ) { padding ->
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().readableContentWidth(),
                 contentPadding = PaddingValues(
                     top = padding.calculateTopPadding(),
                     bottom = padding.calculateBottomPadding() + 24.dp,
@@ -95,7 +81,7 @@ object PreferencesScreen : Screen {
                     SearchPill(onClick = { backstack.add(SettingsSearchScreen) })
                 }
 
-                item { PreferenceSectionHeader(title = "UI & Appearance") }
+                item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_ui_appearance)) }
                 item {
                     PreferenceCard {
                         PreferenceItem(
@@ -113,7 +99,7 @@ object PreferencesScreen : Screen {
                     }
                 }
 
-                item { PreferenceSectionHeader(title = "Playback & Controls") }
+                item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_playback_controls)) }
                 item {
                     PreferenceCard {
                         PreferenceItem(
@@ -131,7 +117,7 @@ object PreferencesScreen : Screen {
                     }
                 }
 
-                item { PreferenceSectionHeader(title = "Media & Files") }
+                item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_media_files)) }
                 item {
                     PreferenceCard {
                         PreferenceItem(
@@ -149,7 +135,7 @@ object PreferencesScreen : Screen {
                     }
                 }
 
-                item { PreferenceSectionHeader(title = "Audio & Subtitles") }
+                item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_audio_subtitles)) }
                 item {
                     PreferenceCard {
                         PreferenceItem(
@@ -167,7 +153,7 @@ object PreferencesScreen : Screen {
                     }
                 }
 
-                item { PreferenceSectionHeader(title = "System & Info") }
+                item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_system_info)) }
                 item {
                     PreferenceCard {
                         PreferenceItem(
@@ -215,7 +201,6 @@ fun SearchPill(onClick: () -> Unit) {
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         interactionSource = interactionSource,
-        tonalElevation = 2.dp
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),

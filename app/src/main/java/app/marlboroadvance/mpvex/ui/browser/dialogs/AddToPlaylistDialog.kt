@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
@@ -50,9 +49,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.database.entities.PlaylistEntity
 import app.marlboroadvance.mpvex.database.repository.PlaylistRepository
 import app.marlboroadvance.mpvex.domain.media.model.Video
@@ -112,7 +114,6 @@ fun AddToPlaylistDialog(
     onDismissRequest = onDismiss,
     sheetState = sheetState,
     dragHandle = { BottomSheetDefaults.DragHandle() },
-    containerColor = MaterialTheme.colorScheme.surface,
     modifier = modifier,
   ) {
     Column(
@@ -130,15 +131,11 @@ fun AddToPlaylistDialog(
       ) {
         Column(modifier = Modifier.weight(1f)) {
           Text(
-            text = "Add to Playlist",
+            text = stringResource(R.string.add_to_playlist),
             style = MaterialTheme.typography.headlineSmallEmphasized,
           )
           Text(
-            text = if (videos.size == 1) {
-              "Adding 1 video"
-            } else {
-              "Adding ${videos.size} videos"
-            },
+            text = pluralStringResource(R.plurals.add_to_playlist_adding, videos.size, videos.size),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -158,7 +155,7 @@ fun AddToPlaylistDialog(
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-          text = "Create New Playlist",
+          text = stringResource(R.string.create_new_playlist),
           fontWeight = FontWeight.Medium,
         )
       }
@@ -166,7 +163,7 @@ fun AddToPlaylistDialog(
       // Existing playlists
       if (playlists.isNotEmpty()) {
         Text(
-          text = "Existing Playlists",
+          text = stringResource(R.string.existing_playlists),
           style = MaterialTheme.typography.labelLargeEmphasized,
           color = MaterialTheme.colorScheme.primary,
         )
@@ -218,7 +215,7 @@ private fun PlaylistItemCard(
     modifier = Modifier
       .fillMaxWidth()
       .clickable(onClick = onClick),
-    shape = RoundedCornerShape(12.dp),
+    shape = MaterialTheme.shapes.medium,
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceVariant,
     ),
@@ -260,7 +257,7 @@ private fun PlaylistItemCard(
 private fun EmptyPlaylistsMessage() {
   Card(
     modifier = Modifier.fillMaxWidth(),
-    shape = RoundedCornerShape(12.dp),
+    shape = MaterialTheme.shapes.medium,
     colors = CardDefaults.cardColors(
       containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
     ),
@@ -279,12 +276,12 @@ private fun EmptyPlaylistsMessage() {
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
       )
       Text(
-        text = "No playlists yet",
+        text = stringResource(R.string.no_playlists_yet),
         style = MaterialTheme.typography.titleMediumEmphasized,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
       Text(
-        text = "Create your first playlist above",
+        text = stringResource(R.string.create_first_playlist_hint),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
@@ -335,7 +332,6 @@ private fun CreatePlaylistDialog(
     },
     sheetState = sheetState,
     dragHandle = { BottomSheetDefaults.DragHandle() },
-    containerColor = MaterialTheme.colorScheme.surface,
   ) {
     Column(
       modifier = Modifier
@@ -351,7 +347,7 @@ private fun CreatePlaylistDialog(
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Text(
-          text = "Create New Playlist",
+          text = stringResource(R.string.create_new_playlist),
           style = MaterialTheme.typography.headlineSmallEmphasized,
           modifier = Modifier.weight(1f)
         )
@@ -365,13 +361,13 @@ private fun CreatePlaylistDialog(
           enabled = playlistName.isNotBlank(),
           colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
           ),
           modifier = Modifier.size(56.dp)
         ) {
           Icon(
             imageVector = Icons.Default.Check,
-            contentDescription = "Create Playlist",
+            contentDescription = stringResource(R.string.create_playlist),
             modifier = Modifier.size(32.dp)
           )
         }
@@ -380,7 +376,7 @@ private fun CreatePlaylistDialog(
       OutlinedTextField(
         value = playlistName,
         onValueChange = { playlistName = it },
-        label = { Text("Playlist Name", fontWeight = FontWeight.Medium) },
+        label = { Text(stringResource(R.string.playlist_name_label), fontWeight = FontWeight.Medium) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,

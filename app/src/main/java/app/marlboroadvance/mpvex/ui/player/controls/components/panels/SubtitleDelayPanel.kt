@@ -224,7 +224,7 @@ fun DelayCardContent( // Renamed from DelayCard and removed the Card wrapper
            onClick = onReset,
            enabled = isDirectionPositive == null,
          ) {
-           Icon(Icons.Default.Refresh, null)
+           Icon(Icons.Default.Refresh, stringResource(R.string.cd_reset_delay))
          }
        }
     }
@@ -249,7 +249,7 @@ fun SubtitleDelayTitle(
     )
     Spacer(Modifier.weight(1f))
     IconButton(onClick = onClose) {
-      Icon(Icons.Default.Close, null, modifier = Modifier.size(32.dp))
+      Icon(Icons.Default.Close, stringResource(R.string.close), modifier = Modifier.size(32.dp))
     }
   }
 }

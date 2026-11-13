@@ -9,6 +9,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import app.marlboroadvance.mpvex.ui.browser.cards.videoCardGroupPosition
+import app.marlboroadvance.mpvex.ui.browser.sheets.rememberSortOrderLabels
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -462,7 +465,7 @@ private fun VideoListDialogs(
     currentPath =
       firstVideoPath?.let { File(it).parent }
         ?: Environment.getExternalStorageDirectory().absolutePath,
-    titlePrefix = if (operationType.value is CopyPasteOps.OperationType.Copy) "Copy to" else "Move to",
+    titlePrefix = stringResource(if (operationType.value is CopyPasteOps.OperationType.Copy) R.string.copy_to else R.string.move_to),
     onDismiss = { folderPickerOpen.value = false },
     onFolderSelected = { destinationPath ->
       folderPickerOpen.value = false
@@ -508,7 +511,7 @@ private fun VideoListDialogs(
   // Private Space Loading Sheet
   LoadingDialog(
     isOpen = movingToPrivateSpace.value,
-    message = "Moving to private space...",
+    message = stringResource(R.string.moving_to_private_space),
   )
 
   // Private Space Completion Dialog
@@ -518,8 +521,11 @@ private fun VideoListDialogs(
       title = { Text(text = stringResource(R.string.dialog_moved_private_title), style = MaterialTheme.typography.headlineSmall) },
       text = {
         Text(
-          text = "Successfully moved ${privateSpaceMovedCount.intValue} video(s) to private space.\n\n" +
-              "To access private space, long press on the app name at the top of the main screen.",
+          text = pluralStringResource(
+            R.plurals.private_space_moved,
+            privateSpaceMovedCount.intValue,
+            privateSpaceMovedCount.intValue,
+          ),
           style = MaterialTheme.typography.bodyMedium,
         )
       },
@@ -601,8 +607,8 @@ private fun VideoListContent(
     videosWithInfo.isEmpty() && !isLoading -> {
       EmptyState(
         icon = Icons.Filled.VideoLibrary,
-        title = "No videos in this folder",
-        message = "Videos you add to this folder will appear here",
+        title = stringResource(R.string.no_videos_in_folder),
+        message = stringResource(R.string.no_videos_in_folder_message),
         modifier = modifier.fillMaxSize(),
       )
     }
@@ -638,9 +644,10 @@ private fun VideoListContent(
           ) {
             LazyColumn(
               state = listState,
-              modifier = Modifier.fillMaxSize(),
+              modifier = Modifier.fillMaxSize().readableContentWidth(),
               contentPadding = PaddingValues(top = 8.dp, start = 8.dp, end = 8.dp, bottom = if (showFloatingBottomBar) 88.dp else 16.dp),
-              verticalArrangement = Arrangement.spacedBy(8.dp),
+              // Connected list: 2dp between rows; the cards round only the group's ends.
+              verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
               items(
                 count = videosWithInfo.size,
@@ -683,6 +690,11 @@ private fun VideoListContent(
                   onThumbClick = currentOnThumbClick,
                   showSubtitleIndicator = showSubtitleIndicator,
                   allowThumbnailGeneration = true,
+                  groupPosition = videoCardGroupPosition(
+                    hasPrevious = index > 0,
+                    hasNext = index < videosWithInfo.lastIndex,
+                  ),
+                  showMenu = !selectionManager.isInSelectionMode,
                 )
               }
             }
@@ -713,10 +725,11 @@ private fun VideoSortBottomSheet(
   val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
   val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
 
+  val sortLabels = rememberSortOrderLabels()
   SortBottomSheet(
     isOpen = isOpen,
     onDismiss = onDismiss,
-    title = "Sort & View Options",
+    title = stringResource(R.string.sort_view_options),
     sortType = sortType.displayName,
     onSortTypeChange = { typeName -> VideoSortType.entries.find { it.displayName == typeName }?.let(onSortTypeChange) },
     sortOrderAsc = sortOrder.isAscending,
@@ -738,21 +751,21 @@ private fun VideoSortBottomSheet(
     getLabelForType = { type, _ ->
       when (type) {
         VideoSortType.Title.displayName -> Pair("A-Z", "Z-A")
-        VideoSortType.Duration.displayName -> Pair("Shortest", "Longest")
-        VideoSortType.Date.displayName -> Pair("Oldest", "Newest")
-        VideoSortType.Size.displayName -> Pair("Smallest", "Biggest")
-        else -> Pair("Asc", "Desc")
+        VideoSortType.Duration.displayName -> Pair(sortLabels.shortest, sortLabels.longest)
+        VideoSortType.Date.displayName -> Pair(sortLabels.oldest, sortLabels.newest)
+        VideoSortType.Size.displayName -> Pair(sortLabels.smallest, sortLabels.largest)
+        else -> Pair(sortLabels.asc, sortLabels.desc)
       }
     },
     visibilityToggles = listOf(
-      VisibilityToggle(label = "Thumbnails", checked = showThumbnails, onCheckedChange = { browserPreferences.showVideoThumbnails.set(it) }),
-      VisibilityToggle(label = "Original file names", checked = showVideoExtension, onCheckedChange = { browserPreferences.showVideoExtension.set(it) }),
-      VisibilityToggle(label = "Subtitles", checked = showSubtitleIndicator, onCheckedChange = { browserPreferences.showSubtitleIndicator.set(it) }),
-      VisibilityToggle(label = "Full Name", checked = unlimitedNameLines, onCheckedChange = { appearancePreferences.unlimitedNameLines.set(it) }),
-      VisibilityToggle(label = "Size", checked = showSizeChip, onCheckedChange = { browserPreferences.showSizeChip.set(it) }),
-      VisibilityToggle(label = "Resolution", checked = showResolutionChip, onCheckedChange = { browserPreferences.showResolutionChip.set(it) }),
-      VisibilityToggle(label = "Framerate", checked = showFramerateInResolution, onCheckedChange = { browserPreferences.showFramerateInResolution.set(it) }),
-      VisibilityToggle(label = "Date", checked = showDateChip, onCheckedChange = { browserPreferences.showDateChip.set(it) }),
+      VisibilityToggle(label = stringResource(R.string.pref_storage_thumbnails_title), checked = showThumbnails, onCheckedChange = { browserPreferences.showVideoThumbnails.set(it) }),
+      VisibilityToggle(label = stringResource(R.string.view_toggle_show_extension), checked = showVideoExtension, onCheckedChange = { browserPreferences.showVideoExtension.set(it) }),
+      VisibilityToggle(label = stringResource(R.string.pref_subtitles), checked = showSubtitleIndicator, onCheckedChange = { browserPreferences.showSubtitleIndicator.set(it) }),
+      VisibilityToggle(label = stringResource(R.string.view_toggle_full_name), checked = unlimitedNameLines, onCheckedChange = { appearancePreferences.unlimitedNameLines.set(it) }),
+      VisibilityToggle(label = stringResource(R.string.media_info_size), checked = showSizeChip, onCheckedChange = { browserPreferences.showSizeChip.set(it) }),
+      VisibilityToggle(label = stringResource(R.string.media_info_resolution), checked = showResolutionChip, onCheckedChange = { browserPreferences.showResolutionChip.set(it) }),
+      VisibilityToggle(label = stringResource(R.string.view_toggle_framerate), checked = showFramerateInResolution, onCheckedChange = { browserPreferences.showFramerateInResolution.set(it) }),
+      VisibilityToggle(label = stringResource(R.string.view_toggle_date), checked = showDateChip, onCheckedChange = { browserPreferences.showDateChip.set(it) }),
     ),
   )
 }

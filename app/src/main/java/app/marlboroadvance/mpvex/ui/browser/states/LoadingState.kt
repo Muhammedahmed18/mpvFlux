@@ -16,14 +16,16 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.R
 
 @Composable
 fun LoadingState(
-  title: String = "Scanning for videos...",
-  message: String = "Please wait while we search your device",
+  title: String = stringResource(R.string.scanning_for_videos),
+  message: String = stringResource(R.string.loading_search_device),
   modifier: Modifier = Modifier,
 ) {
   Column(

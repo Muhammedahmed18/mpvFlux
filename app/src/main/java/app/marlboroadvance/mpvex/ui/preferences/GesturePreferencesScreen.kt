@@ -42,6 +42,7 @@ import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.player.CustomKeyCodes
 import app.marlboroadvance.mpvex.ui.player.SingleActionGesture
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.FooterPreference
@@ -86,7 +87,7 @@ object GesturePreferencesScreen : Screen {
               IconButton(onClick = backstack::removeLastOrNull) {
                 Icon(
                   Icons.AutoMirrored.Rounded.ArrowBack,
-                  contentDescription = null,
+                  contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary,
                 )
               }
@@ -98,7 +99,7 @@ object GesturePreferencesScreen : Screen {
       ) { padding ->
         ProvidePreferenceLocals {
           LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().readableContentWidth(),
             contentPadding = PaddingValues(
                 top = padding.calculateTopPadding(),
                 bottom = padding.calculateBottomPadding() + 24.dp,
@@ -142,7 +143,7 @@ object GesturePreferencesScreen : Screen {
                   },
                   summary = {
                     Text(
-                      text = if (isCustomValue) "Custom (${doubleTapSeekDuration}s)" else "${doubleTapSeekDuration}s",
+                      text = if (isCustomValue) stringResource(R.string.custom_seconds_value, doubleTapSeekDuration) else "${doubleTapSeekDuration}s",
                       style = MaterialTheme.typography.bodyMedium,
                       color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -161,7 +162,7 @@ object GesturePreferencesScreen : Screen {
                   valueToText = { AnnotatedString("${it}%") },
                   title = { 
                     Text(
-                      text = "Double Tap Seek Area Width",
+                      text = stringResource(R.string.pref_double_tap_seek_area_width_title),
                       style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },

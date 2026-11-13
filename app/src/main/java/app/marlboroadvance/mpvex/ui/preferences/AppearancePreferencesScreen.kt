@@ -36,6 +36,7 @@ import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.preferences.components.ThemePicker
 import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.Serializable
@@ -64,7 +65,7 @@ object AppearancePreferencesScreen : Screen {
             DarkMode.Light -> false
             DarkMode.System -> systemDarkTheme
         }
-        val backgroundColor = if (isDarkMode) Color.Black else MaterialTheme.colorScheme.surface
+        val backgroundColor = MaterialTheme.colorScheme.surface
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
         Surface(
@@ -87,7 +88,7 @@ object AppearancePreferencesScreen : Screen {
                             IconButton(onClick = backstack::removeLastOrNull) {
                                 Icon(
                                     Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = null,
+                                    contentDescription = stringResource(R.string.back),
                                     tint = MaterialTheme.colorScheme.secondary,
                                 )
                             }
@@ -99,7 +100,7 @@ object AppearancePreferencesScreen : Screen {
             ) { padding ->
                 ProvidePreferenceLocals {
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.fillMaxSize().readableContentWidth(),
                         contentPadding = PaddingValues(
                             top = padding.calculateTopPadding(),
                             bottom = padding.calculateBottomPadding() + 24.dp,

@@ -61,6 +61,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 
 @Composable
 internal fun MediaInfoReport(sections: List<ReportSection>, copyActions: CopyActions) {
@@ -96,7 +97,7 @@ internal fun MediaInfoReport(sections: List<ReportSection>, copyActions: CopyAct
   val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp
 
   LazyColumn(
-    modifier = Modifier.fillMaxSize(),
+    modifier = Modifier.fillMaxSize().readableContentWidth(),
     contentPadding = PaddingValues(top = 12.dp, bottom = bottomPadding),
     verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
@@ -245,7 +246,7 @@ private fun ReportRow(field: InfoField, copyActions: CopyActions) {
     modifier =
       Modifier
         .fillMaxWidth()
-        .clip(RoundedCornerShape(12.dp))
+        .clip(MaterialTheme.shapes.medium)
         .combinedClickable(
           onClick = {},
           onLongClick = { copyActions.copyValue(field.label, field.value) },

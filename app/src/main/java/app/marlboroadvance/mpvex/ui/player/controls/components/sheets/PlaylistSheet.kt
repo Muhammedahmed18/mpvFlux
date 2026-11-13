@@ -75,7 +75,6 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.presentation.components.PlayerSheet
-import app.marlboroadvance.mpvex.ui.utils.cleanVideoTitle
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
@@ -328,7 +327,7 @@ private fun NowPlayingCard(
           color = MaterialTheme.colorScheme.primary,
         )
         Text(
-          text = remember(item.title) { cleanVideoTitle(item.title) },
+          text = item.title,
           style = MaterialTheme.typography.titleSmallEmphasized,
           maxLines = 2,
           overflow = TextOverflow.Ellipsis,
@@ -373,7 +372,7 @@ private fun PlaylistRow(
       )
       Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
-          text = remember(item.title) { cleanVideoTitle(item.title) },
+          text = item.title,
           style = MaterialTheme.typography.bodyLarge,
           color = if (item.isWatched) {
             MaterialTheme.colorScheme.onSurfaceVariant

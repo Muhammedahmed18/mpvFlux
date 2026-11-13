@@ -31,9 +31,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 
 /**
@@ -41,6 +43,38 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
  * ToggleButtons with built-in shape morphing, arranged in a grid.
  */
 @OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Localized names for each sort direction. Resolved during composition so the
+ * non-composable [SortBottomSheet] getLabelForType lambdas can use them.
+ */
+@androidx.compose.runtime.Immutable
+class SortOrderLabels(
+  val oldest: String,
+  val newest: String,
+  val smallest: String,
+  val largest: String,
+  val fewest: String,
+  val most: String,
+  val shortest: String,
+  val longest: String,
+  val asc: String,
+  val desc: String,
+)
+
+@Composable
+fun rememberSortOrderLabels(): SortOrderLabels = SortOrderLabels(
+  oldest = stringResource(R.string.sort_oldest),
+  newest = stringResource(R.string.sort_newest),
+  smallest = stringResource(R.string.sort_smallest),
+  largest = stringResource(R.string.sort_largest),
+  fewest = stringResource(R.string.sort_fewest),
+  most = stringResource(R.string.sort_most),
+  shortest = stringResource(R.string.sort_shortest),
+  longest = stringResource(R.string.sort_longest),
+  asc = stringResource(R.string.sort_asc),
+  desc = stringResource(R.string.sort_desc),
+)
+
 @Composable
 fun SortBottomSheet(
   isOpen: Boolean,
@@ -95,7 +129,7 @@ fun SortBottomSheet(
             color = MaterialTheme.colorScheme.onSurface,
           )
           Text(
-            text = "Choose how items appear",
+            text = stringResource(R.string.sort_sheet_subtitle),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
@@ -106,13 +140,13 @@ fun SortBottomSheet(
             onClick = onReset,
             colors = IconButtonDefaults.filledIconButtonColors(
               containerColor = MaterialTheme.colorScheme.primaryContainer,
-              contentColor = MaterialTheme.colorScheme.primary,
+              contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ),
             modifier = Modifier.size(48.dp)
           ) {
             Icon(
               imageVector = Icons.Filled.RestartAlt,
-              contentDescription = "Reset",
+              contentDescription = stringResource(R.string.generic_reset),
             )
           }
         }
@@ -167,7 +201,7 @@ private fun SortByCard(
   types: List<String>,
   icons: List<ImageVector>,
 ) {
-  SectionCard(title = "Sort by") {
+  SectionCard(title = stringResource(R.string.sort_by)) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
       types.chunked(2).forEach { rowTypes ->
         Row(
@@ -215,7 +249,7 @@ private fun OrderCard(
   ascLabel: String,
   descLabel: String,
 ) {
-  SectionCard(title = "Order") {
+  SectionCard(title = stringResource(R.string.sort_order)) {
     Row(
       modifier = Modifier.fillMaxWidth(),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -271,7 +305,7 @@ private fun OrderToggle(
 private fun ViewOptionsCard(
   toggles: List<VisibilityToggle>,
 ) {
-  SectionCard(title = "View options") {
+  SectionCard(title = stringResource(R.string.view_options)) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
       toggles.chunked(2).forEach { rowToggles ->
         Row(

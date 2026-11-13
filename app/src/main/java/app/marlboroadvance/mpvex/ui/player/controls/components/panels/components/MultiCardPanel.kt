@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.ui.player.controls.CARDS_MAX_WIDTH
 import app.marlboroadvance.mpvex.ui.theme.spacing
 
@@ -77,7 +78,7 @@ fun MultiCardPanel(
           },
           navigationIcon = {
             IconButton(onClick = onDismissRequest) {
-              Icon(imageVector = Icons.AutoMirrored.Default.ArrowBack, contentDescription = null)
+              Icon(imageVector = Icons.AutoMirrored.Default.ArrowBack, contentDescription = stringResource(R.string.back))
             }
           },
           colors = TopAppBarDefaults.topAppBarColors().copy(containerColor = Color.Transparent),
@@ -119,7 +120,7 @@ fun MultiCardPanel(
               ),
           )
           IconButton(onDismissRequest) {
-            Icon(imageVector = Icons.Default.Close, contentDescription = null)
+            Icon(imageVector = Icons.Default.Close, contentDescription = stringResource(R.string.close))
           }
         }
         repeat(cardCount) { cards(it, Modifier) }

@@ -2,6 +2,9 @@ package app.marlboroadvance.mpvex.ui.player.controls
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import app.marlboroadvance.mpvex.R
 import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import androidx.activity.compose.LocalActivity
@@ -585,7 +588,6 @@ fun PlayerControls(
 
             val primaryColor   = MaterialTheme.colorScheme.primary
             val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
-            val onSurfaceColor = MaterialTheme.colorScheme.onSurface
             val scrimColor     = MaterialTheme.colorScheme.scrim
 
             // M3 Expressive transport: the hero is a bold SOLID `primary` button whose
@@ -603,6 +605,7 @@ fun PlayerControls(
               // ── Skip Previous ──────────────────────────────────────────
               if (showSkip) {
                 val prevEnabled = viewModel.hasPrevious()
+                val previousLabel = stringResource(R.string.cd_previous)
                 Box(
                   modifier = Modifier
                     .graphicsLayer { scaleX = prevScale; scaleY = prevScale }
@@ -610,8 +613,10 @@ fun PlayerControls(
                     .clip(CircleShape)
                     .then(if (!hideBackground) Modifier.transportGlass(scrimColor, strong = false) else Modifier)
                     .alpha(if (isBuffering || !prevEnabled) 0.5f else 1f)
+                    .semantics { contentDescription = previousLabel }
                     .clickable(
                       interactionSource = prevInteraction,
+                      role              = Role.Button,
                       indication        = ripple(bounded = true),
                       enabled           = prevEnabled,
                       onClick           = {
@@ -632,7 +637,7 @@ fun PlayerControls(
                   Icon(
                     imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_skip_previous_fill),
                     contentDescription = null,
-                    tint               = if (hideBackground) onSurfaceColor else Color.White,
+                    tint               = Color.White,
                     modifier           = Modifier.size(26.dp),
                   )
                 }
@@ -676,6 +681,7 @@ fun PlayerControls(
                 // the shape change carries the motion. `toggleBeat` adds a subtle +4%
                 // scale pop on each toggle so the morph lands with a beat. hideBackground
                 // drops the fill and keeps the bare `primary` glyph.
+                val playPauseLabel = stringResource(if (isPlaying) R.string.cd_pause else R.string.cd_play)
                 Box(
                   modifier = Modifier
                     .graphicsLayer {
@@ -686,8 +692,10 @@ fun PlayerControls(
                     .size(88.dp)
                     .clip(heroShape)
                     .then(if (!hideBackground) Modifier.background(primaryColor) else Modifier)
+                    .semantics { contentDescription = playPauseLabel }
                     .clickable(
                       interactionSource = playInteraction,
+                      role              = Role.Button,
                       indication        = ripple(bounded = true),
                       onClick           = {
                         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
@@ -725,6 +733,7 @@ fun PlayerControls(
               // ── Skip Next ───────────────────────────────────────────────
               if (showSkip) {
                 val nextEnabled = viewModel.hasNext()
+                val nextLabel = stringResource(R.string.cd_next)
                 Box(
                   modifier = Modifier
                     .graphicsLayer { scaleX = nextScale; scaleY = nextScale }
@@ -732,8 +741,10 @@ fun PlayerControls(
                     .clip(CircleShape)
                     .then(if (!hideBackground) Modifier.transportGlass(scrimColor, strong = false) else Modifier)
                     .alpha(if (isBuffering || !nextEnabled) 0.5f else 1f)
+                    .semantics { contentDescription = nextLabel }
                     .clickable(
                       interactionSource = nextInteraction,
+                      role              = Role.Button,
                       indication        = ripple(bounded = true),
                       enabled           = nextEnabled,
                       onClick           = {
@@ -755,7 +766,7 @@ fun PlayerControls(
                   Icon(
                     imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_skip_next_fill),
                     contentDescription = null,
-                    tint               = if (hideBackground) onSurfaceColor else Color.White,
+                    tint               = Color.White,
                     modifier           = Modifier.size(26.dp),
                   )
                 }

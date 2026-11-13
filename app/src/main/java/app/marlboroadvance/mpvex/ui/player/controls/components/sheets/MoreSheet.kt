@@ -188,7 +188,6 @@ fun TimePickerDialog(
     Surface(
       shape = MaterialTheme.shapes.extraLarge,
       color = MaterialTheme.colorScheme.surfaceContainerHigh,
-      tonalElevation = 6.dp,
       modifier = modifier
           .width(360.dp) // Fixed wide width to fit presets
           .padding(MaterialTheme.spacing.medium),
@@ -234,7 +233,7 @@ fun TimePickerDialog(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                "Quick Presets",
+                stringResource(R.string.quick_presets),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(bottom = 8.dp)

@@ -44,11 +44,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.utils.storage.StorageVolumeUtils
 import java.io.File
 
@@ -159,12 +161,13 @@ fun FilePickerDialog(
     }
   }
 
-  val displayName = remember(selectedPath, storageVolumes) {
+  val selectStorageLabel = stringResource(R.string.select_storage_location)
+  val displayName = remember(selectedPath, storageVolumes, selectStorageLabel) {
     val volume = storageVolumes.find { StorageVolumeUtils.getVolumePath(it) == selectedPath }
     if (volume != null) {
       volume.getDescription(context)
     } else {
-      selectedPath?.let { File(it).name } ?: "Select a storage location"
+      selectedPath?.let { File(it).name } ?: selectStorageLabel
     }
   }
 
@@ -191,7 +194,7 @@ fun FilePickerDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                   Column(modifier = Modifier.fillMaxWidth()) {
                       Text(
-                        text = "Select Subtitle",
+                        text = stringResource(R.string.select_subtitle),
                         style = MaterialTheme.typography.headlineSmallEmphasized,
                       )
                       Text(
@@ -230,7 +233,7 @@ fun FilePickerDialog(
                   ) {
                       Column(modifier = Modifier.weight(1f)) {
                           Text(
-                            text = "Select Subtitle",
+                            text = stringResource(R.string.select_subtitle),
                             style = MaterialTheme.typography.headlineMediumEmphasized,
                           )
                           Text(
@@ -287,7 +290,7 @@ fun FilePickerDialog(
                     }
                     if (storageVolumes.isEmpty()) {
                       item {
-                         Text("No storage devices found", modifier = Modifier.padding(16.dp))
+                         Text(stringResource(R.string.no_storage_devices_found), modifier = Modifier.padding(16.dp))
                       }
                     }
                   } else {
@@ -307,7 +310,7 @@ fun FilePickerDialog(
                     }
                     if (folders.isEmpty() && files.isEmpty()) {
                       item {
-                         Text("No folders or supported files", modifier = Modifier.padding(16.dp))
+                         Text(stringResource(R.string.no_folders_or_supported_files), modifier = Modifier.padding(16.dp))
                       }
                     }
                   }
@@ -324,7 +327,7 @@ fun FilePickerDialog(
                     shape = MaterialTheme.shapes.extraLarge,
                     // Reduced padding for the button itself if needed, or rely on Row padding
                   ) {
-                    Text("Cancel", fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.generic_cancel), fontWeight = FontWeight.Medium)
                   }
               }
           }
@@ -476,7 +479,7 @@ private fun NavigationButtons(
         contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
       )
     ) {
-      Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", modifier = Modifier.size(iconSize))
+      Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), modifier = Modifier.size(iconSize))
     }
   }
 
@@ -488,7 +491,7 @@ private fun NavigationButtons(
       contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
     )
   ) {
-    Icon(Icons.Default.Home, "Home", modifier = Modifier.size(iconSize))
+    Icon(Icons.Default.Home, stringResource(R.string.home), modifier = Modifier.size(iconSize))
   }
 
   FilledTonalIconButton(
@@ -499,7 +502,7 @@ private fun NavigationButtons(
       contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
     )
   ) {
-    Icon(Icons.Default.DriveFolderUpload, "System Picker", modifier = Modifier.size(iconSize))
+    Icon(Icons.Default.DriveFolderUpload, stringResource(R.string.system_picker), modifier = Modifier.size(iconSize))
   }
 }
 

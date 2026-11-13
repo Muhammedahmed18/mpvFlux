@@ -7,12 +7,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -50,8 +43,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
@@ -75,26 +66,12 @@ fun PermissionDeniedState(
   var showExplanationDialog by remember { mutableStateOf(false) }
 
 
-  // Colors based on the provided image
-  val backgroundColor = Color(0xFF0D1117)
-  val outerCircleColor = Color(0xFF161B22)
-  val innerCircleColor = Color(0xFF21262D)
-  val iconColor = Color(0xFF388BFD)
-  val buttonColor = Color(0xFFADC6FF)
-  val buttonTextColor = Color(0xFF002D6F)
-
-  // Animated scale for the icon
-  val infiniteTransition = rememberInfiniteTransition(label = "permission_icon")
-  val scale by infiniteTransition.animateFloat(
-    initialValue = 1f,
-    targetValue = 1.05f,
-    animationSpec =
-      infiniteRepeatable(
-        animation = tween(2500, easing = FastOutSlowInEasing),
-        repeatMode = RepeatMode.Reverse,
-      ),
-    label = "icon_scale",
-  )
+  // Theme roles, so the first screen a new user sees matches their chosen theme,
+  // light/dark mode and dynamic color (it used to be a fixed dark palette).
+  val colors = MaterialTheme.colorScheme
+  val backgroundColor = colors.surface
+  val outerCircleColor = colors.surfaceContainerHigh
+  val innerCircleColor = colors.primaryContainer
 
   Box(
     modifier = modifier.fillMaxSize().background(backgroundColor)
@@ -111,14 +88,14 @@ fun PermissionDeniedState(
       // Custom Multi-layered Icon
       Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.scale(scale)
+        // Static icon: the old endless pulse was decorative motion with no meaning.
       ) {
         // Outer Circle
         Box(
           modifier = Modifier
             .size(180.dp)
             .clip(CircleShape)
-            .background(outerCircleColor.copy(alpha = 0.5f))
+            .background(outerCircleColor)
         )
         // Inner Circle
         Box(
@@ -132,7 +109,7 @@ fun PermissionDeniedState(
           imageVector = Icons.Filled.FolderSpecial,
           contentDescription = null,
           modifier = Modifier.size(64.dp),
-          tint = Color.White,
+          tint = colors.onPrimaryContainer,
         )
       }
 
@@ -140,10 +117,10 @@ fun PermissionDeniedState(
 
       // Title
       Text(
-        text = "Storage Access\nRequired",
+        text = stringResource(R.string.storage_access_required_title),
         style = MaterialTheme.typography.headlineLargeEmphasized,
         textAlign = TextAlign.Center,
-        color = Color.White,
+        color = colors.onSurface,
         lineHeight = 40.sp
       )
 
@@ -151,9 +128,9 @@ fun PermissionDeniedState(
 
       // Description
       Text(
-        text = "MpvFlux needs \"All file access\" to discover media and subtitles across your device.",
+        text = stringResource(R.string.storage_access_required_message),
         style = MaterialTheme.typography.bodyLarge,
-        color = Color.White.copy(alpha = 0.7f),
+        color = colors.onSurfaceVariant,
         textAlign = TextAlign.Center,
         lineHeight = 24.sp
       )
@@ -180,14 +157,14 @@ fun PermissionDeniedState(
           Modifier
             .fillMaxWidth()
             .height(56.dp),
-        shape = RoundedCornerShape(28.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         colors = ButtonDefaults.buttonColors(
-          containerColor = buttonColor,
-          contentColor = buttonTextColor
+          containerColor = colors.primary,
+          contentColor = colors.onPrimary,
         )
       ) {
         Text(
-          text = "Grant Access",
+          text = stringResource(R.string.grant_access),
           style = MaterialTheme.typography.titleMediumEmphasized,
         )
       }
@@ -203,13 +180,13 @@ fun PermissionDeniedState(
           imageVector = Icons.Outlined.Info,
           contentDescription = null,
           modifier = Modifier.size(18.dp),
-          tint = Color.White.copy(alpha = 0.5f)
+          tint = colors.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-          text = "Why is this needed?",
+          text = stringResource(R.string.why_is_this_needed),
           style = MaterialTheme.typography.bodyMedium,
-          color = Color.White.copy(alpha = 0.5f),
+          color = colors.onSurfaceVariant,
           fontWeight = FontWeight.Normal,
         )
       }
@@ -314,13 +291,13 @@ fun PermissionDeniedState(
       confirmButton = {
         FilledTonalButton(
           onClick = { showExplanationDialog = false },
-          shape = RoundedCornerShape(12.dp),
+          shape = MaterialTheme.shapes.medium,
           modifier = Modifier.height(40.dp),
         ) {
           Text(stringResource(R.string.got_it))
         }
       },
-      shape = RoundedCornerShape(16.dp),
+      shape = MaterialTheme.shapes.large,
     )
   }
 }

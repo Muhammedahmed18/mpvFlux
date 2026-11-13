@@ -13,13 +13,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.*
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.*
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
@@ -59,14 +64,16 @@ data class ConfigEditorScreen(
     val backStack = LocalBackStack.current
     val preferences = koinInject<AdvancedPreferences>()
     val scope = rememberCoroutineScope()
+    // Errors use a Snackbar (themed, stays on this screen) instead of a Toast.
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val (fileName, initialValue) = when (configType) {
       ConfigType.MPV_CONF   -> "mpv.conf"   to preferences.mpvConf.get()
       ConfigType.INPUT_CONF -> "input.conf" to preferences.inputConf.get()
     }
     val screenTitle = when (configType) {
-      ConfigType.MPV_CONF   -> "Edit mpv.conf"
-      ConfigType.INPUT_CONF -> "Edit input.conf"
+      ConfigType.MPV_CONF   -> stringResource(R.string.pref_advanced_mpv_conf)
+      ConfigType.INPUT_CONF -> stringResource(R.string.pref_advanced_input_conf)
     }
 
     var configText by remember { mutableStateOf(initialValue) }
@@ -118,12 +125,12 @@ data class ConfigEditorScreen(
 
           withContext(Dispatchers.Main) {
             hasUnsavedChanges = false
-            Toast.makeText(context, "$fileName saved", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.file_saved, fileName), Toast.LENGTH_SHORT).show()
             backStack.removeLastOrNull()
           }
         } catch (e: Exception) {
           withContext(Dispatchers.Main) {
-            Toast.makeText(context, "Failed to save: ${e.message}", Toast.LENGTH_LONG).show()
+            snackbarHostState.showSnackbar(context.getString(R.string.failed_to_save, e.message.orEmpty()))
           }
         }
       }
@@ -136,6 +143,7 @@ data class ConfigEditorScreen(
       Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
           PreferenceTopBar(
             scrollBehavior = scrollBehavior,
@@ -149,7 +157,7 @@ data class ConfigEditorScreen(
                 )
                 if (hasUnsavedChanges) {
                   Text(
-                    text = "Unsaved changes",
+                    text = stringResource(R.string.unsaved_changes),
                     style = MaterialTheme.typography.labelSmallEmphasized,
                     color = MaterialTheme.colorScheme.error,
                   )
@@ -160,7 +168,7 @@ data class ConfigEditorScreen(
               IconButton(onClick = { backStack.removeLastOrNull() }) {
                 Icon(
                   Icons.AutoMirrored.Rounded.ArrowBack,
-                  contentDescription = "Back",
+                  contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary,
                 )
               }
@@ -178,7 +186,7 @@ data class ConfigEditorScreen(
                   ) {
                     Icon(
                         Icons.Rounded.Check, 
-                        contentDescription = "Save",
+                        contentDescription = stringResource(R.string.save),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(28.dp)
                     )

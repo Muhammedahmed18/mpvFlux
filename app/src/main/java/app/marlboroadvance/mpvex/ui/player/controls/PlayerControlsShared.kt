@@ -13,6 +13,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalViewConfiguration
+import androidx.compose.ui.res.stringResource
+import app.marlboroadvance.mpvex.preferences.getPlayerButtonLabel
 import app.marlboroadvance.mpvex.ui.player.VideoAspect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -36,6 +38,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -112,6 +115,16 @@ internal fun Modifier.glassPanel(shape: Shape, hideBackground: Boolean): Modifie
       )
   }
 
+/**
+ * Text and icon color for player chrome. On the glass fill it is the theme's onSurface.
+ * With "hide button background" on there is no fill, so content sits straight on the
+ * (dark-scrimmed) video and must stay light in every theme; in light theme onSurface is
+ * near-black and disappears.
+ */
+@Composable
+internal fun playerChromeContentColor(hideBackground: Boolean): Color =
+  if (hideBackground) Color.White else MaterialTheme.colorScheme.onSurface
+
 @Composable
 internal fun glassIconButtonColors(hideBackground: Boolean) =
   IconButtonDefaults.filledTonalIconButtonColors(
@@ -120,7 +133,7 @@ internal fun glassIconButtonColors(hideBackground: Boolean) =
     } else {
       MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
     },
-    contentColor = MaterialTheme.colorScheme.onSurface,
+    contentColor = playerChromeContentColor(hideBackground),
   )
 
 @OptIn(
@@ -156,6 +169,9 @@ fun RenderPlayerButton(
   // M3 Expressive shape-morphing: round at rest → squircle-ish on press
   val expressiveShapes = IconButtonDefaults.shapes()
 
+  // Spoken name for TalkBack; same label the layout editor shows for this button.
+  val buttonLabel = getPlayerButtonLabel(button)
+
   when (button) {
 
     // ------------------------------------------------------------------
@@ -170,7 +186,7 @@ fun RenderPlayerButton(
       ) {
         Icon(
           imageVector        = PlayerButton.BACK_ARROW.icon,
-          contentDescription = null,
+          contentDescription = stringResource(R.string.back),
         )
       }
     }
@@ -289,9 +305,9 @@ fun RenderPlayerButton(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
           ) {
             Text(
-              text  = "NOW PLAYING",
+              text  = stringResource(R.string.now_playing),
               style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
-              color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+              color = playerChromeContentColor(hideBackground).copy(alpha = 0.6f),
               maxLines = 1,
             )
             playlistCounter?.let { (current, total) ->
@@ -320,7 +336,7 @@ fun RenderPlayerButton(
           Text(
             text  = mediaTitle ?: "",
             style = MaterialTheme.typography.titleMediumEmphasized,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = playerChromeContentColor(hideBackground),
             maxLines = 1,
             overflow = if (isTitleOverflowing) TextOverflow.Clip else TextOverflow.Ellipsis,
             onTextLayout = { if (it.hasVisualOverflow) isTitleOverflowing = true },
@@ -355,6 +371,7 @@ fun RenderPlayerButton(
           icon           = button.icon,
           onClick        = { onOpenSheet(Sheets.Chapters) },
           hideBackground = hideBackground,
+          contentDescription = buttonLabel,
           buttonSize     = buttonSize,
           modifier       = modifier,
         )
@@ -396,6 +413,7 @@ fun RenderPlayerButton(
           icon           = button.icon,
           onClick        = { onOpenSheet(Sheets.PlaybackSpeed) },
           hideBackground = hideBackground,
+          contentDescription = buttonLabel,
           buttonSize     = buttonSize,
           modifier       = modifier,
         )
@@ -414,6 +432,7 @@ fun RenderPlayerButton(
         },
         onClick        = { onOpenSheet(Sheets.SubtitleTracks) },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
       )
@@ -424,6 +443,7 @@ fun RenderPlayerButton(
         icon           = button.icon,
         onClick        = { onOpenSheet(Sheets.AudioTracks) },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
       )
@@ -453,6 +473,7 @@ fun RenderPlayerButton(
         },
         onLongClick    = { onOpenSheet(Sheets.AspectRatios) },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
       )
@@ -474,6 +495,7 @@ fun RenderPlayerButton(
         icon           = button.icon,
         onClick        = { activity.enterPipModeHidingOverlay() },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
       )
@@ -484,6 +506,7 @@ fun RenderPlayerButton(
         icon           = button.icon,
         onClick        = { viewModel.cycleScreenRotations() },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
       )
@@ -494,6 +517,7 @@ fun RenderPlayerButton(
         icon           = button.icon,
         onClick        = { viewModel.lockControls() },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
       )
@@ -508,6 +532,7 @@ fun RenderPlayerButton(
         PlayerButtonGroup(hideBackground = hideBackground, buttonSize = buttonSize, modifier = modifier) {
           PlayerGroupIconButton(
             icon       = ImageVector.vectorResource(R.drawable.ic_sym_chevron_left),
+            contentDescription = stringResource(R.string.cd_frame_back),
             onClick    = {
               viewModel.frameStepBackward()
               viewModel.resetFrameNavigationTimer()
@@ -521,6 +546,7 @@ fun RenderPlayerButton(
           } else {
             PlayerGroupIconButton(
               icon       = ImageVector.vectorResource(R.drawable.ic_sym_photo_camera),
+              contentDescription = stringResource(R.string.cd_take_snapshot),
               onClick    = {
                 viewModel.takeSnapshot(context)
                 viewModel.resetFrameNavigationTimer()
@@ -530,6 +556,7 @@ fun RenderPlayerButton(
           }
           PlayerGroupIconButton(
             icon       = ImageVector.vectorResource(R.drawable.ic_sym_chevron_right),
+            contentDescription = stringResource(R.string.cd_frame_forward),
             onClick    = {
               viewModel.frameStepForward()
               viewModel.resetFrameNavigationTimer()
@@ -543,6 +570,7 @@ fun RenderPlayerButton(
           onClick        = { viewModel.toggleFrameNavigationExpanded() },
           onLongClick    = { onOpenSheet(Sheets.FrameNavigation) },
           hideBackground = hideBackground,
+          contentDescription = buttonLabel,
           buttonSize     = buttonSize,
           modifier       = modifier,
         )
@@ -566,6 +594,7 @@ fun RenderPlayerButton(
         icon           = button.icon,
         onClick        = { viewModel.toggleShuffle() },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
         checked        = isShuffle,
@@ -583,6 +612,7 @@ fun RenderPlayerButton(
         },
         onClick        = { viewModel.cycleRepeatMode() },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
         checked        = repeatMode != RepeatMode.OFF,
@@ -595,6 +625,7 @@ fun RenderPlayerButton(
         icon           = button.icon,
         onClick        = { viewModel.toggleMirroring() },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
         checked        = isMirrored,
@@ -607,6 +638,7 @@ fun RenderPlayerButton(
         icon           = button.icon,
         onClick        = { viewModel.toggleVerticalFlip() },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
         checked        = isVerticalFlipped,
@@ -629,6 +661,7 @@ fun RenderPlayerButton(
           )
           PlayerGroupIconButton(
             icon       = ImageVector.vectorResource(R.drawable.ic_sym_close),
+            contentDescription = stringResource(R.string.cd_clear_ab_loop),
             onClick    = {
               viewModel.clearABLoop()
               viewModel.toggleABLoopExpanded()
@@ -647,6 +680,7 @@ fun RenderPlayerButton(
           icon           = button.icon,
           onClick        = { viewModel.toggleABLoopExpanded() },
           hideBackground = hideBackground,
+          contentDescription = buttonLabel,
           buttonSize     = buttonSize,
           modifier       = modifier,
           checked        = loopA != null && loopB != null,
@@ -661,6 +695,7 @@ fun RenderPlayerButton(
         icon           = button.icon,
         onClick        = { viewModel.seekBy(playerPreferences.customSkipDuration.get()) },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
       )
@@ -671,6 +706,7 @@ fun RenderPlayerButton(
         icon           = button.icon,
         onClick        = { activity.triggerBackgroundPlayback() },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
       )
@@ -681,6 +717,7 @@ fun RenderPlayerButton(
         icon           = button.icon,
         onClick        = { onOpenSheet(Sheets.More) },
         hideBackground = hideBackground,
+        contentDescription = buttonLabel,
         buttonSize     = buttonSize,
         modifier       = modifier,
       )
@@ -794,7 +831,7 @@ internal fun PlayerValueChip(
     contentColor = if (highlighted) {
       MaterialTheme.colorScheme.onPrimaryContainer
     } else {
-      MaterialTheme.colorScheme.onSurface
+      playerChromeContentColor(hideBackground)
     },
   ) {
     Row(
@@ -824,7 +861,7 @@ private fun PlayerButtonGroup(
     } else {
       MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
     },
-    contentColor = MaterialTheme.colorScheme.onSurface,
+    contentColor = playerChromeContentColor(hideBackground),
   ) {
     Row(
       modifier              = Modifier.padding(horizontal = 4.dp),
@@ -840,6 +877,7 @@ private fun PlayerButtonGroup(
 @Composable
 private fun PlayerGroupIconButton(
   icon: ImageVector,
+  contentDescription: String?,
   onClick: () -> Unit,
   buttonSize: Dp,
 ) {
@@ -852,7 +890,7 @@ private fun PlayerGroupIconButton(
     modifier = Modifier.size(buttonSize - 8.dp),
     shapes   = IconButtonDefaults.shapes(),
   ) {
-    Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(20.dp))
+    Icon(imageVector = icon, contentDescription = contentDescription, modifier = Modifier.size(20.dp))
   }
 }
 
@@ -878,7 +916,7 @@ private fun PlayerGroupTextButton(
     contentColor = if (active) {
       MaterialTheme.colorScheme.onTertiaryContainer
     } else {
-      MaterialTheme.colorScheme.onSurface
+      LocalContentColor.current // set by PlayerButtonGroup for the current background mode
     },
   ) {
     Box(

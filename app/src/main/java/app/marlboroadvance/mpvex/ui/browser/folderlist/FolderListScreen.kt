@@ -65,12 +65,14 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
+import app.marlboroadvance.mpvex.ui.browser.sheets.rememberSortOrderLabels
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.browser.states.LoadingState
 import app.marlboroadvance.mpvex.ui.browser.states.PermissionDeniedState
 import app.marlboroadvance.mpvex.ui.browser.videolist.VideoListScreen
 import app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.utils.permission.PermissionUtils
 import app.marlboroadvance.mpvex.utils.sort.SortUtils
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
@@ -343,15 +345,15 @@ private fun FolderListContent(
     if (showFullScreenLoading || showEmpty) {
       if (showFullScreenLoading) {
         LoadingState(
-          title = "Scanning for videos...",
-          message = "Please wait",
+          title = stringResource(R.string.scanning_for_videos),
+          message = stringResource(R.string.please_wait),
           modifier = Modifier.fillMaxSize(),
         )
       } else {
         EmptyState(
           icon = Icons.Rounded.Folder,
-          title = "No video folders found",
-          message = "Your library is empty or folders are being filtered.",
+          title = stringResource(R.string.no_video_folders),
+          message = stringResource(R.string.no_video_folders_message),
           modifier = Modifier.fillMaxSize(),
         )
       }
@@ -359,7 +361,7 @@ private fun FolderListContent(
       Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
           state = listState,
-          modifier = Modifier.fillMaxSize(),
+          modifier = Modifier.fillMaxSize().readableContentWidth(),
           contentPadding = PaddingValues(
             start = 8.dp,
             end = 8.dp,
@@ -435,10 +437,11 @@ private fun FolderSortDialog(
   onShowTotalSizeChipChange: (Boolean) -> Unit,
   onShowDateChipChange: (Boolean) -> Unit,
 ) {
+  val sortLabels = rememberSortOrderLabels()
   SortBottomSheet(
     isOpen = isOpen,
     onDismiss = onDismiss,
-    title = "Sort & View Options",
+    title = stringResource(R.string.sort_view_options),
     sortType = sortType.displayName,
     onSortTypeChange = { typeName ->
       FolderSortType.entries.find { it.displayName == typeName }?.let(onSortTypeChange)
@@ -461,19 +464,19 @@ private fun FolderSortDialog(
     getLabelForType = { type, _ ->
       when (type) {
         FolderSortType.Title.displayName -> Pair("A-Z", "Z-A")
-        FolderSortType.Date.displayName -> Pair("Oldest", "Newest")
-        FolderSortType.Size.displayName -> Pair("Smallest", "Largest")
-        FolderSortType.VideoCount.displayName -> Pair("Fewest", "Most")
-        else -> Pair("Asc", "Desc")
+        FolderSortType.Date.displayName -> Pair(sortLabels.oldest, sortLabels.newest)
+        FolderSortType.Size.displayName -> Pair(sortLabels.smallest, sortLabels.largest)
+        FolderSortType.VideoCount.displayName -> Pair(sortLabels.fewest, sortLabels.most)
+        else -> Pair(sortLabels.asc, sortLabels.desc)
       }
     },
     visibilityToggles = listOf(
-      VisibilityToggle(label = "Full Name", checked = unlimitedNameLines, onCheckedChange = onUnlimitedNameLinesChange),
-      VisibilityToggle(label = "Path", checked = showFolderPath, onCheckedChange = onShowFolderPathChange),
-      VisibilityToggle(label = "Total Videos", checked = showTotalVideosChip, onCheckedChange = onShowTotalVideosChipChange),
-      VisibilityToggle(label = "Total Duration", checked = showTotalDurationChip, onCheckedChange = onShowTotalDurationChipChange),
-      VisibilityToggle(label = "Folder Size", checked = showTotalSizeChip, onCheckedChange = onShowTotalSizeChipChange),
-      VisibilityToggle(label = "Date", checked = showDateChip, onCheckedChange = onShowDateChipChange),
+      VisibilityToggle(label = stringResource(R.string.view_toggle_full_name), checked = unlimitedNameLines, onCheckedChange = onUnlimitedNameLinesChange),
+      VisibilityToggle(label = stringResource(R.string.path), checked = showFolderPath, onCheckedChange = onShowFolderPathChange),
+      VisibilityToggle(label = stringResource(R.string.view_toggle_total_videos), checked = showTotalVideosChip, onCheckedChange = onShowTotalVideosChipChange),
+      VisibilityToggle(label = stringResource(R.string.view_toggle_total_duration), checked = showTotalDurationChip, onCheckedChange = onShowTotalDurationChipChange),
+      VisibilityToggle(label = stringResource(R.string.view_toggle_folder_size), checked = showTotalSizeChip, onCheckedChange = onShowTotalSizeChipChange),
+      VisibilityToggle(label = stringResource(R.string.view_toggle_date), checked = showDateChip, onCheckedChange = onShowDateChipChange),
     ),
   )
 }

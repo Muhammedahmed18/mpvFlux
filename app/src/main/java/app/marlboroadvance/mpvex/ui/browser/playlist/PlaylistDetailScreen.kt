@@ -48,12 +48,14 @@ import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
 import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
+import app.marlboroadvance.mpvex.ui.browser.cards.videoCardGroupPosition
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -189,14 +191,14 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
             when {
               isReorderMode -> {
                 IconButton(onClick = { isReorderMode = false }) {
-                  Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                  Icon(Icons.Filled.Check, contentDescription = stringResource(R.string.cd_reorder_done), tint = MaterialTheme.colorScheme.primary)
                 }
               }
               !selectionManager.isInSelectionMode && videos.isNotEmpty() -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                   if (playlist?.isM3uPlaylist != true) {
                     IconButton(onClick = { isReorderMode = true }) {
-                      Icon(Icons.Outlined.SwapVert, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
+                      Icon(Icons.Outlined.SwapVert, contentDescription = stringResource(R.string.cd_reorder), tint = MaterialTheme.colorScheme.onSurface)
                     }
                     Spacer(Modifier.width(8.dp))
                   }
@@ -231,7 +233,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
                   ) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null, Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("Play All", style = MaterialTheme.typography.labelLargeEmphasized)
+                    Text(stringResource(R.string.play_all), style = MaterialTheme.typography.labelLargeEmphasized)
                   }
                 }
               }
@@ -310,7 +312,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
         onCopy = {
           val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
           cm.setPrimaryClip(ClipData.newPlainText("URL", urlDialogContent))
-          Toast.makeText(context, "URL copied", Toast.LENGTH_SHORT).show()
+          Toast.makeText(context, context.getString(R.string.url_copied), Toast.LENGTH_SHORT).show()
         }
       )
     }
@@ -345,7 +347,7 @@ private fun PlaylistVideoListContent(
       LoadingIndicator(modifier = Modifier.size(64.dp), color = MaterialTheme.colorScheme.primary)
     }
   } else if (videoItems.isEmpty()) {
-    EmptyState(icon = Icons.AutoMirrored.Outlined.PlaylistAdd, title = "Empty Playlist", message = "Add some videos to this playlist", modifier = modifier.fillMaxSize())
+    EmptyState(icon = Icons.AutoMirrored.Outlined.PlaylistAdd, title = stringResource(R.string.empty_playlist), message = stringResource(R.string.empty_playlist_message), modifier = modifier.fillMaxSize())
   } else {
     val reorderableState = rememberReorderableLazyListState(listState) { from, to ->
         if (isReorderMode) onReorder(from.index, to.index)
@@ -361,9 +363,10 @@ private fun PlaylistVideoListContent(
     ) {
       LazyColumn(
         state = listState,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().readableContentWidth(),
         contentPadding = PaddingValues(top = 12.dp, start = 8.dp, end = 8.dp, bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        // Connected list: 2dp between rows; the cards round only the group's ends.
+        verticalArrangement = Arrangement.spacedBy(2.dp),
       ) {
         items(count = videoItems.size, key = { videoItems[it].playlistItem.id }) { index ->
           ReorderableItem(reorderableState, key = videoItems[index].playlistItem.id) { isDragging ->
@@ -393,11 +396,16 @@ private fun PlaylistVideoListContent(
                     onThumbClick = { if (tapThumbnailToSelect || selectionManager.isInSelectionMode) onVideoItemLongClick(item) else onVideoItemClick(item) },
                     showSubtitleIndicator = showSubtitleIndicator,
                     modifier = Modifier.weight(1f),
+                    groupPosition = videoCardGroupPosition(
+                      hasPrevious = index > 0,
+                      hasNext = index < videoItems.lastIndex,
+                    ),
+                    showMenu = !selectionManager.isInSelectionMode && !isReorderMode,
                   )
 
                   if (isReorderMode) {
                     IconButton(onClick = { }, modifier = Modifier.size(48.dp).draggableHandle()) {
-                      Icon(Icons.Filled.DragHandle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                      Icon(Icons.Filled.DragHandle, contentDescription = stringResource(R.string.cd_drag_to_reorder), tint = MaterialTheme.colorScheme.primary)
                     }
                   }
                 }

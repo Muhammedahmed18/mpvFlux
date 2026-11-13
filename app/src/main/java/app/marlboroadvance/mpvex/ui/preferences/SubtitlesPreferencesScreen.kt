@@ -59,6 +59,7 @@ import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.preferences.components.LanguagePickerPreference
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.utils.media.CustomFontEntry
 import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
 import app.marlboroadvance.mpvex.utils.media.copyFontFromUri
@@ -103,7 +104,7 @@ object SubtitlesPreferencesScreen : Screen {
             ) {
               Icon(
                 Icons.AutoMirrored.Outlined.ArrowBack,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.back),
                 tint = MaterialTheme.colorScheme.secondary,
               )
             }
@@ -170,7 +171,8 @@ object SubtitlesPreferencesScreen : Screen {
           modifier =
             Modifier
               .fillMaxSize()
-              .padding(padding),
+              .padding(padding)
+              .readableContentWidth(),
         ) {
           // === GENERAL SECTION ===
           item {
@@ -494,7 +496,7 @@ object SubtitlesPreferencesScreen : Screen {
                 verticalAlignment = Alignment.CenterVertically
               ) {
                 Text(
-                  text = "Subtitle Search provided by",
+                  text = stringResource(R.string.subtitle_search_provided_by),
                   style = MaterialTheme.typography.bodySmall,
                   color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -532,7 +534,7 @@ object SubtitlesPreferencesScreen : Screen {
               verticalAlignment = Alignment.CenterVertically,
             ) {
               Text(
-                text = "Installed Fonts",
+                text = stringResource(R.string.installed_fonts),
                 style = MaterialTheme.typography.titleLargeEmphasized,
               )
               IconButton(
@@ -542,7 +544,7 @@ object SubtitlesPreferencesScreen : Screen {
               ) {
                 Icon(
                   Icons.Default.Add,
-                  contentDescription = "Add font",
+                  contentDescription = stringResource(R.string.add_font),
                   tint = MaterialTheme.colorScheme.primary,
                 )
               }
@@ -566,7 +568,7 @@ object SubtitlesPreferencesScreen : Screen {
                 contentAlignment = Alignment.Center,
               ) {
                 Text(
-                  text = "No fonts installed",
+                  text = stringResource(R.string.no_fonts_installed),
                   style = MaterialTheme.typography.bodyMedium,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -588,7 +590,7 @@ object SubtitlesPreferencesScreen : Screen {
                         fontWeight = FontWeight.Medium,
                       )
                       Text(
-                        text = "The quick brown fox jumps over the lazy dog",
+                        text = stringResource(R.string.font_preview_sample),
                         style = MaterialTheme.typography.bodyMedium,
                         fontFamily = fontFamily,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -607,7 +609,7 @@ object SubtitlesPreferencesScreen : Screen {
                     ) {
                       Icon(
                         Icons.Default.Delete,
-                        contentDescription = "Delete font",
+                        contentDescription = stringResource(R.string.delete_font),
                         tint = MaterialTheme.colorScheme.error,
                       )
                     }

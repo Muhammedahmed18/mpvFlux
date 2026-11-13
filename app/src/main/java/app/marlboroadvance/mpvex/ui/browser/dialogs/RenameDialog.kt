@@ -36,9 +36,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,17 +80,19 @@ fun RenameDialog(
   var baseName by remember(currentName) { mutableStateOf(currentName) }
   var isError by remember { mutableStateOf(false) }
   var errorMessage by remember { mutableStateOf("") }
+  val emptyNameError = stringResource(R.string.rename_error_empty)
+  val invalidCharsError = stringResource(R.string.rename_error_invalid_chars)
   val focusRequester = remember { FocusRequester() }
 
   fun validateAndConfirm() {
     when {
       baseName.isBlank() -> {
         isError = true
-        errorMessage = "Name cannot be empty"
+        errorMessage = emptyNameError
       }
       baseName.contains("/") || baseName.contains("\\") -> {
         isError = true
-        errorMessage = "Name cannot contain / or \\"
+        errorMessage = invalidCharsError
       }
       else -> {
         onConfirm(baseName + (extension ?: ""))
@@ -109,7 +113,6 @@ fun RenameDialog(
     },
     sheetState = sheetState,
     dragHandle = { BottomSheetDefaults.DragHandle() },
-    containerColor = MaterialTheme.colorScheme.surface,
   ) {
     Column(
       modifier = Modifier
@@ -135,13 +138,13 @@ fun RenameDialog(
           enabled = baseName.isNotBlank(),
           colors = IconButtonDefaults.filledIconButtonColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
           ),
           modifier = Modifier.size(56.dp)
         ) {
           Icon(
             imageVector = Icons.Default.Check,
-            contentDescription = "Confirm Rename",
+            contentDescription = stringResource(R.string.rename_confirm),
             modifier = Modifier.size(32.dp)
           )
         }
@@ -158,7 +161,7 @@ fun RenameDialog(
         modifier = Modifier
           .fillMaxWidth()
           .focusRequester(focusRequester),
-        label = { Text("New name", fontWeight = FontWeight.Medium) },
+        label = { Text(stringResource(R.string.new_name), fontWeight = FontWeight.Medium) },
         singleLine = false,
         maxLines = 5,
         isError = isError,

@@ -1,5 +1,8 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import app.marlboroadvance.mpvex.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.AnimatedVisibility
@@ -99,7 +102,6 @@ fun FolderCard(
     label = "folder_card_scale"
   )
 
-  val tonalElevation = if (isPressed) 4.dp else 1.dp
 
   // Selection: solid tonal fill + check badge (no border or shrink).
   val containerColor = if (isSelected) {
@@ -112,6 +114,7 @@ fun FolderCard(
     modifier = modifier
       .fillMaxWidth()
       .scale(cardScale)
+      .semantics { selected = isSelected }
       .combinedClickable(
         interactionSource = interactionSource,
         indication = ripple(color = MaterialTheme.colorScheme.primary),
@@ -120,7 +123,6 @@ fun FolderCard(
       ),
     shape = MaterialTheme.shapes.extraLarge,
     color = containerColor,
-    tonalElevation = tonalElevation,
   ) {
     Row(
       modifier = Modifier
@@ -216,7 +218,7 @@ private fun FolderIconContainer(
       ) {
         Icon(
           imageVector = Icons.Filled.Check,
-          contentDescription = "Selected",
+          contentDescription = stringResource(R.string.card_cd_selected),
           modifier = Modifier.padding(3.dp),
           tint = MaterialTheme.colorScheme.onPrimaryContainer,
         )
@@ -238,7 +240,7 @@ private fun FolderMetadataChips(
   ) {
     if (settings.showTotalVideosChip && folder.videoCount > 0) {
       UnifiedChip(
-        text = "${folder.videoCount} ${if (folder.videoCount == 1) "Video" else "Videos"}",
+        text = pluralStringResource(R.plurals.card_video_count, folder.videoCount, folder.videoCount),
         isAccent = true,
       )
     }

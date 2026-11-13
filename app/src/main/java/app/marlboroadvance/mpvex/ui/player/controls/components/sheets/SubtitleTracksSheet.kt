@@ -47,7 +47,9 @@ fun SubtitlesSheet(
   onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier
 ) {
-  val items = remember(tracks) {
+  val embeddedLabel = stringResource(R.string.track_header_embedded)
+  val externalLabel = stringResource(R.string.track_header_external)
+  val items = remember(tracks, embeddedLabel, externalLabel) {
     val list = mutableListOf<SubtitleItem>()
     // "Off" row sits at the very top so disabling subtitles is one tap from the top of the list.
     list.add(SubtitleItem.Off)
@@ -56,12 +58,12 @@ fun SubtitlesSheet(
     val external = tracks.filter { it.external == true }
 
     if (internal.isNotEmpty()) {
-      list.add(SubtitleItem.Header("EMBEDDED"))
+      list.add(SubtitleItem.Header(embeddedLabel))
       list.addAll(internal.map { SubtitleItem.Track(it) })
     }
 
     if (external.isNotEmpty()) {
-      list.add(SubtitleItem.Header("EXTERNAL"))
+      list.add(SubtitleItem.Header(externalLabel))
       list.addAll(external.map { SubtitleItem.Track(it) })
     }
 
@@ -74,7 +76,7 @@ fun SubtitlesSheet(
     header = {
       Column {
         SheetHeader(
-          title    = "Subtitles",
+          title    = stringResource(R.string.pref_subtitles),
           trailing = if (tracks.isNotEmpty()) {
             { TrackCountPill(count = tracks.size) }
           } else {
@@ -82,16 +84,20 @@ fun SubtitlesSheet(
           },
         )
         // Leading: find/add (intent = "get more subs"). Trailing: configure (style/timing).
-        val leadingSubtitleActions = remember {
+        val addLabel = stringResource(R.string.add)
+        val searchLabel = stringResource(R.string.settings_search_title)
+        val styleLabel = stringResource(R.string.track_action_style)
+        val syncLabel = stringResource(R.string.track_action_sync)
+        val leadingSubtitleActions = remember(addLabel, searchLabel) {
           listOf(
-            TrackAction(label = "Add",    icon = Icons.Default.Add,    onClick = onAddSubtitle),
-            TrackAction(label = "Search", icon = Icons.Default.Search, onClick = onOpenOnlineSearch),
+            TrackAction(label = addLabel,    icon = Icons.Default.Add,    onClick = onAddSubtitle),
+            TrackAction(label = searchLabel, icon = Icons.Default.Search, onClick = onOpenOnlineSearch),
           )
         }
-        val trailingSubtitleActions = remember {
+        val trailingSubtitleActions = remember(styleLabel, syncLabel) {
           listOf(
-            TrackAction(label = "Style", icon = Icons.Default.Palette,  onClick = onOpenSubtitleSettings),
-            TrackAction(label = "Sync",  icon = Icons.Default.MoreTime, onClick = onOpenSubtitleDelay),
+            TrackAction(label = styleLabel, icon = Icons.Default.Palette,  onClick = onOpenSubtitleSettings),
+            TrackAction(label = syncLabel,  icon = Icons.Default.MoreTime, onClick = onOpenSubtitleDelay),
           )
         }
         TrackActionsRow(
@@ -106,7 +112,7 @@ fun SubtitlesSheet(
           val isOffSelected = tracks.none { isSubtitleSelected(it.id) }
           TrackSelectableBar(
             id         = 0,
-            title      = "Off",
+            title      = stringResource(R.string.player_sheets_tracks_off),
             isSelected = isOffSelected,
             onClick    = {
               // Tap "Off" → toggle whichever track is currently selected so subtitles disable
@@ -175,7 +181,7 @@ fun SubtitlesSheet(
                 ) {
                   Icon(
                     Icons.Default.Delete,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.cd_remove_subtitle),
                     modifier = Modifier.size(20.dp),
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                   )

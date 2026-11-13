@@ -153,7 +153,7 @@ fun OnlineSubtitleSearchSheet(
             IconButton(onClick = { 
               searchQuery = mediaInfo.title
             }) {
-              Icon(Icons.Default.AutoFixHigh, null, tint = MaterialTheme.colorScheme.primary)
+              Icon(Icons.Default.AutoFixHigh, stringResource(R.string.cd_use_video_title), tint = MaterialTheme.colorScheme.primary)
             }
           },
           trailingIcon = {
@@ -163,7 +163,7 @@ fun OnlineSubtitleSearchSheet(
                   searchQuery = ""
                   onClearMediaSelection()
                 }) {
-                  Icon(Icons.Default.Close, null)
+                  Icon(Icons.Default.Close, stringResource(R.string.cd_clear_search))
                 }
               }
               if (isSearching || isDownloading || isSearchingMedia) {
@@ -177,7 +177,7 @@ fun OnlineSubtitleSearchSheet(
                   IconButton(onClick = { showVerifiedOnly = !showVerifiedOnly }) {
                     Icon(
                         if (showVerifiedOnly) Icons.Default.Verified else Icons.Default.FilterList,
-                        contentDescription = "Show Verified Only",
+                        contentDescription = stringResource(R.string.show_verified_only),
                         tint = if (showVerifiedOnly) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   }
@@ -189,7 +189,7 @@ fun OnlineSubtitleSearchSheet(
                 }
                 keyboardController?.hide()
               }) {
-                Icon(Icons.Default.Search, null, tint = MaterialTheme.colorScheme.primary)
+                Icon(Icons.Default.Search, stringResource(R.string.settings_search_title), tint = MaterialTheme.colorScheme.primary)
               }
             }
           },
@@ -333,7 +333,7 @@ fun WyzieSubtitleRow(
                     if (subtitle.isHashMatch) {
                         Icon(
                             imageVector = Icons.Default.Verified,
-                            contentDescription = "Verified Sync",
+                            contentDescription = stringResource(R.string.verified_sync),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
@@ -362,7 +362,7 @@ fun WyzieSubtitleRow(
                 }
             }
             IconButton(onClick = onDownload) {
-                Icon(imageVector = Icons.Default.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Icon(imageVector = Icons.Default.Download, contentDescription = stringResource(R.string.download), tint = MaterialTheme.colorScheme.primary)
             }
         }
     }
@@ -439,7 +439,7 @@ fun SeriesDetailsSection(
                       shape = RoundedCornerShape(8.dp)
                   ) {
                       Text(
-                          text = selectedSeason?.let { "S${it.season_number}" } ?: "Season",
+                          text = selectedSeason?.let { "S${it.season_number}" } ?: stringResource(R.string.season),
                           style = MaterialTheme.typography.labelLargeEmphasized,
                           maxLines = 1
                       )
@@ -487,7 +487,7 @@ fun SeriesDetailsSection(
                           Spacer(Modifier.width(6.dp))
                       }
                       Text(
-                          text = selectedEpisode?.let { "E${it.episode_number}" } ?: "Ep",
+                          text = selectedEpisode?.let { "E${it.episode_number}" } ?: stringResource(R.string.episode_short),
                           style = MaterialTheme.typography.labelLargeEmphasized,
                           maxLines = 1
                       )
@@ -532,7 +532,7 @@ fun SeriesDetailsSection(
                     onClick = onClose,
                     modifier = Modifier.size(24.dp)
                 ) {
-                    Icon(Icons.Default.Close, null, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.Close, stringResource(R.string.close), modifier = Modifier.size(16.dp))
                 }
             }
         }

@@ -204,7 +204,7 @@ fun SubtitleSettingsTypographyCard(modifier: Modifier = Modifier) {
               style = MaterialTheme.typography.titleMedium,
             )
             Text(
-              text = fontName.ifEmpty { "Default" },
+              text = fontName.ifEmpty { stringResource(R.string.theme_default) },
               style = MaterialTheme.typography.bodyMedium,
               fontFamily = fontTypefaces[fontName],
               color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -221,7 +221,7 @@ fun SubtitleSettingsTypographyCard(modifier: Modifier = Modifier) {
             DropdownMenuItem(
               text = {
                 Text(
-                  text = font.ifEmpty { "Default" },
+                  text = font.ifEmpty { stringResource(R.string.theme_default) },
                   style = MaterialTheme.typography.bodyLarge,
                   fontFamily = fontTypefaces[font],
                   color = if (isSelected) MaterialTheme.colorScheme.primary

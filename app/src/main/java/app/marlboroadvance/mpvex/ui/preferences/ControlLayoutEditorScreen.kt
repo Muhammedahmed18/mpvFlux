@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,19 +50,19 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.PlayerButton
 import app.marlboroadvance.mpvex.preferences.icon
 import app.marlboroadvance.mpvex.preferences.allPlayerButtons
 import app.marlboroadvance.mpvex.preferences.preference.Preference
-import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.ConfirmDialog
 import app.marlboroadvance.mpvex.ui.preferences.components.PlayerButtonChip
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
@@ -129,31 +128,25 @@ data class ControlLayoutEditorScreen(
       onDispose { prefToEdit.set(selectedButtons.joinToString(",")) }
     }
 
-    val title = remember(region) {
+    val title = run {
         when (region) {
-          ControlRegion.TOP_RIGHT -> "Edit Top Right"
-          ControlRegion.BOTTOM_RIGHT -> "Edit Bottom Right"
-          ControlRegion.BOTTOM_LEFT -> "Edit Bottom Left"
-          ControlRegion.PORTRAIT_BOTTOM -> "Edit Portrait Bottom"
+          ControlRegion.TOP_RIGHT -> stringResource(R.string.edit_region_top_right)
+          ControlRegion.BOTTOM_RIGHT -> stringResource(R.string.edit_region_bottom_right)
+          ControlRegion.BOTTOM_LEFT -> stringResource(R.string.edit_region_bottom_left)
+          ControlRegion.PORTRAIT_BOTTOM -> stringResource(R.string.edit_region_portrait_bottom)
         }
       }
 
-    val darkMode by preferences.darkMode.collectAsState()
-    val systemDarkTheme = isSystemInDarkTheme()
-    val isDark = when (darkMode) {
-      DarkMode.Dark -> true
-      DarkMode.Light -> false
-      DarkMode.System -> systemDarkTheme
-    }
-    val backgroundColor = if (isDark) Color.Black else MaterialTheme.colorScheme.surface
+    // Settings follow the theme surface; the AMOLED option already makes it pure black.
+    val backgroundColor = MaterialTheme.colorScheme.surface
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     var showResetDialog by remember { mutableStateOf(false) }
 
     if (showResetDialog) {
       ConfirmDialog(
-        title = "Reset to default?",
-        subtitle = "This will reset the controls in this region to their default configuration.",
+        title = stringResource(R.string.reset_to_default_question),
+        subtitle = stringResource(R.string.reset_region_message),
         onConfirm = {
           prefToEdit.delete()
           selectedButtons = prefToEdit.get().split(',').filter(String::isNotBlank).mapNotNull {
@@ -183,12 +176,12 @@ data class ControlLayoutEditorScreen(
               },
               navigationIcon = {
                 IconButton(onClick = backstack::removeLastOrNull) {
-                  Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Back", tint = MaterialTheme.colorScheme.secondary)
+                  Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back), tint = MaterialTheme.colorScheme.secondary)
                 }
               },
               actions = {
                 IconButton(onClick = { showResetDialog = true }) {
-                  Icon(Icons.Rounded.Restore, contentDescription = "Reset to default", tint = MaterialTheme.colorScheme.primary)
+                  Icon(Icons.Rounded.Restore, contentDescription = stringResource(R.string.pref_layout_reset_default), tint = MaterialTheme.colorScheme.primary)
                 }
               },
               scrollBehavior = scrollBehavior,
@@ -237,7 +230,6 @@ data class ControlLayoutEditorScreen(
                              shape = MaterialTheme.shapes.extraLarge,
                              color = MaterialTheme.colorScheme.surfaceContainerLow,
                              border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                             tonalElevation = 1.dp
                          ) {
                              Column(
                                  modifier = Modifier.fillMaxSize(),
@@ -251,12 +243,12 @@ data class ControlLayoutEditorScreen(
                                      tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
                                  )
                                  Text(
-                                      text = "Region is empty",
+                                      text = stringResource(R.string.region_empty),
                                       style = MaterialTheme.typography.titleMediumEmphasized,
                                       color = MaterialTheme.colorScheme.onSurfaceVariant,
                                  )
                                  Text(
-                                      text = "Add buttons from the palette below",
+                                      text = stringResource(R.string.region_empty_hint),
                                       style = MaterialTheme.typography.bodySmall,
                                       color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                  )
@@ -306,7 +298,7 @@ data class ControlLayoutEditorScreen(
                 }
 
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    PreferenceSectionHeader(title = "Available Palette", modifier = Modifier.padding(start = 4.dp))
+                    PreferenceSectionHeader(title = stringResource(R.string.available_palette), modifier = Modifier.padding(start = 4.dp))
                 }
 
                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -335,7 +327,7 @@ data class ControlLayoutEditorScreen(
                             
                             if (availableButtons.isEmpty()) {
                                 Box(modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp), contentAlignment = Alignment.Center) {
-                                    Text(text = "All available buttons are in use.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(text = stringResource(R.string.all_buttons_in_use), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -366,7 +358,7 @@ private fun IconsLegend() {
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             Text(
-                text = "Icons Legend",
+                text = stringResource(R.string.icons_legend),
                 style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
             )

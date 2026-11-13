@@ -68,6 +68,7 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
@@ -130,7 +131,7 @@ object SettingsSearchScreen : Screen {
                             IconButton(onClick = backstack::removeLastOrNull) {
                                 Icon(
                                     Icons.AutoMirrored.Rounded.ArrowBack,
-                                    contentDescription = "Back",
+                                    contentDescription = stringResource(R.string.back),
                                     tint = MaterialTheme.colorScheme.secondary,
                                 )
                             }
@@ -180,7 +181,7 @@ object SettingsSearchScreen : Screen {
                                     IconButton(onClick = { searchQuery = "" }) {
                                         Icon(
                                             imageVector = Icons.Rounded.Clear,
-                                            contentDescription = "Clear",
+                                            contentDescription = stringResource(R.string.pref_storage_clear),
                                             tint = MaterialTheme.colorScheme.error,
                                         )
                                     }
@@ -245,7 +246,7 @@ object SettingsSearchScreen : Screen {
                         }
                     } else {
                         LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().readableContentWidth(),
                             contentPadding = PaddingValues(bottom = 24.dp, start = 8.dp, end = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
@@ -350,7 +351,7 @@ private fun SearchResultItem(
                 }
 
                 Text(
-                    text = preference.category,
+                    text = searchCategoryTitleRes(preference.category)?.let { stringResource(it) } ?: preference.category,
                     style = MaterialTheme.typography.labelSmallEmphasized,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(top = 2.dp)

@@ -48,7 +48,6 @@ fun UnifiedChip(
     contentColor = labelColor,
     shape = MaterialTheme.shapes.extraLarge,
     border = border,
-    tonalElevation = if (isOutlined) 0.dp else 1.dp,
   ) {
     Text(
       text = text,

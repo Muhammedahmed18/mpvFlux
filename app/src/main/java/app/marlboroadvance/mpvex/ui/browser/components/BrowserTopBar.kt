@@ -2,10 +2,9 @@ package app.marlboroadvance.mpvex.ui.browser.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -14,19 +13,19 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.RemoveCircle
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -34,24 +33,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
-import app.marlboroadvance.mpvex.preferences.AppearancePreferences
-import app.marlboroadvance.mpvex.preferences.preference.collectAsState
-import app.marlboroadvance.mpvex.ui.theme.DarkMode
-import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
 
 /**
  * M3 Expressive Browser Top Bar
@@ -130,19 +123,6 @@ private fun NormalTopBar(
   modifier: Modifier = Modifier,
   onTitleLongPress: (() -> Unit)?,
 ) {
-  val preferences = koinInject<AppearancePreferences>()
-  val darkMode by preferences.darkMode.collectAsState()
-  val darkTheme = isSystemInDarkTheme()
-  val coroutineScope = rememberCoroutineScope()
-
-  fun toggleDarkMode() {
-    when (darkMode) {
-      DarkMode.System -> preferences.darkMode.set(if (darkTheme) DarkMode.Light else DarkMode.Dark)
-      DarkMode.Light -> preferences.darkMode.set(if (darkTheme) DarkMode.System else DarkMode.Dark)
-      DarkMode.Dark -> preferences.darkMode.set(if (darkTheme) DarkMode.Light else DarkMode.System)
-    }
-  }
-
   val colors = TopAppBarDefaults.topAppBarColors(
     containerColor = Color.Transparent,
     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -159,13 +139,14 @@ private fun NormalTopBar(
       color = MaterialTheme.colorScheme.primary,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
-      modifier = Modifier
-        .pointerInput(onTitleLongPress) {
-          detectTapGestures(
-            onTap = { coroutineScope.launch { toggleDarkMode() } },
-            onLongPress = { onTitleLongPress?.invoke() },
-          )
-        },
+      // A plain tap on the title does nothing (it used to silently toggle dark mode).
+      modifier = if (onTitleLongPress != null) {
+        Modifier.pointerInput(onTitleLongPress) {
+          detectTapGestures(onLongPress = { onTitleLongPress() })
+        }
+      } else {
+        Modifier
+      },
     )
   }
   val navigationIconContent: @Composable () -> Unit = {
@@ -297,30 +278,77 @@ private fun SelectionTopBar(
       }
     },
     actions = {
-      onPlay?.let { IconButton(onClick = it) { Icon(Icons.Rounded.PlayArrow, contentDescription = "Play", modifier = Modifier.size(32.dp)) } }
-      
-      if (onInfo != null && isSingleSelection) {
-        Surface(
-          onClick = onInfo,
-          shape = CircleShape,
-          color = MaterialTheme.colorScheme.secondary,
-          contentColor = MaterialTheme.colorScheme.onSecondary,
-          modifier = Modifier.padding(horizontal = 4.dp)
-        ) {
-          Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-          ) {
-            Icon(Icons.Rounded.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text(text = "Info", style = MaterialTheme.typography.labelLargeEmphasized, modifier = Modifier.padding(start = 4.dp))
+      // Material 3: keep at most three actions in the bar so the selection count stays
+      // readable on narrow phones; anything beyond that moves into a "More options" menu.
+      val actions = buildList {
+        onPlay?.let { add(SelectionAction(Icons.Rounded.PlayArrow, stringResource(R.string.cd_play), it)) }
+        if (onInfo != null && isSingleSelection) {
+          add(SelectionAction(Icons.Rounded.Info, stringResource(R.string.info), onInfo))
+        }
+        onRename?.let {
+          add(SelectionAction(Icons.Rounded.DriveFileRenameOutline, stringResource(R.string.rename), it, enabled = isSingleSelection))
+        }
+        onShare?.let { add(SelectionAction(Icons.Rounded.Share, stringResource(R.string.generic_share), it)) }
+        onDelete?.let {
+          add(
+            SelectionAction(
+              icon = if (useRemoveIcon) Icons.Rounded.RemoveCircle else Icons.Rounded.Delete,
+              label = stringResource(if (useRemoveIcon) R.string.remove else R.string.delete),
+              onClick = it,
+              destructive = true,
+            ),
+          )
+        }
+      }
+      val visible = if (actions.size <= 3) actions else actions.take(2)
+      val overflow = actions.drop(visible.size)
+
+      visible.forEach { action ->
+        IconButton(onClick = action.onClick, enabled = action.enabled) {
+          Icon(
+            imageVector = action.icon,
+            contentDescription = action.label,
+            tint = if (action.destructive) MaterialTheme.colorScheme.error else LocalContentColor.current,
+          )
+        }
+      }
+      if (overflow.isNotEmpty()) {
+        var showMore by remember { mutableStateOf(false) }
+        Box {
+          IconButton(onClick = { showMore = true }) {
+            Icon(Icons.Rounded.MoreVert, contentDescription = stringResource(R.string.cd_more_options))
+          }
+          DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
+            overflow.forEach { action ->
+              DropdownMenuItem(
+                text = { Text(action.label) },
+                leadingIcon = {
+                  Icon(
+                    imageVector = action.icon,
+                    contentDescription = null,
+                    tint = if (action.destructive) MaterialTheme.colorScheme.error else LocalContentColor.current,
+                  )
+                },
+                enabled = action.enabled,
+                onClick = {
+                  showMore = false
+                  action.onClick()
+                },
+              )
+            }
           }
         }
       }
-
-      onRename?.let { IconButton(onClick = it, enabled = isSingleSelection) { Icon(Icons.Rounded.DriveFileRenameOutline, contentDescription = null) } }
-      onShare?.let { IconButton(onClick = it) { Icon(Icons.Rounded.Share, contentDescription = null) } }
-      onDelete?.let { IconButton(onClick = it) { Icon(if (useRemoveIcon) Icons.Rounded.RemoveCircle else Icons.Rounded.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) } }
     },
     modifier = modifier.clip(MaterialTheme.shapes.extraLarge),
   )
 }
+
+/** One action in the multi-select top bar (shown as an icon or in the overflow menu). */
+private class SelectionAction(
+  val icon: ImageVector,
+  val label: String,
+  val onClick: () -> Unit,
+  val enabled: Boolean = true,
+  val destructive: Boolean = false,
+)

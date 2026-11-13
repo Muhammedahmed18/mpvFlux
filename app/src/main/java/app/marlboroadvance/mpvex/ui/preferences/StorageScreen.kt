@@ -26,6 +26,7 @@ import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.ConfirmDialog
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
+import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.utils.storage.CacheSizeUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -112,7 +113,7 @@ object StorageScreen : Screen {
             IconButton(onClick = backstack::removeLastOrNull) {
               Icon(
                 Icons.AutoMirrored.Rounded.ArrowBack,
-                contentDescription = "Back",
+                contentDescription = stringResource(R.string.back),
                 tint = MaterialTheme.colorScheme.secondary,
               )
             }
@@ -123,7 +124,7 @@ object StorageScreen : Screen {
       },
     ) { padding ->
       LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().readableContentWidth(),
         contentPadding = PaddingValues(
           top = padding.calculateTopPadding(),
           bottom = padding.calculateBottomPadding() + 24.dp,
