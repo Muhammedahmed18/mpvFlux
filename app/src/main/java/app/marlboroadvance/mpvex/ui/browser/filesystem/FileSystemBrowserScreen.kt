@@ -1071,7 +1071,7 @@ fun FileSystemSortBottomSheet(
         onCheckedChange = { browserPreferences.showVideoThumbnails.set(it) },
       ),
       VisibilityToggle(
-        label = "Full file names",
+        label = "Original file names",
         checked = showVideoExtension,
         onCheckedChange = { browserPreferences.showVideoExtension.set(it) },
       ),

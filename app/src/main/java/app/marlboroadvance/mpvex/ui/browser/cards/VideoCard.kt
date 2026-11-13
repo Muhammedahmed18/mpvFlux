@@ -61,6 +61,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -439,7 +440,8 @@ fun VideoThumbnail(
       }
 
       // Bottom overlay: length pill (bottom-right) and, while partly watched, an M3 progress
-      // bar (rounded, with the track gap and end dot) inset above the bottom edge.
+      // bar (rounded, with the track gap and end dot) inset above the bottom edge. The bar is
+      // 6dp with a dark see-through track and a soft shadow so it stays visible on bright frames.
       val showProgress =
         progressPercentage != null && progressPercentage > 0f && showProgressBar && !isWatched && video.duration > 0
       if (showProgress || video.durationFormatted.isNotBlank()) {
@@ -474,9 +476,10 @@ fun VideoThumbnail(
               progress = { animatedProgress },
               modifier = Modifier
                 .fillMaxWidth()
-                .height(4.dp),
+                .height(6.dp)
+                .shadow(elevation = 2.dp, shape = CircleShape, clip = false),
               color = MaterialTheme.colorScheme.primary,
-              trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+              trackColor = Color.Black.copy(alpha = 0.4f),
               strokeCap = StrokeCap.Round,
             )
           }
