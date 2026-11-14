@@ -1065,7 +1065,7 @@
   <string name="extract_audio_track">Audio track</string>
   <string name="extract_audio_track_number">Track %1$d</string>
   <string name="extract_audio_output">File</string>
-  <string name="extract_audio_format_unsupported">%1$s audio can\'t be extracted</string>
+  <string name="extract_audio_format_unsupported">%1$s audio can\'t be extracted. Only AAC, Opus and MP3 audio can be saved.</string>
   <string name="extract_audio_needs_android_10">%1$s audio needs Android 10 or newer</string>
   <string name="extract_audio_extracting">Extracting audio</string>
   <string name="extract_audio_done">Audio extracted</string>

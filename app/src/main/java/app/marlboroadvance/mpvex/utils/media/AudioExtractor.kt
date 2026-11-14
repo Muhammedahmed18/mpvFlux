@@ -12,6 +12,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.nio.ByteBuffer
 import java.util.Locale
+import net.mediaarea.mediainfo.lib.MediaInfo
 
 /**
  * Copies one audio track out of a video without re-encoding (stream copy).
@@ -43,9 +44,11 @@ object AudioExtractor {
     val output: OutputFormat?,
     /** Set when [output] is null: why this track can't be extracted. */
     val unsupportedReason: UnsupportedReason?,
+    /** Codec name from MediaInfo, for tracks Android's reader doesn't expose. */
+    val codecName: String? = null,
   ) {
     val isSupported: Boolean get() = output != null
-    val codecLabel: String get() = codecLabel(mime)
+    val codecLabel: String get() = codecName ?: codecLabel(mime)
     val languageLabel: String?
       get() = language?.let { code ->
         runCatching { Locale.forLanguageTag(code).displayLanguage }.getOrNull()?.takeIf { it.isNotBlank() && it != code } ?: code
@@ -63,8 +66,94 @@ object AudioExtractor {
 
   enum class UnsupportedReason { FORMAT, NEEDS_ANDROID_10 }
 
-  /** Reads the audio tracks of [uri]. Blocking; call off the main thread. */
+  /**
+   * Reads the audio tracks of [uri]. Blocking; call off the main thread.
+   *
+   * Android's reader (MediaExtractor) silently skips codecs the phone can't handle, such as
+   * E-AC3, DTS or TrueHD in MKV, so on its own a video could look like it has no audio. MediaInfo
+   * sees every track, so tracks only it reports are added as "can't be extracted" with their
+   * real codec name.
+   */
   fun probe(context: Context, uri: Uri): List<AudioTrack> {
+    val extractorResult = runCatching { probeWithExtractor(context, uri) }
+    val extractorTracks = extractorResult.getOrDefault(emptyList())
+    val mediaInfoTracks = runCatching { probeWithMediaInfo(context, uri) }.getOrDefault(emptyList())
+
+    if (mediaInfoTracks.size <= extractorTracks.size) {
+      // MediaInfo saw nothing extra (or failed): Android's list is complete.
+      if (extractorTracks.isEmpty()) extractorResult.getOrThrow()
+      return extractorTracks
+    }
+
+    // Merge in MediaInfo's order: use Android's track where one with the same codec is still
+    // unused (it can be extracted), otherwise list the MediaInfo track as unsupported.
+    val unused = extractorTracks.toMutableList()
+    val merged = mutableListOf<AudioTrack>()
+    mediaInfoTracks.forEach { info ->
+      val match = unused.firstOrNull { it.codecLabel == info.codec }
+      merged += if (match != null) {
+        unused.remove(match)
+        match.copy(number = merged.size + 1)
+      } else {
+        AudioTrack(
+          index = -1,
+          number = merged.size + 1,
+          mime = "",
+          language = info.language,
+          channels = info.channels,
+          sampleRate = 0,
+          durationUs = 0L,
+          output = null,
+          unsupportedReason = UnsupportedReason.FORMAT,
+          codecName = info.codec,
+        )
+      }
+    }
+    unused.forEach { merged += it.copy(number = merged.size + 1) }
+    return merged
+  }
+
+  private data class MediaInfoAudio(val codec: String, val language: String?, val channels: Int)
+
+  /** Audio tracks as MediaInfo reports them (codec, language, channels). */
+  private fun probeWithMediaInfo(context: Context, uri: Uri): List<MediaInfoAudio> {
+    val pfd = context.contentResolver.openFileDescriptor(uri, "r") ?: return emptyList()
+    // Same pattern as MediaInfoOps: MediaInfo takes the detached fd and closes it.
+    val fd = pfd.detachFd()
+    val mi = MediaInfo()
+    try {
+      mi.Open(fd, uri.lastPathSegment ?: "video")
+      val count = mi.Count_Get(MediaInfo.Stream.Audio)
+      return (0 until count).map { i ->
+        MediaInfoAudio(
+          codec = mediaInfoCodecLabel(mi.Get(MediaInfo.Stream.Audio, i, "Format")),
+          language = mi.Get(MediaInfo.Stream.Audio, i, "Language").takeIf { it.isNotBlank() && it != "und" },
+          channels = mi.Get(MediaInfo.Stream.Audio, i, "Channel(s)").trim().toIntOrNull() ?: 0,
+        )
+      }
+    } finally {
+      mi.Close()
+      pfd.close()
+    }
+  }
+
+  /** MediaInfo format names → the labels used in the sheet (same as [codecLabel]). */
+  private fun mediaInfoCodecLabel(format: String): String = when (format.trim()) {
+    "AAC" -> "AAC"
+    "MPEG Audio" -> "MP3"
+    "Opus" -> "Opus"
+    "Vorbis" -> "Vorbis"
+    "FLAC" -> "FLAC"
+    "AC-3" -> "AC3"
+    "E-AC-3" -> "E-AC3"
+    "DTS" -> "DTS"
+    "MLP FBA" -> "TrueHD"
+    "PCM" -> "PCM"
+    "" -> "Unknown"
+    else -> format.trim()
+  }
+
+  private fun probeWithExtractor(context: Context, uri: Uri): List<AudioTrack> {
     val extractor = MediaExtractor()
     try {
       extractor.setDataSource(context, uri, null)
