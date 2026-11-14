@@ -39,6 +39,7 @@ data class VideoWithPlaybackInfo(
   val progressPercentage: Float? = null, // 0.0 to 1.0
   val isOldAndUnplayed: Boolean = false, // true if video is older than threshold and never played
   val isWatched: Boolean = false, // true if video has any playback history
+  val isMarkedNew: Boolean = false, // marked as New from "Mark as" and not played since
 )
 
 class VideoListViewModel(
@@ -272,6 +273,7 @@ class VideoListViewModel(
   }
 
   private suspend fun loadPlaybackInfo(videos: List<Video>) {
+    val markedNew = app.marlboroadvance.mpvex.utils.media.VideoMarkOps.getMarkedNewTitles()
     val videosWithInfo =
       videos.map { video ->
         val playbackState = playbackStateRepository.getVideoDataByTitle(video.displayName)
@@ -313,6 +315,7 @@ class VideoListViewModel(
           progressPercentage = progress,
           isOldAndUnplayed = isOldAndUnplayed,
           isWatched = isWatched,
+          isMarkedNew = playbackState == null && video.displayName in markedNew,
         )
       }
     _videosWithPlaybackInfo.value = videosWithInfo

@@ -459,6 +459,24 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
   }
 }
 
+/**
+ * Migration from version 9 to version 10 (v1.4.6)
+ * Adds the video_marks table used by "Mark as > New". Existing data is untouched.
+ */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+  override fun migrate(db: SupportSQLiteDatabase) {
+    db.execSQL(
+      """
+      CREATE TABLE IF NOT EXISTS `video_marks` (
+        `mediaTitle` TEXT NOT NULL,
+        `markedNewAt` INTEGER NOT NULL,
+        PRIMARY KEY(`mediaTitle`)
+      )
+      """.trimIndent()
+    )
+  }
+}
+
 
 val DatabaseModule =
   module {
@@ -474,7 +492,7 @@ val DatabaseModule =
       Room
         .databaseBuilder(context, MpvExDatabase::class.java, "mpvex.db")
         .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
         .fallbackToDestructiveMigration(true) // Fallback if migration fails (last resort)
         .build()
     }
@@ -499,6 +517,8 @@ val DatabaseModule =
     single {
       get<MpvExDatabase>().networkConnectionDao()
     }
+
+    single { get<MpvExDatabase>().videoMarkDao() }
 
     single {
       PlaylistRepository(

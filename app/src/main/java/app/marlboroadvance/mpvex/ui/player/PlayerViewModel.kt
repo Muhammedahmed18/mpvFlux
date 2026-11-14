@@ -770,7 +770,7 @@ class PlayerViewModel(
           _seasonEpisodes.value = emptyList()
         }
         .onFailure {
-          showToast("Failed to load series details: ${it.message}")
+          showToast(subtitleErrorMessage(it, R.string.subtitle_error_series_failed))
         }
       _isFetchingTvDetails.value = false
     }
@@ -789,7 +789,7 @@ class PlayerViewModel(
           _selectedEpisode.value = null
         }
         .onFailure {
-          showToast("Failed to load episodes: ${it.message}")
+          showToast(subtitleErrorMessage(it, R.string.subtitle_error_episodes_failed))
         }
       _isFetchingEpisodes.value = false
     }
@@ -810,6 +810,31 @@ class PlayerViewModel(
   }
 
   // --- Subtitle Search ---
+
+  /**
+   * Friendly message for an online-subtitle failure. When the shared Wyzie quota is used up
+   * it says so (with the local time the daily limit resets) instead of a raw HTTP error.
+   */
+  private fun subtitleErrorMessage(error: Throwable, fallback: Int): String {
+    val context = host.context
+    return when {
+      error is app.marlboroadvance.mpvex.repository.wyzie.WyzieQuotaException -> when (error.kind) {
+        app.marlboroadvance.mpvex.repository.wyzie.WyzieQuotaException.Kind.DailyLimit -> {
+          // The free quota resets at midnight UTC; show that moment in the phone's time.
+          val nextUtcMidnight = java.time.LocalDate.now(java.time.ZoneOffset.UTC).plusDays(1)
+            .atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli()
+          val resetTime = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(nextUtcMidnight))
+          context.getString(R.string.subtitle_error_daily_limit, resetTime)
+        }
+        else -> context.getString(R.string.subtitle_error_unavailable)
+      }
+      error is java.net.UnknownHostException || error is java.net.ConnectException ||
+        error is java.net.SocketTimeoutException -> context.getString(R.string.subtitle_error_no_connection)
+      // Already a readable hint from the repository (e.g. "Please select both a Season and an Episode.").
+      error.message?.startsWith("Please ") == true -> error.message.orEmpty()
+      else -> context.getString(fallback)
+    }
+  }
   fun searchSubtitles(query: String, season: Int? = null, episode: Int? = null, year: String? = null) {
      viewModelScope.launch {
          _isSearchingSub.value = true
@@ -818,7 +843,7 @@ class PlayerViewModel(
                  _wyzieSearchResults.value = results
              }
              .onFailure {
-                 showToast("Search failed: ${it.message}")
+                 showToast(subtitleErrorMessage(it, R.string.subtitle_error_search_failed))
              }
          _isSearchingSub.value = false
      }
@@ -837,7 +862,7 @@ class PlayerViewModel(
                   addSubtitle(uri)
               }
               .onFailure {
-                  showToast("Download failed: ${it.message}")
+                  showToast(subtitleErrorMessage(it, R.string.subtitle_error_download_failed))
               }
           _isDownloadingSub.value = false
       }

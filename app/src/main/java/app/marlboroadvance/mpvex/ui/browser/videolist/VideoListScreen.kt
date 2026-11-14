@@ -33,6 +33,8 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -81,6 +83,7 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.fab.FabScrollHelper
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
+import app.marlboroadvance.mpvex.ui.browser.sheets.MarkAsHost
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.utils.media.CopyPasteOps
@@ -194,6 +197,8 @@ data class VideoListScreen(
     val isRefreshing = remember { mutableStateOf(false) }
     val sortDialogOpen = rememberSaveable { mutableStateOf(false) }
     val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
+    val markAsOpen = rememberSaveable { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
     val renameDialogOpen = rememberSaveable { mutableStateOf(false) }
     val addToPlaylistDialogOpen = rememberSaveable { mutableStateOf(false) }
 
@@ -266,6 +271,7 @@ data class VideoListScreen(
     }
 
     Scaffold(
+      snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
         BrowserTopBar(
           title = displayFolderName,
@@ -301,6 +307,7 @@ data class VideoListScreen(
           onSelectAll = { selectionManager.selectAll() },
           onInvertSelection = { selectionManager.invertSelection() },
           onDeselectAll = { selectionManager.clear() },
+          onMarkAsClick = { markAsOpen.value = true },
         )
       },
     ) { padding ->
@@ -391,6 +398,21 @@ data class VideoListScreen(
         movingToPrivateSpace = movingToPrivateSpace,
         showPrivateSpaceCompletionDialog = showPrivateSpaceCompletionDialog,
         privateSpaceMovedCount = privateSpaceMovedCount,
+      )
+
+      // "Mark as" sheet (New / Last played / Finished / Unwatched) with Undo.
+      MarkAsHost(
+        open = markAsOpen,
+        selectedVideos = { selectionManager.getSelectedItems() },
+        allFinished = if (markAsOpen.value) {
+          val selectedIds = selectionManager.getSelectedItems().map { it.id }.toSet()
+          val selected = videosWithPlaybackInfo.filter { it.video.id in selectedIds }
+          selected.isNotEmpty() && selected.all { it.isWatched }
+        } else {
+          false
+        },
+        snackbarHostState = snackbarHostState,
+        onApplied = { selectionManager.clear() },
       )
     }
   }
@@ -684,6 +706,7 @@ private fun VideoListContent(
                   isRecentlyPlayed = recentlyPlayedFilePath?.let { video.path == it } ?: false,
                   isSelected = isSelected,
                   isOldAndUnplayed = videoWithInfo.isOldAndUnplayed,
+                  isMarkedNew = videoWithInfo.isMarkedNew,
                   isWatched = videoWithInfo.isWatched,
                   onClick = currentOnClick,
                   onLongClick = currentOnLongClick,

@@ -985,4 +985,58 @@
   <string name="cd_more_options">More options</string>
   <string name="cd_embedded_subtitles">Embedded subtitles</string>
   <string name="video_status_new">New</string>
+  <!-- Mark as (GitHub issue #3) -->
+  <string name="mark_as_title">Mark as</string>
+  <string name="mark_as_new">New</string>
+  <string name="mark_as_new_summary">Clear progress and show as new</string>
+  <string name="mark_as_last_played">Last played</string>
+  <string name="mark_as_last_played_summary">Move to the top of Recently played</string>
+  <string name="mark_as_finished">Finished</string>
+  <string name="mark_as_finished_summary">Mark as fully watched</string>
+  <string name="mark_as_finished_already">Already finished</string>
+  <string name="mark_as_unwatched">Unwatched</string>
+  <string name="mark_as_unwatched_summary">Remove all marks and watch history</string>
+  <string name="mark_as_undo">Undo</string>
+  <string name="mark_as_failed">Couldn\'t update the selected videos</string>
+  <plurals name="mark_as_selected_count">
+    <item quantity="one">%1$d video selected</item>
+    <item quantity="other">%1$d videos selected</item>
+  </plurals>
+  <plurals name="mark_as_done_new">
+    <item quantity="one">%1$d video marked as new</item>
+    <item quantity="other">%1$d videos marked as new</item>
+  </plurals>
+  <plurals name="mark_as_done_last_played">
+    <item quantity="one">%1$d video moved to Recently played</item>
+    <item quantity="other">%1$d videos moved to Recently played</item>
+  </plurals>
+  <plurals name="mark_as_done_finished">
+    <item quantity="one">%1$d video marked as finished</item>
+    <item quantity="other">%1$d videos marked as finished</item>
+  </plurals>
+  <plurals name="mark_as_done_unwatched">
+    <item quantity="one">%1$d video marked as unwatched</item>
+    <item quantity="other">%1$d videos marked as unwatched</item>
+  </plurals>
+  <!-- Online subtitle errors -->
+  <string name="subtitle_error_daily_limit">Online subtitle search has reached today\'s shared limit. Try again after %1$s.</string>
+  <string name="subtitle_error_unavailable">Online subtitle search is temporarily unavailable. Please try again later.</string>
+  <string name="subtitle_error_no_connection">Couldn\'t connect. Check your internet connection.</string>
+  <string name="subtitle_error_search_failed">Subtitle search failed. Please try again.</string>
+  <string name="subtitle_error_series_failed">Couldn\'t load the series details.</string>
+  <string name="subtitle_error_episodes_failed">Couldn\'t load the episodes.</string>
+  <string name="subtitle_error_download_failed">Couldn\'t download the subtitle.</string>
+  <!-- Settings > Decoder > Device codec support -->
+  <string name="codec_support_title">Device codec support</string>
+  <string name="codec_support_summary">%1$d of %2$d formats decoded in hardware</string>
+  <string name="codec_support_explainer">Other formats still play with software decoding, which uses more battery.</string>
+  <string name="codec_support_hardware">Hardware</string>
+  <string name="codec_support_software">Software</string>
+  <string name="codec_support_software_detail">Plays with software decoding (mpv)</string>
+  <string name="codec_support_up_to">Up to %1$s</string>
+  <string name="codec_support_up_to_fps">Up to %1$s · %2$d fps</string>
+  <string name="codec_support_hdr">HDR</string>
+  <string name="codec_support_no_android_decoder">No Android decoder for this format</string>
+  <string name="codec_support_copy_report">Copy report</string>
+  <string name="codec_support_copied">Copied</string>
 </resources>

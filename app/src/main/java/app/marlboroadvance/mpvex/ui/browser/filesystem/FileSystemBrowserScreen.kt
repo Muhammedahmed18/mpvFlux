@@ -40,6 +40,8 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -82,6 +84,7 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
 import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
+import app.marlboroadvance.mpvex.ui.browser.sheets.MarkAsHost
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.browser.states.PermissionDeniedState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
@@ -139,6 +142,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
   val currentPath by viewModel.currentPath.collectAsStateWithLifecycle()
   val items by viewModel.items.collectAsStateWithLifecycle()
   val videoFilesWithPlayback by viewModel.videoFilesWithPlayback.collectAsStateWithLifecycle()
+  val markedNewVideoIds by viewModel.markedNewVideoIds.collectAsStateWithLifecycle()
   val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
   val error by viewModel.error.collectAsStateWithLifecycle()
   val isAtRoot by viewModel.isAtRoot.collectAsStateWithLifecycle()
@@ -205,6 +209,8 @@ fun FileSystemBrowserScreen(path: String? = null) {
   val isRefreshing = remember { mutableStateOf(false) }
   val sortDialogOpen = rememberSaveable { mutableStateOf(false) }
   val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
+  val markAsOpen = rememberSaveable { mutableStateOf(false) }
+  val snackbarHostState = remember { SnackbarHostState() }
   val renameDialogOpen = rememberSaveable { mutableStateOf(false) }
   val addToPlaylistDialogOpen = rememberSaveable { mutableStateOf(false) }
 
@@ -390,6 +396,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
   // Main content
   Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
+      snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
         BrowserTopBar(
           title = if (isAtRoot) {
@@ -449,6 +456,12 @@ fun FileSystemBrowserScreen(path: String? = null) {
             videoSelectionManager.clear()
           },
           onAddToPlaylistClick = null,
+          // "Mark as" works on videos only, so it's hidden while folders are selected.
+          onMarkAsClick = if (videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode) {
+            { markAsOpen.value = true }
+          } else {
+            null
+          },
         )
       },
     ) { padding ->
@@ -459,6 +472,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
                 listState = listState,
                 items = items,
                 videoFilesWithPlayback = videoFilesWithPlayback,
+                markedNewVideoIds = markedNewVideoIds,
                 isLoading = isLoading && items.isEmpty(),
                 isRefreshing = isRefreshing,
                 error = error,
@@ -571,6 +585,15 @@ fun FileSystemBrowserScreen(path: String? = null) {
         modifier = Modifier.padding(bottom = 0.dp) // Zero bottom padding - absolute bottom
       )
     }
+
+    // "Mark as" sheet for the selected videos, with Undo.
+    MarkAsHost(
+      open = markAsOpen,
+      selectedVideos = { videoSelectionManager.getSelectedItems() },
+      allFinished = false,
+      snackbarHostState = snackbarHostState,
+      onApplied = { videoSelectionManager.clear() },
+    )
 
     // Dialogs
     FileSystemSortBottomSheet(
@@ -761,6 +784,7 @@ private fun FileSystemBrowserContent(
   listState: LazyListState,
   items: List<FileSystemItem>,
   videoFilesWithPlayback: Map<Long, Float>,
+  markedNewVideoIds: Set<Long>,
   isLoading: Boolean,
   isRefreshing: androidx.compose.runtime.MutableState<Boolean>,
   error: String?,
@@ -957,6 +981,7 @@ private fun FileSystemBrowserContent(
                 video = videoFile.video,
                 settings = videoCardSettings,
                 progressPercentage = videoFilesWithPlayback[videoFile.video.id],
+                isMarkedNew = videoFile.video.id in markedNewVideoIds,
                 isRecentlyPlayed = false,
                 isSelected = isSelected,
                 onClick = { onVideoClick(videoFile.video) },

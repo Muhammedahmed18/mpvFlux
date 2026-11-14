@@ -117,6 +117,8 @@ fun VideoCard(
   isSelected: Boolean = false,
   progressPercentage: Float? = null,
   isOldAndUnplayed: Boolean = false,
+  // Marked as New from the "Mark as" sheet: shows the NEW chip whatever the file date.
+  isMarkedNew: Boolean = false,
   isWatched: Boolean = false,
   isRecentlyPlayed: Boolean = false,
   onThumbClick: () -> Unit = {},
@@ -130,8 +132,10 @@ fun VideoCard(
   // True while multi-select is active: every row shows a selection circle at its end.
   inSelectionMode: Boolean = false,
 ) {
-  val isNew = remember(video.dateModified, settings.showUnplayedOldVideoLabel, isOldAndUnplayed, settings.unplayedOldVideoDays) {
-    if (settings.showUnplayedOldVideoLabel && isOldAndUnplayed) {
+  val isNew = remember(video.dateModified, settings.showUnplayedOldVideoLabel, isOldAndUnplayed, isMarkedNew, settings.unplayedOldVideoDays) {
+    if (isMarkedNew) {
+      true
+    } else if (settings.showUnplayedOldVideoLabel && isOldAndUnplayed) {
       val currentTime = System.currentTimeMillis()
       val videoAge = currentTime - (video.dateModified * 1000)
       val thresholdMillis = settings.unplayedOldVideoDays * 24 * 60 * 60 * 1000L

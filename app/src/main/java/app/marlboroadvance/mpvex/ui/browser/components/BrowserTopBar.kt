@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
@@ -77,6 +78,7 @@ fun BrowserTopBar(
   useRemoveIcon: Boolean = false,
   onAddToPlaylistClick: (() -> Unit)? = null,
   subtitle: String? = null,
+  onMarkAsClick: (() -> Unit)? = null,
 ) {
   if (isInSelectionMode) {
     SelectionTopBar(
@@ -96,6 +98,7 @@ fun BrowserTopBar(
       modifier = modifier,
       useRemoveIcon = useRemoveIcon,
       onAddToPlaylist = onAddToPlaylistClick,
+      onMarkAs = onMarkAsClick,
     )
   } else {
     NormalTopBar(
@@ -233,6 +236,7 @@ private fun SelectionTopBar(
   modifier: Modifier = Modifier,
   useRemoveIcon: Boolean = false,
   onAddToPlaylist: (() -> Unit)? = null,
+  onMarkAs: (() -> Unit)? = null,
 ) {
   var showDropdown by remember { mutableStateOf(false) }
 
@@ -284,6 +288,9 @@ private fun SelectionTopBar(
         onPlay?.let { add(SelectionAction(Icons.Rounded.PlayArrow, stringResource(R.string.cd_play), it)) }
         if (onInfo != null && isSingleSelection) {
           add(SelectionAction(Icons.Rounded.Info, stringResource(R.string.info), onInfo))
+        }
+        onMarkAs?.let {
+          add(SelectionAction(ImageVector.vectorResource(R.drawable.ic_sym_done_all), stringResource(R.string.mark_as_title), it))
         }
         onRename?.let {
           add(SelectionAction(Icons.Rounded.DriveFileRenameOutline, stringResource(R.string.rename), it, enabled = isSingleSelection))

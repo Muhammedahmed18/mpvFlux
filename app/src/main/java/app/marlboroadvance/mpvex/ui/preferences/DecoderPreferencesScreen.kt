@@ -274,6 +274,14 @@ object DecoderPreferencesScreen : Screen {
                 )
               }
             }
+
+            // Which formats this phone decodes in hardware.
+            item {
+              PreferenceSectionHeader(title = stringResource(R.string.codec_support_title))
+            }
+            item {
+              app.marlboroadvance.mpvex.ui.preferences.components.DeviceCodecSupportCard()
+            }
           }
         }
       }

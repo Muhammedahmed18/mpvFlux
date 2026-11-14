@@ -203,6 +203,21 @@ object WyzieLanguages {
     val SORTED = ALL.toList().sortedBy { it.second }.toMap()
 }
 
+/**
+ * The shared Wyzie quota behind the subtitle proxy is used up or blocked.
+ * [kind] tells the player which message to show.
+ */
+class WyzieQuotaException(val kind: Kind) : IOException("Wyzie quota: $kind") {
+    enum class Kind {
+        /** Free key's daily requests are used up (HTTP 429); resets at midnight UTC. */
+        DailyLimit,
+        /** Paid balance is used up (HTTP 402). */
+        BalanceEmpty,
+        /** Key paused by Wyzie (HTTP 403). */
+        Paused,
+    }
+}
+
 class WyzieSearchRepository(
     private val context: Context,
     private val client: OkHttpClient,
@@ -219,6 +234,15 @@ class WyzieSearchRepository(
 
     private fun Request.Builder.addAuth(): Request.Builder {
         return this.addHeader("User-Agent", userAgent)
+    }
+
+    /** Throws [WyzieQuotaException] when the proxy reports the shared quota is used up. */
+    private fun throwIfQuotaProblem(code: Int) {
+        when (code) {
+            429 -> throw WyzieQuotaException(WyzieQuotaException.Kind.DailyLimit)
+            402 -> throw WyzieQuotaException(WyzieQuotaException.Kind.BalanceEmpty)
+            403 -> throw WyzieQuotaException(WyzieQuotaException.Kind.Paused)
+        }
     }
 
     suspend fun search(
@@ -352,6 +376,7 @@ class WyzieSearchRepository(
         client.newCall(request).execute().use { response ->
             val responseBodyString = response.body?.string() ?: ""
             if (!response.isSuccessful) {
+                throwIfQuotaProblem(response.code)
                 // Wyzie API returns 400 when no subtitles are found for valid parameters
                 if (response.code == 400 && responseBodyString.contains("No subtitles found", ignoreCase = true)) {
                     return emptyList()
@@ -387,7 +412,11 @@ class WyzieSearchRepository(
                 .replace("https://sub.wyzie.io", baseUrl)
                 .replace("https://sub.wyzie.ru", baseUrl)
             val response = client.newCall(Request.Builder().url(downloadUrl).addAuth().build()).execute()
-            if (!response.isSuccessful) return@withContext Result.failure(Exception("Download failed: ${response.code}"))
+            if (!response.isSuccessful) {
+                response.close()
+                if (downloadUrl.startsWith(baseUrl)) throwIfQuotaProblem(response.code)
+                return@withContext Result.failure(Exception("Download failed: ${response.code}"))
+            }
 
             val bytes = response.body?.bytes() ?: return@withContext Result.failure(Exception("Empty body"))
             val urlExtension = subtitle.url.substringAfterLast("/", "").substringBefore("?").substringAfterLast(".", "")
@@ -443,7 +472,10 @@ class WyzieSearchRepository(
             val url = "$baseUrl/api/tmdb/tv/$id"
             val request = Request.Builder().url(url).addAuth().build()
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw IOException("Failed to get TV show details: ${response.code}")
+                if (!response.isSuccessful) {
+                    throwIfQuotaProblem(response.code)
+                    throw IOException("Failed to get TV show details: ${response.code}")
+                }
                 val body = response.body?.string() ?: throw IOException("Empty body from $url")
                 Result.success(json.decodeFromString<WyzieTvShowDetails>(body))
             }
@@ -458,7 +490,10 @@ class WyzieSearchRepository(
             val url = "$baseUrl/api/tmdb/tv/$id/$season"
             val request = Request.Builder().url(url).addAuth().build()
             client.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) throw IOException("Failed to get season episodes: ${response.code}")
+                if (!response.isSuccessful) {
+                    throwIfQuotaProblem(response.code)
+                    throw IOException("Failed to get season episodes: ${response.code}")
+                }
                 val body = response.body?.string() ?: throw IOException("Empty body from $url")
                 Result.success(json.decodeFromString<WyzieSeasonDetails>(body).episodes)
             }
@@ -472,7 +507,10 @@ class WyzieSearchRepository(
         val url = "$baseUrl/api/tmdb/search?q=${URLEncoder.encode(query, "UTF-8")}"
         val request = Request.Builder().url(url).addAuth().build()
         client.newCall(request).execute().use { response ->
-            if (!response.isSuccessful) throw IOException("TMDb search failed: ${response.code}")
+            if (!response.isSuccessful) {
+                throwIfQuotaProblem(response.code)
+                throw IOException("TMDb search failed: ${response.code}")
+            }
             val body = response.body?.string() ?: throw IOException("Empty body")
             return json.decodeFromString<WyzieTmdbResponse>(body).results
         }

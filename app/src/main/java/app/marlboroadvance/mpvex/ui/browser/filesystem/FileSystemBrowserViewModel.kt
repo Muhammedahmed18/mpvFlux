@@ -74,6 +74,10 @@ class FileSystemBrowserViewModel(
   private val _videoFilesWithPlayback = MutableStateFlow<Map<Long, Float>>(emptyMap())
   val videoFilesWithPlayback: StateFlow<Map<Long, Float>> = _videoFilesWithPlayback.asStateFlow()
 
+  // Videos marked as New from "Mark as" that haven't been played since.
+  private val _markedNewVideoIds = MutableStateFlow<Set<Long>>(emptySet())
+  val markedNewVideoIds: StateFlow<Set<Long>> = _markedNewVideoIds.asStateFlow()
+
   // Loading state - similar to Fossify's showProgressBar/hideProgressBar
   private val _isLoading = MutableStateFlow(false)
   val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
@@ -460,12 +464,15 @@ class FileSystemBrowserViewModel(
     viewModelScope.launch(Dispatchers.IO) {
       val videoFiles = items.filterIsInstance<FileSystemItem.VideoFile>()
       val playbackMap = mutableMapOf<Long, Float>()
+      val markedNewTitles = app.marlboroadvance.mpvex.utils.media.VideoMarkOps.getMarkedNewTitles()
+      val markedNewIds = mutableSetOf<Long>()
 
       Log.d(TAG, "Loading playback info for ${videoFiles.size} videos")
 
       videoFiles.forEach { videoFile ->
         val video = videoFile.video
         val playbackState = playbackStateRepository.getVideoDataByTitle(video.displayName)
+        if (playbackState == null && video.displayName in markedNewTitles) markedNewIds += video.id
 
         if (playbackState != null && video.duration > 0) {
           val durationSeconds = video.duration / 1000
@@ -482,6 +489,7 @@ class FileSystemBrowserViewModel(
       }
 
       _videoFilesWithPlayback.value = playbackMap
+      _markedNewVideoIds.value = markedNewIds
       Log.d(TAG, "Loaded playback info for ${playbackMap.size} videos with progress")
     }
   }
