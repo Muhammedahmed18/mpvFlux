@@ -296,12 +296,8 @@ fun PlayerControls(
     appearancePreferences.parseButtons(portraitBottomControlsPref, mutableSetOf())
   }
 
-  // Show chapter markers in the seekbar only when the user has opted in by adding
-  // the BOOKMARKS_CHAPTERS button to any of their layout slots.
-  val showChapterMarkers = remember(topRightButtons, bottomRightButtons, bottomLeftButtons, portraitBottomButtons) {
-    app.marlboroadvance.mpvex.preferences.PlayerButton.BOOKMARKS_CHAPTERS in
-      (topRightButtons + bottomRightButtons + bottomLeftButtons + portraitBottomButtons)
-  }
+  // Chapter gaps on the seekbar: Settings > Player layout > "Show chapters on seekbar".
+  val showChapterMarkers by appearancePreferences.showSeekbarChapters.collectAsState()
 
   LaunchedEffect(
     controlsShown,

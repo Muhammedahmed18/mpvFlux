@@ -30,6 +30,9 @@ class AppearancePreferences(
   val showNetworkThumbnails = preferenceStore.getBoolean("show_network_thumbnails", false)
   val seekbarStyle = preferenceStore.getEnum("seekbar_style", SeekbarStyle.Thick)
 
+  /** Split the seekbar at chapter starts (OP / Part A / ED…) when the file has chapters. */
+  val showSeekbarChapters = preferenceStore.getBoolean("seekbar_show_chapters", true)
+
   val topLeftControls =
     preferenceStore.getString(
       "top_left_controls",

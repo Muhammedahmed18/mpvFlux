@@ -69,6 +69,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
@@ -316,7 +317,7 @@ private fun NowPlayingCard(
     ) {
       Thumbnail(
         bitmap = thumbnail,
-        duration = "",
+        duration = item.duration,
         progressPercent = item.progressPercent,
         modifier = Modifier.width(128.dp),
       )
@@ -400,7 +401,8 @@ private fun PlaylistRow(
 /** "1080p · 23:40" under a title; leaves out parts that are unknown. */
 @Composable
 private fun DetailsLine(item: PlaylistItem, color: Color) {
-  val text = listOf(item.resolution, item.duration).filter { it.isNotBlank() }.joinToString(" · ")
+  // The length is shown on the thumbnail, so only the resolution goes here.
+  val text = item.resolution
   if (text.isNotEmpty()) {
     Text(text = text, style = MaterialTheme.typography.labelMedium, color = color, maxLines = 1)
   }
@@ -440,31 +442,39 @@ private fun Thumbnail(
       )
     }
 
+    // Same overlay as the video cards: length pill bottom-right, lifted above a thick
+    // rounded progress bar inset from the edges.
+    val showProgress = progressPercent > 0f
     if (duration.isNotEmpty()) {
       Surface(
-        modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp),
+        modifier = Modifier
+          .align(Alignment.BottomEnd)
+          .padding(end = 5.dp, bottom = if (showProgress) 14.dp else 5.dp),
         shape = CircleShape,
-        color = Color.Black.copy(alpha = 0.65f),
+        color = Color.Black.copy(alpha = 0.72f),
         contentColor = Color.White,
       ) {
         Text(
           text = duration,
-          style = MaterialTheme.typography.labelSmall,
+          style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
+          fontWeight = FontWeight.SemiBold,
           modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
         )
       }
     }
 
-    if (progressPercent > 0f) {
+    if (showProgress) {
       LinearProgressIndicator(
         progress = { (progressPercent / 100f).coerceIn(0f, 1f) },
         modifier = Modifier
           .align(Alignment.BottomCenter)
+          .padding(5.dp)
           .fillMaxWidth()
-          .height(3.dp),
+          .height(4.dp)
+          .clip(CircleShape),
         color = MaterialTheme.colorScheme.primary,
-        trackColor = Color.White.copy(alpha = 0.25f),
-        strokeCap = StrokeCap.Butt,
+        trackColor = Color.White.copy(alpha = 0.4f),
+        strokeCap = StrokeCap.Round,
         gapSize = 0.dp,
         drawStopIndicator = {},
       )

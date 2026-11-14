@@ -1050,4 +1050,6 @@
   <string name="codec_support_group_common">Common formats</string>
   <string name="codec_support_group_10bit">10-bit and HDR</string>
   <string name="codec_support_group_older">Older formats</string>
+  <string name="pref_seekbar_show_chapters_title">Show chapters on seekbar</string>
+  <string name="pref_seekbar_show_chapters_summary">Split the seekbar where chapters start, like the opening and ending</string>
 </resources>

@@ -190,6 +190,13 @@ object PlayerControlsPreferencesScreen : Screen {
                     headlineContent = {
                       Text(text = style.name, style = MaterialTheme.typography.titleMediumEmphasized)
                     },
+                    // Small live drawing of the style, with sample chapter gaps.
+                    supportingContent = {
+                      app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarStylePreview(
+                        style = style,
+                        modifier = Modifier.padding(top = 6.dp),
+                      )
+                    },
                     trailingContent = {
                       RadioButton(
                         selected = seekbarStyle == style,
@@ -206,6 +213,29 @@ object PlayerControlsPreferencesScreen : Screen {
                     PreferenceDivider()
                   }
                 }
+              }
+            }
+
+            item {
+              val showSeekbarChapters by appearancePrefs.showSeekbarChapters.collectAsState()
+              PreferenceCard {
+                SwitchPreference(
+                  value = showSeekbarChapters,
+                  onValueChange = { appearancePrefs.showSeekbarChapters.set(it) },
+                  title = {
+                    Text(
+                      text = stringResource(R.string.pref_seekbar_show_chapters_title),
+                      style = MaterialTheme.typography.titleMediumEmphasized,
+                    )
+                  },
+                  summary = {
+                    Text(
+                      text = stringResource(R.string.pref_seekbar_show_chapters_summary),
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                  },
+                )
               }
             }
             
