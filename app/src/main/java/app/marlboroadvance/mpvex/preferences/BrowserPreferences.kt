@@ -44,6 +44,12 @@ class BrowserPreferences(
 
   // Watched threshold preference (percentage 1-100)
   val watchedThreshold = preferenceStore.getInt("watched_threshold", 95)
+
+  // Extract audio: folder chosen with the system folder picker (persisted tree URI, empty = not set)
+  val audioOutputTreeUri = preferenceStore.getString("audio_output_tree_uri", "")
+
+  // Audio tab in the navigation bar; turned on after the first successful extraction
+  val showAudioTab = preferenceStore.getBoolean("show_audio_tab", false)
 }
 
 /**

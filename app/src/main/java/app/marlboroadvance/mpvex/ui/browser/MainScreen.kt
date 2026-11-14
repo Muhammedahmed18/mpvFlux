@@ -28,8 +28,10 @@ import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.automirrored.outlined.PlaylistPlay
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.LibraryMusic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -45,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -53,7 +56,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.preferences.BrowserPreferences
+import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
+import app.marlboroadvance.mpvex.ui.browser.audio.ExtractedAudioScreen
 import app.marlboroadvance.mpvex.ui.browser.folderlist.FolderListScreen
 import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistScreen
 import app.marlboroadvance.mpvex.ui.browser.recentlyplayed.RecentlyPlayedScreen
@@ -61,6 +67,7 @@ import app.marlboroadvance.mpvex.ui.utils.WindowWidthClass
 import app.marlboroadvance.mpvex.ui.utils.currentWindowWidthClass
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 
 @Serializable
 object MainScreen : Screen {
@@ -68,9 +75,13 @@ object MainScreen : Screen {
 
   @Composable
   override fun Content() {
+    val browserPreferences = koinInject<BrowserPreferences>()
+    // The Audio tab appears after the first extraction and can be hidden in Settings.
+    val showAudioTab by browserPreferences.showAudioTab.collectAsState()
+    val pageCount = if (showAudioTab) 4 else 3
     val pagerState = rememberPagerState(
-      initialPage = persistentSelectedTab,
-      pageCount = { 3 }
+      initialPage = persistentSelectedTab.coerceAtMost(pageCount - 1),
+      pageCount = { pageCount }
     )
     val scope = rememberCoroutineScope()
 
@@ -81,15 +92,20 @@ object MainScreen : Screen {
       persistentSelectedTab = pagerState.currentPage
     }
 
-    val navItems = remember {
-      listOf(
+    val navItems = remember(showAudioTab) {
+      listOfNotNull(
         NavItem(Icons.Filled.Home, Icons.Outlined.Home, R.string.home),
         NavItem(Icons.Filled.History, Icons.Outlined.History, R.string.recents),
         NavItem(
           Icons.AutoMirrored.Filled.PlaylistPlay,
           Icons.AutoMirrored.Outlined.PlaylistPlay,
           R.string.playlists,
-        )
+        ),
+        if (showAudioTab) {
+          NavItem(Icons.Filled.LibraryMusic, Icons.Outlined.LibraryMusic, R.string.nav_audio)
+        } else {
+          null
+        },
       )
     }
 
@@ -243,6 +259,7 @@ object MainScreen : Screen {
               0 -> FolderListScreen.Content()
               1 -> RecentlyPlayedScreen.Content()
               2 -> PlaylistScreen.Content()
+              3 -> ExtractedAudioScreen.Content()
             }
           }
         }

@@ -1052,4 +1052,36 @@
   <string name="codec_support_group_older">Older formats</string>
   <string name="pref_seekbar_show_chapters_title">Show chapters on seekbar</string>
   <string name="pref_seekbar_show_chapters_summary">Split the seekbar where chapters start, like the opening and ending</string>
+  <!-- Extract audio (1.5.2) -->
+  <string name="extract_audio">Extract audio</string>
+  <string name="extract_audio_action">Extract</string>
+  <string name="extract_audio_save_to">Save to</string>
+  <string name="extract_audio_no_folder">No folder chosen</string>
+  <string name="extract_audio_choose_folder">Choose folder</string>
+  <string name="extract_audio_folder_access_lost">Folder access lost. Choose the folder again.</string>
+  <string name="extract_audio_reading_tracks">Reading audio tracks…</string>
+  <string name="extract_audio_read_failed">Couldn\'t read this video.</string>
+  <string name="extract_audio_no_tracks">This video has no audio track.</string>
+  <string name="extract_audio_track">Audio track</string>
+  <string name="extract_audio_track_number">Track %1$d</string>
+  <string name="extract_audio_output">File</string>
+  <string name="extract_audio_format_unsupported">%1$s audio can\'t be extracted</string>
+  <string name="extract_audio_needs_android_10">%1$s audio needs Android 10 or newer</string>
+  <string name="extract_audio_extracting">Extracting audio</string>
+  <string name="extract_audio_done">Audio extracted</string>
+  <string name="extract_audio_saved_to">Saved to %1$s</string>
+  <string name="audio_extract_failed">Couldn\'t extract the audio.</string>
+  <string name="audio_extract_create_failed">Couldn\'t create the file in the chosen folder.</string>
+  <string name="change">Change</string>
+  <string name="generic_open">Open</string>
+  <string name="nav_audio">Audio</string>
+  <string name="audio_tab_title">Extracted audio</string>
+  <string name="audio_empty_title">No extracted audio yet</string>
+  <string name="audio_empty_message">Long-press a video and tap the music note to save its audio here.</string>
+  <string name="audio_no_folder_title">No folder chosen</string>
+  <string name="audio_no_folder_message">Choose the folder where extracted audio is saved.</string>
+  <string name="pref_audio_category">Extracted audio</string>
+  <string name="pref_audio_folder_title">Audio save folder</string>
+  <string name="pref_audio_show_tab_title">Show Audio tab</string>
+  <string name="pref_audio_show_tab_summary">Show extracted audio as a tab in the navigation bar</string>
 </resources>

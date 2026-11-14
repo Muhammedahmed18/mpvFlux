@@ -141,6 +141,9 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
       }
     }
 
+    val extractAudio = app.marlboroadvance.mpvex.ui.browser.sheets.rememberExtractAudioController()
+    app.marlboroadvance.mpvex.ui.browser.sheets.ExtractAudioHost(extractAudio)
+
     Scaffold(
       topBar = {
         BrowserTopBar(
@@ -159,6 +162,14 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
           onCancelSelection = { selectionManager.clear() },
           isSingleSelection = selectionManager.isSingleSelection,
           useRemoveIcon = true,
+          onExtractAudioClick = if (playlist?.isM3uPlaylist != true) {
+            {
+              if (extractAudio.open(selectionManager.getSelectedItems().singleOrNull()?.video)) {
+                selectionManager.clear()
+              }
+            }
+          } else null,
+          extractAudioEnabled = !extractAudio.isRunning,
           onInfoClick = if (selectionManager.isSingleSelection) {
               {
                 val item = selectionManager.getSelectedItems().firstOrNull()

@@ -245,6 +245,20 @@ class PlayerViewModel(
       .map { tracks -> tracks.filter { it.isAudio }.toImmutableList() }
       .stateIn(viewModelScope, SharingStarted.Lazily, persistentListOf())
 
+  /**
+   * The playing audio track when the file has no video at all (e.g. an extracted .m4a), else
+   * null. Files with embedded cover art have an album-art video track, which mpv already
+   * shows, so they don't count as audio-only.
+   */
+  val audioOnlyTrack: StateFlow<TrackNode?> =
+    allTracks
+      .map { tracks ->
+        val hasVideo = tracks.any { it.type == "video" }
+        val audio = tracks.filter { it.isAudio }
+        if (hasVideo || audio.isEmpty()) null else audio.firstOrNull { it.isSelected } ?: audio.first()
+      }
+      .stateIn(viewModelScope, SharingStarted.Lazily, null)
+
   val chapters: StateFlow<List<dev.vivvvek.seeker.Segment>> =
     MPVLib.propNode["chapter-list"]
       .map { node ->

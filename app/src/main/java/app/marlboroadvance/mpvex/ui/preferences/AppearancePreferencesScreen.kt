@@ -19,7 +19,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -37,9 +42,14 @@ import app.marlboroadvance.mpvex.ui.preferences.components.ThemePicker
 import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
+import app.marlboroadvance.mpvex.ui.browser.sheets.rememberAudioFolderPicker
+import app.marlboroadvance.mpvex.utils.storage.AudioFolderStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.Serializable
+import me.zhanghai.compose.preference.Preference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import me.zhanghai.compose.preference.SliderPreference
 import me.zhanghai.compose.preference.SwitchPreference
@@ -317,6 +327,66 @@ object AppearancePreferencesScreen : Screen {
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_show_network_thumbnails_summary),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        item {
+                            PreferenceSectionHeader(title = stringResource(id = R.string.pref_audio_category))
+                        }
+
+                        item {
+                            PreferenceCard {
+                                val context = LocalContext.current
+                                val audioTreeValue by browserPreferences.audioOutputTreeUri.collectAsState()
+                                var audioFolderName by remember { mutableStateOf<String?>(null) }
+                                LaunchedEffect(audioTreeValue) {
+                                    val treeUri = AudioFolderStore.parse(audioTreeValue)
+                                    audioFolderName = withContext(Dispatchers.IO) {
+                                        if (AudioFolderStore.hasAccess(context, treeUri)) {
+                                            AudioFolderStore.displayName(context, treeUri!!)
+                                        } else {
+                                            null
+                                        }
+                                    }
+                                }
+                                val pickAudioFolder = rememberAudioFolderPicker()
+                                Preference(
+                                    title = {
+                                        Text(
+                                            text = stringResource(R.string.pref_audio_folder_title),
+                                            style = MaterialTheme.typography.titleMediumEmphasized
+                                        )
+                                    },
+                                    summary = {
+                                        Text(
+                                            text = audioFolderName ?: stringResource(R.string.extract_audio_no_folder),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = pickAudioFolder,
+                                )
+
+                                PreferenceDivider()
+
+                                val showAudioTab by browserPreferences.showAudioTab.collectAsState()
+                                SwitchPreference(
+                                    value = showAudioTab,
+                                    onValueChange = { browserPreferences.showAudioTab.set(it) },
+                                    title = {
+                                        Text(
+                                            text = stringResource(R.string.pref_audio_show_tab_title),
+                                            style = MaterialTheme.typography.titleMediumEmphasized
+                                        )
+                                    },
+                                    summary = {
+                                        Text(
+                                            text = stringResource(R.string.pref_audio_show_tab_summary),
                                             style = MaterialTheme.typography.bodyMedium,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )

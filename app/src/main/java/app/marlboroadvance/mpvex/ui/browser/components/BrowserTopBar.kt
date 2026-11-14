@@ -13,6 +13,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.RemoveCircle
@@ -79,6 +80,8 @@ fun BrowserTopBar(
   onAddToPlaylistClick: (() -> Unit)? = null,
   subtitle: String? = null,
   onMarkAsClick: (() -> Unit)? = null,
+  onExtractAudioClick: (() -> Unit)? = null,
+  extractAudioEnabled: Boolean = true,
 ) {
   if (isInSelectionMode) {
     SelectionTopBar(
@@ -99,6 +102,8 @@ fun BrowserTopBar(
       useRemoveIcon = useRemoveIcon,
       onAddToPlaylist = onAddToPlaylistClick,
       onMarkAs = onMarkAsClick,
+      onExtractAudio = onExtractAudioClick,
+      extractAudioEnabled = extractAudioEnabled,
     )
   } else {
     NormalTopBar(
@@ -237,6 +242,8 @@ private fun SelectionTopBar(
   useRemoveIcon: Boolean = false,
   onAddToPlaylist: (() -> Unit)? = null,
   onMarkAs: (() -> Unit)? = null,
+  onExtractAudio: (() -> Unit)? = null,
+  extractAudioEnabled: Boolean = true,
 ) {
   var showDropdown by remember { mutableStateOf(false) }
 
@@ -286,6 +293,17 @@ private fun SelectionTopBar(
       // readable on narrow phones; anything beyond that moves into a "More options" menu.
       val actions = buildList {
         onPlay?.let { add(SelectionAction(Icons.Rounded.PlayArrow, stringResource(R.string.cd_play), it)) }
+        // Extract audio sits before Info; both act on a single video only.
+        if (onExtractAudio != null && isSingleSelection) {
+          add(
+            SelectionAction(
+              Icons.Rounded.MusicNote,
+              stringResource(R.string.extract_audio),
+              onExtractAudio,
+              enabled = extractAudioEnabled,
+            ),
+          )
+        }
         if (onInfo != null && isSingleSelection) {
           add(SelectionAction(Icons.Rounded.Info, stringResource(R.string.info), onInfo))
         }

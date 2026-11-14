@@ -74,6 +74,21 @@ object SearchablePreferences {
                 screen = AppearancePreferencesScreen,
             ))
 
+            // Extracted audio
+            add(SearchablePreference(
+                titleRes = R.string.pref_audio_folder_title,
+                keywords = listOf("extract", "audio", "folder", "save", "music", "m4a", "mp3"),
+                category = "Appearance",
+                screen = AppearancePreferencesScreen,
+            ))
+            add(SearchablePreference(
+                titleRes = R.string.pref_audio_show_tab_title,
+                summaryRes = R.string.pref_audio_show_tab_summary,
+                keywords = listOf("audio", "tab", "navigation", "extracted", "music"),
+                category = "Appearance",
+                screen = AppearancePreferencesScreen,
+            ))
+
             // Layout preferences
             add(SearchablePreference(
                 titleRes = R.string.pref_layout_title,

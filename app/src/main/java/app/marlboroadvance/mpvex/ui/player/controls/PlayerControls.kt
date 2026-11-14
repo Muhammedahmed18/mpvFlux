@@ -112,6 +112,7 @@ import app.marlboroadvance.mpvex.ui.player.Panels
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
 import app.marlboroadvance.mpvex.ui.player.PlayerUpdates
 import app.marlboroadvance.mpvex.ui.player.PlayerViewModel
+import app.marlboroadvance.mpvex.ui.player.controls.components.AudioOnlyBackdrop
 import app.marlboroadvance.mpvex.ui.player.Sheets
 import app.marlboroadvance.mpvex.ui.player.controls.components.BrightnessSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.CompactSpeedIndicator
@@ -319,6 +320,16 @@ fun PlayerControls(
     animationSpec = if (controlsShown) playerControlsEnterAnimationSpec() else playerControlsExitAnimationSpec(),
     label = "scrim_alpha",
   )
+
+  // Audio-only files (no video track): show a "now playing" backdrop instead of a black
+  // screen. Drawn first so gestures and controls stay on top; it handles no input itself.
+  val audioOnlyTrack by viewModel.audioOnlyTrack.collectAsState()
+  audioOnlyTrack?.let { track ->
+    AudioOnlyBackdrop(
+      title = MPVLib.propString["media-title"].collectAsState().value,
+      track = track,
+    )
+  }
 
   GestureHandler(
     viewModel = viewModel,

@@ -395,6 +395,9 @@ fun FileSystemBrowserScreen(path: String? = null) {
 
   // Main content
   Box(modifier = Modifier.fillMaxSize()) {
+    val extractAudio = app.marlboroadvance.mpvex.ui.browser.sheets.rememberExtractAudioController()
+    app.marlboroadvance.mpvex.ui.browser.sheets.ExtractAudioHost(extractAudio)
+
     Scaffold(
       snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
@@ -427,6 +430,16 @@ fun FileSystemBrowserScreen(path: String? = null) {
           },
           onRenameClick = { renameDialogOpen.value = true },
           isSingleSelection = (videoSelectionManager.isSingleSelection || folderSelectionManager.isSingleSelection) && !isMixedSelection,
+          onExtractAudioClick = if (videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode) {
+            {
+              if (extractAudio.open(videoSelectionManager.getSelectedItems().singleOrNull())) {
+                videoSelectionManager.clear()
+              }
+            }
+          } else {
+            null
+          },
+          extractAudioEnabled = !extractAudio.isRunning,
           onInfoClick = if (videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode) {
             {
               val video = videoSelectionManager.getSelectedItems().firstOrNull()

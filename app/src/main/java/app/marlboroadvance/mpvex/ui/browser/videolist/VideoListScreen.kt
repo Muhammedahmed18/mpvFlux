@@ -270,6 +270,8 @@ data class VideoListScreen(
       selectionManager.clear()
     }
 
+    val extractAudio = app.marlboroadvance.mpvex.ui.browser.sheets.rememberExtractAudioController()
+
     Scaffold(
       snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
@@ -292,6 +294,12 @@ data class VideoListScreen(
             backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
           },
           isSingleSelection = selectionManager.isSingleSelection,
+          onExtractAudioClick = {
+            if (extractAudio.open(selectionManager.getSelectedItems().singleOrNull())) {
+              selectionManager.clear()
+            }
+          },
+          extractAudioEnabled = !extractAudio.isRunning,
           onInfoClick = {
             if (selectionManager.isSingleSelection) {
               val video = selectionManager.getSelectedItems().firstOrNull()
@@ -311,6 +319,7 @@ data class VideoListScreen(
         )
       },
     ) { padding ->
+      app.marlboroadvance.mpvex.ui.browser.sheets.ExtractAudioHost(extractAudio)
       val autoScrollToLastPlayed by browserPreferences.autoScrollToLastPlayed.collectAsState()
 
       Box(modifier = Modifier.fillMaxSize()) {

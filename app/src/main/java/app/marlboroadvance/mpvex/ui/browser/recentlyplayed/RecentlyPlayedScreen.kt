@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.ui.browser.sheets.canExtractAudio
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
@@ -161,6 +162,9 @@ object RecentlyPlayedScreen : Screen {
     )
   }
 
+  val extractAudio = app.marlboroadvance.mpvex.ui.browser.sheets.rememberExtractAudioController()
+  app.marlboroadvance.mpvex.ui.browser.sheets.ExtractAudioHost(extractAudio)
+
   Scaffold(
         topBar = {
           BrowserTopBar(
@@ -175,6 +179,20 @@ object RecentlyPlayedScreen : Screen {
               backStack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
             },
             isSingleSelection = selectionManager.isSingleSelection,
+            // Only for one selected local video (not playlists or network streams).
+            onExtractAudioClick = if (selectionManager.isSingleSelection) {
+              val video = (selectionManager.getSelectedItems().singleOrNull() as? RecentlyPlayedItem.VideoItem)?.video
+              if (video != null && video.canExtractAudio()) {
+                {
+                  if (extractAudio.open(video)) selectionManager.clear()
+                }
+              } else {
+                null
+              }
+            } else {
+              null
+            },
+            extractAudioEnabled = !extractAudio.isRunning,
             onInfoClick = null,
             onShareClick = null,
             onPlayClick = null,
