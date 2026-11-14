@@ -8,14 +8,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.update.ReleaseInfo
@@ -136,46 +138,70 @@ fun SettingsIconWithUpdateDot(icon: @Composable () -> Unit) {
   }
 }
 
-/** One-time "update available" popup, shown the first time a new version is found. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * "Update available" dialog shown when the app opens and a newer version is on GitHub.
+ * M3 basic dialog: icon on top, centred title, version line, scrollable release notes.
+ * [onUpdate] starts the download, [onLater] hides it until the next app launch and
+ * [onSkip] stops asking about this version.
+ */
 @Composable
-fun UpdateAvailableSheet(
+fun UpdateAvailableDialog(
   release: ReleaseInfo,
+  installedVersion: String,
+  onUpdate: () -> Unit,
   onLater: () -> Unit,
-  onView: () -> Unit,
+  onSkip: () -> Unit,
 ) {
-  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-  ModalBottomSheet(onDismissRequest = onLater, sheetState = sheetState) {
-    Column(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).navigationBarsPadding(),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Icon(
-          ImageVector.vectorResource(R.drawable.ic_sym_new_releases),
-          contentDescription = null,
-          tint = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.size(28.dp),
-        )
-        Text(
-          stringResource(R.string.update_available_title, release.version.toString()),
-          style = MaterialTheme.typography.titleLargeEmphasized,
-        )
-      }
-      Box(modifier = Modifier.heightIn(max = 160.dp)) {
-        ReleaseNotes(markdown = release.notes, maxBlocks = 4)
-      }
-      Row(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-        horizontalArrangement = Arrangement.End,
-      ) {
-        TextButton(onClick = onLater) { Text(stringResource(R.string.update_later)) }
-        Button(onClick = onView, modifier = Modifier.padding(start = 8.dp)) {
-          Text(stringResource(R.string.update_view_update))
+  AlertDialog(
+    onDismissRequest = onLater,
+    icon = {
+      Icon(
+        imageVector = ImageVector.vectorResource(R.drawable.ic_sym_new_releases),
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary,
+      )
+    },
+    title = {
+      Text(
+        text = stringResource(R.string.update_dialog_title),
+        style = MaterialTheme.typography.headlineSmallEmphasized,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+      )
+    },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+          Text(
+            text = stringResource(R.string.update_dialog_version, release.version.toString()),
+            style = MaterialTheme.typography.titleMediumEmphasized,
+            color = MaterialTheme.colorScheme.onSurface,
+          )
+          Text(
+            text = stringResource(R.string.update_release_meta, installedVersion, release.abi, formatBytes(release.apkSize)),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+          )
+        }
+        if (release.notes.isNotBlank()) {
+          HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+          Box(modifier = Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
+            ReleaseNotes(markdown = release.notes)
+          }
         }
       }
-    }
-  }
+    },
+    confirmButton = {
+      Button(onClick = onUpdate) { Text(stringResource(R.string.update_dialog_update)) }
+    },
+    dismissButton = {
+      Row {
+        TextButton(onClick = onSkip) { Text(stringResource(R.string.update_skip_version)) }
+        TextButton(onClick = onLater) { Text(stringResource(R.string.update_later)) }
+      }
+    },
+  )
 }
 
 /** "What's new" sheet shown once after the app was updated from inside the app. */

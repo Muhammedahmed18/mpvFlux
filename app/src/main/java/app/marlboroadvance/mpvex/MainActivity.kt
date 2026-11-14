@@ -231,8 +231,8 @@ class MainActivity : ComponentActivity() {
   }
 
   /**
-   * Update popups over the app: "What's new" once after an in-app update, the one-time
-   * "update available" sheet, and opening Settings → Updates from the notification.
+   * Update popups over the app: "What's new" once after an in-app update, the
+   * "update available" dialog, and opening Settings → Updates from the notification.
    */
   @Composable
   private fun UpdatePrompts(backstack: NavBackStack<Screen>) {
@@ -248,33 +248,32 @@ class MainActivity : ComponentActivity() {
       app.marlboroadvance.mpvex.ui.update.WhatsNewSheet(version, notes) { whatsNewState = null }
     }
 
+    // "Update available" dialog: shown when the app opens and a newer version was found.
+    // "Later" hides it until the next launch; "Skip this version" stops it for that version.
     val state by updateManager.state.collectAsState()
     val available = state as? app.marlboroadvance.mpvex.update.UpdateState.Available
-    var popupFor by androidx.compose.runtime.remember {
-      androidx.compose.runtime.mutableStateOf<app.marlboroadvance.mpvex.update.ReleaseInfo?>(null)
+    var dismissedVersion by androidx.compose.runtime.saveable.rememberSaveable {
+      androidx.compose.runtime.mutableStateOf<String?>(null)
     }
-    LaunchedEffect(available?.release?.version) {
-      val release = available?.release ?: return@LaunchedEffect
-      if (available.skipped || updateManager.wasNotified(release)) return@LaunchedEffect
-      if (backstack.lastOrNull() == updatesScreen) {
-        // Already looking at it (manual check): no popup needed.
-        updateManager.markNotified(release)
-      } else if (whatsNewState == null) {
-        popupFor = release
-      }
+    val onUpdatesScreen = backstack.lastOrNull() == updatesScreen
+    val release = available?.release
+    // Found while on the Updates screen (e.g. "Check now"): the user already sees it there.
+    LaunchedEffect(release?.version, onUpdatesScreen) {
+      if (onUpdatesScreen && release != null) dismissedVersion = release.version.toString()
     }
-    popupFor?.let { release ->
-      app.marlboroadvance.mpvex.ui.update.UpdateAvailableSheet(
+    if (release != null && available?.skipped != true && !onUpdatesScreen && whatsNewState == null &&
+      dismissedVersion != release.version.toString()
+    ) {
+      app.marlboroadvance.mpvex.ui.update.UpdateAvailableDialog(
         release = release,
-        onLater = {
-          updateManager.markNotified(release)
-          popupFor = null
-        },
-        onView = {
-          updateManager.markNotified(release)
-          popupFor = null
+        installedVersion = updateManager.currentVersion,
+        onUpdate = {
+          dismissedVersion = release.version.toString()
+          updateManager.download()
           backstack.add(updatesScreen)
         },
+        onLater = { dismissedVersion = release.version.toString() },
+        onSkip = { updateManager.skip(release) },
       )
     }
   }

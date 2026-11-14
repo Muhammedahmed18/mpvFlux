@@ -14,9 +14,13 @@ import androidx.compose.runtime.Immutable
  */
 object DeviceCodecReport {
 
+  /** Sections of the Device codec support screen. */
+  enum class Group { Common, TenBitHdr, Older }
+
   @Immutable
   data class Entry(
     val label: String,
+    val group: Group,
     val hardware: Boolean,
     /** e.g. "4K" or "1080p"; null when not decoded in hardware. */
     val maxResolution: String?,
@@ -32,35 +36,42 @@ object DeviceCodecReport {
     val mime: String,
     val profile: Int? = null,
     val hdrProfiles: List<Int> = emptyList(),
+    val group: Group,
   )
 
   // Profile constants are plain ints, so using the newer ones on older Android is safe:
   // they simply never match there.
   private val FORMATS = listOf(
-    Format("H.264 (AVC)", "video/avc"),
-    Format("H.264 10-bit (Hi10P)", "video/avc", CodecProfileLevel.AVCProfileHigh10),
+    // Common formats
+    Format("H.264 (AVC)", "video/avc", group = Group.Common),
     Format(
       "HEVC (H.265)",
       "video/hevc",
       hdrProfiles = listOf(CodecProfileLevel.HEVCProfileMain10HDR10, CodecProfileLevel.HEVCProfileMain10HDR10Plus),
+      group = Group.Common,
     ),
-    Format("HEVC 10-bit (Main 10)", "video/hevc", CodecProfileLevel.HEVCProfileMain10),
     Format(
       "AV1",
       "video/av01",
       hdrProfiles = listOf(CodecProfileLevel.AV1ProfileMain10HDR10, CodecProfileLevel.AV1ProfileMain10HDR10Plus),
+      group = Group.Common,
     ),
-    Format("AV1 10-bit", "video/av01", CodecProfileLevel.AV1ProfileMain10),
     Format(
       "VP9",
       "video/x-vnd.on2.vp9",
       hdrProfiles = listOf(CodecProfileLevel.VP9Profile2HDR, CodecProfileLevel.VP9Profile2HDR10Plus),
+      group = Group.Common,
     ),
-    Format("VP9 10-bit (Profile 2)", "video/x-vnd.on2.vp9", CodecProfileLevel.VP9Profile2),
-    Format("Dolby Vision", "video/dolby-vision"),
-    Format("VP8", "video/x-vnd.on2.vp8"),
-    Format("MPEG-2", "video/mpeg2"),
-    Format("MPEG-4 Part 2", "video/mp4v-es"),
+    // 10-bit and HDR
+    Format("H.264 10-bit (Hi10P)", "video/avc", CodecProfileLevel.AVCProfileHigh10, group = Group.TenBitHdr),
+    Format("HEVC 10-bit (Main 10)", "video/hevc", CodecProfileLevel.HEVCProfileMain10, group = Group.TenBitHdr),
+    Format("AV1 10-bit", "video/av01", CodecProfileLevel.AV1ProfileMain10, group = Group.TenBitHdr),
+    Format("VP9 10-bit (Profile 2)", "video/x-vnd.on2.vp9", CodecProfileLevel.VP9Profile2, group = Group.TenBitHdr),
+    Format("Dolby Vision", "video/dolby-vision", group = Group.TenBitHdr),
+    // Older formats
+    Format("VP8", "video/x-vnd.on2.vp8", group = Group.Older),
+    Format("MPEG-2", "video/mpeg2", group = Group.Older),
+    Format("MPEG-4 Part 2", "video/mp4v-es", group = Group.Older),
   )
 
   @Volatile private var cached: List<Entry>? = null
@@ -84,6 +95,7 @@ object DeviceCodecReport {
       }
       Entry(
         label = format.label,
+        group = format.group,
         hardware = hardware.isNotEmpty(),
         maxResolution = resolution,
         maxFps = fps,

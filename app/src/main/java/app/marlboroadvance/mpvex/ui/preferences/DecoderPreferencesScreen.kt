@@ -275,12 +275,16 @@ object DecoderPreferencesScreen : Screen {
               }
             }
 
-            // Which formats this phone decodes in hardware.
+            // Which formats this phone decodes in hardware: opens its own screen.
             item {
-              PreferenceSectionHeader(title = stringResource(R.string.codec_support_title))
+              PreferenceSectionHeader(title = stringResource(R.string.codec_support_section))
             }
             item {
-              app.marlboroadvance.mpvex.ui.preferences.components.DeviceCodecSupportCard()
+              PreferenceCard {
+                app.marlboroadvance.mpvex.ui.preferences.components.DeviceCodecSupportRow(
+                  onClick = { backstack.add(DeviceCodecSupportScreen) },
+                )
+              }
             }
           }
         }

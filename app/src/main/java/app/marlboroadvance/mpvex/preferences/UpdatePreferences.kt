@@ -18,6 +18,11 @@ class UpdatePreferences(
   /** Newest version found by the last check that is newer than the installed one, or "". */
   val availableVersion = preferenceStore.getString("update_available_version", "")
 
+  /** GitHub ETag, request URL and body of the last release check (see ReleaseResponseCache). */
+  val releasesEtag = preferenceStore.getString("update_releases_etag", "")
+  val releasesUrl = preferenceStore.getString("update_releases_url", "")
+  val releasesBody = preferenceStore.getString("update_releases_body", "")
+
   /** Version the user chose to skip, e.g. "1.4.5". */
   val skippedVersion = preferenceStore.getString("update_skipped_version", "")
 

@@ -79,7 +79,23 @@ class UpdateManager(
 ) {
   // Downloads can take a while on slow connections, so no read deadline per call.
   private val client = baseClient.newBuilder().readTimeout(60, TimeUnit.SECONDS).build()
-  private val releases = GitHubReleases(client)
+  private val releases = GitHubReleases(
+    client,
+    object : ReleaseResponseCache {
+      override fun get(url: String): Pair<String, String>? {
+        if (preferences.releasesUrl.get() != url) return null
+        val etag = preferences.releasesEtag.get()
+        val body = preferences.releasesBody.get()
+        return if (etag.isNotEmpty() && body.isNotEmpty()) etag to body else null
+      }
+
+      override fun put(url: String, etag: String, body: String) {
+        preferences.releasesUrl.set(url)
+        preferences.releasesEtag.set(etag)
+        preferences.releasesBody.set(body)
+      }
+    },
+  )
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val updatesDir = File(context.cacheDir, "updates")
 
@@ -99,17 +115,13 @@ class UpdateManager(
     scope.launch { runCatching { updatesDir.deleteRecursively() } }
   }
 
-  /** Called when the app opens: checks GitHub if auto-check is on and a day has passed. */
+  /** Called when the app opens: checks GitHub in the background if auto-check is on. */
   fun checkIfDue() {
     if (!isSupported || !preferences.autoCheck.get()) return
+    // Once per app launch: the state is Idle only until the first check of this process,
+    // so coming back from the player or switching apps doesn't check again.
     if (_state.value !is UpdateState.Idle) return
-    val elapsed = System.currentTimeMillis() - preferences.lastCheckTime.get()
-    // Also re-check when an earlier check found an update that isn't installed yet, so the
-    // Settings card still shows it after the app was closed.
-    val pending = AppVersion.parse(preferences.availableVersion.get())
-    val installed = AppVersion.parse(currentVersion)
-    val updatePending = pending != null && installed != null && pending > installed
-    if (elapsed >= CHECK_INTERVAL_MS || updatePending) check()
+    check()
   }
 
   /** Asks GitHub for the newest release now. */
@@ -397,7 +409,6 @@ class UpdateManager(
     private const val TAG = "UpdateManager"
     private const val CHANNEL_ID = "app_updates"
     private const val NOTIFICATION_ID = 4210
-    private const val CHECK_INTERVAL_MS = 24L * 60 * 60 * 1000
 
     /** Set on the notification's intent so the app can open the Updates screen. */
     const val EXTRA_OPEN_UPDATES = "open_updates"

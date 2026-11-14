@@ -32,8 +32,19 @@ class UpdateCheckException(val reason: UpdateError, cause: Throwable? = null) : 
  * 60 requests an hour per network). Draft releases are never visible here, so users only
  * see a release after it is published.
  */
+/**
+ * Remembers GitHub's ETag and the last response body, so an unchanged release list costs a
+ * tiny "304 Not modified" reply that GitHub doesn't count against its rate limit.
+ */
+interface ReleaseResponseCache {
+  fun get(url: String): Pair<String, String>?
+
+  fun put(url: String, etag: String, body: String)
+}
+
 class GitHubReleases(
   private val client: OkHttpClient,
+  private val cache: ReleaseResponseCache? = null,
   private val owner: String = OWNER,
   private val repo: String = REPO,
 ) {
@@ -63,20 +74,26 @@ class GitHubReleases(
   }
 
   private fun get(url: String): String {
+    val cached = cache?.get(url)
     val request = Request.Builder()
       .url(url)
       .header("Accept", "application/vnd.github+json")
       .header("X-GitHub-Api-Version", "2022-11-28")
       .header("User-Agent", "MpvFlux-Updater")
+      .apply { cached?.let { header("If-None-Match", it.first) } }
       .build()
     try {
       client.newCall(request).execute().use { response ->
+        // Nothing changed since the last check: reuse the saved response.
+        if (response.code == 304 && cached != null) return cached.second
         when {
           response.code == 403 || response.code == 429 -> throw UpdateCheckException(UpdateError.RateLimited)
           response.code == 404 -> throw UpdateCheckException(UpdateError.NoRelease)
           !response.isSuccessful -> throw UpdateCheckException(UpdateError.Network)
         }
-        return response.body.string()
+        val body = response.body.string()
+        response.header("ETag")?.let { etag -> cache?.put(url, etag, body) }
+        return body
       }
     } catch (e: UpdateCheckException) {
       throw e

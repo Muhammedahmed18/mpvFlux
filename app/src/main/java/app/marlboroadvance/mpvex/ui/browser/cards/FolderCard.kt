@@ -40,6 +40,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -103,17 +106,20 @@ fun FolderCard(
   )
 
 
-  // Selection: solid tonal fill + check badge (no border or shrink).
-  val containerColor = if (isSelected) {
-    MaterialTheme.colorScheme.secondaryContainer
-  } else {
-    MaterialTheme.colorScheme.surfaceContainerLow
-  }
+  // No container, same as the video rows: folders sit directly on the screen.
+  // Selection adds a soft accent highlight behind the row (plus the check badge).
+  val containerColor by animateColorAsState(
+    targetValue = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
+    animationSpec = tween(durationMillis = 150),
+    label = "folder_row_selection",
+  )
+  val shape = MaterialTheme.shapes.large
 
   Surface(
     modifier = modifier
       .fillMaxWidth()
       .scale(cardScale)
+      .clip(shape)
       .semantics { selected = isSelected }
       .combinedClickable(
         interactionSource = interactionSource,
@@ -121,7 +127,7 @@ fun FolderCard(
         onClick = onClick,
         onLongClick = onLongClick,
       ),
-    shape = MaterialTheme.shapes.extraLarge,
+    shape = shape,
     color = containerColor,
   ) {
     Row(

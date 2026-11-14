@@ -388,6 +388,13 @@ object SearchablePreferences {
                 screen = DecoderPreferencesScreen,
             ))
             add(SearchablePreference(
+                titleRes = R.string.codec_support_title,
+                summaryRes = R.string.codec_support_row_summary,
+                keywords = listOf("codec", "hardware", "decoder", "hevc", "av1", "hi10p", "hdr", "10-bit", "support"),
+                category = "Decoder",
+                screen = DeviceCodecSupportScreen,
+            ))
+            add(SearchablePreference(
                 titleRes = R.string.pref_decoder_yuv420p_title,
                 summaryRes = R.string.pref_decoder_yuv420p_summary,
                 keywords = listOf("yuv420p", "chroma", "subsampling", "format", "compatibility"),

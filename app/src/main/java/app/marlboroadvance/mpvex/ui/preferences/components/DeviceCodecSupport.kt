@@ -20,10 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -50,58 +50,78 @@ import app.marlboroadvance.mpvex.utils.media.DeviceCodecReport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/**
- * Settings → Decoder → "Device codec support": one row per video format with a
- * Hardware / Software chip, the top resolution and frame rate, 10-bit and HDR support.
- * Tap a row to see the Android decoder names. "Copy report" puts it all on the clipboard.
- */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+/** Loads the codec report once in the background; null while it's being built. */
 @Composable
-fun DeviceCodecSupportCard() {
+fun rememberDeviceCodecReport(): List<DeviceCodecReport.Entry>? {
   val entries by produceState<List<DeviceCodecReport.Entry>?>(initialValue = null) {
     value = withContext(Dispatchers.Default) { DeviceCodecReport.build() }
   }
-
-  PreferenceCard {
-    val list = entries
-    if (list == null) {
-      Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-        LoadingIndicator(modifier = Modifier.size(40.dp))
-      }
-      return@PreferenceCard
-    }
-
-    SummaryRow(hardwareCount = list.count { it.hardware }, total = list.size)
-    PreferenceDivider()
-    list.forEachIndexed { index, entry ->
-      if (index > 0) PreferenceDivider()
-      CodecRow(entry)
-    }
-    PreferenceDivider()
-    CopyReportRow(list)
-  }
+  return entries
 }
 
+/**
+ * Row in Settings → Decoder that opens the Device codec support screen.
+ * Shows how many formats play in hardware once the background check is done.
+ */
 @Composable
-private fun SummaryRow(hardwareCount: Int, total: Int) {
+fun DeviceCodecSupportRow(onClick: () -> Unit) {
+  val entries = rememberDeviceCodecReport()
   Row(
-    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .clickable(onClick = onClick)
+      .padding(horizontal = 20.dp, vertical = 14.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(16.dp),
   ) {
-    Surface(
-      shape = CircleShape,
-      color = MaterialTheme.colorScheme.secondaryContainer,
-      contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-      modifier = Modifier.size(40.dp),
+    TonalIcon(R.drawable.ic_sym_memory)
+    Column(modifier = Modifier.weight(1f)) {
+      Text(text = stringResource(R.string.codec_support_title), style = MaterialTheme.typography.titleMediumEmphasized)
+      Text(
+        text = entries?.let {
+          stringResource(R.string.codec_support_row_count, it.count { e -> e.hardware }, it.size)
+        } ?: stringResource(R.string.codec_support_checking),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+      )
+    }
+    Icon(
+      imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+      contentDescription = null,
+      tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+  }
+}
+
+/** Top card of the screen: phone, hardware count, explanation and Copy report. */
+@Composable
+fun DeviceCodecSummaryCard(entries: List<DeviceCodecReport.Entry>) {
+  PreferenceCard {
+    Row(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-      Box(contentAlignment = Alignment.Center) {
-        Icon(ImageVector.vectorResource(R.drawable.ic_sym_memory), contentDescription = null, modifier = Modifier.size(22.dp))
+      TonalIcon(R.drawable.ic_sym_memory)
+      Column(modifier = Modifier.weight(1f)) {
+        Text(
+          text = "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}",
+          style = MaterialTheme.typography.titleMediumEmphasized,
+        )
+        Text(
+          text = stringResource(R.string.codec_support_android_version, Build.VERSION.RELEASE),
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
       }
     }
-    Column(modifier = Modifier.weight(1f)) {
+    PreferenceDivider()
+    Column(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+      verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
       Text(
-        text = stringResource(R.string.codec_support_summary, hardwareCount, total),
+        text = stringResource(R.string.codec_support_summary, entries.count { it.hardware }, entries.size),
         style = MaterialTheme.typography.titleMediumEmphasized,
       )
       Text(
@@ -109,6 +129,32 @@ private fun SummaryRow(hardwareCount: Int, total: Int) {
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
       )
+    }
+    CopyReportRow(entries)
+  }
+}
+
+/** One card per group (Common, 10-bit and HDR, Older) with a row per format. */
+@Composable
+fun CodecGroupCard(entries: List<DeviceCodecReport.Entry>) {
+  PreferenceCard {
+    entries.forEachIndexed { index, entry ->
+      if (index > 0) PreferenceDivider()
+      CodecRow(entry)
+    }
+  }
+}
+
+@Composable
+private fun TonalIcon(icon: Int) {
+  Surface(
+    shape = CircleShape,
+    color = MaterialTheme.colorScheme.secondaryContainer,
+    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    modifier = Modifier.size(40.dp),
+  ) {
+    Box(contentAlignment = Alignment.Center) {
+      Icon(ImageVector.vectorResource(icon), contentDescription = null, modifier = Modifier.size(22.dp))
     }
   }
 }

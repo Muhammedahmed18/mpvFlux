@@ -716,7 +716,7 @@
   <string name="update_title">Updates</string>
   <string name="update_allow">Allow</string>
   <string name="update_auto_check">Check for updates automatically</string>
-  <string name="update_auto_check_summary">At most once a day when the app opens</string>
+  <string name="update_auto_check_summary">Every time the app opens</string>
   <string name="update_available_title">MpvFlux %1$s is available</string>
   <string name="update_beta">Beta updates</string>
   <string name="update_beta_label">Beta</string>
@@ -1039,4 +1039,15 @@
   <string name="codec_support_no_android_decoder">No Android decoder for this format</string>
   <string name="codec_support_copy_report">Copy report</string>
   <string name="codec_support_copied">Copied</string>
+  <string name="update_dialog_title">Update available</string>
+  <string name="update_dialog_version">MpvFlux %1$s</string>
+  <string name="update_dialog_update">Update</string>
+  <string name="codec_support_section">Device</string>
+  <string name="codec_support_row_summary">See which video formats play in hardware</string>
+  <string name="codec_support_row_count">%1$d of %2$d formats play in hardware</string>
+  <string name="codec_support_checking">Checking…</string>
+  <string name="codec_support_android_version">Android %1$s</string>
+  <string name="codec_support_group_common">Common formats</string>
+  <string name="codec_support_group_10bit">10-bit and HDR</string>
+  <string name="codec_support_group_older">Older formats</string>
 </resources>
