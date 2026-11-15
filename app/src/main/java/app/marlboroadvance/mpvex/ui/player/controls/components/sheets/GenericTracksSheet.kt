@@ -84,8 +84,6 @@ import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.presentation.components.PlayerSideSheet
 import app.marlboroadvance.mpvex.presentation.components.rememberSideSheetWidth
-import app.marlboroadvance.mpvex.presentation.components.isCompact
-import app.marlboroadvance.mpvex.presentation.components.rememberPlayerWidthClass
 import app.marlboroadvance.mpvex.ui.player.TrackNode
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import kotlinx.collections.immutable.ImmutableList
@@ -136,8 +134,8 @@ fun getTrackTitle(track: TrackNode): String {
  * single source of truth, used by both the subtitles and audio sheets (the
  * branching below was previously copy-pasted in each).
  *
- *  - Medium/Expanded width → right-anchored [PlayerSideSheet] so the video stays watchable.
- *  - Compact width         → canonical M3 [ModalBottomSheet] with built-in drag handle.
+ *  - Landscape → right-anchored [PlayerSideSheet] so the video stays watchable.
+ *  - Portrait  → canonical M3 [ModalBottomSheet] with built-in drag handle.
  *
  * Each host fully owns its entrance/exit animation. The content slot receives a
  * `dismiss` lambda that animates the sheet out **before** clearing the sheet
@@ -150,9 +148,8 @@ internal fun TracksSheetHost(
   onDismissRequest: () -> Unit,
   content: @Composable (dismiss: () -> Unit) -> Unit,
 ) {
-  // Side sheet whenever the window is wide enough (Medium/Expanded width class),
-  // bottom sheet on Compact widths — independent of device orientation.
-  val useSideSheet = !rememberPlayerWidthClass().isCompact
+  val useSideSheet =
+    LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
   if (useSideSheet) {
     PlayerSideSheet(

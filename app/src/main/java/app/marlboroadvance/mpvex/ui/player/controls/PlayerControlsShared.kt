@@ -50,9 +50,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
-import app.marlboroadvance.mpvex.presentation.components.isCompact
-import app.marlboroadvance.mpvex.presentation.components.rememberPlayerWidthClass
 import android.content.Context
 import app.marlboroadvance.mpvex.ui.player.PlayerUpdates
 import kotlinx.coroutines.flow.update
@@ -193,14 +190,14 @@ fun RenderPlayerButton(
       val interactionSource = remember { MutableInteractionSource() }
 
       // Width cap for the whole capsule. Without it a long filename stretched the pill
-      // across the full top row. Upright phones: 300dp. Wider windows: 40% of the window,
+      // across the full top row. Portrait: 300dp. Landscape: 40% of the screen width,
       // between 240dp and 360dp. Longer titles ellipsize, then marquee inside the cap.
-      val isCompactWidth = rememberPlayerWidthClass().isCompact
-      val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
-      val titleMaxWidth = if (isCompactWidth) {
+      // Uses LocalConfiguration, which updates on every rotation on all Android versions.
+      val titleConfiguration = LocalConfiguration.current
+      val titleMaxWidth = if (titleConfiguration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT) {
         300.dp
       } else {
-        (windowWidth * 0.4f).coerceIn(240.dp, 360.dp)
+        (titleConfiguration.screenWidthDp.dp * 0.4f).coerceIn(240.dp, 360.dp)
       }
       val hasPlaylistChip = playlistModeEnabled || playlistCounter != null
 

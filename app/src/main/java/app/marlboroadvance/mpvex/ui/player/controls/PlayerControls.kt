@@ -6,6 +6,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import app.marlboroadvance.mpvex.R
+import android.content.res.Configuration.ORIENTATION_PORTRAIT
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -99,8 +101,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
-import app.marlboroadvance.mpvex.presentation.components.isCompact
-import app.marlboroadvance.mpvex.presentation.components.rememberPlayerWidthClass
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
@@ -335,10 +335,11 @@ fun PlayerControls(
     CompositionLocalProvider(
       LocalLayoutDirection provides LayoutDirection.Ltr,
     ) {
-      // Layout follows the window's width class, not the device orientation: Compact
-      // (phone upright, narrow split-screen) → stacked layout; Medium/Expanded (landscape
-      // phone, tablet, unfolded foldable) → corner groups. See PlayerWidthClass.
-      val isCompactLayout = rememberPlayerWidthClass().isCompact
+      // Layout follows the device orientation: portrait → stacked layout, landscape →
+      // corner groups. (A window-width-based choice was tried and reverted: on Android 10
+      // LocalWindowInfo.containerSize kept the old portrait width after the player rotated
+      // itself to landscape, so landscape got the stacked layout.)
+      val isCompactLayout = LocalConfiguration.current.orientation == ORIENTATION_PORTRAIT
 
       // Edges the unlocked controls keep clear of: only the system bars, and only when
       // the user chose to show them. The camera cutout is deliberately NOT avoided here:

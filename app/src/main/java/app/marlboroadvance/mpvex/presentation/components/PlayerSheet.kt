@@ -3,6 +3,8 @@
 package app.marlboroadvance.mpvex.presentation.components
 
 import android.annotation.SuppressLint
+import android.content.res.Configuration.ORIENTATION_LANDSCAPE
+import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -74,11 +76,8 @@ fun PlayerSheet(
   val scope = rememberCoroutineScope()
   val density = LocalDensity.current
   val latestOnDismissRequest by rememberUpdatedState(onDismissRequest)
-  // Sized by window width class rather than orientation, so an upright tablet or an
-  // unfolded foldable gets the wider sheet too.
-  val isCompactWidth = rememberPlayerWidthClass().isCompact
   val maxWidth = customMaxWidth ?:
-  if (!isCompactWidth) {
+  if (LocalConfiguration.current.orientation == ORIENTATION_LANDSCAPE) {
     640.dp
   } else {
     420.dp
@@ -86,7 +85,7 @@ fun PlayerSheet(
   val isImeVisible = WindowInsets.ime.getBottom(density) > 0
   val maxHeight = customMaxHeight ?: when {
     isImeVisible -> LocalConfiguration.current.screenHeightDp.dp
-    isCompactWidth ->
+    LocalConfiguration.current.orientation == ORIENTATION_PORTRAIT ->
       LocalConfiguration.current.screenHeightDp.dp * .90f
     else -> LocalConfiguration.current.screenHeightDp.dp
   }
