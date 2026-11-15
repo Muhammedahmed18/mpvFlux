@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.clickable
 import androidx.compose.material3.TextButton
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
@@ -261,8 +259,6 @@ private fun SelectionTopBar(
   extractAudioEnabled: Boolean = true,
   summary: String? = null,
 ) {
-  var showDropdown by remember { mutableStateOf(false) }
-
   TopAppBar(
     colors = TopAppBarDefaults.topAppBarColors(
       containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -274,7 +270,6 @@ private fun SelectionTopBar(
       Column(
         modifier =
           Modifier
-            .clickable { showDropdown = true }
             // TalkBack reads the new count (and size/duration) whenever the selection changes.
             .semantics(mergeDescendants = true) {
               liveRegion = LiveRegionMode.Polite
@@ -300,11 +295,6 @@ private fun SelectionTopBar(
               overflow = TextOverflow.Ellipsis,
             )
           }
-          Icon(
-            Icons.Rounded.ArrowDropDown,
-            contentDescription = stringResource(R.string.selection_options),
-            modifier = Modifier.size(28.dp)
-          )
         }
         // Total size and duration of the selection, e.g. "3.2 GB · 4h 12m".
         if (!summary.isNullOrBlank()) {
@@ -315,15 +305,6 @@ private fun SelectionTopBar(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
           )
-        }
-
-        DropdownMenu(
-          expanded = showDropdown,
-          onDismissRequest = { showDropdown = false },
-        ) {
-          onSelectAll?.let { DropdownMenuItem(text = { Text(stringResource(R.string.select_all)) }, onClick = { it(); showDropdown = false }) }
-          onInvertSelection?.let { DropdownMenuItem(text = { Text(stringResource(R.string.invert_selection)) }, onClick = { it(); showDropdown = false }) }
-          onDeselectAll?.let { DropdownMenuItem(text = { Text(stringResource(R.string.deselect_all)) }, onClick = { it(); showDropdown = false }) }
         }
       }
     },
