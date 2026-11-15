@@ -1087,4 +1087,18 @@
   <string name="pref_audio_folder_title">Audio save folder</string>
   <string name="pref_audio_show_tab_title">Show Audio tab</string>
   <string name="pref_audio_show_tab_summary">Show extracted audio as a tab in the navigation bar</string>
+  <!-- Selection toolbar -->
+  <string name="selection_send_to_folder">Copy or move</string>
+  <string name="selection_copy_summary">Keep the originals where they are</string>
+  <string name="selection_move_summary">Take them out of this folder</string>
+  <plurals name="selection_send_to_folder_title">
+    <item quantity="one">Send %1$d video to a folder</item>
+    <item quantity="other">Send %1$d videos to a folder</item>
+  </plurals>
+  <string name="selection_hide_folder">Hide from library</string>
+  <string name="selection_toolbar_pane">Selection actions</string>
+  <plurals name="selection_folders_hidden">
+    <item quantity="one">%1$d folder hidden</item>
+    <item quantity="other">%1$d folders hidden</item>
+  </plurals>
 </resources>

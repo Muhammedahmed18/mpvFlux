@@ -1,6 +1,18 @@
 package app.marlboroadvance.mpvex.ui.browser.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -257,14 +269,37 @@ private fun SelectionTopBar(
       titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
     ),
     title = {
-      Column(modifier = Modifier.clickable { showDropdown = true }) {
+      val countText = stringResource(R.string.selected_items, selectedCount, totalCount)
+      val announcement = if (summary.isNullOrBlank()) countText else "$countText, $summary"
+      Column(
+        modifier =
+          Modifier
+            .clickable { showDropdown = true }
+            // TalkBack reads the new count (and size/duration) whenever the selection changes.
+            .semantics(mergeDescendants = true) {
+              liveRegion = LiveRegionMode.Polite
+              contentDescription = announcement
+            },
+      ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-          Text(
-            stringResource(R.string.selected_items, selectedCount, totalCount),
-            style = MaterialTheme.typography.titleLargeEmphasized,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-          )
+          // The count rolls up when items are added and down when they are removed.
+          AnimatedContent(
+            targetState = selectedCount,
+            transitionSpec = {
+              val up = targetState > initialState
+              (slideInVertically { if (up) it else -it } + fadeIn()) togetherWith
+                (slideOutVertically { if (up) -it else it } + fadeOut()) using
+                SizeTransform(clip = false)
+            },
+            label = "selectionCount",
+          ) { count ->
+            Text(
+              stringResource(R.string.selected_items, count, totalCount),
+              style = MaterialTheme.typography.titleLargeEmphasized,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+            )
+          }
           Icon(
             Icons.Rounded.ArrowDropDown,
             contentDescription = stringResource(R.string.selection_options),
@@ -338,6 +373,18 @@ private fun SelectionTopBar(
           )
         }
       }
+      // Screens that moved their actions to the floating SelectionToolbar pass none here;
+      // the top bar then offers the most-used selection command as a text button instead.
+      if (actions.isEmpty()) {
+        val allSelected = totalCount > 0 && selectedCount >= totalCount
+        when {
+          allSelected && onDeselectAll != null ->
+            TextButton(onClick = onDeselectAll) { Text(stringResource(R.string.deselect_all)) }
+          !allSelected && onSelectAll != null ->
+            TextButton(onClick = onSelectAll) { Text(stringResource(R.string.select_all)) }
+        }
+      }
+
       val visible = if (actions.size <= 3) actions else actions.take(2)
       val overflow = actions.drop(visible.size)
 
@@ -381,12 +428,3 @@ private fun SelectionTopBar(
     modifier = modifier.clip(MaterialTheme.shapes.extraLarge),
   )
 }
-
-/** One action in the multi-select top bar (shown as an icon or in the overflow menu). */
-private class SelectionAction(
-  val icon: ImageVector,
-  val label: String,
-  val onClick: () -> Unit,
-  val enabled: Boolean = true,
-  val destructive: Boolean = false,
-)

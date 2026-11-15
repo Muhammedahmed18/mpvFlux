@@ -1,7 +1,6 @@
 package app.marlboroadvance.mpvex.ui.browser.selection
 
 import android.content.Context
-import android.content.Intent
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -12,7 +11,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import app.marlboroadvance.mpvex.domain.media.model.Video
-import app.marlboroadvance.mpvex.ui.player.PlayerActivity
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -149,19 +147,7 @@ class SelectionManager<T, ID>(
     @Suppress("UNCHECKED_CAST")
     val videos = selected as List<Video>
 
-    if (videos.size == 1) {
-      // Single video - play normally
-      MediaUtils.playFile(videos.first(), context)
-    } else {
-      // Multiple videos - play as playlist
-      val intent = Intent(Intent.ACTION_VIEW, videos.first().uri)
-      intent.setClass(context, PlayerActivity::class.java)
-      intent.putExtra("internal_launch", true)
-      intent.putParcelableArrayListExtra("playlist", ArrayList(videos.map { it.uri }))
-      intent.putExtra("playlist_index", 0)
-      intent.putExtra("launch_source", "playlist")
-      context.startActivity(intent)
-    }
+    playVideosAsQueue(context, videos)
 
     // Clear selection after starting playback
     clear()

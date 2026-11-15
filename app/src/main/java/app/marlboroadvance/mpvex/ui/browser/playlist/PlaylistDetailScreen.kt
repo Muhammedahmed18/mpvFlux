@@ -50,6 +50,18 @@ import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
 import app.marlboroadvance.mpvex.ui.browser.cards.videoCardGroupPosition
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionAction
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbarDefaults
+import app.marlboroadvance.mpvex.ui.browser.components.selectionToolbarScroll
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionHaptics
+import app.marlboroadvance.mpvex.ui.browser.selection.playVideosAsQueue
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.RemoveCircle
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.ui.unit.Dp
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
@@ -134,6 +146,11 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
     var showUrlDialog by rememberSaveable { mutableStateOf(false) }
     var urlDialogContent by remember { mutableStateOf("") }
     var isReorderMode by rememberSaveable { mutableStateOf(false) }
+    var toolbarExpanded by rememberSaveable { mutableStateOf(true) }
+    LaunchedEffect(selectionManager.isInSelectionMode) {
+      if (selectionManager.isInSelectionMode) toolbarExpanded = true
+    }
+    SelectionHaptics(selectionManager.selectedCount)
 
     BackHandler(enabled = selectionManager.isInSelectionMode || isReorderMode) {
       when {
@@ -171,46 +188,10 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
           },
           onCancelSelection = { selectionManager.clear() },
           isSingleSelection = selectionManager.isSingleSelection,
-          useRemoveIcon = true,
-          onExtractAudioClick = if (playlist?.isM3uPlaylist != true) {
-            {
-              if (extractAudio.open(selectionManager.getSelectedItems().singleOrNull()?.video)) {
-                selectionManager.clear()
-              }
-            }
-          } else null,
-          extractAudioEnabled = !extractAudio.isRunning,
-          onInfoClick = if (selectionManager.isSingleSelection) {
-              {
-                val item = selectionManager.getSelectedItems().firstOrNull()
-                if (item != null) {
-                  if (playlist?.isM3uPlaylist == true) {
-                    urlDialogContent = item.video.path
-                    showUrlDialog = true
-                    selectionManager.clear()
-                  } else {
-                    context.startActivity(
-                      app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(
-                        context,
-                        item.video.uri,
-                        item.video.path,
-                      ),
-                    )
-                    selectionManager.clear()
-                  }
-                }
-              }
-            } else null,
-          onShareClick = if (playlist?.isM3uPlaylist != true) {
-            {
-              val videosToShare = selectionManager.getSelectedItems().map { it.video }
-              MediaUtils.shareVideos(context, videosToShare)
-            }
-          } else null,
+          // Selection actions live in the floating SelectionToolbar.
           onSelectAll = { selectionManager.selectAll() },
           onInvertSelection = { selectionManager.invertSelection() },
           onDeselectAll = { selectionManager.clear() },
-          onDeleteClick = { deleteDialogOpen.value = true },
           additionalActions = {
             when {
               isReorderMode -> {
@@ -266,6 +247,15 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
         )
       }
     ) { padding ->
+     Box(
+       modifier =
+         Modifier
+           .fillMaxSize()
+           .selectionToolbarScroll(
+             onExpand = { toolbarExpanded = true },
+             onCollapse = { toolbarExpanded = false },
+           ),
+     ) {
       PullRefreshBox(
         isRefreshing = remember { mutableStateOf(false) },
         enabled = !selectionManager.isInSelectionMode && !isReorderMode,
@@ -310,8 +300,75 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
           onVideoItemLongClick = { selectionManager.toggle(it) },
           listState = listState,
           modifier = Modifier.fillMaxSize(),
+          bottomPadding =
+            if (selectionManager.isInSelectionMode) SelectionToolbarDefaults.contentBottomPadding() else 32.dp,
         )
       }
+
+      // Selection toolbar: Play the selected items in order, Share, Remove from playlist.
+      val isM3u = playlist?.isM3uPlaylist == true
+      val isSingle = selectionManager.isSingleSelection
+      val playLabel = stringResource(R.string.cd_play)
+      val shareLabel = stringResource(R.string.generic_share)
+      val removeLabel = stringResource(R.string.remove)
+      val infoLabel = stringResource(R.string.info)
+      val extractLabel = stringResource(R.string.extract_audio)
+      SelectionToolbar(
+        visible = selectionManager.isInSelectionMode && !isReorderMode,
+        expanded = toolbarExpanded,
+        modifier = Modifier.align(Alignment.BottomCenter),
+        primaryAction =
+          SelectionAction(Icons.Rounded.PlayArrow, playLabel, {
+            val selected = selectionManager.getSelectedItems().map { it.video }
+            playVideosAsQueue(context, selected)
+            selectionManager.clear()
+          }),
+        actions = buildList {
+          if (!isM3u) {
+            add(
+              SelectionAction(Icons.Rounded.Share, shareLabel, {
+                MediaUtils.shareVideos(context, selectionManager.getSelectedItems().map { it.video })
+              }),
+            )
+          }
+          if (isSingle) {
+            add(
+              SelectionAction(Icons.Rounded.Info, infoLabel, {
+                val item = selectionManager.getSelectedItems().firstOrNull()
+                if (item != null) {
+                  if (isM3u) {
+                    urlDialogContent = item.video.path
+                    showUrlDialog = true
+                  } else {
+                    context.startActivity(
+                      app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(context, item.video.uri, item.video.path),
+                    )
+                  }
+                  selectionManager.clear()
+                }
+              }),
+            )
+          }
+          add(SelectionAction(Icons.Rounded.RemoveCircle, removeLabel, { deleteDialogOpen.value = true }, destructive = true))
+        },
+        overflowActions = buildList {
+          if (isSingle && !isM3u) {
+            add(
+              SelectionAction(
+                Icons.Rounded.MusicNote,
+                extractLabel,
+                {
+                  if (extractAudio.open(selectionManager.getSelectedItems().singleOrNull()?.video)) {
+                    selectionManager.clear()
+                  }
+                },
+                enabled = !extractAudio.isRunning,
+              ),
+            )
+          }
+        },
+      )
+     }
     }
 
     if (deleteDialogOpen.value) {
@@ -356,6 +413,7 @@ private fun PlaylistVideoListContent(
   listState: LazyListState,
   modifier: Modifier = Modifier,
   isM3uPlaylist: Boolean = false,
+  bottomPadding: Dp = 32.dp,
 ) {
   val gesturePreferences = koinInject<GesturePreferences>()
   val browserPreferences = koinInject<BrowserPreferences>()
@@ -388,7 +446,7 @@ private fun PlaylistVideoListContent(
       LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().readableContentWidth(),
-        contentPadding = PaddingValues(top = 12.dp, start = 8.dp, end = 8.dp, bottom = 32.dp),
+        contentPadding = PaddingValues(top = 12.dp, start = 8.dp, end = 8.dp, bottom = bottomPadding),
         // Video rows carry their own 8dp padding, so only a small gap is needed.
         verticalArrangement = Arrangement.spacedBy(2.dp),
       ) {

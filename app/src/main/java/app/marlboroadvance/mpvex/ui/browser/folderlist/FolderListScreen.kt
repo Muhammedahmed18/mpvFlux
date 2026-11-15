@@ -58,6 +58,27 @@ import app.marlboroadvance.mpvex.ui.browser.NavigationBarState
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionAction
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbarDefaults
+import app.marlboroadvance.mpvex.ui.browser.dialogs.AddToPlaylistDialog
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionHaptics
+import app.marlboroadvance.mpvex.ui.browser.selection.playVideosAsQueue
+import app.marlboroadvance.mpvex.ui.browser.sheets.MarkAsHost
+import app.marlboroadvance.mpvex.domain.media.model.Video
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import app.marlboroadvance.mpvex.ui.browser.components.selectionToolbarScroll
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.unit.Dp
+import kotlinx.coroutines.launch
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteProgressDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
@@ -126,6 +147,13 @@ object FolderListScreen : Screen {
     val sortDialogOpen = rememberSaveable { mutableStateOf(false) }
     val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
     val renameDialogOpen = rememberSaveable { mutableStateOf(false) }
+    val markAsOpen = rememberSaveable { mutableStateOf(false) }
+    val addToPlaylistOpen = rememberSaveable { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    // Videos of the selected folders, resolved when an action needs them (Play, Mark as, Playlist).
+    var folderVideos by remember { mutableStateOf<List<Video>>(emptyList()) }
+    var toolbarExpanded by rememberSaveable { mutableStateOf(true) }
 
     val sortedFolders = remember(videoFolders, folderSortType, folderSortOrder) {
       SortUtils.sortFolders(videoFolders, folderSortType, folderSortOrder)
@@ -164,9 +192,23 @@ object FolderListScreen : Screen {
       onOperationComplete = { viewModel.refresh() },
     )
 
+    // The app's navigation bar steps aside while folders are selected so the selection
+    // toolbar can take its place. (updateSelectionState resets the hide flag, so it runs first.)
     LaunchedEffect(selectionManager.isInSelectionMode) {
-      NavigationBarState.updateBottomBarVisibility(!selectionManager.isInSelectionMode)
       NavigationBarState.updateSelectionState(selectionManager.isInSelectionMode, false)
+      NavigationBarState.updateBottomBarVisibility(!selectionManager.isInSelectionMode)
+      if (selectionManager.isInSelectionMode) toolbarExpanded = true
+    }
+    SelectionHaptics(selectionManager.selectedCount)
+
+    /** Loads the selected folders' videos, then runs [action] with them (skipped when empty). */
+    fun withSelectedFolderVideos(action: (List<Video>) -> Unit) {
+      val folders = selectionManager.getSelectedItems()
+      if (folders.isEmpty()) return
+      scope.launch {
+        val videos = viewModel.videosInFolders(folders)
+        if (videos.isNotEmpty()) action(videos)
+      }
     }
 
     val permissionState = PermissionUtils.handleStoragePermission(
@@ -189,6 +231,7 @@ object FolderListScreen : Screen {
 
     Scaffold(
       contentWindowInsets = WindowInsets(0, 0, 0, 0),
+      snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
         if (permissionState.status !is PermissionStatus.Denied) {
           // Folder totals come from the scan; nothing is measured here.
@@ -209,9 +252,8 @@ object FolderListScreen : Screen {
             onCancelSelection = { selectionManager.clear() },
             onSortClick = { sortDialogOpen.value = true },
             onSettingsClick = { backstack.add(PreferencesScreen) },
-            onDeleteClick = { deleteDialogOpen.value = true },
-            onRenameClick = { renameDialogOpen.value = true },
             isSingleSelection = selectionManager.isSingleSelection,
+            // Folder actions live in the floating SelectionToolbar below.
             onSelectAll = { selectionManager.selectAll() },
             onInvertSelection = { selectionManager.invertSelection() },
             onDeselectAll = { selectionManager.clear() },
@@ -219,7 +261,16 @@ object FolderListScreen : Screen {
         }
       },
     ) { padding ->
-      Box(modifier = Modifier.padding(padding)) {
+      Box(
+        modifier =
+          Modifier
+            .padding(padding)
+            .fillMaxSize()
+            .selectionToolbarScroll(
+              onExpand = { toolbarExpanded = true },
+              onCollapse = { toolbarExpanded = false },
+            ),
+      ) {
         when (permissionState.status) {
           PermissionStatus.Granted -> {
             FolderListContent(
@@ -228,6 +279,12 @@ object FolderListScreen : Screen {
               isScanning = isScanning,
               hasCompletedInitialLoad = hasCompletedInitialLoad,
               tapThumbnailToSelect = { currentTapThumbnailToSelect },
+              bottomPadding =
+                if (selectionManager.isInSelectionMode) {
+                  SelectionToolbarDefaults.contentBottomPadding()
+                } else {
+                  navigationBarHeight + 12.dp
+                },
               navigationBarHeight = navigationBarHeight,
               listState = listState,
               isRefreshing = isRefreshing,
@@ -245,7 +302,85 @@ object FolderListScreen : Screen {
             PermissionDeniedState(onRequestPermission = { permissionState.launchPermissionRequest() })
           }
         }
+
+        val playLabel = stringResource(R.string.cd_play)
+        val markAsLabel = stringResource(R.string.mark_as_title)
+        val playlistLabel = stringResource(R.string.add_to_playlist)
+        val renameLabel = stringResource(R.string.rename)
+        val deleteLabel = stringResource(R.string.delete)
+        val hideLabel = stringResource(R.string.selection_hide_folder)
+        val markAsIcon = ImageVector.vectorResource(R.drawable.ic_sym_done_all)
+
+        SelectionToolbar(
+          visible = selectionManager.isInSelectionMode,
+          expanded = toolbarExpanded,
+          modifier = Modifier.align(Alignment.BottomCenter),
+          primaryAction =
+            SelectionAction(Icons.Rounded.PlayArrow, playLabel, {
+              withSelectedFolderVideos { videos ->
+                playVideosAsQueue(context, videos)
+                selectionManager.clear()
+              }
+            }),
+          actions = buildList {
+            add(
+              SelectionAction(markAsIcon, markAsLabel, {
+                withSelectedFolderVideos { videos ->
+                  folderVideos = videos
+                  markAsOpen.value = true
+                }
+              }),
+            )
+            add(
+              SelectionAction(Icons.AutoMirrored.Rounded.PlaylistAdd, playlistLabel, {
+                withSelectedFolderVideos { videos ->
+                  folderVideos = videos
+                  addToPlaylistOpen.value = true
+                }
+              }),
+            )
+            // Rename only appears for a single folder; it is hidden, not disabled, otherwise.
+            if (selectionManager.isSingleSelection) {
+              add(SelectionAction(Icons.Rounded.DriveFileRenameOutline, renameLabel, { renameDialogOpen.value = true }))
+            }
+            add(SelectionAction(Icons.Rounded.Delete, deleteLabel, { deleteDialogOpen.value = true }, destructive = true))
+          },
+          overflowActions = listOf(
+            SelectionAction(Icons.Rounded.VisibilityOff, hideLabel, {
+              val folders = selectionManager.getSelectedItems()
+              if (folders.isNotEmpty()) {
+                val previous = viewModel.hideFolders(folders)
+                selectionManager.clear()
+                scope.launch {
+                  snackbarHostState.currentSnackbarData?.dismiss()
+                  val result = snackbarHostState.showSnackbar(
+                    message = context.resources.getQuantityString(R.plurals.selection_folders_hidden, folders.size, folders.size),
+                    actionLabel = context.getString(R.string.mark_as_undo),
+                    duration = SnackbarDuration.Short,
+                  )
+                  if (result == SnackbarResult.ActionPerformed) viewModel.restoreBlacklist(previous)
+                }
+              }
+            }),
+          ),
+        )
       }
+
+      // "Mark as" for every video in the selected folders, with Undo.
+      MarkAsHost(
+        open = markAsOpen,
+        selectedVideos = { folderVideos },
+        allFinished = false,
+        snackbarHostState = snackbarHostState,
+        onApplied = { selectionManager.clear() },
+      )
+
+      AddToPlaylistDialog(
+        isOpen = addToPlaylistOpen.value,
+        videos = folderVideos,
+        onDismiss = { addToPlaylistOpen.value = false },
+        onSuccess = { selectionManager.clear() },
+      )
 
       FolderSortDialog(
         isOpen = sortDialogOpen.value,
@@ -316,6 +451,7 @@ private fun FolderListContent(
   isScanning: Boolean,
   hasCompletedInitialLoad: Boolean,
   tapThumbnailToSelect: () -> Boolean,
+  bottomPadding: Dp,
   navigationBarHeight: androidx.compose.ui.unit.Dp,
   listState: LazyListState,
   isRefreshing: androidx.compose.runtime.MutableState<Boolean>,
@@ -377,7 +513,7 @@ private fun FolderListContent(
             start = 8.dp,
             end = 8.dp,
             top = 12.dp,
-            bottom = navigationBarHeight + 12.dp
+            bottom = bottomPadding,
           ),
           verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {

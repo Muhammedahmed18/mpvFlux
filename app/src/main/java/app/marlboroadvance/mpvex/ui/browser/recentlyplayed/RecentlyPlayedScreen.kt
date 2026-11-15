@@ -15,6 +15,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.ui.unit.Dp
+import app.marlboroadvance.mpvex.ui.browser.NavigationBarState
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionAction
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbarDefaults
+import app.marlboroadvance.mpvex.ui.browser.components.selectionToolbarScroll
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionHaptics
+import app.marlboroadvance.mpvex.ui.browser.selection.playVideosAsQueue
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
@@ -115,6 +128,20 @@ object RecentlyPlayedScreen : Screen {
       selectionManager.clear()
     }
 
+    // The app's navigation bar steps aside for the selection toolbar while items are selected.
+    var toolbarExpanded by rememberSaveable { mutableStateOf(true) }
+    LaunchedEffect(selectionManager.isInSelectionMode) {
+      val selecting = selectionManager.isInSelectionMode
+      NavigationBarState.updateSelectionState(selecting, false)
+      NavigationBarState.updateBottomBarVisibility(!selecting)
+      if (selecting) toolbarExpanded = true
+    }
+    // Leaving the tab mid-selection must not leave the navigation bar hidden.
+    DisposableEffect(Unit) {
+      onDispose { NavigationBarState.updateBottomBarVisibility(true) }
+    }
+    SelectionHaptics(selectionManager.selectedCount)
+
     val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
     val showThumbnails by browserPreferences.showVideoThumbnails.collectAsState()
     val showVideoExtension by browserPreferences.showVideoExtension.collectAsState()
@@ -197,30 +224,22 @@ object RecentlyPlayedScreen : Screen {
               backStack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
             },
             isSingleSelection = selectionManager.isSingleSelection,
-            // Only for one selected local video (not playlists or network streams).
-            onExtractAudioClick = if (selectionManager.isSingleSelection) {
-              val video = (selectionManager.getSelectedItems().singleOrNull() as? RecentlyPlayedItem.VideoItem)?.video
-              if (video != null && video.canExtractAudio()) {
-                {
-                  if (extractAudio.open(video)) selectionManager.clear()
-                }
-              } else {
-                null
-              }
-            } else {
-              null
-            },
-            extractAudioEnabled = !extractAudio.isRunning,
-            onInfoClick = null,
-            onShareClick = null,
-            onPlayClick = null,
+            // Selection actions live in the floating SelectionToolbar.
             onSelectAll = { selectionManager.selectAll() },
             onInvertSelection = { selectionManager.invertSelection() },
             onDeselectAll = { selectionManager.clear() },
-            onDeleteClick = { showDeleteSheet.value = true },
           )
         },
     ) { padding ->
+     Box(
+       modifier =
+         Modifier
+           .fillMaxSize()
+           .selectionToolbarScroll(
+             onExpand = { toolbarExpanded = true },
+             onCollapse = { toolbarExpanded = false },
+           ),
+     ) {
       when {
         !enableRecentlyPlayed -> {
           EmptyState(
@@ -257,9 +276,66 @@ object RecentlyPlayedScreen : Screen {
             modifier = Modifier.padding(padding),
             isInSelectionMode = selectionManager.isInSelectionMode,
             listState = listState,
+            bottomPadding =
+              if (selectionManager.isInSelectionMode) SelectionToolbarDefaults.contentBottomPadding() else 16.dp,
           )
         }
       }
+
+      // Selection toolbar. Play and Share act on the selected videos; playlists in the
+      // selection are only removed from history.
+      val selectedVideos =
+        selectionManager.getSelectedItems().filterIsInstance<RecentlyPlayedItem.VideoItem>().map { it.video }
+      val singleVideo = selectedVideos.singleOrNull()?.takeIf { selectionManager.isSingleSelection }
+      val playLabel = stringResource(R.string.cd_play)
+      val shareLabel = stringResource(R.string.generic_share)
+      val deleteLabel = stringResource(R.string.delete)
+      val infoLabel = stringResource(R.string.info)
+      val extractLabel = stringResource(R.string.extract_audio)
+      SelectionToolbar(
+        visible = selectionManager.isInSelectionMode,
+        expanded = toolbarExpanded,
+        modifier = Modifier.align(Alignment.BottomCenter),
+        primaryAction =
+          if (selectedVideos.isNotEmpty()) {
+            SelectionAction(Icons.Rounded.PlayArrow, playLabel, {
+              playVideosAsQueue(context, selectedVideos)
+              selectionManager.clear()
+            })
+          } else {
+            null
+          },
+        actions = buildList {
+          if (selectedVideos.isNotEmpty()) {
+            add(SelectionAction(Icons.Rounded.Share, shareLabel, { MediaUtils.shareVideos(context, selectedVideos) }))
+          }
+          if (singleVideo != null) {
+            add(
+              SelectionAction(Icons.Rounded.Info, infoLabel, {
+                context.startActivity(
+                  app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(context, singleVideo.uri, singleVideo.path),
+                )
+                selectionManager.clear()
+              }),
+            )
+          }
+          add(SelectionAction(Icons.Rounded.Delete, deleteLabel, { showDeleteSheet.value = true }, destructive = true))
+        },
+        overflowActions = buildList {
+          // Only for one selected local video (not playlists or network streams).
+          if (singleVideo != null && singleVideo.canExtractAudio()) {
+            add(
+              SelectionAction(
+                Icons.Rounded.MusicNote,
+                extractLabel,
+                { if (extractAudio.open(singleVideo)) selectionManager.clear() },
+                enabled = !extractAudio.isRunning,
+              ),
+            )
+          }
+        },
+      )
+     }
 
       DeleteConfirmationSheet(
           isOpen = showDeleteSheet.value && selectionManager.isInSelectionMode,
@@ -286,6 +362,7 @@ private fun RecentItemsContent(
   modifier: Modifier = Modifier,
   isInSelectionMode: Boolean = false,
   listState: LazyListState,
+  bottomPadding: Dp = 16.dp,
 ) {
   val gesturePreferences = koinInject<GesturePreferences>()
   val browserPreferences = koinInject<BrowserPreferences>()
@@ -346,7 +423,7 @@ private fun RecentItemsContent(
         LazyColumn(
           state = listState,
           modifier = Modifier.fillMaxSize().readableContentWidth(),
-          contentPadding = PaddingValues(top = 8.dp, start = 8.dp, end = 8.dp, bottom = 16.dp),
+          contentPadding = PaddingValues(top = 8.dp, start = 8.dp, end = 8.dp, bottom = bottomPadding),
           // Consecutive videos join into one group (2dp gaps); playlist cards add their own spacing.
           verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {

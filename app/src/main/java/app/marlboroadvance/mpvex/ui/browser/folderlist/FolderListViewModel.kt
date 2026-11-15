@@ -235,6 +235,43 @@ class FolderListViewModel(
   suspend fun deleteFolders(folders: List<VideoFolder>): Pair<Int, Int> =
     deleteFoldersWithProgress(folders.map { it.path })
 
+  /**
+   * All videos in [folders], folder by folder in the given order, each folder's videos in the
+   * user's video sort order. Used by the selection toolbar (Play, Mark as, Add to playlist).
+   */
+  suspend fun videosInFolders(folders: List<VideoFolder>): List<app.marlboroadvance.mpvex.domain.media.model.Video> =
+    withContext(Dispatchers.IO) {
+      val sortType = browserPreferences.videoSortType.get()
+      val sortOrder = browserPreferences.videoSortOrder.get()
+      folders.flatMap { folder ->
+        try {
+          app.marlboroadvance.mpvex.utils.sort.SortUtils.sortVideos(
+            MediaFileRepository.getVideosInFolder(getApplication(), folder.bucketId),
+            sortType,
+            sortOrder,
+          )
+        } catch (e: Exception) {
+          if (e is CancellationException) throw e
+          Log.e(TAG, "Error loading videos for ${folder.path}", e)
+          emptyList()
+        }
+      }
+    }
+
+  /**
+   * Hides [folders] from the library by adding them to the folder blacklist.
+   * Returns the previous blacklist so the caller can offer Undo via [restoreBlacklist].
+   */
+  fun hideFolders(folders: List<VideoFolder>): Set<String> {
+    val previous = foldersPreferences.blacklistedFolders.get()
+    foldersPreferences.blacklistedFolders.set(previous + folders.map { it.path })
+    return previous
+  }
+
+  fun restoreBlacklist(previous: Set<String>) {
+    foldersPreferences.blacklistedFolders.set(previous)
+  }
+
   fun loadVideoFolders(forceShowScanning: Boolean = false) {
     val hasExistingData = _allVideoFolders.value.isNotEmpty()
 

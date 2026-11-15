@@ -6,15 +6,12 @@ import android.content.Intent
 import android.os.Environment
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import app.marlboroadvance.mpvex.ui.browser.cards.videoCardGroupPosition
 import app.marlboroadvance.mpvex.ui.browser.sheets.rememberSortOrderLabels
 import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.utils.media.OpenDocumentTreeContract
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -70,7 +67,20 @@ import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
-import app.marlboroadvance.mpvex.ui.browser.components.BrowserBottomBar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionAction
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbarDefaults
+import app.marlboroadvance.mpvex.ui.browser.dialogs.CopyOrMoveSheet
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionHaptics
+import androidx.compose.material.icons.automirrored.rounded.DriveFileMove
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Share
+import app.marlboroadvance.mpvex.ui.browser.components.selectionToolbarScroll
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.AddToPlaylistDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
@@ -202,6 +212,7 @@ data class VideoListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val renameDialogOpen = rememberSaveable { mutableStateOf(false) }
     val addToPlaylistDialogOpen = rememberSaveable { mutableStateOf(false) }
+    val copyOrMoveOpen = rememberSaveable { mutableStateOf(false) }
 
     // Copy/Move state
     val folderPickerOpen = rememberSaveable { mutableStateOf(false) }
@@ -246,13 +257,13 @@ data class VideoListScreen(
     // FAB visibility state
     val isFabVisible = remember { mutableStateOf(true) }
 
-    // Bottom bar animation state
-    var showFloatingBottomBar by remember { mutableStateOf(false) }
-    val animationDuration = 300
-
+    // Selection toolbar state. It collapses to just the Play FAB while scrolling down.
+    val showFloatingBottomBar = selectionManager.isInSelectionMode
+    var toolbarExpanded by rememberSaveable { mutableStateOf(true) }
     LaunchedEffect(selectionManager.isInSelectionMode) {
-      showFloatingBottomBar = selectionManager.isInSelectionMode
+      if (selectionManager.isInSelectionMode) toolbarExpanded = true
     }
+    SelectionHaptics(selectionManager.selectedCount)
 
     DisposableEffect(lifecycleOwner) {
       val observer =
@@ -304,34 +315,25 @@ data class VideoListScreen(
             backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
           },
           isSingleSelection = selectionManager.isSingleSelection,
-          onExtractAudioClick = {
-            if (extractAudio.open(selectionManager.getSelectedItems().singleOrNull())) {
-              selectionManager.clear()
-            }
-          },
-          extractAudioEnabled = !extractAudio.isRunning,
-          onInfoClick = {
-            if (selectionManager.isSingleSelection) {
-              val video = selectionManager.getSelectedItems().firstOrNull()
-              if (video != null) {
-                context.startActivity(
-                  app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(context, video.uri, video.path),
-                )
-                selectionManager.clear()
-              }
-            }
-          },
+          // Selection actions live in the floating SelectionToolbar below.
           onSelectAll = { selectionManager.selectAll() },
           onInvertSelection = { selectionManager.invertSelection() },
           onDeselectAll = { selectionManager.clear() },
-          onMarkAsClick = { markAsOpen.value = true },
         )
       },
     ) { padding ->
       app.marlboroadvance.mpvex.ui.browser.sheets.ExtractAudioHost(extractAudio)
       val autoScrollToLastPlayed by browserPreferences.autoScrollToLastPlayed.collectAsState()
 
-      Box(modifier = Modifier.fillMaxSize()) {
+      Box(
+        modifier =
+          Modifier
+            .fillMaxSize()
+            .selectionToolbarScroll(
+              onExpand = { toolbarExpanded = true },
+              onCollapse = { toolbarExpanded = false },
+            ),
+      ) {
         VideoListContent(
           folderId = bucketId,
           videosWithInfo = sortedVideosWithInfo,
@@ -359,43 +361,82 @@ data class VideoListScreen(
           showFloatingBottomBar = showFloatingBottomBar,
         )
 
-        AnimatedVisibility(
+        // Strings are read here (not inside the action lambdas) so they follow the locale.
+        val playLabel = stringResource(R.string.cd_play)
+        val shareLabel = stringResource(R.string.generic_share)
+        val playlistLabel = stringResource(R.string.add_to_playlist)
+        val renameLabel = stringResource(R.string.rename)
+        val sendLabel = stringResource(R.string.selection_send_to_folder)
+        val deleteLabel = stringResource(R.string.delete)
+        val infoLabel = stringResource(R.string.info)
+        val extractLabel = stringResource(R.string.extract_audio)
+        val markAsLabel = stringResource(R.string.mark_as_title)
+
+        val isSingle = selectionManager.isSingleSelection
+        val sendToFolder = SelectionAction(Icons.AutoMirrored.Rounded.DriveFileMove, sendLabel, { copyOrMoveOpen.value = true })
+        val markAs = SelectionAction(ImageVector.vectorResource(R.drawable.ic_sym_done_all), markAsLabel, { markAsOpen.value = true })
+
+        SelectionToolbar(
           visible = showFloatingBottomBar,
-          enter = slideInVertically(
-            animationSpec = tween(durationMillis = animationDuration),
-            initialOffsetY = { fullHeight -> fullHeight }
-          ),
-          exit = slideOutVertically(
-            animationSpec = tween(durationMillis = animationDuration),
-            targetOffsetY = { fullHeight -> fullHeight }
-          ),
-          modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-          BrowserBottomBar(
-            isSelectionMode = true,
-            onCopyClick = {
-              operationType.value = CopyPasteOps.OperationType.Copy
-              if (CopyPasteOps.canUseDirectFileOperations()) {
-                folderPickerOpen.value = true
-              } else {
-                treePickerLauncher.launch(null)
-              }
-            },
-            onMoveClick = {
-              operationType.value = CopyPasteOps.OperationType.Move
-              if (CopyPasteOps.canUseDirectFileOperations()) {
-                folderPickerOpen.value = true
-              } else {
-                treePickerLauncher.launch(null)
-              }
-            },
-            onRenameClick = { renameDialogOpen.value = true },
-            onDeleteClick = { deleteDialogOpen.value = true },
-            onAddToPlaylistClick = { addToPlaylistDialogOpen.value = true },
-            showRename = selectionManager.isSingleSelection
-          )
-        }
+          expanded = toolbarExpanded,
+          modifier = Modifier.align(Alignment.BottomCenter),
+          primaryAction = SelectionAction(Icons.Rounded.PlayArrow, playLabel, { selectionManager.playSelected() }),
+          actions = buildList {
+            add(SelectionAction(Icons.Rounded.Share, shareLabel, { selectionManager.shareSelected() }))
+            add(SelectionAction(Icons.AutoMirrored.Rounded.PlaylistAdd, playlistLabel, { addToPlaylistDialogOpen.value = true }))
+            // One video: Rename sits in the bar. Several: Copy/Move takes its place.
+            if (isSingle) {
+              add(SelectionAction(Icons.Rounded.DriveFileRenameOutline, renameLabel, { renameDialogOpen.value = true }))
+            } else {
+              add(sendToFolder)
+            }
+            add(SelectionAction(Icons.Rounded.Delete, deleteLabel, { deleteDialogOpen.value = true }, destructive = true))
+          },
+          overflowActions = buildList {
+            if (isSingle) {
+              add(
+                SelectionAction(Icons.Rounded.Info, infoLabel, {
+                  val video = selectionManager.getSelectedItems().firstOrNull()
+                  if (video != null) {
+                    context.startActivity(
+                      app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(context, video.uri, video.path),
+                    )
+                    selectionManager.clear()
+                  }
+                }),
+              )
+              add(
+                SelectionAction(
+                  Icons.Rounded.MusicNote,
+                  extractLabel,
+                  {
+                    if (extractAudio.open(selectionManager.getSelectedItems().singleOrNull())) {
+                      selectionManager.clear()
+                    }
+                  },
+                  enabled = !extractAudio.isRunning,
+                ),
+              )
+            }
+            add(markAs)
+            if (isSingle) add(sendToFolder)
+          },
+        )
       }
+
+      CopyOrMoveSheet(
+        isOpen = copyOrMoveOpen.value,
+        itemCount = selectionManager.selectedCount,
+        onDismiss = { copyOrMoveOpen.value = false },
+        onCopy = {
+          operationType.value = CopyPasteOps.OperationType.Copy
+          if (CopyPasteOps.canUseDirectFileOperations()) folderPickerOpen.value = true else treePickerLauncher.launch(null)
+        },
+        onMove = {
+          operationType.value = CopyPasteOps.OperationType.Move
+          if (CopyPasteOps.canUseDirectFileOperations()) folderPickerOpen.value = true else treePickerLauncher.launch(null)
+        },
+      )
 
       // All overlays (sort/delete/rename/copy-move/private-space/playlist) live in their
       // own composable so their driving state stays out of the main Content scope.
@@ -685,7 +726,7 @@ private fun VideoListContent(
             LazyColumn(
               state = listState,
               modifier = Modifier.fillMaxSize().readableContentWidth(),
-              contentPadding = PaddingValues(top = 8.dp, start = 8.dp, end = 8.dp, bottom = if (showFloatingBottomBar) 88.dp else 16.dp),
+              contentPadding = PaddingValues(top = 8.dp, start = 8.dp, end = 8.dp, bottom = if (showFloatingBottomBar) SelectionToolbarDefaults.contentBottomPadding() else 16.dp),
               // Video rows carry their own 8dp padding, so only a small gap is needed.
               verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {

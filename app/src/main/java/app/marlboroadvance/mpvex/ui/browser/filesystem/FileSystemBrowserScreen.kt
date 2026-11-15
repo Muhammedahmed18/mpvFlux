@@ -6,10 +6,7 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.lazy.itemsIndexed
 import app.marlboroadvance.mpvex.ui.browser.cards.videoCardGroupPosition
 import app.marlboroadvance.mpvex.ui.browser.sheets.rememberSortOrderLabels
@@ -73,7 +70,21 @@ import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefresh
 import app.marlboroadvance.mpvex.ui.browser.NavigationBarState
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCard
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
-import app.marlboroadvance.mpvex.ui.browser.components.BrowserBottomBar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionAction
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbarDefaults
+import app.marlboroadvance.mpvex.ui.browser.components.selectionToolbarScroll
+import app.marlboroadvance.mpvex.ui.browser.dialogs.CopyOrMoveSheet
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionHaptics
+import app.marlboroadvance.mpvex.ui.browser.selection.playVideosAsQueue
+import androidx.compose.material.icons.automirrored.rounded.DriveFileMove
+import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Share
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.AddToPlaylistDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
@@ -94,7 +105,9 @@ import app.marlboroadvance.mpvex.utils.media.MediaUtils
 import app.marlboroadvance.mpvex.utils.permission.PermissionUtils
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionStatus
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
@@ -224,12 +237,11 @@ fun FileSystemBrowserScreen(path: String? = null) {
   val progressDialogOpen = rememberSaveable { mutableStateOf(false) }
   val operationProgress by CopyPasteOps.operationProgress.collectAsStateWithLifecycle()
 
-  // Bottom bar visibility state
-  var showFloatingBottomBar by remember { mutableStateOf(false) }
-  var showBottomNavigation by remember { mutableStateOf(true) }
-
-  // Animation duration for responsive slide animations
-  val animationDuration = 200
+  val copyOrMoveOpen = rememberSaveable { mutableStateOf(false) }
+  // Videos the toolbar acts on: the selected videos plus, for selected folders, every video
+  // inside them (resolved when an action needs them).
+  var toolbarVideos by remember { mutableStateOf<List<app.marlboroadvance.mpvex.domain.media.model.Video>>(emptyList()) }
+  var toolbarExpanded by rememberSaveable { mutableStateOf(true) }
 
   // Selection managers - separate for folders and videos
   val folders = items.filterIsInstance<FileSystemItem.Folder>()
@@ -265,21 +277,35 @@ fun FileSystemBrowserScreen(path: String? = null) {
   val totalCount = folders.size + videos.size
   val isMixedSelection = folderSelectionManager.isInSelectionMode && videoSelectionManager.isInSelectionMode
 
-  // Update bottom bar visibility with optimized animation sequencing
-  LaunchedEffect(isInSelectionMode, videoSelectionManager.isInSelectionMode, isMixedSelection) {
-    // Show floating bar and hide bottom navigation when appropriate.
-    // Play Store gating is intentionally bypassed here.
-    val shouldShowFloatingBar = isInSelectionMode && videoSelectionManager.isInSelectionMode && !isMixedSelection
-    
-    if (shouldShowFloatingBar) {
-      // Entering selection mode: Hide bottom navigation immediately, then show floating bar
-      showBottomNavigation = false
-      showFloatingBottomBar = true
-    } else {
-      // Exiting selection mode: Hide floating bar and show bottom navigation immediately for better responsiveness
-      showFloatingBottomBar = false
-      showBottomNavigation = true
+  // The selection toolbar shows for any selection (videos, folders or both) and the app's
+  // navigation bar steps aside for it.
+  val showFloatingBottomBar = isInSelectionMode
+  val showBottomNavigation = !isInSelectionMode
+  LaunchedEffect(isInSelectionMode) {
+    if (isInSelectionMode) toolbarExpanded = true
+  }
+  SelectionHaptics(selectedCount)
+
+  /** Selected videos, then every video inside the selected folders (recursively). */
+  fun withSelectedVideos(action: (List<app.marlboroadvance.mpvex.domain.media.model.Video>) -> Unit) {
+    val selectedVideos = videoSelectionManager.getSelectedItems()
+    val selectedFolders = folderSelectionManager.getSelectedItems()
+    if (selectedFolders.isEmpty()) {
+      if (selectedVideos.isNotEmpty()) action(selectedVideos)
+      return
     }
+    coroutineScope.launch {
+      val fromFolders = withContext(Dispatchers.IO) {
+        selectedFolders.flatMap { collectVideosRecursively(context, it.path) }
+      }
+      val all = (selectedVideos + fromFolders).distinctBy { it.path }
+      if (all.isNotEmpty()) action(all)
+    }
+  }
+
+  fun clearSelection() {
+    folderSelectionManager.clear()
+    videoSelectionManager.clear()
   }
 
   // Permissions
@@ -299,12 +325,12 @@ fun FileSystemBrowserScreen(path: String? = null) {
       try {
         val onlyVideosSelected = videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode
 
-        // Update NavigationBarState for reactive navigation bar visibility
-        NavigationBarState.updateBottomBarVisibility(showBottomNavigation)
+        // updateSelectionState resets the hide flag, so it runs before the visibility call.
         NavigationBarState.updateSelectionState(
           inSelectionMode = isInSelectionMode,
           onlyVideos = onlyVideosSelected
         )
+        NavigationBarState.updateBottomBarVisibility(showBottomNavigation)
         NavigationBarState.updatePermissionState(
           denied = permissionState.status is PermissionStatus.Denied
         )
@@ -395,7 +421,15 @@ fun FileSystemBrowserScreen(path: String? = null) {
   }
 
   // Main content
-  Box(modifier = Modifier.fillMaxSize()) {
+  Box(
+    modifier =
+      Modifier
+        .fillMaxSize()
+        .selectionToolbarScroll(
+          onExpand = { toolbarExpanded = true },
+          onCollapse = { toolbarExpanded = false },
+        ),
+  ) {
     val extractAudio = app.marlboroadvance.mpvex.ui.browser.sheets.rememberExtractAudioController()
     app.marlboroadvance.mpvex.ui.browser.sheets.ExtractAudioHost(extractAudio)
 
@@ -442,38 +476,8 @@ fun FileSystemBrowserScreen(path: String? = null) {
           onSettingsClick = {
             backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
           },
-          onDeleteClick = if (videoSelectionManager.isInSelectionMode && !isMixedSelection) {
-            null
-          } else {
-            { deleteDialogOpen.value = true }
-          },
-          onRenameClick = { renameDialogOpen.value = true },
           isSingleSelection = (videoSelectionManager.isSingleSelection || folderSelectionManager.isSingleSelection) && !isMixedSelection,
-          onExtractAudioClick = if (videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode) {
-            {
-              if (extractAudio.open(videoSelectionManager.getSelectedItems().singleOrNull())) {
-                videoSelectionManager.clear()
-              }
-            }
-          } else {
-            null
-          },
-          extractAudioEnabled = !extractAudio.isRunning,
-          onInfoClick = if (videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode) {
-            {
-              val video = videoSelectionManager.getSelectedItems().firstOrNull()
-              if (video != null) {
-                context.startActivity(
-                  app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(context, video.uri, video.path),
-                )
-                videoSelectionManager.clear()
-              }
-            }
-          } else {
-            null
-          },
-          onShareClick = null,
-          onPlayClick = null,
+          // Selection actions live in the floating SelectionToolbar.
           onSelectAll = {
             folderSelectionManager.selectAll()
             videoSelectionManager.selectAll()
@@ -485,13 +489,6 @@ fun FileSystemBrowserScreen(path: String? = null) {
           onDeselectAll = {
             folderSelectionManager.clear()
             videoSelectionManager.clear()
-          },
-          onAddToPlaylistClick = null,
-          // "Mark as" works on videos only, so it's hidden while folders are selected.
-          onMarkAsClick = if (videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode) {
-            { markAsOpen.value = true }
-          } else {
-            null
           },
         )
       },
@@ -510,7 +507,8 @@ fun FileSystemBrowserScreen(path: String? = null) {
                 isAtRoot = isAtRoot,
                 breadcrumbs = breadcrumbs,
                 showSubtitleIndicator = showSubtitleIndicator,
-                navigationBarHeight = navigationBarHeight,
+                navigationBarHeight =
+                  if (isInSelectionMode) SelectionToolbarDefaults.contentBottomPadding() else navigationBarHeight,
                 videoCardSettings = videoCardSettings,
                 folderCardSettings = folderCardSettings,
                 onRefresh = { viewModel.refresh() },
@@ -577,53 +575,123 @@ fun FileSystemBrowserScreen(path: String? = null) {
       }
     }
 
-    // Independent Floating Bottom Bar - positioned at absolute bottom
-    // Play Store gating is intentionally bypassed here.
-    AnimatedVisibility(
+    // Selection toolbar. Which actions show depends on what is selected:
+    // videos only, folders only, or a mix of both.
+    val onlyVideos = videoSelectionManager.isInSelectionMode && !folderSelectionManager.isInSelectionMode
+    val onlyFolders = folderSelectionManager.isInSelectionMode && !videoSelectionManager.isInSelectionMode
+    val singleItem = selectedCount == 1
+
+    val playLabel = stringResource(R.string.cd_play)
+    val shareLabel = stringResource(R.string.generic_share)
+    val playlistLabel = stringResource(R.string.add_to_playlist)
+    val renameLabel = stringResource(R.string.rename)
+    val sendLabel = stringResource(R.string.selection_send_to_folder)
+    val deleteLabel = stringResource(R.string.delete)
+    val infoLabel = stringResource(R.string.info)
+    val extractLabel = stringResource(R.string.extract_audio)
+    val markAsLabel = stringResource(R.string.mark_as_title)
+    val markAsIcon = ImageVector.vectorResource(R.drawable.ic_sym_done_all)
+
+    val playAction = SelectionAction(Icons.Rounded.PlayArrow, playLabel, {
+      withSelectedVideos { videos ->
+        playVideosAsQueue(context, videos)
+        clearSelection()
+      }
+    })
+    val playlistAction = SelectionAction(Icons.AutoMirrored.Rounded.PlaylistAdd, playlistLabel, {
+      withSelectedVideos { videos ->
+        toolbarVideos = videos
+        addToPlaylistDialogOpen.value = true
+      }
+    })
+    val markAsAction = SelectionAction(markAsIcon, markAsLabel, {
+      withSelectedVideos { videos ->
+        toolbarVideos = videos
+        markAsOpen.value = true
+      }
+    })
+    val renameAction = SelectionAction(Icons.Rounded.DriveFileRenameOutline, renameLabel, { renameDialogOpen.value = true })
+    val sendAction = SelectionAction(Icons.AutoMirrored.Rounded.DriveFileMove, sendLabel, { copyOrMoveOpen.value = true })
+    val deleteAction = SelectionAction(Icons.Rounded.Delete, deleteLabel, { deleteDialogOpen.value = true }, destructive = true)
+
+    SelectionToolbar(
       visible = showFloatingBottomBar,
-      enter = slideInVertically(
-        animationSpec = tween(durationMillis = animationDuration),
-        initialOffsetY = { fullHeight -> fullHeight }
-      ),
-      exit = slideOutVertically(
-        animationSpec = tween(durationMillis = animationDuration),
-        targetOffsetY = { fullHeight -> fullHeight }
-      ),
-      modifier = Modifier.align(Alignment.BottomCenter)
-    ) {
-      BrowserBottomBar(
-        isSelectionMode = true,
-        onCopyClick = {
-          operationType.value = CopyPasteOps.OperationType.Copy
-          if (CopyPasteOps.canUseDirectFileOperations()) {
-            folderPickerOpen.value = true
-          } else {
-            treePickerLauncher.launch(null)
+      expanded = toolbarExpanded,
+      modifier = Modifier.align(Alignment.BottomCenter),
+      primaryAction = playAction,
+      actions = buildList {
+        when {
+          onlyVideos -> {
+            add(SelectionAction(Icons.Rounded.Share, shareLabel, { videoSelectionManager.shareSelected() }))
+            add(playlistAction)
+            add(if (singleItem) renameAction else sendAction)
           }
-        },
-        onMoveClick = {
-          operationType.value = CopyPasteOps.OperationType.Move
-          if (CopyPasteOps.canUseDirectFileOperations()) {
-            folderPickerOpen.value = true
-          } else {
-            treePickerLauncher.launch(null)
+          onlyFolders -> {
+            add(markAsAction)
+            add(playlistAction)
+            if (singleItem) add(renameAction)
           }
-        },
-        onRenameClick = { renameDialogOpen.value = true },
-        onDeleteClick = { deleteDialogOpen.value = true },
-        onAddToPlaylistClick = { addToPlaylistDialogOpen.value = true },
-        showRename = videoSelectionManager.isSingleSelection,
-        modifier = Modifier.padding(bottom = 0.dp) // Zero bottom padding - absolute bottom
-      )
-    }
+          else -> { // folders and videos together
+            add(markAsAction)
+            add(playlistAction)
+          }
+        }
+        add(deleteAction)
+      },
+      overflowActions = buildList {
+        if (onlyVideos && singleItem) {
+          add(
+            SelectionAction(Icons.Rounded.Info, infoLabel, {
+              val video = videoSelectionManager.getSelectedItems().firstOrNull()
+              if (video != null) {
+                context.startActivity(
+                  app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(context, video.uri, video.path),
+                )
+                videoSelectionManager.clear()
+              }
+            }),
+          )
+          add(
+            SelectionAction(
+              Icons.Rounded.MusicNote,
+              extractLabel,
+              {
+                if (extractAudio.open(videoSelectionManager.getSelectedItems().singleOrNull())) {
+                  videoSelectionManager.clear()
+                }
+              },
+              enabled = !extractAudio.isRunning,
+            ),
+          )
+        }
+        if (onlyVideos) {
+          add(markAsAction)
+          if (singleItem) add(sendAction)
+        }
+      },
+    )
+
+    CopyOrMoveSheet(
+      isOpen = copyOrMoveOpen.value,
+      itemCount = videoSelectionManager.selectedCount,
+      onDismiss = { copyOrMoveOpen.value = false },
+      onCopy = {
+        operationType.value = CopyPasteOps.OperationType.Copy
+        if (CopyPasteOps.canUseDirectFileOperations()) folderPickerOpen.value = true else treePickerLauncher.launch(null)
+      },
+      onMove = {
+        operationType.value = CopyPasteOps.OperationType.Move
+        if (CopyPasteOps.canUseDirectFileOperations()) folderPickerOpen.value = true else treePickerLauncher.launch(null)
+      },
+    )
 
     // "Mark as" sheet for the selected videos, with Undo.
     MarkAsHost(
       open = markAsOpen,
-      selectedVideos = { videoSelectionManager.getSelectedItems() },
+      selectedVideos = { toolbarVideos },
       allFinished = false,
       snackbarHostState = snackbarHostState,
-      onApplied = { videoSelectionManager.clear() },
+      onApplied = { clearSelection() },
     )
 
     // Dialogs
@@ -743,10 +811,10 @@ fun FileSystemBrowserScreen(path: String? = null) {
     // Add to Playlist Dialog
     AddToPlaylistDialog(
       isOpen = addToPlaylistDialogOpen.value,
-      videos = videoSelectionManager.getSelectedItems(),
+      videos = toolbarVideos,
       onDismiss = { addToPlaylistDialogOpen.value = false },
       onSuccess = {
-        videoSelectionManager.clear()
+        clearSelection()
         viewModel.refresh()
       },
     )
