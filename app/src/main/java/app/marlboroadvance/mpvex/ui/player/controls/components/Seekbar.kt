@@ -3,9 +3,6 @@ package app.marlboroadvance.mpvex.ui.player.controls.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.Surface
 import androidx.compose.ui.geometry.CornerRadius
@@ -31,6 +28,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -282,19 +280,18 @@ fun VideoTimer(
 @Composable
 fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Segment>, isPaused: Boolean = false, isScrubbing: Boolean = false, seekbarStyle: SeekbarStyle = SeekbarStyle.Standard, onSeek: (Float) -> Unit, onSeekFinished: () -> Unit, loopStart: Float? = null, loopEnd: Float? = null, modifier: Modifier = Modifier) {
     val activeColor = MaterialTheme.colorScheme.primary
-    val inactiveColor = MaterialTheme.colorScheme.secondaryContainer
+    // Classic look: the unplayed part is the accent colour at 30%.
+    val inactiveColor = seekbarInactiveColor(activeColor)
     // A-B loop markers use the theme's tertiary so they follow dynamic colour.
     val loopColor = MaterialTheme.colorScheme.tertiary
     val interactionSource = remember { MutableInteractionSource() }
+    val isThick = seekbarStyle == SeekbarStyle.Thick
     // Reuse a single Animatable across pause/scrub toggles instead of allocating a new
     // one each time the effect re-runs.
-    val isThick = seekbarStyle == SeekbarStyle.Thick
     val heightAnimatable = remember { Animatable(1f) }
-    // Only the Thick track eases thinner while paused (20dp → 14dp). Standard keeps its
-    // full height so it never turns into a hairline, and neither style shrinks while
-    // dragging, so the handle stays in proportion.
-    LaunchedEffect(isPaused, isScrubbing, isThick) {
-        val shouldFlatten = isThick && isPaused && !isScrubbing
+    // Classic behaviour: both styles ease the track to 70% height while paused or dragging.
+    LaunchedEffect(isPaused, isScrubbing) {
+        val shouldFlatten = isPaused || isScrubbing
         val targetHeight = if (shouldFlatten) 0.7f else 1f
         delay(if (shouldFlatten) 0L else 60L)
         heightAnimatable.animateTo(targetValue = targetHeight, animationSpec = tween(durationMillis = if (shouldFlatten) 550 else 800, easing = LinearEasing))
@@ -302,25 +299,6 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
     val trackHeightDp = (if (isThick) ThickTrackHeight else StandardTrackHeight) * heightAnimatable.value
     // Chapter start times as fractions of the video (the first chapter at 0 isn't a cut).
     val chapterFractions = remember(chapters, duration) { chapterFractions(chapters, duration) }
-
-    // Standard: the M3 slider handle — a slim 4dp rounded bar that gets thinner and taller
-    // while dragging. Thick: a chunky rounded pill (8dp) that grows a little while dragging.
-    val thumbWidth by animateDpAsState(
-        targetValue = when {
-            isThick -> if (isScrubbing) 10.dp else 8.dp
-            else -> if (isScrubbing) 2.dp else 4.dp
-        },
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "seek_thumb_width",
-    )
-    val thumbHeight by animateDpAsState(
-        targetValue = when {
-            isThick -> if (isScrubbing) 38.dp else 32.dp
-            else -> if (isScrubbing) 42.dp else 36.dp
-        },
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-        label = "seek_thumb_height",
-    )
 
     Slider(value = position, onValueChange = onSeek, onValueChangeFinished = onSeekFinished, valueRange = 0f..duration.coerceAtLeast(0.1f), modifier = modifier.fillMaxWidth().height(48.dp), interactionSource = interactionSource,
         track = { sliderState ->
@@ -342,25 +320,33 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
             }
         },
         thumb = {
-            // Fixed-size slot (as wide as the handle gets) so the animated handle never
-            // changes the track's length.
+            // Classic fixed-size handle (doesn't change while dragging), 6dp wide.
+            // Standard: a 24dp-tall rounded pill standing above the 8dp track.
+            // Thick: a 16dp block (same height as the track) with 3dp corners.
             Box(
-                modifier = Modifier.width(seekbarThumbSlotWidth(isThick)).height(44.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(modifier = Modifier.width(thumbWidth).height(thumbHeight).background(activeColor, CircleShape))
-            }
+                modifier = Modifier
+                    .width(SeekbarThumbWidth)
+                    .height(if (isThick) ThickTrackHeight else 24.dp)
+                    .background(activeColor, if (isThick) RoundedCornerShape(3.dp) else CircleShape),
+            )
         }
     )
 }
 
-// Seekbar sizes. Standard = M3-style 10dp track with a slim bar handle; Thick = 20dp
-// track with a chunky rounded pill handle.
-internal val StandardTrackHeight = 10.dp
-internal val ThickTrackHeight = 20.dp
+// Seekbar sizes (classic style). Standard = 8dp track with a 6×24dp pill handle;
+// Thick = 16dp track with a 6×16dp block handle. Both leave 7dp either side of the
+// handle's centre clear.
+internal val StandardTrackHeight = 8.dp
+internal val ThickTrackHeight = 16.dp
+internal val SeekbarThumbWidth = 6.dp
+private val SeekbarThumbGapHalf = 7.dp
 
-/** Width of the handle's slot: the widest the handle gets (while dragging). */
-internal fun seekbarThumbSlotWidth(isThick: Boolean) = if (isThick) 10.dp else 4.dp
+/** Handle width, used to line the drag bubble up with it (same for both styles). */
+@Suppress("UNUSED_PARAMETER")
+internal fun seekbarThumbSlotWidth(isThick: Boolean) = SeekbarThumbWidth
+
+/** Unplayed-track colour: the accent at 30% (classic style). */
+internal fun seekbarInactiveColor(activeColor: Color) = activeColor.copy(alpha = 0.3f)
 
 /** Chapter starts as fractions of [duration], skipping a chapter at the very start. */
 internal fun chapterFractions(chapters: List<Segment>, duration: Float): List<Float> {
@@ -371,7 +357,8 @@ internal fun chapterFractions(chapters: List<Segment>, duration: Float): List<Fl
 /**
  * Draws the seek track: played part in [activeColor], the rest in [inactiveColor], a gap
  * around the handle, small gaps where chapters start, and a stop dot. Outer ends are
- * fully rounded; edges next to a gap get small corners (M3 Expressive).
+ * fully rounded. Edges next to a gap: Standard gets small 2dp corners, Thick is fully
+ * rounded so each piece reads as its own pill (classic style).
  */
 internal fun DrawScope.drawSeekTrack(
     fraction: Float,
@@ -383,10 +370,10 @@ internal fun DrawScope.drawSeekTrack(
     val width = size.width
     val trackHeight = size.height
     val outerRadius = trackHeight / 2f
-    val innerRadius = if (isThick) 3.dp.toPx() else 2.dp.toPx()
+    val innerRadius = if (isThick) outerRadius else 2.dp.toPx()
     val playedPx = width * fraction
-    // Half the handle slot plus a 4dp gap on each side of the handle.
-    val thumbGapHalf = (seekbarThumbSlotWidth(isThick) / 2 + 4.dp).toPx()
+    // 7dp either side of the handle's centre (6dp handle → 4dp visible gap each side).
+    val thumbGapHalf = SeekbarThumbGapHalf.toPx()
     val chapterGapHalf = if (isThick) 2.dp.toPx() else 1.5.dp.toPx()
 
     // Cuts: the thumb gap and one small gap per chapter start.
@@ -450,7 +437,7 @@ internal fun DrawScope.drawSeekTrack(
 @Composable
 fun SeekbarStylePreview(style: SeekbarStyle, modifier: Modifier = Modifier) {
     val activeColor = MaterialTheme.colorScheme.primary
-    val inactiveColor = MaterialTheme.colorScheme.secondaryContainer
+    val inactiveColor = seekbarInactiveColor(activeColor)
     val isThick = style == SeekbarStyle.Thick
     Canvas(modifier = modifier.width(120.dp).height(28.dp)) {
         val trackHeight = (if (isThick) 12.dp else 6.dp).toPx()
@@ -459,14 +446,16 @@ fun SeekbarStylePreview(style: SeekbarStyle, modifier: Modifier = Modifier) {
         inset(left = 0f, top = top, right = 0f, bottom = top) {
             drawSeekTrack(fraction, listOf(0.18f, 0.72f), isThick, activeColor, inactiveColor)
         }
-        // Standard: slim bar handle. Thick: chunky rounded pill handle.
+        // Standard: pill handle taller than the track. Thick: block handle as tall as
+        // the track, with small rounded corners.
         val x = size.width * fraction
-        val handleWidth = (if (isThick) 6.dp else 3.dp).toPx()
+        val handleWidth = 4.dp.toPx()
+        val handleHeight = if (isThick) trackHeight else size.height * 0.75f
         drawRoundRect(
             color = activeColor,
-            topLeft = Offset(x - handleWidth / 2f, 0f),
-            size = Size(handleWidth, size.height),
-            cornerRadius = CornerRadius(handleWidth / 2f),
+            topLeft = Offset(x - handleWidth / 2f, (size.height - handleHeight) / 2f),
+            size = Size(handleWidth, handleHeight),
+            cornerRadius = CornerRadius(if (isThick) 2.dp.toPx() else handleWidth / 2f),
         )
     }
 }
