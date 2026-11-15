@@ -4,12 +4,7 @@ import app.marlboroadvance.mpvex.R
 import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -22,6 +17,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Text
 import androidx.compose.material3.Icon
@@ -50,7 +46,9 @@ import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.NavigationBarState
 import app.marlboroadvance.mpvex.ui.browser.cards.FolderCardSettings
 import app.marlboroadvance.mpvex.ui.browser.cards.PlaylistCard
-import app.marlboroadvance.mpvex.ui.browser.components.BrowserBottomBar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionAction
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbar
+import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbarDefaults
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
@@ -166,7 +164,7 @@ object PlaylistScreen : Screen {
               start = 8.dp,
               top = 8.dp,
               end = 8.dp,
-              bottom = navBarHeight + 32.dp
+              bottom = if (showFloatingBottomBar) SelectionToolbarDefaults.contentBottomPadding() else navBarHeight + 32.dp
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
           ) {
@@ -193,25 +191,18 @@ object PlaylistScreen : Screen {
           }
         }
 
-        AnimatedVisibility(
+        SelectionToolbar(
           visible = showFloatingBottomBar,
-          enter = slideInVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium), initialOffsetY = { it }),
-          exit = slideOutVertically(animationSpec = spring(stiffness = Spring.StiffnessMedium), targetOffsetY = { it }),
-          modifier = Modifier.align(Alignment.BottomCenter)
-        ) {
-          BrowserBottomBar(
-            isSelectionMode = true,
-            onRenameClick = { },
-            onDeleteClick = { deleteDialogOpen.value = true },
-            showRename = false,
-            onCopyClick = {},
-            onMoveClick = {},
-            onAddToPlaylistClick = {},
-            showCopy = false,
-            showMove = false,
-            showAddToPlaylist = false
-          )
-        }
+          modifier = Modifier.align(Alignment.BottomCenter),
+          actions = listOf(
+            SelectionAction(
+              icon = Icons.Rounded.Delete,
+              label = stringResource(R.string.delete),
+              onClick = { deleteDialogOpen.value = true },
+              destructive = true,
+            ),
+          ),
+        )
       }
 
       // Gated so getSelectedItems()/map only runs while the sheet is open.

@@ -136,11 +136,11 @@ class UpdateManager(
         preferences.lastCheckTime.set(System.currentTimeMillis())
         val installed = AppVersion.parse(currentVersion)
         val newer = latest != null && (installed == null || latest.version > installed)
-        preferences.availableVersion.set(if (newer) latest!!.version.toString() else "")
+        preferences.availableVersion.set(if (newer) latest.version.toString() else "")
         when {
           !newer -> UpdateState.UpToDate
           else -> UpdateState.Available(
-            release = latest!!,
+            release = latest,
             skipped = preferences.skippedVersion.get() == latest.version.toString(),
           )
         }
