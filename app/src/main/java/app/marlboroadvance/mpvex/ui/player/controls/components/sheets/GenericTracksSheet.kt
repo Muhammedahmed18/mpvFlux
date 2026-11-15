@@ -74,6 +74,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -83,6 +84,8 @@ import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.presentation.components.PlayerSideSheet
 import app.marlboroadvance.mpvex.presentation.components.rememberSideSheetWidth
+import app.marlboroadvance.mpvex.presentation.components.isCompact
+import app.marlboroadvance.mpvex.presentation.components.rememberPlayerWidthClass
 import app.marlboroadvance.mpvex.ui.player.TrackNode
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import kotlinx.collections.immutable.ImmutableList
@@ -133,8 +136,8 @@ fun getTrackTitle(track: TrackNode): String {
  * single source of truth, used by both the subtitles and audio sheets (the
  * branching below was previously copy-pasted in each).
  *
- *  - Landscape → right-anchored [PlayerSideSheet] so the video stays watchable.
- *  - Portrait  → canonical M3 [ModalBottomSheet] with built-in drag handle.
+ *  - Medium/Expanded width → right-anchored [PlayerSideSheet] so the video stays watchable.
+ *  - Compact width         → canonical M3 [ModalBottomSheet] with built-in drag handle.
  *
  * Each host fully owns its entrance/exit animation. The content slot receives a
  * `dismiss` lambda that animates the sheet out **before** clearing the sheet
@@ -147,10 +150,11 @@ internal fun TracksSheetHost(
   onDismissRequest: () -> Unit,
   content: @Composable (dismiss: () -> Unit) -> Unit,
 ) {
-  val isLandscape =
-    LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+  // Side sheet whenever the window is wide enough (Medium/Expanded width class),
+  // bottom sheet on Compact widths — independent of device orientation.
+  val useSideSheet = !rememberPlayerWidthClass().isCompact
 
-  if (isLandscape) {
+  if (useSideSheet) {
     PlayerSideSheet(
       onDismissRequest = onDismissRequest,
       sheetWidth       = rememberSideSheetWidth(),
@@ -313,7 +317,7 @@ fun TrackCountPill(count: Int) {
     color = MaterialTheme.colorScheme.surfaceContainerHigh,
   ) {
     Text(
-      text     = "$count TRACK${if (count != 1) "S" else ""}",
+      text     = pluralStringResource(R.plurals.player_track_count, count, count),
       modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
       style    = MaterialTheme.typography.labelSmall.copy(
         fontWeight          = FontWeight.Medium,

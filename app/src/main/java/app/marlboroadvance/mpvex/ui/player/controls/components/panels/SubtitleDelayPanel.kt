@@ -143,7 +143,7 @@ fun DelayCardContent( // Renamed from DelayCard and removed the Card wrapper
          step = 0.1f,
          min = Float.NEGATIVE_INFINITY,
          max = Float.POSITIVE_INFINITY,
-         suffix = { Text("s") },
+         suffix = { Text(stringResource(R.string.player_unit_seconds_short)) },
          increaseIcon = Icons.Filled.Add,
          decreaseIcon = Icons.Filled.Remove,
          valueFormatter = { "%.1f".format(it) }

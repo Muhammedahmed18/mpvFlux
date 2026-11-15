@@ -25,7 +25,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.ui.player.controls.GlassWeight
+import app.marlboroadvance.mpvex.ui.player.controls.PlayerChrome
 import app.marlboroadvance.mpvex.ui.player.controls.playerControlsEnterAnimationSpec
+import app.marlboroadvance.mpvex.ui.player.controls.playerGlassFill
 import app.marlboroadvance.mpvex.ui.player.controls.playerControlsExitAnimationSpec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -52,13 +55,10 @@ fun ThumbZoneUnlock(
 
   val primaryColor = MaterialTheme.colorScheme.primary
 
-  // Glass circle: slightly more opaque (0.72f) to match the FAB alpha used in Phase 2,
-  // ensuring all glass surfaces in the player share the same visual weight.
-  val glassColor = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f)
-
-  // outlineVariant replaces hardcoded Color.White.copy(alpha = 0.15f) —
-  // correct M3 token for subtle borders, adapts to light/dark theme automatically.
-  val glassBorderColor = MaterialTheme.colorScheme.outlineVariant
+  // Strong player glass (PlayerChromeStyle): same fill and rim light as Prev/Next and
+  // the volume/brightness sliders.
+  val glassColor = playerGlassFill(GlassWeight.Strong)
+  val glassRimBrush = PlayerChrome.RimBrush
 
   // onPrimary replaces hardcoded Color.White for the unlocked state —
   // semantically correct on a primary-tinted surface.
@@ -142,7 +142,7 @@ fun ThumbZoneUnlock(
 
   val density          = LocalDensity.current
   val arcStrokeWidth   = with(density) { 3.dp.toPx() }
-  val borderStrokeWidth = with(density) { 0.5.dp.toPx() }
+  val borderStrokeWidth = with(density) { PlayerChrome.RimWidth.toPx() }
 
   Box(
     modifier = modifier
@@ -182,9 +182,9 @@ fun ThumbZoneUnlock(
           center = visualCenter,
         )
 
-        // 3. Subtle Glass Border — now uses outlineVariant token
+        // 3. Glass rim light — shared PlayerChrome rim
         drawCircle(
-          color  = glassBorderColor,
+          brush  = glassRimBrush,
           radius = circleRadius,
           center = visualCenter,
           style  = Stroke(width = borderStrokeWidth),

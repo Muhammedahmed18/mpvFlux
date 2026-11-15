@@ -12,7 +12,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,7 +31,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -41,6 +40,9 @@ import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.ui.player.controls.LocalPlayerButtonsClickEvent
+import app.marlboroadvance.mpvex.ui.player.controls.PlayerChrome
+import app.marlboroadvance.mpvex.ui.player.controls.playerChromeContentColor
+import app.marlboroadvance.mpvex.ui.player.controls.playerGlassFill
 import app.marlboroadvance.mpvex.ui.theme.controlColor
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import org.koin.compose.koinInject
@@ -66,6 +68,9 @@ fun ControlsButton(
     shape: Shape = CircleShape,
     iconSize: Dp = 24.dp,
     enabled: Boolean = true,
+    // Pass the "hide button background" setting when the caller already has it, so each
+    // button doesn't read the preference itself. Null = read it here (old behaviour).
+    hideBackgroundOverride: Boolean? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -89,31 +94,28 @@ fun ControlsButton(
         label = "button_shape"
     )
 
-    val appearancePreferences = koinInject<AppearancePreferences>()
-    val hideBackground by appearancePreferences.hidePlayerButtonsBackground.collectAsState()
+    val hideBackground = hideBackgroundOverride ?: run {
+        val appearancePreferences = koinInject<AppearancePreferences>()
+        appearancePreferences.hidePlayerButtonsBackground.collectAsState().value
+    }
 
     val clickEvent = LocalPlayerButtonsClickEvent.current
 
     val containerColor = when {
         hideBackground || !enabled -> Color.Transparent
         type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-        type == ControlsButtonType.Tonal -> MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.75f)
+        type == ControlsButtonType.Tonal -> playerGlassFill()
         else -> Color.Transparent
     }
 
     val baseContentColor = color ?: when {
         type == ControlsButtonType.Filled -> MaterialTheme.colorScheme.onPrimary
         // No fill when backgrounds are hidden: keep the glyph light over the video.
-        hideBackground -> Color.White
-        type == ControlsButtonType.Tonal -> MaterialTheme.colorScheme.onSurface
+        hideBackground || type == ControlsButtonType.Tonal -> playerChromeContentColor(hideBackground)
         else -> controlColor
     }
-    
-    val contentColor = if (enabled) baseContentColor else baseContentColor.copy(alpha = 0.38f)
 
-    // Modern glass edge border for M3 Expressive
-    val showBorder = !hideBackground && type != ControlsButtonType.Transparent && enabled
-    val borderColor = Color.White.copy(alpha = 0.15f)
+    val contentColor = if (enabled) baseContentColor else baseContentColor.copy(alpha = PlayerChrome.DisabledAlpha)
 
     Surface(
         modifier = modifier
@@ -145,21 +147,15 @@ fun ControlsButton(
             modifier = Modifier
                 .drawBehind {
                     val pxRadius = cornerRadius.toPx()
-                    // 1. Draw Expressive Background
+                    // Standard player glass (PlayerChromeStyle): fill only, no rim.
                     drawRoundRect(
                         color = containerColor,
                         cornerRadius = CornerRadius(pxRadius)
                     )
-                    // 2. Draw Glass Edge Border
-                    if (showBorder) {
-                        drawRoundRect(
-                            color = borderColor,
-                            style = Stroke(width = 1.dp.toPx()),
-                            cornerRadius = CornerRadius(pxRadius)
-                        )
-                    }
                 }
-                .padding(12.dp)
+                // Fill the 48dp button and centre the icon, so iconSize is honoured
+                // (a fixed 12dp padding used to cap the icon at 24dp).
+                .fillMaxSize()
         ) {
             Icon(
                 imageVector = icon,

@@ -1101,4 +1101,27 @@
     <item quantity="one">%1$d folder hidden</item>
     <item quantity="other">%1$d folders hidden</item>
   </plurals>
+  <!-- Player: long-press discoverability -->
+  <string name="player_sheets_more_quick_access">Quick access</string>
+  <string name="player_hint_long_press_aspect_ratio">Tip: long-press for all aspect ratios</string>
+  <string name="player_hint_long_press_frame_navigation">Tip: long-press for frame navigation</string>
+  <!-- Player: on-screen messages -->
+  <string name="player_update_zoom">Zoom: %1$d%%</string>
+  <string name="player_update_repeat_off">Repeat: Off</string>
+  <string name="player_update_repeat_one">Repeat: Current file</string>
+  <string name="player_update_repeat_all">Repeat: All playlist</string>
+  <string name="player_update_shuffle_on">Shuffle: On</string>
+  <string name="player_update_shuffle_off">Shuffle: Off</string>
+  <string name="player_update_shuffle_unavailable">Shuffle: Not available</string>
+  <string name="player_update_frame_of_total">Frame: %1$d/%2$d</string>
+  <string name="player_update_frame">Frame: %1$d</string>
+  <!-- Player: sheet and panel labels -->
+  <string name="player_frame_navigation_frame_label">"Frame: "</string>
+  <string name="player_frame_navigation_timestamp_label">"Timestamp: "</string>
+  <string name="player_unit_seconds_short">s</string>
+  <string name="timer_preset_minutes">%1$dm</string>
+  <plurals name="player_track_count">
+    <item quantity="one">%1$d TRACK</item>
+    <item quantity="other">%1$d TRACKS</item>
+  </plurals>
 </resources>

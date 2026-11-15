@@ -63,7 +63,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -76,6 +75,8 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.presentation.components.PlayerSheet
+import app.marlboroadvance.mpvex.presentation.components.isCompact
+import app.marlboroadvance.mpvex.presentation.components.rememberPlayerWidthClass
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filter
@@ -135,8 +136,8 @@ fun PlaylistSheet(
   isM3UPlaylist: Boolean = false,
   loadingItemIndex: Int = -1,
 ) {
-  val isPortrait =
-    LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+  // Bottom sheet on Compact widths, side sheet on Medium/Expanded (see PlayerWidthClass).
+  val isPortrait = rememberPlayerWidthClass().isCompact
   val windowSize = LocalWindowInfo.current.containerSize
   val density = LocalDensity.current
   val screenWidth = with(density) { windowSize.width.toDp() }

@@ -18,8 +18,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +27,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -45,17 +46,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.preferences.SeekbarStyle
 import app.marlboroadvance.mpvex.ui.player.controls.LocalPlayerButtonsClickEvent
+import app.marlboroadvance.mpvex.ui.player.controls.playerChromeContentColor
+import app.marlboroadvance.mpvex.ui.player.controls.playerGlass
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import dev.vivvvek.seeker.Segment
 import `is`.xyz.mpv.Utils
@@ -71,7 +72,7 @@ fun SeekbarWithTimers(
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit,
     timersInverted: Pair<Boolean, Boolean>,
-    positionTimerOnClick: () -> Unit,
+    positionTimerOnClick: (() -> Unit)?,
     durationTimerOnCLick: () -> Unit,
     chapters: ImmutableList<Segment>,
     paused: Boolean,
@@ -79,6 +80,7 @@ fun SeekbarWithTimers(
     loopStart: Float? = null,
     loopEnd: Float? = null,
     modifier: Modifier = Modifier,
+    hideBackground: Boolean = false,
 ) {
     val clickEvent = LocalPlayerButtonsClickEvent.current
     val haptics = LocalHapticFeedback.current
@@ -135,56 +137,23 @@ fun SeekbarWithTimers(
         VideoTimer(
             value = if (isUserInteracting) userPosition else position,
             isInverted = timersInverted.first,
-            onClick = {
-                clickEvent()
-                positionTimerOnClick()
+            // Only tappable when it has a job; otherwise plain text with no ripple.
+            onClick = positionTimerOnClick?.let { handler ->
+                {
+                    clickEvent()
+                    handler()
+                }
             },
+            hideBackground = hideBackground,
             modifier = Modifier.widthIn(min = 72.dp),
         )
 
         Box(
-            modifier = Modifier.weight(1f).height(48.dp).padding(vertical = 8.dp),
+            // The whole 48dp row height is the touch area: the Slider itself handles
+            // taps and drags, with no extra gesture layer underneath.
+            modifier = Modifier.weight(1f).height(48.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier.fillMaxWidth().height(64.dp)
-                    .pointerInput(duration) {
-                        detectTapGestures(onTap = { offset ->
-                            val newPosition = (offset.x / size.width) * duration
-                            if (!isUserInteracting) isUserInteracting = true
-                            userPosition = newPosition.coerceIn(0f, duration)
-                            onValueChange(userPosition)
-                            scope.launch {
-                                animatedPosition.snapTo(userPosition)
-                                isUserInteracting = false
-                                onValueChangeFinished()
-                            }
-                        })
-                    }
-                    .pointerInput(duration) {
-                        detectDragGestures(onDragStart = { isUserInteracting = true }, onDragEnd = {
-                            scope.launch {
-                                delay(50)
-                                animatedPosition.snapTo(userPosition)
-                                isUserInteracting = false
-                                onValueChangeFinished()
-                            }
-                        }, onDragCancel = {
-                            scope.launch {
-                                delay(50)
-                                animatedPosition.snapTo(userPosition)
-                                isUserInteracting = false
-                                onValueChangeFinished()
-                            }
-                        }) { change, _ ->
-                            change.consume()
-                            val newPosition = (change.position.x / size.width) * duration
-                            userPosition = newPosition.coerceIn(0f, duration)
-                            onValueChange(userPosition)
-                        }
-                    }
-            )
-
             // animatedPosition changes on every frame of the 1 s glide between position ticks.
             // Reading it here re-ran this whole composable (timers, gesture modifiers and all)
             // at the display refresh rate while the controls were visible. It's now read only
@@ -207,14 +176,14 @@ fun SeekbarWithTimers(
                 visible = isUserInteracting && duration > 0f,
                 enter = androidx.compose.animation.fadeIn(tween(120)),
                 exit = androidx.compose.animation.fadeOut(tween(150)),
-                modifier = Modifier.align(Alignment.TopCenter).offset(y = (-44).dp),
+                modifier = Modifier.align(Alignment.TopCenter).offset(y = (-36).dp),
             ) {
                 SeekBubble(
                     position = userPosition,
                     duration = duration,
                     startPosition = dragStartPosition,
                     chapters = chapters,
-                    thumbSlotWidth = if (seekbarStyle == SeekbarStyle.Thick) 4.dp else 20.dp,
+                    thumbSlotWidth = seekbarThumbSlotWidth(seekbarStyle == SeekbarStyle.Thick),
                 )
             }
         }
@@ -226,6 +195,7 @@ fun SeekbarWithTimers(
                 clickEvent()
                 durationTimerOnCLick()
             },
+            hideBackground = hideBackground,
             modifier = Modifier.widthIn(min = 72.dp),
         )
     }
@@ -264,30 +234,48 @@ fun VideoTimer(
     value: Float,
     isInverted: Boolean,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit = {},
+    onClick: (() -> Unit)? = null,
+    hideBackground: Boolean = false,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
-    // Same round tonal pill as the player's icon buttons.
+    // Same round Standard-glass pill as the player's icon buttons; follows
+    // "hide button background" like every other control.
     val shape = CircleShape
+    // Outer box = 48dp touch target; inner pill keeps its compact look and shows the
+    // ripple. With no onClick the timer is plain text (no ripple, nothing to press).
     Box(
         modifier = modifier
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f), shape)
-            .clickable(interactionSource = interactionSource, indication = ripple(), onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = Utils.prettyTime(value.toInt(), isInverted),
-            maxLines = 1,
-            softWrap = false,
-            style = MaterialTheme.typography.titleSmall.copy(
-                fontWeight = FontWeight.Medium,
-                fontFeatureSettings = "tnum",
+            .heightIn(min = 48.dp)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+                } else {
+                    Modifier
+                },
             ),
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.Center,
-        )
+        contentAlignment = Alignment.Center,
+        propagateMinConstraints = true,
+    ) {
+        Box(
+            modifier = Modifier
+                .wrapContentHeight()
+                .playerGlass(shape, hideBackground)
+                .then(if (onClick != null) Modifier.indication(interactionSource, ripple()) else Modifier)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = Utils.prettyTime(value.toInt(), isInverted),
+                maxLines = 1,
+                softWrap = false,
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.Medium,
+                    fontFeatureSettings = "tnum",
+                ),
+                color = playerChromeContentColor(hideBackground),
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 
@@ -295,34 +283,46 @@ fun VideoTimer(
 fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Segment>, isPaused: Boolean = false, isScrubbing: Boolean = false, seekbarStyle: SeekbarStyle = SeekbarStyle.Standard, onSeek: (Float) -> Unit, onSeekFinished: () -> Unit, loopStart: Float? = null, loopEnd: Float? = null, modifier: Modifier = Modifier) {
     val activeColor = MaterialTheme.colorScheme.primary
     val inactiveColor = MaterialTheme.colorScheme.secondaryContainer
+    // A-B loop markers use the theme's tertiary so they follow dynamic colour.
+    val loopColor = MaterialTheme.colorScheme.tertiary
     val interactionSource = remember { MutableInteractionSource() }
     // Reuse a single Animatable across pause/scrub toggles instead of allocating a new
     // one each time the effect re-runs.
+    val isThick = seekbarStyle == SeekbarStyle.Thick
     val heightAnimatable = remember { Animatable(1f) }
-    LaunchedEffect(isPaused, isScrubbing) {
-        val shouldFlatten = isPaused || isScrubbing
+    // Only the Thick track eases thinner while paused (20dp → 14dp). Standard keeps its
+    // full height so it never turns into a hairline, and neither style shrinks while
+    // dragging, so the handle stays in proportion.
+    LaunchedEffect(isPaused, isScrubbing, isThick) {
+        val shouldFlatten = isThick && isPaused && !isScrubbing
         val targetHeight = if (shouldFlatten) 0.7f else 1f
         delay(if (shouldFlatten) 0L else 60L)
         heightAnimatable.animateTo(targetValue = targetHeight, animationSpec = tween(durationMillis = if (shouldFlatten) 550 else 800, easing = LinearEasing))
     }
-    val isThick = seekbarStyle == SeekbarStyle.Thick
-    val trackHeightDp = (if (isThick) 16.dp else 6.dp) * heightAnimatable.value
+    val trackHeightDp = (if (isThick) ThickTrackHeight else StandardTrackHeight) * heightAnimatable.value
     // Chapter start times as fractions of the video (the first chapter at 0 isn't a cut).
     val chapterFractions = remember(chapters, duration) { chapterFractions(chapters, duration) }
 
-    // Thumb reacts to touch: Thick's bar gets thinner and taller, Standard's dot grows.
+    // Standard: the M3 slider handle — a slim 4dp rounded bar that gets thinner and taller
+    // while dragging. Thick: a chunky rounded pill (8dp) that grows a little while dragging.
     val thumbWidth by animateDpAsState(
-        targetValue = if (isThick) (if (isScrubbing) 2.dp else 4.dp) else (if (isScrubbing) 20.dp else 12.dp),
+        targetValue = when {
+            isThick -> if (isScrubbing) 10.dp else 8.dp
+            else -> if (isScrubbing) 2.dp else 4.dp
+        },
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "seek_thumb_width",
     )
     val thumbHeight by animateDpAsState(
-        targetValue = if (isThick) (if (isScrubbing) 40.dp else 32.dp) else (if (isScrubbing) 20.dp else 12.dp),
+        targetValue = when {
+            isThick -> if (isScrubbing) 38.dp else 32.dp
+            else -> if (isScrubbing) 42.dp else 36.dp
+        },
         animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
         label = "seek_thumb_height",
     )
 
-    Slider(value = position, onValueChange = onSeek, onValueChangeFinished = onSeekFinished, valueRange = 0f..duration.coerceAtLeast(0.1f), modifier = modifier.fillMaxWidth(), interactionSource = interactionSource,
+    Slider(value = position, onValueChange = onSeek, onValueChangeFinished = onSeekFinished, valueRange = 0f..duration.coerceAtLeast(0.1f), modifier = modifier.fillMaxWidth().height(48.dp), interactionSource = interactionSource,
         track = { sliderState ->
             Canvas(modifier = Modifier.fillMaxWidth().height(trackHeightDp)) {
                 val range = (sliderState.valueRange.endInclusive - sliderState.valueRange.start).takeIf { it > 0f } ?: 1f
@@ -335,7 +335,6 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
                     inactiveColor = inactiveColor,
                 )
                 if (loopStart != null || loopEnd != null) {
-                    val loopColor = Color(0xFFFFB300)
                     if (loopStart != null) { val startPx = (loopStart / duration).coerceIn(0f, 1f) * size.width; drawLine(color = loopColor, start = Offset(startPx, 0f), end = Offset(startPx, size.height), strokeWidth = 2.dp.toPx()) }
                     if (loopEnd != null) { val endPx = (loopEnd / duration).coerceIn(0f, 1f) * size.width; drawLine(color = loopColor, start = Offset(endPx, 0f), end = Offset(endPx, size.height), strokeWidth = 2.dp.toPx()) }
                     if (loopStart != null && loopEnd != null) { val minPx = (minOf(loopStart, loopEnd) / duration).coerceIn(0f, 1f) * size.width; val maxPx = (maxOf(loopStart, loopEnd) / duration).coerceIn(0f, 1f) * size.width; drawRect(color = loopColor.copy(alpha = 0.3f), topLeft = Offset(minPx, 0f), size = Size(maxPx - minPx, size.height)) }
@@ -343,9 +342,10 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
             }
         },
         thumb = {
-            // Fixed-size slot so the animated thumb never changes the track's length.
+            // Fixed-size slot (as wide as the handle gets) so the animated handle never
+            // changes the track's length.
             Box(
-                modifier = Modifier.width(if (isThick) 4.dp else 20.dp).height(40.dp),
+                modifier = Modifier.width(seekbarThumbSlotWidth(isThick)).height(44.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Box(modifier = Modifier.width(thumbWidth).height(thumbHeight).background(activeColor, CircleShape))
@@ -353,6 +353,14 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
         }
     )
 }
+
+// Seekbar sizes. Standard = M3-style 10dp track with a slim bar handle; Thick = 20dp
+// track with a chunky rounded pill handle.
+internal val StandardTrackHeight = 10.dp
+internal val ThickTrackHeight = 20.dp
+
+/** Width of the handle's slot: the widest the handle gets (while dragging). */
+internal fun seekbarThumbSlotWidth(isThick: Boolean) = if (isThick) 10.dp else 4.dp
 
 /** Chapter starts as fractions of [duration], skipping a chapter at the very start. */
 internal fun chapterFractions(chapters: List<Segment>, duration: Float): List<Float> {
@@ -362,8 +370,8 @@ internal fun chapterFractions(chapters: List<Segment>, duration: Float): List<Fl
 
 /**
  * Draws the seek track: played part in [activeColor], the rest in [inactiveColor], a gap
- * around the thumb (Thick style only), small gaps where chapters start, and a stop dot.
- * Outer ends are fully rounded; edges next to a gap get small corners (M3 Expressive).
+ * around the handle, small gaps where chapters start, and a stop dot. Outer ends are
+ * fully rounded; edges next to a gap get small corners (M3 Expressive).
  */
 internal fun DrawScope.drawSeekTrack(
     fraction: Float,
@@ -375,10 +383,11 @@ internal fun DrawScope.drawSeekTrack(
     val width = size.width
     val trackHeight = size.height
     val outerRadius = trackHeight / 2f
-    val innerRadius = if (isThick) 2.dp.toPx() else 1.dp.toPx()
+    val innerRadius = if (isThick) 3.dp.toPx() else 2.dp.toPx()
     val playedPx = width * fraction
-    val thumbGapHalf = if (isThick) 6.dp.toPx() else 0f
-    val chapterGapHalf = if (isThick) 1.5.dp.toPx() else 1.dp.toPx()
+    // Half the handle slot plus a 4dp gap on each side of the handle.
+    val thumbGapHalf = (seekbarThumbSlotWidth(isThick) / 2 + 4.dp).toPx()
+    val chapterGapHalf = if (isThick) 2.dp.toPx() else 1.5.dp.toPx()
 
     // Cuts: the thumb gap and one small gap per chapter start.
     val cuts = buildList {
@@ -418,7 +427,8 @@ internal fun DrawScope.drawSeekTrack(
             end <= playedPx -> drawPiece(start, end, activeColor, roundLeft = true, roundRight = true)
             start >= playedPx -> drawPiece(start, end, inactiveColor, roundLeft = true, roundRight = true)
             else -> {
-                // Standard style has no thumb gap, so a piece can span the thumb.
+                // Defensive: with a handle gap a piece shouldn't span the play position,
+                // but split it cleanly if it ever does.
                 drawPiece(start, playedPx, activeColor, roundLeft = true, roundRight = false)
                 drawPiece(playedPx, end, inactiveColor, roundLeft = false, roundRight = true)
             }
@@ -443,23 +453,21 @@ fun SeekbarStylePreview(style: SeekbarStyle, modifier: Modifier = Modifier) {
     val inactiveColor = MaterialTheme.colorScheme.secondaryContainer
     val isThick = style == SeekbarStyle.Thick
     Canvas(modifier = modifier.width(120.dp).height(28.dp)) {
-        val trackHeight = (if (isThick) 10.dp else 4.dp).toPx()
+        val trackHeight = (if (isThick) 12.dp else 6.dp).toPx()
         val top = (size.height - trackHeight) / 2f
         val fraction = 0.4f
         inset(left = 0f, top = top, right = 0f, bottom = top) {
             drawSeekTrack(fraction, listOf(0.18f, 0.72f), isThick, activeColor, inactiveColor)
         }
+        // Standard: slim bar handle. Thick: chunky rounded pill handle.
         val x = size.width * fraction
-        if (isThick) {
-            drawRoundRect(
-                color = activeColor,
-                topLeft = Offset(x - 1.5.dp.toPx(), 0f),
-                size = Size(3.dp.toPx(), size.height),
-                cornerRadius = CornerRadius(1.5.dp.toPx()),
-            )
-        } else {
-            drawCircle(color = activeColor, radius = 5.dp.toPx(), center = Offset(x, size.height / 2f))
-        }
+        val handleWidth = (if (isThick) 6.dp else 3.dp).toPx()
+        drawRoundRect(
+            color = activeColor,
+            topLeft = Offset(x - handleWidth / 2f, 0f),
+            size = Size(handleWidth, size.height),
+            cornerRadius = CornerRadius(handleWidth / 2f),
+        )
     }
 }
 

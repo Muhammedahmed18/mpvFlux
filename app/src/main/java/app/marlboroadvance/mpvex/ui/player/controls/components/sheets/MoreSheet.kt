@@ -11,15 +11,20 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import app.marlboroadvance.mpvex.preferences.PlayerButton
+import app.marlboroadvance.mpvex.preferences.icon
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -64,6 +69,10 @@ fun MoreSheet(
   onDismissRequest: () -> Unit,
   onEnterFiltersPanel: () -> Unit,
   modifier: Modifier = Modifier,
+  // Sheets that are otherwise only reachable by long-pressing their player button.
+  // Listed here so they can be found without knowing the gesture. Null hides the entry.
+  onOpenAspectRatio: (() -> Unit)? = null,
+  onOpenFrameNavigation: (() -> Unit)? = null,
 ) {
   val advancedPreferences = koinInject<AdvancedPreferences>()
   val decoderPreferences = koinInject<DecoderPreferences>()
@@ -132,6 +141,43 @@ val scope = rememberCoroutineScope()
               Icon(imageVector = Icons.Default.Tune, contentDescription = null)
               Text(text = stringResource(id = R.string.player_sheets_filters_title))
             }
+          }
+        }
+      }
+      if (onOpenAspectRatio != null || onOpenFrameNavigation != null) {
+        Text(
+          text = stringResource(R.string.player_sheets_more_quick_access),
+          style = MaterialTheme.typography.titleMedium,
+          color = MaterialTheme.colorScheme.primary,
+        )
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
+        ) {
+          onOpenAspectRatio?.let { open ->
+            AssistChip(
+              onClick = open,
+              label = { Text(stringResource(R.string.aspect_ratio)) },
+              leadingIcon = {
+                Icon(
+                  imageVector = PlayerButton.ASPECT_RATIO.icon,
+                  contentDescription = null,
+                  modifier = Modifier.size(AssistChipDefaults.IconSize),
+                )
+              },
+            )
+          }
+          onOpenFrameNavigation?.let { open ->
+            AssistChip(
+              onClick = open,
+              label = { Text(stringResource(R.string.player_sheets_frame_navigation_title)) },
+              leadingIcon = {
+                Icon(
+                  imageVector = PlayerButton.FRAME_NAVIGATION.icon,
+                  contentDescription = null,
+                  modifier = Modifier.size(AssistChipDefaults.IconSize),
+                )
+              },
+            )
           }
         }
       }
@@ -250,7 +296,7 @@ fun TimePickerDialog(
                             onTimeSelect(minutes * 60)
                             onDismissRequest()
                         },
-                        label = { Text("${minutes}m") },
+                        label = { Text(stringResource(R.string.timer_preset_minutes, minutes)) },
                         leadingIcon = null,
                     )
                 }

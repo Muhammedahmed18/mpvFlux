@@ -6,7 +6,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import app.marlboroadvance.mpvex.R
-import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -30,7 +29,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -44,9 +42,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
@@ -89,7 +88,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -101,6 +99,8 @@ import androidx.compose.ui.unit.dp
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
+import app.marlboroadvance.mpvex.presentation.components.isCompact
+import app.marlboroadvance.mpvex.presentation.components.rememberPlayerWidthClass
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
@@ -159,9 +159,10 @@ fun <T> playerControlsEnterAnimationSpec(): FiniteAnimationSpec<T> =
 
 // Long-press detector that does NOT swallow normal taps. The underlying button's
 // clickable still fires on quick taps; once the long-press timeout elapses we
-// consume the up event so the click handler doesn't double-fire.
-private fun Modifier.onLongPressNoConsume(onLongPress: () -> Unit): Modifier =
-  this.pointerInput(Unit) {
+// consume the up event so the click handler doesn't double-fire. Does nothing
+// when [enabled] is false (e.g. Prev/Next with no previous/next item).
+private fun Modifier.onLongPressNoConsume(enabled: Boolean = true, onLongPress: () -> Unit): Modifier =
+  if (!enabled) this else this.pointerInput(Unit) {
     awaitEachGesture {
       awaitFirstDown(requireUnconsumed = false)
       try {
@@ -174,33 +175,6 @@ private fun Modifier.onLongPressNoConsume(onLongPress: () -> Unit): Modifier =
       }
     }
   }
-
-// Heavy "smoked glass" fill for a circular transport button. MPV draws to a
-// SurfaceView that can't be sampled for a real backdrop blur, so the glass is
-// approximated: a deep near-opaque dark `scrim` disc (one contrast strategy —
-// dark disc against any video frame, vivid accent glyph against the dark disc)
-// + a white vertical rim-light border, which on dark glass is the main specular
-// "glass" signal. No accent tint in the disc itself: the accent lives solely in
-// the glyph. `strong` is the heavier Play/Pause hero; Prev/Next sit lighter.
-// `rimBoost` (0..1) momentarily brightens the rim — light catching the glass
-// edge — and is pulsed by the hero on each play/pause toggle.
-private fun Modifier.transportGlass(
-  scrim: Color,
-  strong: Boolean,
-  rimBoost: Float = 0f,
-): Modifier =
-  this
-    .background(scrim.copy(alpha = if (strong) 0.58f else 0.48f))
-    .border(
-      width = 1.dp,
-      brush = Brush.verticalGradient(
-        listOf(
-          Color.White.copy(alpha = (if (strong) 0.30f else 0.22f) + 0.25f * rimBoost),
-          Color.White.copy(alpha = (if (strong) 0.05f else 0.04f) + 0.10f * rimBoost),
-        ),
-      ),
-      shape = CircleShape,
-    )
 
 @OptIn(
   ExperimentalMaterial3Api::class,
@@ -358,10 +332,19 @@ fun PlayerControls(
     CompositionLocalProvider(
       LocalLayoutDirection provides LayoutDirection.Ltr,
     ) {
-      val configuration = LocalConfiguration.current
-      val isPortrait by remember(configuration) {
-        derivedStateOf { configuration.orientation == ORIENTATION_PORTRAIT }
-      }
+      // Layout follows the window's width class, not the device orientation: Compact
+      // (phone upright, narrow split-screen) → stacked layout; Medium/Expanded (landscape
+      // phone, tablet, unfolded foldable) → corner groups. See PlayerWidthClass.
+      val isCompactLayout = rememberPlayerWidthClass().isCompact
+
+      // Insets the unlocked controls keep clear of. The camera cutout always applies
+      // (immersive landscape can otherwise put the back button under a punch-hole);
+      // the system bars only when the user chose to show them.
+      val cutoutInsets = WindowInsets.displayCutout
+      val navInsets = if (showSystemNavigationBar) WindowInsets.navigationBars else WindowInsets(0, 0, 0, 0)
+      val statusInsets = if (showSystemStatusBar) WindowInsets.statusBars else WindowInsets(0, 0, 0, 0)
+      val sideInsets = cutoutInsets.union(navInsets).only(WindowInsetsSides.Horizontal)
+      val topInsets = cutoutInsets.union(statusInsets).only(WindowInsetsSides.Top).union(sideInsets)
 
       Box(modifier = modifier.fillMaxSize()) {
         // OPTIMIZATION: Scrim is isolated in a dedicated layer to avoid layout-wide redraws.
@@ -434,9 +417,9 @@ fun PlayerControls(
             swapVolumeAndBrightness = swapVolumeAndBrightness,
             modifier = Modifier.constrainAs(brightnessSlider) {
               if (swapVolumeAndBrightness) {
-                start.linkTo(parent.start, if (isPortrait) spacing.large else spacing.extraLarge)
+                start.linkTo(parent.start, if (isCompactLayout) spacing.large else spacing.extraLarge)
               } else {
-                end.linkTo(parent.end, if (isPortrait) spacing.large else spacing.extraLarge)
+                end.linkTo(parent.end, if (isCompactLayout) spacing.large else spacing.extraLarge)
               }
               top.linkTo(parent.top, spacing.larger)
               bottom.linkTo(parent.bottom, spacing.extraLarge)
@@ -452,9 +435,9 @@ fun PlayerControls(
             swapVolumeAndBrightness = swapVolumeAndBrightness,
             modifier = Modifier.constrainAs(volumeSlider) {
               if (swapVolumeAndBrightness) {
-                end.linkTo(parent.end, if (isPortrait) spacing.large else spacing.extraLarge)
+                end.linkTo(parent.end, if (isCompactLayout) spacing.large else spacing.extraLarge)
               } else {
-                start.linkTo(parent.start, if (isPortrait) spacing.large else spacing.extraLarge)
+                start.linkTo(parent.start, if (isCompactLayout) spacing.large else spacing.extraLarge)
               }
               top.linkTo(parent.top, spacing.larger)
               bottom.linkTo(parent.bottom, spacing.extraLarge)
@@ -489,8 +472,8 @@ fun PlayerControls(
                 // The 64dp circle sits 16dp inside its 96dp touch area, so the visible button is
                 // about 80dp from the edge in landscape and 32dp in portrait. safeDrawing insets
                 // keep it clear of a camera cutout on that side.
-                end.linkTo(parent.end, if (isPortrait) 16.dp else 64.dp)
-                verticalBias = if (isPortrait) 0.80f else 0.58f
+                end.linkTo(parent.end, if (isCompactLayout) 16.dp else 64.dp)
+                verticalBias = if (isCompactLayout) 0.80f else 0.58f
               },
           ) { ThumbZoneUnlock(onUnlock = { viewModel.unlockControls() }) }
 
@@ -501,7 +484,7 @@ fun PlayerControls(
             modifier = Modifier
               .windowInsetsPadding(lockedInsets.only(WindowInsetsSides.Start + WindowInsetsSides.Top))
               .constrainAs(lockedClockPill) {
-                top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.medium)
+                top.linkTo(parent.top, if (isCompactLayout) spacing.extraLarge else spacing.medium)
                 start.linkTo(parent.start, spacing.large)
               },
           ) { LockedClockPill() }
@@ -515,7 +498,7 @@ fun PlayerControls(
               .constrainAs(lockedInfoPill) {
                 start.linkTo(parent.start)
                 end.linkTo(parent.end)
-                if (isPortrait) {
+                if (isCompactLayout) {
                   // Portrait is too narrow for both pills on one row.
                   top.linkTo(lockedClockPill.bottom, spacing.small)
                 } else {
@@ -531,7 +514,7 @@ fun PlayerControls(
             modifier = Modifier.constrainAs(playerPauseButton) {
               end.linkTo(parent.absoluteRight)
               start.linkTo(parent.absoluteLeft)
-              if (isPortrait) bottom.linkTo(bottomRightControls.top, spacing.large)
+              if (isCompactLayout) bottom.linkTo(bottomRightControls.top, spacing.large)
               else { top.linkTo(parent.top); bottom.linkTo(parent.bottom) }
             },
           ) {
@@ -595,13 +578,13 @@ fun PlayerControls(
 
             val primaryColor   = MaterialTheme.colorScheme.primary
             val onPrimaryColor = MaterialTheme.colorScheme.onPrimary
-            val scrimColor     = MaterialTheme.colorScheme.scrim
+            val transportContentColor = playerChromeContentColor(hideBackground)
 
             // M3 Expressive transport: the hero is a bold SOLID `primary` button whose
             // CONTAINER morphs shape on toggle — a full circle when paused, a rounded
             // square (squircle) when playing — driven by an animated corner radius on
-            // the shared soft spring. The glyph rides in `onPrimary`. Prev/Next stay as
-            // recessed dark smoked-glass circles with white glyphs, so the filled hero
+            // the shared soft spring. The glyph rides in `onPrimary`. Prev/Next use the
+            // shared Strong player glass (PlayerChromeStyle), so the filled hero
             // is the unmistakable focal and the secondaries fall back. Hierarchy by
             // size + fill weight; unified by one shared spring. hideBackground collapses
             // every disc to a bare glyph over the video.
@@ -618,8 +601,10 @@ fun PlayerControls(
                     .graphicsLayer { scaleX = prevScale; scaleY = prevScale }
                     .size(54.dp)
                     .clip(CircleShape)
-                    .then(if (!hideBackground) Modifier.transportGlass(scrimColor, strong = false) else Modifier)
-                    .alpha(if (isBuffering || !prevEnabled) 0.5f else 1f)
+                    .playerGlass(CircleShape, hideBackground, GlassWeight.Strong)
+                    // Only a real disabled state fades (M3 0.38). Buffering is shown on the
+                    // Play/Pause hero alone, so Prev stays fully usable.
+                    .alpha(if (!prevEnabled) PlayerChrome.DisabledAlpha else 1f)
                     .semantics { contentDescription = previousLabel }
                     .clickable(
                       interactionSource = prevInteraction,
@@ -631,7 +616,7 @@ fun PlayerControls(
                         viewModel.playPrevious()
                       },
                     )
-                    .onLongPressNoConsume {
+                    .onLongPressNoConsume(enabled = prevEnabled) {
                       haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                       val newPos = (viewModel.precisePosition.value - 10f)
                         .coerceAtLeast(0f)
@@ -644,7 +629,7 @@ fun PlayerControls(
                   Icon(
                     imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_skip_previous_fill),
                     contentDescription = null,
-                    tint               = Color.White,
+                    tint               = transportContentColor,
                     modifier           = Modifier.size(26.dp),
                   )
                 }
@@ -746,8 +731,10 @@ fun PlayerControls(
                     .graphicsLayer { scaleX = nextScale; scaleY = nextScale }
                     .size(54.dp)
                     .clip(CircleShape)
-                    .then(if (!hideBackground) Modifier.transportGlass(scrimColor, strong = false) else Modifier)
-                    .alpha(if (isBuffering || !nextEnabled) 0.5f else 1f)
+                    .playerGlass(CircleShape, hideBackground, GlassWeight.Strong)
+                    // Only a real disabled state fades (M3 0.38). Buffering is shown on the
+                    // Play/Pause hero alone, so Next stays fully usable.
+                    .alpha(if (!nextEnabled) PlayerChrome.DisabledAlpha else 1f)
                     .semantics { contentDescription = nextLabel }
                     .clickable(
                       interactionSource = nextInteraction,
@@ -759,7 +746,7 @@ fun PlayerControls(
                         viewModel.playNext()
                       },
                     )
-                    .onLongPressNoConsume {
+                    .onLongPressNoConsume(enabled = nextEnabled) {
                       haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                       val maxPos = viewModel.effectiveDuration.value
                       val newPos = (viewModel.precisePosition.value + 10f)
@@ -773,7 +760,7 @@ fun PlayerControls(
                   Icon(
                     imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_skip_next_fill),
                     contentDescription = null,
-                    tint               = Color.White,
+                    tint               = transportContentColor,
                     modifier           = Modifier.size(26.dp),
                   )
                 }
@@ -785,8 +772,8 @@ fun PlayerControls(
             visible = controlsShown && !areControlsLocked,
             enter = if (!reduceMotion) slideInVertically(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutVertically(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(seekbar) {
-              if (isPortrait) bottom.linkTo(playerPauseButton.top, spacing.medium) else bottom.linkTo(parent.bottom, spacing.medium)
+            modifier = Modifier.windowInsetsPadding(sideInsets).constrainAs(seekbar) {
+              if (isCompactLayout) bottom.linkTo(playerPauseButton.top, spacing.medium) else bottom.linkTo(parent.bottom, spacing.medium)
               start.linkTo(parent.start, 24.dp); end.linkTo(parent.end, 24.dp); width = Dimension.fillToConstraints
             },
           ) {
@@ -817,12 +804,14 @@ fun PlayerControls(
                 resetControlsTimestamp = System.currentTimeMillis()
                 playerPreferences.invertDuration.set(!invertDuration)
               },
-              positionTimerOnClick = {},
+              // Left timer is display-only (no tap action), so it renders as plain text.
+              positionTimerOnClick = null,
               chapters = if (showChapterMarkers) chaptersImm else persistentListOf(),
               paused = paused ?: false,
               seekbarStyle = seekbarStyle,
               loopStart = abLoopA?.toFloat(),
               loopEnd = abLoopB?.toFloat(),
+              hideBackground = hideBackground,
             )
           }
 
@@ -830,38 +819,38 @@ fun PlayerControls(
             visible = controlsShown && !areControlsLocked,
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.then(if (showSystemStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier).then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(topLeftControls) {
-              top.linkTo(parent.top, if (isPortrait) spacing.extraLarge else spacing.small)
+            modifier = Modifier.windowInsetsPadding(topInsets).constrainAs(topLeftControls) {
+              top.linkTo(parent.top, if (isCompactLayout) spacing.extraLarge else spacing.small)
               start.linkTo(parent.start, spacing.large)
-              if (isPortrait) { width = Dimension.fillToConstraints; end.linkTo(parent.end, spacing.large) } else { width = Dimension.fillToConstraints; end.linkTo(topRightControls.start, spacing.extraSmall) }
+              if (isCompactLayout) { width = Dimension.fillToConstraints; end.linkTo(parent.end, spacing.large) } else { width = Dimension.fillToConstraints; end.linkTo(topRightControls.start, spacing.extraSmall) }
             },
           ) {
-            if (isPortrait) TopPlayerControlsPortrait(mediaTitle = mediaTitle, hideBackground = hideBackground, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
+            if (isCompactLayout) TopPlayerControlsPortrait(mediaTitle = mediaTitle, hideBackground = hideBackground, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
             else TopLeftPlayerControlsLandscape(mediaTitle = mediaTitle, hideBackground = hideBackground, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
           }
 
           AnimatedVisibility(
-            visible = controlsShown && !areControlsLocked && !isPortrait,
+            visible = controlsShown && !areControlsLocked && !isCompactLayout,
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.then(if (showSystemStatusBar) Modifier.windowInsetsPadding(WindowInsets.statusBars) else Modifier).then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(topRightControls) { top.linkTo(parent.top, spacing.small); end.linkTo(parent.end, spacing.large) },
+            modifier = Modifier.windowInsetsPadding(topInsets).constrainAs(topRightControls) { top.linkTo(parent.top, spacing.small); end.linkTo(parent.end, spacing.large) },
           ) { TopRightPlayerControlsLandscape(buttons = topRightButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity) }
 
           AnimatedVisibility(
-            visible = controlsShown && !areControlsLocked && (isPortrait || !areSlidersShown),
+            visible = controlsShown && !areControlsLocked && (isCompactLayout || !areSlidersShown),
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(bottomRightControls) { if (isPortrait) { bottom.linkTo(parent.bottom, spacing.extraLarge); start.linkTo(parent.start, spacing.large); end.linkTo(parent.end, spacing.large); width = Dimension.fillToConstraints } else { bottom.linkTo(seekbar.top, spacing.small); end.linkTo(parent.end, spacing.large) } },
+            modifier = Modifier.windowInsetsPadding(sideInsets).constrainAs(bottomRightControls) { if (isCompactLayout) { bottom.linkTo(parent.bottom, spacing.extraLarge); start.linkTo(parent.start, spacing.large); end.linkTo(parent.end, spacing.large); width = Dimension.fillToConstraints } else { bottom.linkTo(seekbar.top, spacing.small); end.linkTo(parent.end, spacing.large) } },
           ) {
-            if (isPortrait) BottomPlayerControlsPortrait(buttons = portraitBottomButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
+            if (isCompactLayout) BottomPlayerControlsPortrait(buttons = portraitBottomButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
             else BottomRightPlayerControlsLandscape(buttons = bottomRightButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
           }
 
           AnimatedVisibility(
-            visible = controlsShown && !areControlsLocked && !isPortrait && !areSlidersShown,
+            visible = controlsShown && !areControlsLocked && !isCompactLayout && !areSlidersShown,
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.then(if (showSystemNavigationBar) { val navBarPadding = WindowInsets.navigationBars.asPaddingValues(); Modifier.padding(start = navBarPadding.calculateLeftPadding(LayoutDirection.Ltr), end = navBarPadding.calculateRightPadding(LayoutDirection.Ltr)) } else Modifier).constrainAs(bottomLeftControls) { bottom.linkTo(seekbar.top, spacing.small); start.linkTo(parent.start, spacing.large); width = Dimension.fillToConstraints; end.linkTo(bottomRightControls.start, spacing.small) },
+            modifier = Modifier.windowInsetsPadding(sideInsets).constrainAs(bottomLeftControls) { bottom.linkTo(seekbar.top, spacing.small); start.linkTo(parent.start, spacing.large); width = Dimension.fillToConstraints; end.linkTo(bottomRightControls.start, spacing.small) },
           ) { BottomLeftPlayerControlsLandscape(buttons = bottomLeftButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity) }
         }
       }
@@ -1072,7 +1061,7 @@ private fun PlayerUpdatesSection(
         TextPlayerUpdate(displayText)
       }
       is PlayerUpdates.ShowText -> TextPlayerUpdate((currentPlayerUpdate as PlayerUpdates.ShowText).value)
-      is PlayerUpdates.VideoZoom -> TextPlayerUpdate("Zoom: ${(videoZoom * 100).toInt()}%")
+      is PlayerUpdates.VideoZoom -> TextPlayerUpdate(stringResource(R.string.player_update_zoom, (videoZoom * 100).toInt()))
       is PlayerUpdates.HorizontalSeek -> {
         val seekUpdate = currentPlayerUpdate as PlayerUpdates.HorizontalSeek
         TextPlayerUpdate("${seekUpdate.currentTime} [ ${seekUpdate.seekDelta} ]")
@@ -1080,11 +1069,11 @@ private fun PlayerUpdatesSection(
       is PlayerUpdates.RepeatMode -> {
         val mode = (currentPlayerUpdate as PlayerUpdates.RepeatMode).mode
         val text = when (mode) {
-          app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> "Repeat: Off"
-          app.marlboroadvance.mpvex.ui.player.RepeatMode.ONE -> "Repeat: Current file"
+          app.marlboroadvance.mpvex.ui.player.RepeatMode.OFF -> stringResource(R.string.player_update_repeat_off)
+          app.marlboroadvance.mpvex.ui.player.RepeatMode.ONE -> stringResource(R.string.player_update_repeat_one)
           app.marlboroadvance.mpvex.ui.player.RepeatMode.ALL ->
-            if (playlistMode && viewModel.hasPlaylistSupport()) "Repeat: All playlist"
-            else "Repeat: Current file"
+            if (playlistMode && viewModel.hasPlaylistSupport()) stringResource(R.string.player_update_repeat_all)
+            else stringResource(R.string.player_update_repeat_one)
         }
         TextPlayerUpdate(text)
       }
@@ -1092,18 +1081,21 @@ private fun PlayerUpdatesSection(
         val enabled = (currentPlayerUpdate as PlayerUpdates.Shuffle).enabled
         val text =
           if (enabled) {
-            if (playlistMode && viewModel.hasPlaylistSupport()) "Shuffle: On"
-            else "Shuffle: Not available"
+            if (playlistMode && viewModel.hasPlaylistSupport()) stringResource(R.string.player_update_shuffle_on)
+            else stringResource(R.string.player_update_shuffle_unavailable)
           } else {
-            "Shuffle: Off"
+            stringResource(R.string.player_update_shuffle_off)
           }
         TextPlayerUpdate(text)
       }
       is PlayerUpdates.FrameInfo -> {
         val frameInfo = currentPlayerUpdate as PlayerUpdates.FrameInfo
         val text =
-          if (frameInfo.totalFrames > 0) "Frame: ${frameInfo.currentFrame}/${frameInfo.totalFrames}"
-          else "Frame: ${frameInfo.currentFrame}"
+          if (frameInfo.totalFrames > 0) {
+            stringResource(R.string.player_update_frame_of_total, frameInfo.currentFrame, frameInfo.totalFrames)
+          } else {
+            stringResource(R.string.player_update_frame, frameInfo.currentFrame)
+          }
         TextPlayerUpdate(text)
       }
       else -> {}

@@ -24,12 +24,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import app.marlboroadvance.mpvex.ui.player.controls.GlassWeight
+import app.marlboroadvance.mpvex.ui.player.controls.playerGlass
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
@@ -74,8 +75,9 @@ fun VerticalSlider(
       modifier
         .width(52.dp)
         .height(200.dp)
-        .clip(sliderShape)
-        .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f)),
+        // Strong player glass (PlayerChromeStyle). Sliders are gesture feedback, so
+        // they keep their fill even with "hide button background" on.
+        .playerGlass(sliderShape, hideBackground = false, weight = GlassWeight.Strong),
     contentAlignment = Alignment.BottomCenter,
   ) {
     val targetHeight by animateFloatAsState(
@@ -88,10 +90,9 @@ fun VerticalSlider(
       Modifier
         .fillMaxWidth()
         .fillMaxHeight(targetHeight)
-        .background(
-          if (isBoost) MaterialTheme.colorScheme.primary
-          else MaterialTheme.colorScheme.primary
-        ),
+        // Same fill whether or not volume boost is active; the boost amount is drawn
+        // separately as the tertiary overlay below.
+        .background(MaterialTheme.colorScheme.primary),
     )
 
     if (overflowRange != null && overflowValue != null) {

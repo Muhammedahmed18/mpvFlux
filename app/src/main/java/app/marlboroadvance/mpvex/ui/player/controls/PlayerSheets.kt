@@ -237,6 +237,8 @@ fun PlayerSheets(
         onStartTimer = onStartSleepTimer,
         onDismissRequest = onDismissRequest,
         onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
+        onOpenAspectRatio = { onShowSheet(Sheets.AspectRatios) },
+        onOpenFrameNavigation = { onShowSheet(Sheets.FrameNavigation) },
       )
     }
 

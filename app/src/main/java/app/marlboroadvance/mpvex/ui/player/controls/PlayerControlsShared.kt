@@ -1,12 +1,7 @@
 package app.marlboroadvance.mpvex.ui.player.controls
 
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.MarqueeSpacing
-import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.runtime.LaunchedEffect
@@ -19,7 +14,6 @@ import app.marlboroadvance.mpvex.ui.player.VideoAspect
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,12 +45,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import android.content.Context
+import app.marlboroadvance.mpvex.ui.player.PlayerUpdates
+import kotlinx.coroutines.flow.update
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -91,48 +86,17 @@ private fun chipValueLabelStyle() =
   MaterialTheme.typography.labelLargeEmphasized
 
 // ---------------------------------------------------------------------------
-// One UI–style translucent "glass" for controls layered over video. MPV draws
-// to a SurfaceView, which can't be sampled for a real backdrop blur, so frosted
-// glass is approximated with a translucent tonal fill + a soft top highlight edge.
+// Glass surfaces come from PlayerChromeStyle.kt (playerGlass / playerGlassFill /
+// playerChromeContentColor). glassPanel is kept as an alias for existing callers.
 // ---------------------------------------------------------------------------
 @Composable
 internal fun Modifier.glassPanel(shape: Shape, hideBackground: Boolean): Modifier =
-  if (hideBackground) {
-    this.clip(shape)
-  } else {
-    this
-      .clip(shape)
-      .background(MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.5f))
-      .border(
-        width = 1.dp,
-        brush = Brush.verticalGradient(
-          listOf(
-            Color.White.copy(alpha = 0.25f),
-            Color.White.copy(alpha = 0.05f),
-          ),
-        ),
-        shape = shape,
-      )
-  }
-
-/**
- * Text and icon color for player chrome. On the glass fill it is the theme's onSurface.
- * With "hide button background" on there is no fill, so content sits straight on the
- * (dark-scrimmed) video and must stay light in every theme; in light theme onSurface is
- * near-black and disappears.
- */
-@Composable
-internal fun playerChromeContentColor(hideBackground: Boolean): Color =
-  if (hideBackground) Color.White else MaterialTheme.colorScheme.onSurface
+  playerGlass(shape, hideBackground, GlassWeight.Strong)
 
 @Composable
 internal fun glassIconButtonColors(hideBackground: Boolean) =
   IconButtonDefaults.filledTonalIconButtonColors(
-    containerColor = if (hideBackground) {
-      Color.Transparent
-    } else {
-      MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
-    },
+    containerColor = if (hideBackground) Color.Transparent else playerGlassFill(),
     contentColor = playerChromeContentColor(hideBackground),
   )
 
@@ -193,8 +157,8 @@ fun RenderPlayerButton(
 
     // ------------------------------------------------------------------
     // VIDEO TITLE — Stable "Now Playing" capsule
-    //   28dp pill · neutral frosted glass (scrim + tint + rim) · NOW PLAYING label
-    //   (left) + accent counter pill (right) · ExtraBold single-line title (ellipsis
+    //   48dp pill · standard player glass (PlayerChromeStyle) · single-line title
+    //   + accent counter pill + chevron when it opens the playlist · ExtraBold title (ellipsis
     //   by default, marquee only when it actually overflows) · layer-free press
     //   feedback · NO elevation shadow — hardware shadows show through translucent
     //   fills as a dark rectangular core over the SurfaceView
@@ -223,63 +187,20 @@ fun RenderPlayerButton(
 
       val capsuleShape = RoundedCornerShape(28.dp)
       val interactionSource = remember { MutableInteractionSource() }
-      val isPressed by interactionSource.collectIsPressedAsState()
-      // Frosted-glass press feedback: animate only the translucent neutral tint's
-      // alpha (rest → brighter on press) via inline background() draws — no
-      // graphicsLayer scale/alpha trick. Nothing allocates a hardware/offscreen
-      // layer, so there's no rectangular seam over the SurfaceView. The dark scrim
-      // base underneath keeps the small title text legible over any video frame.
-      val tintAlpha by animateFloatAsState(
-        targetValue   = if (isPressed) 0.60f else 0.45f,
-        animationSpec = spring(
-          dampingRatio = Spring.DampingRatioMediumBouncy,
-          stiffness    = Spring.StiffnessLow,
-        ),
-        label = "video_title_glass_tint",
-      )
 
       Row(
         modifier              = modifier.wrapContentWidth(Alignment.Start),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
       ) {
-        Column(
+        // Single-line capsule (48dp, same height as the icon buttons): title, then the
+        // playlist counter and a chevron when tapping opens the playlist. Without a
+        // playlist the capsule is display-only, so it shows no chevron.
+        Row(
           modifier = Modifier
             .weight(1f, fill = false)
-            .clip(capsuleShape)
-            .then(
-              if (hideBackground) {
-                Modifier
-              } else {
-                // Neutral frosted glass, same recipe as the rest of the chrome: a
-                // dark scrim base (legibility) + a translucent surface tint gradient
-                // (the glass, brightening on press via tintAlpha) + a white rim-light
-                // edge. The accent stays reserved for the counter pill and the play
-                // hero, so the capsule reads as supporting glass, not a second focal.
-                Modifier
-                  .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.40f))
-                  .background(
-                    Brush.verticalGradient(
-                      listOf(
-                        MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = tintAlpha),
-                        MaterialTheme.colorScheme.surfaceContainerHighest.copy(
-                          alpha = (tintAlpha - 0.13f).coerceAtLeast(0f),
-                        ),
-                      ),
-                    ),
-                  )
-                  .border(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                      listOf(
-                        Color.White.copy(alpha = 0.25f),
-                        Color.White.copy(alpha = 0.05f),
-                      ),
-                    ),
-                    shape = capsuleShape,
-                  )
-              },
-            )
+            // Standard player glass (PlayerChromeStyle). Press feedback is the ripple.
+            .playerGlass(capsuleShape, hideBackground)
             .then(
               if (playlistModeEnabled) {
                 Modifier.clickable(
@@ -293,46 +214,24 @@ fun RenderPlayerButton(
                 Modifier
               },
             )
-            .heightIn(min = 56.dp)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-          verticalArrangement = Arrangement.Center,
+            .heightIn(min = 48.dp)
+            .padding(
+              start  = 18.dp,
+              end    = if (playlistModeEnabled) 12.dp else 18.dp,
+              top    = 8.dp,
+              bottom = 8.dp,
+            ),
+          verticalAlignment     = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-          // Header row: "NOW PLAYING" label + optional counter pill, snug and
-          // left-grouped (no fillMaxWidth) so the capsule's width is driven by
-          // the title, not stretched to the full available width.
-          Row(
-            verticalAlignment     = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-          ) {
-            Text(
-              text  = stringResource(R.string.now_playing),
-              style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
-              color = playerChromeContentColor(hideBackground).copy(alpha = 0.6f),
-              maxLines = 1,
-            )
-            playlistCounter?.let { (current, total) ->
-              Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
-              ) {
-                Text(
-                  text  = "$current / $total",
-                  style = MaterialTheme.typography.labelSmallEmphasized,
-                  color = MaterialTheme.colorScheme.onPrimaryContainer,
-                  modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
-                )
-              }
-            }
-          }
-
-          Spacer(modifier = Modifier.height(2.dp))
-
           // Latch overflow once per title: ellipsis first, then switch to
           // marquee. Latch-only (never reset to false here) so the two layout
           // passes can't oscillate; remember is keyed on the title so a new
           // (possibly shorter) title re-evaluates from scratch.
           var isTitleOverflowing by remember(mediaTitle) { mutableStateOf(false) }
 
+          // No fixed width cap: the title takes whatever room the top row leaves it
+          // (weight with fill = false keeps the capsule snug for short titles).
           Text(
             text  = mediaTitle ?: "",
             style = MaterialTheme.typography.titleMediumEmphasized,
@@ -341,7 +240,7 @@ fun RenderPlayerButton(
             overflow = if (isTitleOverflowing) TextOverflow.Clip else TextOverflow.Ellipsis,
             onTextLayout = { if (it.hasVisualOverflow) isTitleOverflowing = true },
             modifier = Modifier
-              .widthIn(max = 280.dp)
+              .weight(1f, fill = false)
               .then(
                 if (isTitleOverflowing) {
                   Modifier.basicMarquee(
@@ -355,6 +254,30 @@ fun RenderPlayerButton(
                 },
               ),
           )
+
+          playlistCounter?.let { (current, total) ->
+            Surface(
+              shape = CircleShape,
+              color = MaterialTheme.colorScheme.primaryContainer,
+            ) {
+              Text(
+                text  = "$current / $total",
+                style = MaterialTheme.typography.labelSmallEmphasized,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                maxLines = 1,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+              )
+            }
+          }
+
+          if (playlistModeEnabled) {
+            Icon(
+              imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_chevron_right),
+              contentDescription = null,
+              tint               = playerChromeContentColor(hideBackground).copy(alpha = 0.7f),
+              modifier           = Modifier.size(20.dp),
+            )
+          }
         }
       }
     }
@@ -451,6 +374,7 @@ fun RenderPlayerButton(
 
     // Tap cycles Fit → Stretch → Crop (as in mpvEx); long-press opens the ratio sheet.
     PlayerButton.ASPECT_RATIO -> {
+      val longPressHint = stringResource(R.string.player_hint_long_press_aspect_ratio)
       val aspect by viewModel.videoAspect.collectAsState()
       val customRatio by viewModel.currentAspectRatio.collectAsState()
       PlayerIconButton(
@@ -470,6 +394,7 @@ fun RenderPlayerButton(
             else -> VideoAspect.Fit
           }
           viewModel.changeVideoAspect(next)
+          showOneTimeHint(context, viewModel, HINT_KEY_ASPECT_RATIO, longPressHint)
         },
         onLongClick    = { onOpenSheet(Sheets.AspectRatios) },
         hideBackground = hideBackground,
@@ -526,6 +451,7 @@ fun RenderPlayerButton(
     // Tap expands to  ‹ previous frame · screenshot · next frame ›  (collapses on its own
     // after a few seconds); long-press opens the frame navigation sheet.
     PlayerButton.FRAME_NAVIGATION -> {
+      val frameNavHint = stringResource(R.string.player_hint_long_press_frame_navigation)
       val isExpanded by viewModel.isFrameNavigationExpanded.collectAsState()
       val isSnapshotLoading by viewModel.isSnapshotLoading.collectAsState()
       if (isExpanded) {
@@ -540,7 +466,7 @@ fun RenderPlayerButton(
             buttonSize = buttonSize,
           )
           if (isSnapshotLoading) {
-            Box(modifier = Modifier.size(buttonSize - 8.dp), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(buttonSize), contentAlignment = Alignment.Center) {
               CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             }
           } else {
@@ -567,7 +493,10 @@ fun RenderPlayerButton(
       } else {
         PlayerIconButton(
           icon           = button.icon,
-          onClick        = { viewModel.toggleFrameNavigationExpanded() },
+          onClick        = {
+            viewModel.toggleFrameNavigationExpanded()
+            showOneTimeHint(context, viewModel, HINT_KEY_FRAME_NAVIGATION, frameNavHint)
+          },
           onLongClick    = { onOpenSheet(Sheets.FrameNavigation) },
           hideBackground = hideBackground,
           contentDescription = buttonLabel,
@@ -728,6 +657,27 @@ fun RenderPlayerButton(
 }
 
 // ---------------------------------------------------------------------------
+// One-time hints for long-press shortcuts
+// ---------------------------------------------------------------------------
+
+private const val HINTS_PREFS = "player_hints"
+private const val HINT_KEY_ASPECT_RATIO = "long_press_aspect_ratio"
+private const val HINT_KEY_FRAME_NAVIGATION = "long_press_frame_navigation"
+
+/**
+ * Shows [text] as a player message the first time it's called for [key], then never
+ * again. Used to reveal long-press shortcuts (aspect ratio sheet, frame navigation
+ * sheet) the first time their button is tapped. Shown after the button's own action,
+ * so it replaces that action's message just this once.
+ */
+private fun showOneTimeHint(context: Context, viewModel: PlayerViewModel, key: String, text: String) {
+  val prefs = context.getSharedPreferences(HINTS_PREFS, Context.MODE_PRIVATE)
+  if (prefs.getBoolean(key, false)) return
+  prefs.edit().putBoolean(key, true).apply()
+  viewModel.playerUpdate.update { PlayerUpdates.ShowText(text) }
+}
+
+// ---------------------------------------------------------------------------
 // Shared player button styles
 // ---------------------------------------------------------------------------
 
@@ -826,7 +776,7 @@ internal fun PlayerValueChip(
     color        = when {
       highlighted -> MaterialTheme.colorScheme.primaryContainer
       hideBackground -> Color.Transparent
-      else -> MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
+      else -> playerGlassFill()
     },
     contentColor = if (highlighted) {
       MaterialTheme.colorScheme.onPrimaryContainer
@@ -845,7 +795,10 @@ internal fun PlayerValueChip(
   }
 }
 
-/** Pill container for expanded buttons (frame navigation, A-B loop). */
+/**
+ * Pill container for expanded buttons (frame navigation, A-B loop). Children are full
+ * [buttonSize] (48dp) so each one has a complete touch target; they sit edge to edge.
+ */
 @Composable
 private fun PlayerButtonGroup(
   hideBackground: Boolean,
@@ -856,17 +809,11 @@ private fun PlayerButtonGroup(
   Surface(
     modifier     = modifier.height(buttonSize),
     shape        = CircleShape,
-    color        = if (hideBackground) {
-      Color.Transparent
-    } else {
-      MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f)
-    },
+    color        = if (hideBackground) Color.Transparent else playerGlassFill(),
     contentColor = playerChromeContentColor(hideBackground),
   ) {
     Row(
-      modifier              = Modifier.padding(horizontal = 4.dp),
-      verticalAlignment     = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(2.dp),
+      verticalAlignment = Alignment.CenterVertically,
     ) {
       content()
     }
@@ -887,7 +834,7 @@ private fun PlayerGroupIconButton(
       clickEvent()
       onClick()
     },
-    modifier = Modifier.size(buttonSize - 8.dp),
+    modifier = Modifier.size(buttonSize),
     shapes   = IconButtonDefaults.shapes(),
   ) {
     Icon(imageVector = icon, contentDescription = contentDescription, modifier = Modifier.size(20.dp))
@@ -909,8 +856,8 @@ private fun PlayerGroupTextButton(
       onClick()
     },
     modifier     = Modifier
-      .height(buttonSize - 8.dp)
-      .widthIn(min = buttonSize - 8.dp),
+      .height(buttonSize)
+      .widthIn(min = buttonSize),
     shape        = CircleShape,
     color        = if (active) MaterialTheme.colorScheme.tertiaryContainer else Color.Transparent,
     contentColor = if (active) {
@@ -920,7 +867,7 @@ private fun PlayerGroupTextButton(
     },
   ) {
     Box(
-      modifier         = Modifier.padding(horizontal = if (active) 10.dp else 0.dp),
+      modifier         = Modifier.padding(horizontal = if (active) 12.dp else 0.dp),
       contentAlignment = Alignment.Center,
     ) {
       Text(text = text, style = chipValueLabelStyle())

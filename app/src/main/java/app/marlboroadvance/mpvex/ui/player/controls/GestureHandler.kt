@@ -333,12 +333,16 @@ fun GestureHandler(
           // Track long press separately
           var longPressTriggered = false
           val longPressDelay = 500L
+          // Latest pointer position, updated by the event loop below. The long-press job
+          // reads it so a finger that has drifted (but not yet far enough to start a
+          // drag) doesn't trigger the hold-for-speed boost.
+          var latestPosition = startPosition
           val longPressJob = coroutineScope.launch {
             delay(longPressDelay)
             if (!longPressTriggered && paused == false) {
               val distance = sqrt(
-                (down.position.x - startPosition.x) * (down.position.x - startPosition.x) +
-                (down.position.y - startPosition.y) * (down.position.y - startPosition.y)
+                (latestPosition.x - startPosition.x) * (latestPosition.x - startPosition.x) +
+                (latestPosition.y - startPosition.y) * (latestPosition.y - startPosition.y)
               )
               // Only trigger if still within tap threshold
               if (distance < 10f && multipleSpeedGesture > 0f) {
@@ -373,6 +377,7 @@ fun GestureHandler(
               event.changes.forEach { change ->
                 if (change.pressed) {
                   val currentPosition = change.position
+                  latestPosition = currentPosition
                   val deltaX = currentPosition.x - startPosition.x
                   val deltaY = currentPosition.y - startPosition.y
 
