@@ -42,8 +42,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.fillMaxSize
@@ -96,6 +94,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.constraintlayout.compose.ConstraintLayout
 import androidx.constraintlayout.compose.Dimension
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
@@ -136,6 +136,9 @@ import kotlinx.coroutines.flow.update
 import org.koin.compose.koinInject
 import java.util.Locale
 import kotlin.math.abs
+
+/** Gap kept between a shown system bar and the nearest player control. */
+private val EdgeInsetGap = 8.dp
 
 @Suppress("CompositionLocalAllowlist")
 val LocalPlayerButtonsClickEvent = staticCompositionLocalOf { {} }
@@ -337,14 +340,23 @@ fun PlayerControls(
       // phone, tablet, unfolded foldable) → corner groups. See PlayerWidthClass.
       val isCompactLayout = rememberPlayerWidthClass().isCompact
 
-      // Insets the unlocked controls keep clear of. The camera cutout always applies
-      // (immersive landscape can otherwise put the back button under a punch-hole);
-      // the system bars only when the user chose to show them.
-      val cutoutInsets = WindowInsets.displayCutout
-      val navInsets = if (showSystemNavigationBar) WindowInsets.navigationBars else WindowInsets(0, 0, 0, 0)
-      val statusInsets = if (showSystemStatusBar) WindowInsets.statusBars else WindowInsets(0, 0, 0, 0)
-      val sideInsets = cutoutInsets.union(navInsets).only(WindowInsetsSides.Horizontal)
-      val topInsets = cutoutInsets.union(statusInsets).only(WindowInsetsSides.Top).union(sideInsets)
+      // Edges the unlocked controls keep clear of: only the system bars, and only when
+      // the user chose to show them. The camera cutout is deliberately NOT avoided here:
+      // on centred punch-hole phones the hole sits mid-edge in landscape, away from the
+      // corner controls, and padding the whole edge made the layout lopsided. (The
+      // locked-screen controls still use safeDrawing, which includes the cutout.)
+      //
+      // Each edge margin is max(normal margin, bar + gap), not margin + bar.
+      val density = LocalDensity.current
+      val sideInsets = if (showSystemNavigationBar) WindowInsets.navigationBars else WindowInsets(0, 0, 0, 0)
+      val topInsets = if (showSystemStatusBar) WindowInsets.statusBars else WindowInsets(0, 0, 0, 0)
+      val leftInset = with(density) { sideInsets.getLeft(this, LayoutDirection.Ltr).toDp() }
+      val rightInset = with(density) { sideInsets.getRight(this, LayoutDirection.Ltr).toDp() }
+      val topInset = with(density) { topInsets.getTop(this).toDp() }
+      fun edgeMargin(base: Dp, inset: Dp): Dp = if (inset > 0.dp) maxOf(base, inset + EdgeInsetGap) else base
+      fun startMargin(base: Dp) = edgeMargin(base, leftInset)
+      fun endMargin(base: Dp) = edgeMargin(base, rightInset)
+      fun topMargin(base: Dp) = edgeMargin(base, topInset)
 
       Box(modifier = modifier.fillMaxSize()) {
         // OPTIMIZATION: Scrim is isolated in a dedicated layer to avoid layout-wide redraws.
@@ -772,9 +784,9 @@ fun PlayerControls(
             visible = controlsShown && !areControlsLocked,
             enter = if (!reduceMotion) slideInVertically(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutVertically(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.windowInsetsPadding(sideInsets).constrainAs(seekbar) {
+            modifier = Modifier.constrainAs(seekbar) {
               if (isCompactLayout) bottom.linkTo(playerPauseButton.top, spacing.medium) else bottom.linkTo(parent.bottom, spacing.medium)
-              start.linkTo(parent.start, 24.dp); end.linkTo(parent.end, 24.dp); width = Dimension.fillToConstraints
+              start.linkTo(parent.start, startMargin(24.dp)); end.linkTo(parent.end, endMargin(24.dp)); width = Dimension.fillToConstraints
             },
           ) {
             val invertDuration by playerPreferences.invertDuration.collectAsState()
@@ -819,10 +831,10 @@ fun PlayerControls(
             visible = controlsShown && !areControlsLocked,
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.windowInsetsPadding(topInsets).constrainAs(topLeftControls) {
-              top.linkTo(parent.top, if (isCompactLayout) spacing.extraLarge else spacing.small)
-              start.linkTo(parent.start, spacing.large)
-              if (isCompactLayout) { width = Dimension.fillToConstraints; end.linkTo(parent.end, spacing.large) } else { width = Dimension.fillToConstraints; end.linkTo(topRightControls.start, spacing.extraSmall) }
+            modifier = Modifier.constrainAs(topLeftControls) {
+              top.linkTo(parent.top, topMargin(if (isCompactLayout) spacing.extraLarge else spacing.small))
+              start.linkTo(parent.start, startMargin(spacing.large))
+              if (isCompactLayout) { width = Dimension.fillToConstraints; end.linkTo(parent.end, endMargin(spacing.large)) } else { width = Dimension.fillToConstraints; end.linkTo(topRightControls.start, spacing.extraSmall) }
             },
           ) {
             if (isCompactLayout) TopPlayerControlsPortrait(mediaTitle = mediaTitle, hideBackground = hideBackground, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
@@ -833,14 +845,14 @@ fun PlayerControls(
             visible = controlsShown && !areControlsLocked && !isCompactLayout,
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.windowInsetsPadding(topInsets).constrainAs(topRightControls) { top.linkTo(parent.top, spacing.small); end.linkTo(parent.end, spacing.large) },
+            modifier = Modifier.constrainAs(topRightControls) { top.linkTo(parent.top, topMargin(spacing.small)); end.linkTo(parent.end, endMargin(spacing.large)) },
           ) { TopRightPlayerControlsLandscape(buttons = topRightButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity) }
 
           AnimatedVisibility(
             visible = controlsShown && !areControlsLocked && (isCompactLayout || !areSlidersShown),
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.windowInsetsPadding(sideInsets).constrainAs(bottomRightControls) { if (isCompactLayout) { bottom.linkTo(parent.bottom, spacing.extraLarge); start.linkTo(parent.start, spacing.large); end.linkTo(parent.end, spacing.large); width = Dimension.fillToConstraints } else { bottom.linkTo(seekbar.top, spacing.small); end.linkTo(parent.end, spacing.large) } },
+            modifier = Modifier.constrainAs(bottomRightControls) { if (isCompactLayout) { bottom.linkTo(parent.bottom, spacing.extraLarge); start.linkTo(parent.start, startMargin(spacing.large)); end.linkTo(parent.end, endMargin(spacing.large)); width = Dimension.fillToConstraints } else { bottom.linkTo(seekbar.top, spacing.small); end.linkTo(parent.end, endMargin(spacing.large)) } },
           ) {
             if (isCompactLayout) BottomPlayerControlsPortrait(buttons = portraitBottomButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
             else BottomRightPlayerControlsLandscape(buttons = bottomRightButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
@@ -850,7 +862,7 @@ fun PlayerControls(
             visible = controlsShown && !areControlsLocked && !isCompactLayout && !areSlidersShown,
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.windowInsetsPadding(sideInsets).constrainAs(bottomLeftControls) { bottom.linkTo(seekbar.top, spacing.small); start.linkTo(parent.start, spacing.large); width = Dimension.fillToConstraints; end.linkTo(bottomRightControls.start, spacing.small) },
+            modifier = Modifier.constrainAs(bottomLeftControls) { bottom.linkTo(seekbar.top, spacing.small); start.linkTo(parent.start, startMargin(spacing.large)); width = Dimension.fillToConstraints; end.linkTo(bottomRightControls.start, spacing.small) },
           ) { BottomLeftPlayerControlsLandscape(buttons = bottomLeftButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity) }
         }
       }

@@ -49,6 +49,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
+import app.marlboroadvance.mpvex.presentation.components.isCompact
+import app.marlboroadvance.mpvex.presentation.components.rememberPlayerWidthClass
 import android.content.Context
 import app.marlboroadvance.mpvex.ui.player.PlayerUpdates
 import kotlinx.coroutines.flow.update
@@ -157,8 +161,8 @@ fun RenderPlayerButton(
 
     // ------------------------------------------------------------------
     // VIDEO TITLE — Stable "Now Playing" capsule
-    //   48dp pill · standard player glass (PlayerChromeStyle) · single-line title
-    //   + accent counter pill + chevron when it opens the playlist · ExtraBold title (ellipsis
+    //   48dp pill, width-capped · standard player glass (PlayerChromeStyle) · single-line
+    //   title + one accent "3 / 12 ›" playlist chip · ExtraBold title (ellipsis
     //   by default, marquee only when it actually overflows) · layer-free press
     //   feedback · NO elevation shadow — hardware shadows show through translucent
     //   fills as a dark rectangular core over the SurfaceView
@@ -188,6 +192,18 @@ fun RenderPlayerButton(
       val capsuleShape = RoundedCornerShape(28.dp)
       val interactionSource = remember { MutableInteractionSource() }
 
+      // Width cap for the whole capsule. Without it a long filename stretched the pill
+      // across the full top row. Upright phones: 300dp. Wider windows: 40% of the window,
+      // between 240dp and 360dp. Longer titles ellipsize, then marquee inside the cap.
+      val isCompactWidth = rememberPlayerWidthClass().isCompact
+      val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+      val titleMaxWidth = if (isCompactWidth) {
+        300.dp
+      } else {
+        (windowWidth * 0.4f).coerceIn(240.dp, 360.dp)
+      }
+      val hasPlaylistChip = playlistModeEnabled || playlistCounter != null
+
       Row(
         modifier              = modifier.wrapContentWidth(Alignment.Start),
         verticalAlignment     = Alignment.CenterVertically,
@@ -199,6 +215,7 @@ fun RenderPlayerButton(
         Row(
           modifier = Modifier
             .weight(1f, fill = false)
+            .widthIn(max = titleMaxWidth)
             // Standard player glass (PlayerChromeStyle). Press feedback is the ripple.
             .playerGlass(capsuleShape, hideBackground)
             .then(
@@ -217,7 +234,8 @@ fun RenderPlayerButton(
             .heightIn(min = 48.dp)
             .padding(
               start  = 18.dp,
-              end    = if (playlistModeEnabled) 12.dp else 18.dp,
+              // The playlist chip sits close to the capsule's rounded end.
+              end    = if (hasPlaylistChip) 10.dp else 18.dp,
               top    = 8.dp,
               bottom = 8.dp,
             ),
@@ -255,28 +273,42 @@ fun RenderPlayerButton(
               ),
           )
 
-          playlistCounter?.let { (current, total) ->
+          // Playlist chip: position and a chevron in one accent pill, e.g. "3 / 12 ›",
+          // so "this opens the playlist" reads as a single tappable cue rather than a
+          // counter plus a loose grey arrow. The chevron only shows when tapping the
+          // capsule actually opens the playlist.
+          if (hasPlaylistChip) {
             Surface(
-              shape = CircleShape,
-              color = MaterialTheme.colorScheme.primaryContainer,
+              shape        = CircleShape,
+              color        = MaterialTheme.colorScheme.primaryContainer,
+              contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             ) {
-              Text(
-                text  = "$current / $total",
-                style = MaterialTheme.typography.labelSmallEmphasized,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                maxLines = 1,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
-              )
+              Row(
+                modifier = Modifier.padding(
+                  start  = if (playlistCounter != null) 10.dp else 4.dp,
+                  end    = if (playlistModeEnabled) 4.dp else 10.dp,
+                  top    = 3.dp,
+                  bottom = 3.dp,
+                ),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+              ) {
+                playlistCounter?.let { (current, total) ->
+                  Text(
+                    text     = "$current / $total",
+                    style    = MaterialTheme.typography.labelMediumEmphasized.copy(fontFeatureSettings = "tnum"),
+                    maxLines = 1,
+                  )
+                }
+                if (playlistModeEnabled) {
+                  Icon(
+                    imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_chevron_right),
+                    contentDescription = null,
+                    modifier           = Modifier.size(18.dp),
+                  )
+                }
+              }
             }
-          }
-
-          if (playlistModeEnabled) {
-            Icon(
-              imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_chevron_right),
-              contentDescription = null,
-              tint               = playerChromeContentColor(hideBackground).copy(alpha = 0.7f),
-              modifier           = Modifier.size(20.dp),
-            )
           }
         }
       }
