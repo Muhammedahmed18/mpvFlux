@@ -316,10 +316,38 @@ object GesturePreferencesScreen : Screen {
             
             item {
               PreferenceCard {
+                val mediaButtonsEnabled by preferences.mediaButtonsEnabled.collectAsState()
+                me.zhanghai.compose.preference.SwitchPreference(
+                  value = mediaButtonsEnabled,
+                  onValueChange = { preferences.mediaButtonsEnabled.set(it) },
+                  title = {
+                    Text(
+                      text = stringResource(R.string.pref_gesture_media_buttons_enabled_title),
+                      style = MaterialTheme.typography.titleMediumEmphasized
+                    )
+                  },
+                  summary = {
+                    Text(
+                      text = stringResource(
+                        if (mediaButtonsEnabled) {
+                          R.string.pref_gesture_media_buttons_enabled_summary_on
+                        } else {
+                          R.string.pref_gesture_media_buttons_enabled_summary_off
+                        },
+                      ),
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                  },
+                )
+
+                PreferenceDivider()
+
                 val mediaPrevious by preferences.mediaPreviousGesture.collectAsState()
                 ListPreference(
                   value = mediaPrevious,
                   onValueChange = { preferences.mediaPreviousGesture.set(it) },
+                  enabled = mediaButtonsEnabled,
                   values = SingleActionGesture.entries,
                   valueToText = { AnnotatedString(gestureNames[it] ?: "") },
                   title = { 
@@ -343,6 +371,7 @@ object GesturePreferencesScreen : Screen {
                 ListPreference(
                   value = mediaPlay,
                   onValueChange = { preferences.mediaPlayGesture.set(it) },
+                  enabled = mediaButtonsEnabled,
                   values = SingleActionGesture.entries,
                   valueToText = { AnnotatedString(gestureNames[it] ?: "") },
                   title = { 
@@ -366,6 +395,7 @@ object GesturePreferencesScreen : Screen {
                 ListPreference(
                   value = mediaNext,
                   onValueChange = { preferences.mediaNextGesture.set(it) },
+                  enabled = mediaButtonsEnabled,
                   values = SingleActionGesture.entries,
                   valueToText = { AnnotatedString(gestureNames[it] ?: "") },
                   title = { 
@@ -379,7 +409,35 @@ object GesturePreferencesScreen : Screen {
                       text = gestureNames[mediaNext] ?: "",
                       style = MaterialTheme.typography.bodyMedium,
                       color = MaterialTheme.colorScheme.onSurfaceVariant
-                    ) 
+                    )
+                  },
+                )
+
+                val mediaKeyCodes = listOf(
+                    CustomKeyCodes.MediaPrevious,
+                    CustomKeyCodes.MediaPlay,
+                    CustomKeyCodes.MediaNext,
+                  ).map { it.keyCode }
+                val mediaInfoText = stringResource(R.string.pref_gesture_media_custom_info)
+                val keyCodeStyle = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+
+                FooterPreference(
+                  summary = {
+                    val annotated = buildAnnotatedString {
+                      append(mediaInfoText)
+                      // Highlight each key code where it appears after its "Label: " prefix.
+                      mediaKeyCodes.forEach { keyCode ->
+                        val start = mediaInfoText.indexOf(": $keyCode")
+                        if (start != -1) {
+                          addStyle(keyCodeStyle, start + 2, start + 2 + keyCode.length)
+                        }
+                      }
+                    }
+                    Text(
+                      text = annotated,
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
                   },
                 )
               }

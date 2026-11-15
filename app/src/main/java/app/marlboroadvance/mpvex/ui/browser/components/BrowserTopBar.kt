@@ -3,6 +3,7 @@ package app.marlboroadvance.mpvex.ui.browser.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.size
@@ -82,6 +83,7 @@ fun BrowserTopBar(
   onMarkAsClick: (() -> Unit)? = null,
   onExtractAudioClick: (() -> Unit)? = null,
   extractAudioEnabled: Boolean = true,
+  selectionSummary: String? = null,
 ) {
   if (isInSelectionMode) {
     SelectionTopBar(
@@ -104,6 +106,7 @@ fun BrowserTopBar(
       onMarkAs = onMarkAsClick,
       onExtractAudio = onExtractAudioClick,
       extractAudioEnabled = extractAudioEnabled,
+      summary = selectionSummary,
     )
   } else {
     NormalTopBar(
@@ -244,6 +247,7 @@ private fun SelectionTopBar(
   onMarkAs: (() -> Unit)? = null,
   onExtractAudio: (() -> Unit)? = null,
   extractAudioEnabled: Boolean = true,
+  summary: String? = null,
 ) {
   var showDropdown by remember { mutableStateOf(false) }
 
@@ -253,21 +257,30 @@ private fun SelectionTopBar(
       titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
     ),
     title = {
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.clickable { showDropdown = true },
-      ) {
-        Text(
-          stringResource(R.string.selected_items, selectedCount, totalCount),
-          style = MaterialTheme.typography.titleLargeEmphasized,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Icon(
-          Icons.Rounded.ArrowDropDown,
-          contentDescription = stringResource(R.string.selection_options),
-          modifier = Modifier.size(28.dp)
-        )
+      Column(modifier = Modifier.clickable { showDropdown = true }) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text(
+            stringResource(R.string.selected_items, selectedCount, totalCount),
+            style = MaterialTheme.typography.titleLargeEmphasized,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+          Icon(
+            Icons.Rounded.ArrowDropDown,
+            contentDescription = stringResource(R.string.selection_options),
+            modifier = Modifier.size(28.dp)
+          )
+        }
+        // Total size and duration of the selection, e.g. "3.2 GB · 4h 12m".
+        if (!summary.isNullOrBlank()) {
+          Text(
+            text = summary,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
 
         DropdownMenu(
           expanded = showDropdown,

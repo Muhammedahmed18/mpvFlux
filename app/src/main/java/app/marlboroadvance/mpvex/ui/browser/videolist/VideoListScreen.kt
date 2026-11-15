@@ -82,6 +82,7 @@ import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.fab.FabScrollHelper
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.MarkAsHost
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
@@ -275,10 +276,19 @@ data class VideoListScreen(
     Scaffold(
       snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
+        val selectionSummary =
+          if (selectionManager.isInSelectionMode) {
+            remember(selectionManager, selectionManager.state) {
+              SelectionSummary.ofVideos(selectionManager.getSelectedItems())
+            }
+          } else {
+            null
+          }
         BrowserTopBar(
           title = displayFolderName,
           subtitle = topBarSubtitle,
           isInSelectionMode = selectionManager.isInSelectionMode,
+          selectionSummary = selectionSummary,
           selectedCount = selectionManager.selectedCount,
           totalCount = sortedVideosWithInfo.size,
           onBackClick = {
@@ -304,10 +314,9 @@ data class VideoListScreen(
             if (selectionManager.isSingleSelection) {
               val video = selectionManager.getSelectedItems().firstOrNull()
               if (video != null) {
-                val intent = Intent(context, app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity::class.java)
-                intent.action = Intent.ACTION_VIEW
-                intent.data = video.uri
-                context.startActivity(intent)
+                context.startActivity(
+                  app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(context, video.uri, video.path),
+                )
                 selectionManager.clear()
               }
             }

@@ -19,6 +19,7 @@ import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import android.util.Log
+import android.view.KeyEvent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.media.MediaBrowserServiceCompat
@@ -26,6 +27,7 @@ import androidx.media.session.MediaButtonReceiver
 import app.marlboroadvance.mpvex.R
 import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.MPVNode
+import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -41,6 +43,13 @@ class MediaPlaybackService :
     private const val TAG = "MediaPlaybackService"
     private const val NOTIFICATION_ID = 1
     private const val NOTIFICATION_CHANNEL_ID = "mpvex_playback_channel"
+
+    // Notification button actions. These are sent straight to this service instead of being
+    // disguised as media-button events, so turning hardware media buttons off never disables
+    // the on-screen notification controls.
+    private const val ACTION_PREVIOUS = "app.marlboroadvance.mpvex.action.PREVIOUS"
+    private const val ACTION_TOGGLE_PAUSE = "app.marlboroadvance.mpvex.action.TOGGLE_PAUSE"
+    private const val ACTION_NEXT = "app.marlboroadvance.mpvex.action.NEXT"
 
     @Volatile
     internal var thumbnail: Bitmap? = null
@@ -69,6 +78,7 @@ class MediaPlaybackService :
   private val binder = MediaPlaybackBinder()
   private lateinit var mediaSession: MediaSessionCompat
   private val playerPreferences: PlayerPreferences by inject()
+  private val gesturePreferences: GesturePreferences by inject()
 
   private var mediaTitle = ""
   private var mediaArtist = ""
@@ -185,10 +195,17 @@ class MediaPlaybackService :
   ): Int {
     Log.d(TAG, "Service starting with startId: $startId")
 
-    // Handle media button events
     intent?.let {
-      MediaButtonReceiver.handleIntent(mediaSession, it)
-      
+      when (it.action) {
+        // Notification buttons: always honoured, independent of the hardware-button setting.
+        ACTION_PREVIOUS -> MediaButtonHandler.seek(-gesturePreferences.doubleTapToSeekDuration.get(), playerPreferences)
+        ACTION_TOGGLE_PAUSE -> MediaButtonHandler.togglePause()
+        ACTION_NEXT -> MediaButtonHandler.seek(gesturePreferences.doubleTapToSeekDuration.get(), playerPreferences)
+        // Hardware media buttons routed here by MediaButtonReceiver. They end up in the
+        // session callback's onMediaButtonEvent, which applies the user's settings.
+        else -> MediaButtonReceiver.handleIntent(mediaSession, it)
+      }
+
       // Get media info from intent extras if available
       val title = it.getStringExtra("media_title")
       val artist = it.getStringExtra("media_artist")
@@ -256,11 +273,44 @@ class MediaPlaybackService :
     updateMediaSession()
   }
 
+  /** Playback actions for hardware media buttons while the session handles them. */
+  private val mediaButtonActions =
+    object : MediaButtonHandler.Actions {
+      override fun togglePause() = MediaButtonHandler.togglePause()
+
+      override fun setPaused(paused: Boolean) = MediaButtonHandler.setPaused(paused)
+
+      override fun seekBy(seconds: Int) = MediaButtonHandler.seek(seconds, playerPreferences)
+
+      override fun stop() = stopSelf()
+    }
+
   private fun setupMediaSession() {
     mediaSession =
       MediaSessionCompat(this, TAG).apply {
         setCallback(
           object : MediaSessionCompat.Callback() {
+            /**
+             * Hardware media buttons (headset, Bluetooth, car kits) arrive here before being
+             * turned into onPlay/onSkipToNext/etc. They are handled entirely by
+             * [MediaButtonHandler] so the "Hardware media buttons" switch and the per-button
+             * actions in Settings → Gestures → Media controls apply. Transport controls (lock
+             * screen, system media controls) don't come through here and keep working.
+             */
+            override fun onMediaButtonEvent(mediaButtonEvent: Intent): Boolean {
+              val extra: KeyEvent? =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                  mediaButtonEvent.getParcelableExtra(Intent.EXTRA_KEY_EVENT, KeyEvent::class.java)
+                } else {
+                  @Suppress("DEPRECATION")
+                  mediaButtonEvent.getParcelableExtra<KeyEvent>(Intent.EXTRA_KEY_EVENT)
+                }
+              val keyEvent = extra ?: return super.onMediaButtonEvent(mediaButtonEvent)
+
+              val handled = MediaButtonHandler.handle(keyEvent, gesturePreferences, mediaButtonActions)
+              return handled || super.onMediaButtonEvent(mediaButtonEvent)
+            }
+
             override fun onPlay() {
               Log.d(TAG, "onPlay called")
               if (!MpvSession.isAlive) return
@@ -278,24 +328,16 @@ class MediaPlaybackService :
               stopSelf()
             }
 
+            // Lock screen / system media controls: seek by the user's double-tap seek duration
+            // (previously a hard-coded 10 seconds).
             override fun onSkipToNext() {
               Log.d(TAG, "onSkipToNext called")
-              if (!MpvSession.isAlive) return
-              // Use precise seeking for videos shorter than 2 minutes (120 seconds) or if preference is enabled
-              val duration = MPVLib.getPropertyInt("duration") ?: 0
-              val shouldUsePreciseSeeking = playerPreferences.usePreciseSeeking.get() || duration < 120
-              val seekMode = if (shouldUsePreciseSeeking) "relative+exact" else "relative+keyframes"
-              MPVLib.command("seek", "10", seekMode)
+              MediaButtonHandler.seek(gesturePreferences.doubleTapToSeekDuration.get(), playerPreferences)
             }
 
             override fun onSkipToPrevious() {
               Log.d(TAG, "onSkipToPrevious called")
-              if (!MpvSession.isAlive) return
-              // Use precise seeking for videos shorter than 2 minutes (120 seconds) or if preference is enabled
-              val duration = MPVLib.getPropertyInt("duration") ?: 0
-              val shouldUsePreciseSeeking = playerPreferences.usePreciseSeeking.get() || duration < 120
-              val seekMode = if (shouldUsePreciseSeeking) "relative+exact" else "relative+keyframes"
-              MPVLib.command("seek", "-10", seekMode)
+              MediaButtonHandler.seek(-gesturePreferences.doubleTapToSeekDuration.get(), playerPreferences)
             }
 
             override fun onSeekTo(pos: Long) {
@@ -401,35 +443,27 @@ class MediaPlaybackService :
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
       )
 
-    // Create notification actions
+    // Create notification actions. They target this service directly (not the media-button
+    // path), so they keep working when hardware media buttons are turned off.
     val previousAction =
       NotificationCompat.Action(
         android.R.drawable.ic_media_previous,
         "Previous",
-        MediaButtonReceiver.buildMediaButtonPendingIntent(
-          this,
-          PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS,
-        ),
+        serviceActionIntent(ACTION_PREVIOUS, requestCode = 1),
       )
 
     val playPauseAction =
       NotificationCompat.Action(
         if (paused) android.R.drawable.ic_media_play else android.R.drawable.ic_media_pause,
         if (paused) "Play" else "Pause",
-        MediaButtonReceiver.buildMediaButtonPendingIntent(
-          this,
-          PlaybackStateCompat.ACTION_PLAY_PAUSE,
-        ),
+        serviceActionIntent(ACTION_TOGGLE_PAUSE, requestCode = 2),
       )
 
     val nextAction =
       NotificationCompat.Action(
         android.R.drawable.ic_media_next,
         "Next",
-        MediaButtonReceiver.buildMediaButtonPendingIntent(
-          this,
-          PlaybackStateCompat.ACTION_SKIP_TO_NEXT,
-        ),
+        serviceActionIntent(ACTION_NEXT, requestCode = 3),
       )
 
     return NotificationCompat
@@ -453,6 +487,22 @@ class MediaPlaybackService :
       ).setPriority(NotificationCompat.PRIORITY_LOW)
       .build()
   }
+
+  /**
+   * PendingIntent that delivers [action] to this service. getForegroundService is used because
+   * the service may have left the foreground while paused in the background; onStartCommand
+   * always calls startForeground, so the foreground-start contract is met.
+   */
+  private fun serviceActionIntent(
+    action: String,
+    requestCode: Int,
+  ): PendingIntent =
+    PendingIntent.getForegroundService(
+      this,
+      requestCode,
+      Intent(this, MediaPlaybackService::class.java).setAction(action),
+      PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
 
   // ==================== MPV Event Observers ====================
 

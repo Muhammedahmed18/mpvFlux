@@ -84,6 +84,7 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
 import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
 import app.marlboroadvance.mpvex.ui.browser.sheets.MarkAsHost
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.browser.states.PermissionDeniedState
@@ -401,6 +402,23 @@ fun FileSystemBrowserScreen(path: String? = null) {
     Scaffold(
       snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
+        // Folder totals come from the scan; nothing is measured here.
+        val selectionSummary =
+          if (isInSelectionMode) {
+            remember(
+              folderSelectionManager,
+              folderSelectionManager.state,
+              videoSelectionManager,
+              videoSelectionManager.state,
+            ) {
+              SelectionSummary.format(
+                folderSelectionManager.getSelectedItems().map { SelectionSummary.entry(it) } +
+                  videoSelectionManager.getSelectedItems().map { SelectionSummary.entry(it) },
+              )
+            }
+          } else {
+            null
+          }
         BrowserTopBar(
           title = if (isAtRoot) {
             stringResource(R.string.app_name)
@@ -408,6 +426,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
             breadcrumbs.lastOrNull()?.name ?: stringResource(R.string.tree_view)
           },
           isInSelectionMode = isInSelectionMode,
+          selectionSummary = selectionSummary,
           selectedCount = selectedCount,
           totalCount = totalCount,
           onBackClick = if (isAtRoot) {
@@ -444,10 +463,9 @@ fun FileSystemBrowserScreen(path: String? = null) {
             {
               val video = videoSelectionManager.getSelectedItems().firstOrNull()
               if (video != null) {
-                val intent = Intent(context, app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity::class.java)
-                intent.action = Intent.ACTION_VIEW
-                intent.data = video.uri
-                context.startActivity(intent)
+                context.startActivity(
+                  app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(context, video.uri, video.path),
+                )
                 videoSelectionManager.clear()
               }
             }

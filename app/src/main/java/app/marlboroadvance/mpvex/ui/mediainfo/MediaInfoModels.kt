@@ -63,6 +63,7 @@ internal object MediaInfoFormatter {
   fun build(
     context: Context,
     fileName: String,
+    filePath: String?,
     info: MediaInfoOps.MediaInfoData,
     inform: String,
   ): MediaInfoDetails {
@@ -81,6 +82,7 @@ internal object MediaInfoFormatter {
       buildString {
         appendLine("=".repeat(60))
         appendLine("MEDIA INFO - $fileName")
+        filePath?.let { appendLine("Location: $it") }
         appendLine("=".repeat(60))
         appendLine()
         append(inform.trimEnd())
@@ -115,7 +117,7 @@ internal object MediaInfoFormatter {
         },
       audioTracks = audioTracks,
       subtitleTracks = subtitleTracks,
-      fileFields = fileFields(context, fileName, general),
+      fileFields = fileFields(context, fileName, filePath, general),
       reportSections = parseReport(inform),
       reportText = reportText,
       summaryText = summary(context, title, info, audioTracks, subtitleTracks),
@@ -224,11 +226,14 @@ internal object MediaInfoFormatter {
   private fun fileFields(
     context: Context,
     fileName: String,
+    filePath: String?,
     g: MediaInfoOps.GeneralInfo,
   ): List<InfoField> {
     val container = listOfNotNull(g.format.clean(), g.formatVersion.clean()).joinToString(" ")
     return listOfNotNull(
       InfoField(context.getString(R.string.media_info_file_name), fileName),
+      // Full path on the device; tapping the row copies it. Omitted when it can't be known.
+      filePath?.let { InfoField(context.getString(R.string.media_info_location), it) },
       container.ifBlank { null }?.let { InfoField(context.getString(R.string.media_info_container), it) },
       g.duration.clean()?.let { InfoField(context.getString(R.string.media_info_duration), it) },
       g.fileSize.clean()?.let { InfoField(context.getString(R.string.media_info_size), it) },
@@ -236,7 +241,8 @@ internal object MediaInfoFormatter {
       g.encodedDate.clean()?.let { InfoField(context.getString(R.string.media_info_encoded_date), it) },
       g.writingApplication.clean()?.let { InfoField(context.getString(R.string.media_info_writing_app), it) },
       g.writingLibrary.clean()?.let { InfoField(context.getString(R.string.media_info_writing_library), it) },
-      g.completeName.clean()?.let { InfoField(context.getString(R.string.media_info_location), it) },
+      // MediaInfoLib's CompleteName is not used: the file is opened by descriptor with only its
+      // name, so it just repeated the file name instead of giving a location.
     )
   }
 

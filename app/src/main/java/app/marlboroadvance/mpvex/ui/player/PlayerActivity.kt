@@ -40,6 +40,7 @@ import app.marlboroadvance.mpvex.domain.playbackstate.repository.PlaybackStateRe
 import app.marlboroadvance.mpvex.preferences.AdvancedPreferences
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
+import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.SubtitlesPreferences
 import app.marlboroadvance.mpvex.ui.player.controls.PlayerControls
@@ -107,6 +108,29 @@ class PlayerActivity :
    * Preferences for player settings.
    */
   private val playerPreferences: PlayerPreferences by inject()
+
+  /**
+   * Preferences for gestures and hardware media buttons.
+   */
+  private val gesturePreferences: GesturePreferences by inject()
+
+  /**
+   * Hardware media buttons pressed while the player is focused. Routed through the view model
+   * so play/pause also handles audio focus, like the on-screen controls.
+   */
+  private val mediaButtonActions =
+    object : MediaButtonHandler.Actions {
+      override fun togglePause() = viewModel.pauseUnpause()
+
+      override fun setPaused(paused: Boolean) {
+        val isPaused = runCatching { MPVLib.getPropertyBoolean("pause") }.getOrNull() == true
+        if (isPaused != paused) viewModel.pauseUnpause()
+      }
+
+      override fun seekBy(seconds: Int) = viewModel.seekBy(seconds)
+
+      override fun stop() = finishAndRemoveTask()
+    }
 
   /**
    * Preferences for audio settings.
@@ -2062,6 +2086,12 @@ class PlayerActivity :
         viewModel.sheetShown.value == Sheets.AudioTracks
     val isNoSheetOpen = viewModel.sheetShown.value == Sheets.None
 
+    // Hardware media keys (headset, Bluetooth, keyboard) follow Settings → Gestures → Media
+    // controls, including the switch that turns them off. They never reach mpv's own bindings.
+    if (event != null && MediaButtonHandler.isMediaKey(keyCode)) {
+      return MediaButtonHandler.handle(event, gesturePreferences, mediaButtonActions)
+    }
+
     when (keyCode) {
       KeyEvent.KEYCODE_DPAD_UP -> {
         return super.onKeyDown(keyCode, event)
@@ -2115,21 +2145,6 @@ class PlayerActivity :
         return true
       }
 
-      KeyEvent.KEYCODE_MEDIA_STOP -> {
-        finishAndRemoveTask()
-        return true
-      }
-
-      KeyEvent.KEYCODE_MEDIA_REWIND -> {
-        viewModel.handleLeftDoubleTap()
-        return true
-      }
-
-      KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
-        viewModel.handleRightDoubleTap()
-        return true
-      }
-
       else -> {
         event?.let { player.onKey(it) }
         return super.onKeyDown(keyCode, event)
@@ -2141,6 +2156,10 @@ class PlayerActivity :
     keyCode: Int,
     event: KeyEvent?,
   ): Boolean {
+    // Media keys were fully handled (or deliberately ignored) in onKeyDown.
+    if (event != null && MediaButtonHandler.isMediaKey(keyCode)) {
+      return MediaButtonHandler.handle(event, gesturePreferences, mediaButtonActions)
+    }
     event?.let {
       if (player.onKey(it)) return true
     }

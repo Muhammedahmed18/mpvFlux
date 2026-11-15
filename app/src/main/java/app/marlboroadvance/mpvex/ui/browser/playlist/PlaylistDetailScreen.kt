@@ -51,6 +51,7 @@ import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
 import app.marlboroadvance.mpvex.ui.browser.cards.videoCardGroupPosition
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
@@ -146,10 +147,19 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
 
     Scaffold(
       topBar = {
+        val selectionSummary =
+          if (selectionManager.isInSelectionMode) {
+            remember(selectionManager, selectionManager.state) {
+              SelectionSummary.ofVideos(selectionManager.getSelectedItems().map { it.video })
+            }
+          } else {
+            null
+          }
         BrowserTopBar(
           title = playlist?.name ?: stringResource(R.string.playlist_default_title),
           subtitle = if (videos.isEmpty()) null else pluralStringResource(R.plurals.card_video_count, videos.size, videos.size),
           isInSelectionMode = selectionManager.isInSelectionMode,
+          selectionSummary = selectionSummary,
           selectedCount = selectionManager.selectedCount,
           totalCount = videos.size,
           onBackClick = {
@@ -179,10 +189,13 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
                     showUrlDialog = true
                     selectionManager.clear()
                   } else {
-                    val intent = Intent(context, app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity::class.java)
-                    intent.action = Intent.ACTION_VIEW
-                    intent.data = item.video.uri
-                    context.startActivity(intent)
+                    context.startActivity(
+                      app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(
+                        context,
+                        item.video.uri,
+                        item.video.path,
+                      ),
+                    )
                     selectionManager.clear()
                   }
                 }

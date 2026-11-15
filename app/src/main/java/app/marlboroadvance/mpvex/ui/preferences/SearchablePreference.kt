@@ -334,6 +334,13 @@ object SearchablePreferences {
                 screen = GesturePreferencesScreen,
             ))
             add(SearchablePreference(
+                titleRes = R.string.pref_gesture_media_buttons_enabled_title,
+                summaryRes = R.string.pref_gesture_media_buttons_enabled_summary_on,
+                keywords = listOf("media", "button", "headphone", "headset", "bluetooth", "earbuds", "car", "disable", "ignore"),
+                category = "Gestures",
+                screen = GesturePreferencesScreen,
+            ))
+            add(SearchablePreference(
                 titleRes = R.string.pref_gesture_media_previous,
                 keywords = listOf("media", "previous", "gesture", "control", "backward"),
                 category = "Gestures",

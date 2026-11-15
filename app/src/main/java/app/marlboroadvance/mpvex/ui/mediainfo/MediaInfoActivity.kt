@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex.ui.mediainfo
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -28,6 +29,23 @@ import org.koin.android.ext.android.inject
  * in [MediaInfoViewModel], so rotating the phone doesn't re-read the file.
  */
 class MediaInfoActivity : ComponentActivity() {
+  companion object {
+    /** Absolute path of the file on the device, when the caller knows it (library screens). */
+    const val EXTRA_FILE_PATH = "app.marlboroadvance.mpvex.extra.FILE_PATH"
+
+    /** Opens media info for a library video; [path] is shown as the file's location. */
+    fun createIntent(
+      context: Context,
+      uri: Uri,
+      path: String?,
+    ): Intent =
+      Intent(context, MediaInfoActivity::class.java).apply {
+        action = Intent.ACTION_VIEW
+        data = uri
+        if (!path.isNullOrBlank()) putExtra(EXTRA_FILE_PATH, path)
+      }
+  }
+
   private val appearancePreferences by inject<AppearancePreferences>()
   private val viewModel: MediaInfoViewModel by viewModels()
 
@@ -35,7 +53,7 @@ class MediaInfoActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
 
     // Ignored after rotation: the ViewModel already has (or is loading) this file.
-    viewModel.load(mediaUri(intent))
+    viewModel.load(mediaUri(intent), intent?.getStringExtra(EXTRA_FILE_PATH))
 
     setContent {
       val dark by appearancePreferences.darkMode.collectAsState()
@@ -68,7 +86,7 @@ class MediaInfoActivity : ComponentActivity() {
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
-    viewModel.load(mediaUri(intent))
+    viewModel.load(mediaUri(intent), intent.getStringExtra(EXTRA_FILE_PATH))
   }
 
   private fun mediaUri(intent: Intent?): Uri? =

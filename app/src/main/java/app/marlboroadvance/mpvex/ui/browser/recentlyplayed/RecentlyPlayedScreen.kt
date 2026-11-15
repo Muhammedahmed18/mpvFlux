@@ -48,6 +48,7 @@ import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationSheet
 import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistDetailScreen
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
@@ -167,9 +168,26 @@ object RecentlyPlayedScreen : Screen {
 
   Scaffold(
         topBar = {
+          // Playlists have no size/duration, so they make the totals a lower bound ("≥").
+          val selectionSummary =
+            if (selectionManager.isInSelectionMode) {
+              remember(selectionManager, selectionManager.state) {
+                SelectionSummary.format(
+                  selectionManager.getSelectedItems().map { item ->
+                    when (item) {
+                      is RecentlyPlayedItem.VideoItem -> SelectionSummary.entry(item.video)
+                      is RecentlyPlayedItem.PlaylistItem -> SelectionSummary.Unknown
+                    }
+                  },
+                )
+              }
+            } else {
+              null
+            }
           BrowserTopBar(
             title = stringResource(R.string.pref_advanced_enable_recently_played_title),
             isInSelectionMode = selectionManager.isInSelectionMode,
+            selectionSummary = selectionSummary,
             selectedCount = selectionManager.selectedCount,
             totalCount = recentItems.size,
             onBackClick = null,

@@ -205,6 +205,9 @@
   <string name="pref_gesture_view_title">View</string>
   <string name="pref_gesture_double_tap_custom_info">You can bind custom actions to these gestures in input.conf using the following key codes:\n\nLeft: MBTN_LEFT_DBL\nCenter: MBTN_MID_DBL\nRight: MBTN_RIGHT_DBL</string>
   <string name="pref_gesture_media_title">Media controls</string>
+  <string name="pref_gesture_media_buttons_enabled_title">Hardware media buttons</string>
+  <string name="pref_gesture_media_buttons_enabled_summary_on">Headphones, Bluetooth devices and car kits can control playback</string>
+  <string name="pref_gesture_media_buttons_enabled_summary_off">Ignored. Notification and lock screen controls still work. While mpvFlux is playing, these buttons won\'t control other apps either</string>
   <string name="pref_gesture_media_previous">Previous</string>
   <string name="pref_gesture_media_play">Play/Pause</string>
   <string name="pref_gesture_media_next">Next</string>

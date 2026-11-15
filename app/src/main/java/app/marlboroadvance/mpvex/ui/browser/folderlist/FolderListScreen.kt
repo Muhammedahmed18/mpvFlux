@@ -63,6 +63,7 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteProgressDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
+import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
 import app.marlboroadvance.mpvex.ui.browser.sheets.rememberSortOrderLabels
@@ -190,9 +191,19 @@ object FolderListScreen : Screen {
       contentWindowInsets = WindowInsets(0, 0, 0, 0),
       topBar = {
         if (permissionState.status !is PermissionStatus.Denied) {
+          // Folder totals come from the scan; nothing is measured here.
+          val selectionSummary =
+            if (selectionManager.isInSelectionMode) {
+              remember(selectionManager, selectionManager.state) {
+                SelectionSummary.format(selectionManager.getSelectedItems().map { SelectionSummary.entry(it) })
+              }
+            } else {
+              null
+            }
           BrowserTopBar(
             title = stringResource(R.string.app_name),
             isInSelectionMode = selectionManager.isInSelectionMode,
+            selectionSummary = selectionSummary,
             selectedCount = selectionManager.selectedCount,
             totalCount = videoFolders.size,
             onCancelSelection = { selectionManager.clear() },

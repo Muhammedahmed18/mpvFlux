@@ -13,6 +13,12 @@ class GesturePreferences(
   val centerSingleActionGesture = preferenceStore.getEnum("center_drag_gesture", SingleActionGesture.PlayPause)
   val rightSingleActionGesture = preferenceStore.getEnum("right_drag_gesture", SingleActionGesture.Seek)
   val useSingleTapForCenter = preferenceStore.getBoolean("use_single_tap_for_center", false)
+  /**
+   * Whether hardware media buttons (headset, Bluetooth earbuds, car kits, keyboards) control
+   * playback. When off they are ignored; the notification and lock-screen controls still work.
+   */
+  val mediaButtonsEnabled = preferenceStore.getBoolean("media_buttons_enabled", true)
+  // Key kept as "meda_previous_gesture" (sic) so existing user settings are preserved.
   val mediaPreviousGesture = preferenceStore.getEnum("meda_previous_gesture", SingleActionGesture.Seek)
   val mediaPlayGesture = preferenceStore.getEnum("media_play_gesture", SingleActionGesture.PlayPause)
   val mediaNextGesture = preferenceStore.getEnum("media_next_gesture", SingleActionGesture.Seek)
