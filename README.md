@@ -1,97 +1,117 @@
 <div align="center">
 
-<img src="fastlane/metadata/android/en-US/images/icon.png" width="96" alt="MpvFlux icon">
+<img src="fastlane/metadata/android/en-US/images/icon.png" width="112" alt="mpvFlux app icon" />
 
-# MpvFlux
+# mpvFlux
 
-**A fast, battery-friendly local video player for Android, built on mpv.**
+### Your videos. Your subtitles. Your player.
 
-Full ASS/SSA subtitle rendering, hardware decoding and a modern Material 3 design. Made with anime in mind.
+A fast, battery-conscious Android video player powered by **mpv**, built with **Material 3 Expressive** and made with anime in mind.
 
-[![Latest release](https://img.shields.io/github/v/release/Muhammedahmed18/mpvFlux?label=release)](https://github.com/Muhammedahmed18/mpvFlux/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/Muhammedahmed18/mpvFlux/total)](https://github.com/Muhammedahmed18/mpvFlux/releases)
-[![Android 8.0+](https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white)](#-download)
-[![License](https://img.shields.io/github/license/Muhammedahmed18/mpvFlux)](LICENSE)
+<p>
+  <a href="https://github.com/Muhammedahmed18/mpvFlux/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Muhammedahmed18/mpvFlux?style=flat-square&label=Release" /></a>
+  <a href="https://github.com/Muhammedahmed18/mpvFlux/releases"><img alt="Total downloads" src="https://img.shields.io/github/downloads/Muhammedahmed18/mpvFlux/total?style=flat-square&label=Downloads" /></a>
+  <img alt="Android 8.0 or later" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white" />
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/Muhammedahmed18/mpvFlux?style=flat-square" /></a>
+</p>
 
-[**Download**](https://github.com/Muhammedahmed18/mpvFlux/releases/latest) · [Screenshots](#-screenshots) · [Features](#-features) · [Build](#-building-from-source) · [Report a bug](https://github.com/Muhammedahmed18/mpvFlux/issues)
+**[Download latest APK](https://github.com/Muhammedahmed18/mpvFlux/releases/latest)** · **[Explore features](#features)** · **[View screenshots](#screenshots)** · **[Report an issue](https://github.com/Muhammedahmed18/mpvFlux/issues)**
 
 </div>
 
 ---
 
-## 📸 Screenshots
+## Why mpvFlux?
+
+**Powerful playback, without the clutter.** mpvFlux combines mpv's format support and libass subtitle rendering with an Android-native interface, thoughtful playback controls, and local media management.
+
+| 🎬 Playback | 💬 Subtitles | 🎨 Personalization |
+| :--- | :--- | :--- |
+| Hardware decoding, chapters, PiP, playback speed and resume | Full ASS/SSA rendering, SRT/VTT styling, language preferences and dual subtitles | Material 3 Expressive, dynamic colors, OLED black and customizable gestures |
+
+## Screenshots
 
 <div align="center">
-
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/folderscreen.png" width="260" alt="Folder list">
-&nbsp;
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/videoscreen.png" width="260" alt="Episode list">
-
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/player.png" width="760" alt="Player">
-
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/folderscreen.png" width="235" alt="mpvFlux folder browser" />
+  &nbsp;
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/videoscreen.png" width="235" alt="mpvFlux video library" />
+  <p><sub>Browse your folders and video library</sub></p>
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/player.png" width="760" alt="mpvFlux playback controls" />
+  <p><sub>Watch with a customizable, distraction-free player</sub></p>
 </div>
 
----
+## Features
 
-## ✨ Features
+### Playback that adapts to your device
 
-### 🎬 Playback
-- **Powered by mpv:** plays practically any local video format.
-- **Hardware decoding first:** uses MediaCodec and falls back to software only when needed.
-- **Knows what your phone can decode:** the decoder sheet checks the video's codec, profile and resolution and explains when hardware decoding isn't available (for example AV1 or 10-bit H.264).
+- **Powered by mpv** for broad local video format support.
+- **MediaCodec hardware decoding**, with software fallback when necessary.
+- **Decoder information sheet** explaining codec, profile and resolution compatibility, including cases such as AV1 and 10-bit H.264.
 - **Picture-in-picture** and **background audio playback**.
-- **Resume where you left off**, plus a recently played list and playlists.
-- Frame-by-frame navigation, chapters, speed presets and a sleep timer.
-- **Locked controls made for one hand:** a hold-to-unlock button where your right thumb rests, plus small pills showing the clock, time left and battery.
-- Advanced users can edit `mpv.conf` directly in the app.
+- **Playback history**, resume position, recently played videos and playlists.
+- **Chapters**, frame-by-frame navigation, speed presets and a sleep timer.
+- **One-handed locked controls** with hold-to-unlock and compact clock, remaining-time and battery indicators.
+- **In-app `mpv.conf` editing** for advanced configuration.
 
-### 💬 Subtitles
-- **Full ASS/SSA rendering** through libass, with your typesetting, karaoke and signs exactly as the fansub intended.
-- **Online subtitle search with hash matching:** identifies your file from its first and last 64 KB, so the subtitles you find are synced to that exact release.
-- **SRT/VTT subtitles use your phone's font**, including fonts from your phone's theme store. ASS/SSA keeps its original styling.
-- **Preferred audio and subtitle language** picked from a list, matching every language code a file may use (`en`, `eng`, `en-US`…).
-- **Subtitles off by default** if you prefer turning them on yourself.
-- Custom fonts, styling, subtitle delay and secondary subtitles.
+### Subtitles, the way they were intended
 
-### 🔋 Battery and performance
-- **No polling loops:** the player only reacts to real changes instead of checking every few milliseconds.
-- **Video decoding pauses during background playback**, so audio-only listening doesn't waste power.
-- **Smart media scanning:** an asynchronous scanner with caching keeps large libraries responsive, and full rescans are limited to once every 12 hours.
-- **Lightweight thumbnail cache**, limited in size and cleaned up automatically.
-- **No background work while you watch:** thumbnail generation pauses while a video is playing.
+- **ASS/SSA subtitles rendered with libass**, preserving typesetting, karaoke effects and signs.
+- **Online subtitle search with file-hash matching**, using the first and last 64 KB of a video file.
+- **SRT/VTT subtitles** displayed with your phone's font, including supported theme-store fonts.
+- **Audio and subtitle language preferences**, including language-code variants such as `en`, `eng` and `en-US`.
+- **Optional subtitles-off default**, plus custom fonts, styling, subtitle delay and secondary subtitles.
 
-### 🎨 Design
-- **Material 3 Expressive** UI with dynamic (wallpaper) colours and an OLED black option.
-- Customizable gestures for volume, brightness and seeking, plus a custom player control layout.
-- Folder and file browser with copy, move, rename and delete.
+### Material 3 Expressive design
 
-### 🔒 Privacy
-No ads, no trackers, no analytics. Fully open source.
+- **Dynamic wallpaper colors** and an **OLED black** option.
+- **Customizable gestures** for volume, brightness and seeking.
+- **Custom player control layout** designed for comfortable everyday use.
+- **Built-in file management**: browse, copy, move, rename and delete files.
 
----
+<details>
+<summary><strong>Battery and performance optimizations</strong></summary>
 
-## 📥 Download
+<br />
 
-Get the latest APK from the [**Releases page**](https://github.com/Muhammedahmed18/mpvFlux/releases/latest).
+- Event-driven playback state updates instead of frequent polling loops.
+- Video decoding pauses during background audio playback to conserve power.
+- Asynchronous media scanning with caching; full rescans are limited to once every 12 hours.
+- Bounded thumbnail caching with automatic cleanup.
+- Thumbnail generation pauses while a video is playing.
 
-| File | For |
-|---|---|
-| `mpvFlux-arm64-v8a-vX.Y.Z.apk` | Most phones (recommended) |
-| `mpvFlux-armeabi-v7a-vX.Y.Z.apk` | Older 32-bit phones |
-| `mpvFlux-x86_64-vX.Y.Z.apk` / `mpvFlux-x86-vX.Y.Z.apk` | Emulators, Chromebooks |
-| `mpvFlux-universal-vX.Y.Z.apk` | Not sure? This one works everywhere |
+</details>
 
-**Requires Android 8.0 (API 26) or newer.**
+### Privacy first
 
-> **Coming from mpvEx or MpvFlux 1.1.x?** Since 1.2.0, MpvFlux uses its own app ID
-> (`app.marlboroadvance.mpvflux`), so it installs as a separate app. Your old watch
-> history and settings don't carry over.
+**No ads. No trackers. No analytics.** mpvFlux is open source.
 
 ---
 
-## 🛠️ Building from source
+## Download
 
-**You need:** Android Studio (latest stable) and JDK 17.
+Get the APK from **[GitHub Releases](https://github.com/Muhammedahmed18/mpvFlux/releases/latest)**.
+
+**Minimum Android version:** Android 8.0 (API 26).
+
+| APK variant | Recommended for |
+| :--- | :--- |
+| `arm64-v8a` | Most modern Android phones **(recommended)** |
+| `armeabi-v7a` | Older 32-bit Android devices |
+| `x86_64` / `x86` | Compatible emulators and Chromebooks |
+| `universal` | When you're unsure which architecture to choose |
+
+<details>
+<summary><strong>Upgrading from mpvEx or mpvFlux 1.1.x?</strong></summary>
+
+<br />
+
+Since version 1.2.0, mpvFlux uses the app ID `app.marlboroadvance.mpvflux`. It installs separately from older versions, and existing watch history and settings are not transferred automatically.
+
+</details>
+
+## Build from source
+
+**Requirements:** Android Studio (latest stable) and JDK 17.
 
 ```bash
 git clone https://github.com/Muhammedahmed18/mpvFlux.git
@@ -99,29 +119,31 @@ cd mpvFlux
 ./gradlew assembleDebug
 ```
 
-The debug APK ends up in `app/build/outputs/apk/debug/`.
+Find the debug APK in `app/build/outputs/apk/debug/`.
 
-Release builds (`./gradlew assembleRelease`, or **Build → Generate Signed APK** in Android Studio) are named like the GitHub releases, e.g. `mpvFlux-arm64-v8a-v1.3.9.apk`, in `app/build/outputs/apk/release/` or the destination folder you choose.
+For a release build, use `./gradlew assembleRelease` or **Build → Generate Signed APK** in Android Studio. Release APKs are generated under `app/build/outputs/apk/release/` or your selected output folder; naming follows the release variant and version.
 
----
+## Contributing and feedback
 
-## 🤝 Contributing
+Bug reports, suggestions and focused pull requests are welcome.
 
-Bug reports, ideas and pull requests are welcome.
+- **[Report a bug](https://github.com/Muhammedahmed18/mpvFlux/issues/new?template=bug_report.md)** — include your device model, Android version and relevant video details.
+- **[Suggest a feature](https://github.com/Muhammedahmed18/mpvFlux/issues/new?template=feature_request.md)** — describe the use case and expected behavior.
+- **Submit a pull request** — keep changes focused and use [Conventional Commits](https://www.conventionalcommits.org/) such as `feat:`, `fix:`, `perf:` or `ui:`.
 
-- **Found a bug?** [Open an issue](https://github.com/Muhammedahmed18/mpvFlux/issues/new?template=bug_report.md) and include your phone model, Android version and, if possible, the video file type.
-- **Have an idea?** [Suggest a feature](https://github.com/Muhammedahmed18/mpvFlux/issues/new?template=feature_request.md).
-- **Sending a PR?** Keep it focused on one change and use [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `perf:`, `ui:`, …).
+> **Project status:** mpvFlux v1.5.9 is planned as the final regularly maintained release. Issues remain welcome, but future fixes and features are not guaranteed.
 
----
+## Credits
 
-## 🙏 Credits
+mpvFlux is a fork of **[mpvEx](https://github.com/marlboro-advance/mpvEx)**, built on excellent open-source projects:
 
-MpvFlux is a fork of [**mpvEx**](https://github.com/marlboro-advance/mpvEx) and stands on the shoulders of:
+- **[mpv](https://mpv.io/)** and **[mpv-android](https://github.com/mpv-android/mpv-android)** — playback engine and Android integration.
+- **[libass](https://github.com/libass/libass)** — ASS/SSA subtitle rendering.
 
-- [mpv](https://mpv.io/) and [mpv-android](https://github.com/mpv-android/mpv-android): the playback engine
-- [libass](https://github.com/libass/libass): ASS/SSA subtitle rendering
+## License
 
-## 📄 License
+Licensed under the **[Apache License 2.0](LICENSE)**.
 
-Released under the [Apache License 2.0](LICENSE).
+<div align="center">
+  <sub>Built for people who care about how their videos look, sound and play.</sub>
+</div>
