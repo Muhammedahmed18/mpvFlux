@@ -76,15 +76,10 @@ import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbarDefaults
 import app.marlboroadvance.mpvex.ui.browser.components.selectionToolbarScroll
 import app.marlboroadvance.mpvex.ui.browser.dialogs.CopyOrMoveSheet
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionHaptics
-import app.marlboroadvance.mpvex.ui.browser.selection.playVideosAsQueue
 import androidx.compose.material.icons.automirrored.rounded.DriveFileMove
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Share
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.AddToPlaylistDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
@@ -257,18 +252,20 @@ fun FileSystemBrowserScreen(path: String? = null) {
       viewModel.renameFolder(folder, newName)
     },
     onOperationComplete = { viewModel.refresh() },
+    deletedMessage = R.plurals.delete_result_folders,
   )
 
   val videoSelectionManager = rememberSelectionManager(
     items = videos,
     getId = { it.id },
     onDeleteItems = { videosToDelete, _ ->
-      viewModel.deleteVideos(videosToDelete)
+      viewModel.deleteVideosWithProgress(videosToDelete)
     },
     onRenameItem = { video, newName ->
       viewModel.renameVideo(video, newName)
     },
     onOperationComplete = { viewModel.refresh() },
+    deletedMessage = R.plurals.delete_result_videos,
   )
 
   // Determine which selection manager is active
@@ -276,6 +273,8 @@ fun FileSystemBrowserScreen(path: String? = null) {
   val selectedCount = folderSelectionManager.selectedCount + videoSelectionManager.selectedCount
   val totalCount = folders.size + videos.size
   val isMixedSelection = folderSelectionManager.isInSelectionMode && videoSelectionManager.isInSelectionMode
+  // Info and Extract audio only apply to exactly one video (no folders in the selection).
+  val singleVideoOnly = videoSelectionManager.isSingleSelection && !folderSelectionManager.isInSelectionMode
 
   // The selection toolbar shows for any selection (videos, folders or both) and the app's
   // navigation bar steps aside for it.
@@ -477,7 +476,33 @@ fun FileSystemBrowserScreen(path: String? = null) {
             backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
           },
           isSingleSelection = (videoSelectionManager.isSingleSelection || folderSelectionManager.isSingleSelection) && !isMixedSelection,
-          // Selection actions live in the floating SelectionToolbar.
+          // Single-video actions sit in the top bar; everything else is in the floating toolbar.
+          onInfoClick =
+            if (singleVideoOnly) {
+              {
+                val video = videoSelectionManager.getSelectedItems().firstOrNull()
+                if (video != null) {
+                  context.startActivity(
+                    app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(context, video.uri, video.path),
+                  )
+                  videoSelectionManager.clear()
+                }
+              }
+            } else {
+              null
+            },
+          onExtractAudioClick =
+            if (singleVideoOnly) {
+              {
+                if (extractAudio.open(videoSelectionManager.getSelectedItems().singleOrNull())) {
+                  videoSelectionManager.clear()
+                }
+              }
+            } else {
+              null
+            },
+          extractAudioEnabled = !extractAudio.isRunning,
+          showSelectAllWithActions = true,
           onSelectAll = {
             folderSelectionManager.selectAll()
             videoSelectionManager.selectAll()
@@ -581,23 +606,13 @@ fun FileSystemBrowserScreen(path: String? = null) {
     val onlyFolders = folderSelectionManager.isInSelectionMode && !videoSelectionManager.isInSelectionMode
     val singleItem = selectedCount == 1
 
-    val playLabel = stringResource(R.string.cd_play)
-    val shareLabel = stringResource(R.string.generic_share)
     val playlistLabel = stringResource(R.string.add_to_playlist)
     val renameLabel = stringResource(R.string.rename)
     val sendLabel = stringResource(R.string.selection_send_to_folder)
     val deleteLabel = stringResource(R.string.delete)
-    val infoLabel = stringResource(R.string.info)
-    val extractLabel = stringResource(R.string.extract_audio)
     val markAsLabel = stringResource(R.string.mark_as_title)
     val markAsIcon = ImageVector.vectorResource(R.drawable.ic_sym_done_all)
 
-    val playAction = SelectionAction(Icons.Rounded.PlayArrow, playLabel, {
-      withSelectedVideos { videos ->
-        playVideosAsQueue(context, videos)
-        clearSelection()
-      }
-    })
     val playlistAction = SelectionAction(Icons.AutoMirrored.Rounded.PlaylistAdd, playlistLabel, {
       withSelectedVideos { videos ->
         toolbarVideos = videos
@@ -614,17 +629,20 @@ fun FileSystemBrowserScreen(path: String? = null) {
     val sendAction = SelectionAction(Icons.AutoMirrored.Rounded.DriveFileMove, sendLabel, { copyOrMoveOpen.value = true })
     val deleteAction = SelectionAction(Icons.Rounded.Delete, deleteLabel, { deleteDialogOpen.value = true }, destructive = true)
 
+    // Delete is the round button for every selection. Info and Extract audio for a single
+    // video are in the top bar.
     SelectionToolbar(
       visible = showFloatingBottomBar,
       expanded = toolbarExpanded,
       modifier = Modifier.align(Alignment.BottomCenter),
-      primaryAction = playAction,
+      primaryAction = deleteAction,
       actions = buildList {
         when {
-          onlyVideos -> {
-            add(SelectionAction(Icons.Rounded.Share, shareLabel, { videoSelectionManager.shareSelected() }))
+          onlyVideos -> { // Copy/Move · Add to playlist · Rename (one) · Mark as
+            add(sendAction)
             add(playlistAction)
-            add(if (singleItem) renameAction else sendAction)
+            if (singleItem) add(renameAction)
+            add(markAsAction)
           }
           onlyFolders -> {
             add(markAsAction)
@@ -635,38 +653,6 @@ fun FileSystemBrowserScreen(path: String? = null) {
             add(markAsAction)
             add(playlistAction)
           }
-        }
-        add(deleteAction)
-      },
-      overflowActions = buildList {
-        if (onlyVideos && singleItem) {
-          add(
-            SelectionAction(Icons.Rounded.Info, infoLabel, {
-              val video = videoSelectionManager.getSelectedItems().firstOrNull()
-              if (video != null) {
-                context.startActivity(
-                  app.marlboroadvance.mpvex.ui.mediainfo.MediaInfoActivity.createIntent(context, video.uri, video.path),
-                )
-                videoSelectionManager.clear()
-              }
-            }),
-          )
-          add(
-            SelectionAction(
-              Icons.Rounded.MusicNote,
-              extractLabel,
-              {
-                if (extractAudio.open(videoSelectionManager.getSelectedItems().singleOrNull())) {
-                  videoSelectionManager.clear()
-                }
-              },
-              enabled = !extractAudio.isRunning,
-            ),
-          )
-        }
-        if (onlyVideos) {
-          add(markAsAction)
-          if (singleItem) add(sendAction)
         }
       },
     )

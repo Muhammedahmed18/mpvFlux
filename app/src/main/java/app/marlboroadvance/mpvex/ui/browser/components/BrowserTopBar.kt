@@ -22,12 +22,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Deselect
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.RemoveCircle
+import androidx.compose.material.icons.rounded.SelectAll
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.DropdownMenu
@@ -94,6 +96,9 @@ fun BrowserTopBar(
   onExtractAudioClick: (() -> Unit)? = null,
   extractAudioEnabled: Boolean = true,
   selectionSummary: String? = null,
+  /** Keep Select all / Deselect all (as an icon) next to the selection actions instead of
+   *  only showing it when the bar has no other actions. */
+  showSelectAllWithActions: Boolean = false,
 ) {
   if (isInSelectionMode) {
     SelectionTopBar(
@@ -117,6 +122,7 @@ fun BrowserTopBar(
       onExtractAudio = onExtractAudioClick,
       extractAudioEnabled = extractAudioEnabled,
       summary = selectionSummary,
+      showSelectAllWithActions = showSelectAllWithActions,
     )
   } else {
     NormalTopBar(
@@ -258,6 +264,7 @@ private fun SelectionTopBar(
   onExtractAudio: (() -> Unit)? = null,
   extractAudioEnabled: Boolean = true,
   summary: String? = null,
+  showSelectAllWithActions: Boolean = false,
 ) {
   TopAppBar(
     colors = TopAppBarDefaults.topAppBarColors(
@@ -376,6 +383,19 @@ private fun SelectionTopBar(
             contentDescription = action.label,
             tint = if (action.destructive) MaterialTheme.colorScheme.error else LocalContentColor.current,
           )
+        }
+      }
+      // Select all stays reachable even when the bar also shows actions (Info, Extract audio).
+      if (showSelectAllWithActions && actions.isNotEmpty()) {
+        val allSelected = totalCount > 0 && selectedCount >= totalCount
+        if (allSelected && onDeselectAll != null) {
+          IconButton(onClick = onDeselectAll) {
+            Icon(Icons.Rounded.Deselect, contentDescription = stringResource(R.string.deselect_all))
+          }
+        } else if (!allSelected && onSelectAll != null) {
+          IconButton(onClick = onSelectAll) {
+            Icon(Icons.Rounded.SelectAll, contentDescription = stringResource(R.string.select_all))
+          }
         }
       }
       if (overflow.isNotEmpty()) {

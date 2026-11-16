@@ -30,7 +30,9 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.PermissionStatus
 import com.google.accompanist.permissions.rememberPermissionState
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -225,12 +227,18 @@ object PermissionUtils {
     /**
      * Delete videos using direct file operations (requires MANAGE_EXTERNAL_STORAGE on Android 11+)
      */
+    /**
+     * Delete [videos] one file at a time. [onEach] is called after every file with whether it
+     * was removed, so callers can show live progress. The loop checks for cancellation between
+     * files: cancelling stops it in place and keeps whatever was already deleted.
+     */
     suspend fun deleteVideos(
       context: Context,
       videos: List<Video>,
+      onEach: ((video: Video, deleted: Boolean) -> Unit)? = null,
     ): Pair<Int, Int> =
       withContext(Dispatchers.IO) {
-        deleteVideosDirectly(context, videos)
+        deleteVideosDirectly(context, videos, onEach)
       }
 
     /**
@@ -238,36 +246,45 @@ object PermissionUtils {
      */
     private suspend fun deleteVideosDirectly(
         context: Context,
-        videos: List<Video>
+        videos: List<Video>,
+        onEach: ((Video, Boolean) -> Unit)?,
     ): Pair<Int, Int> =
       withContext(Dispatchers.IO) {
         var deleted = 0
         var failed = 0
 
-        for (video in videos) {
-          try {
-            val file = File(video.path)
-            if (file.exists() && file.delete()) {
-              deleted++
-              RecentlyPlayedOps.onVideoDeleted(video.path)
-              PlaybackStateOps.onVideoDeleted(video.path)
-              Log.d(TAG, "✓ Deleted: ${video.displayName}")
-              
-              // Notify MediaStore immediately
-              android.media.MediaScannerConnection.scanFile(context, arrayOf(video.path), null, null)
-            } else {
-              failed++
-              Log.w(TAG, "✗ Failed to delete: ${video.displayName}")
-            }
-          } catch (e: Exception) {
-            failed++
-            Log.e(TAG, "✗ Error deleting ${video.displayName}", e)
-          }
-        }
+        try {
+          for (video in videos) {
+            ensureActive()
+            var ok = false
+            try {
+              val file = File(video.path)
+              if (file.exists() && file.delete()) {
+                ok = true
+                deleted++
+                RecentlyPlayedOps.onVideoDeleted(video.path)
+                PlaybackStateOps.onVideoDeleted(video.path)
+                Log.d(TAG, "✓ Deleted: ${video.displayName}")
 
-        // Notify that media library has changed
-        if (deleted > 0) {
-          MediaLibraryEvents.notifyChanged()
+                // Notify MediaStore immediately
+                android.media.MediaScannerConnection.scanFile(context, arrayOf(video.path), null, null)
+              } else {
+                failed++
+                Log.w(TAG, "✗ Failed to delete: ${video.displayName}")
+              }
+            } catch (e: CancellationException) {
+              throw e
+            } catch (e: Exception) {
+              failed++
+              Log.e(TAG, "✗ Error deleting ${video.displayName}", e)
+            }
+            onEach?.invoke(video, ok)
+          }
+        } finally {
+          // Runs on cancel too, so a partly finished delete still refreshes the library.
+          if (deleted > 0) {
+            MediaLibraryEvents.notifyChanged()
+          }
         }
 
         Pair(deleted, failed)

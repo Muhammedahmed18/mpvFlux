@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex.ui.browser.dialogs
 
 import app.marlboroadvance.mpvex.R
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.animation.core.animateFloatAsState
@@ -26,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 
 /**
- * Live progress of an in-flight folder deletion. [total] is every regular file across all the
+ * Live progress of an in-flight deletion (folders, or a batch of videos). [total] is every regular file across all the
  * selected folders (the true unit of work, so the bar reaches 100% exactly when the last file
  * is gone); [completed] ticks up per file; [currentName] is the file currently being removed.
  */
@@ -34,10 +35,14 @@ data class DeleteProgress(
   val total: Int,
   val completed: Int,
   val currentName: String = "",
-)
+  val kind: Kind = Kind.Folders,
+) {
+  /** What is being deleted; picks the dialog title. */
+  enum class Kind { Folders, Videos }
+}
 
 /**
- * Non-dismissable Material 3 dialog shown while a folder is being deleted file-by-file. It
+ * Non-dismissable Material 3 dialog shown while folders or videos are being deleted file-by-file. It
  * reports "X / N deleted" with a determinate bar and the current filename, and closes
  * automatically when [progress] becomes null. The Cancel button stops the deletion in place
  * (already-removed files stay removed; their thumbnails are still purged).
@@ -67,7 +72,14 @@ fun DeleteProgressDialog(
       )
     },
     title = {
-      Text(text = stringResource(R.string.dialog_deleting_folder))
+      Text(
+        text =
+          when (progress.kind) {
+            DeleteProgress.Kind.Folders -> stringResource(R.string.dialog_deleting_folder)
+            DeleteProgress.Kind.Videos ->
+              pluralStringResource(R.plurals.dialog_deleting_videos, progress.total, progress.total)
+          },
+      )
     },
     text = {
       Column(
@@ -81,7 +93,7 @@ fun DeleteProgressDialog(
             color = MaterialTheme.colorScheme.primary,
           )
           Text(
-            text = " / ${progress.total} deleted",
+            text = stringResource(R.string.delete_progress_of_total, progress.total),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )

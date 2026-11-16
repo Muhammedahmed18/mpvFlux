@@ -564,6 +564,25 @@
   <string name="playlist_create_failed">Couldn\'t create playlist: %1$s</string>
   <!-- Dialogs -->
   <string name="dialog_deleting_folder">Deleting folder</string>
+  <plurals name="dialog_deleting_videos">
+    <item quantity="one">Deleting %1$d video</item>
+    <item quantity="other">Deleting %1$d videos</item>
+  </plurals>
+  <string name="delete_progress_of_total">" / %1$d deleted"</string>
+  <plurals name="delete_result_items">
+    <item quantity="one">%1$d item deleted</item>
+    <item quantity="other">%1$d items deleted</item>
+  </plurals>
+  <plurals name="delete_result_videos">
+    <item quantity="one">%1$d video deleted</item>
+    <item quantity="other">%1$d videos deleted</item>
+  </plurals>
+  <plurals name="delete_result_folders">
+    <item quantity="one">%1$d folder deleted</item>
+    <item quantity="other">%1$d folders deleted</item>
+  </plurals>
+  <string name="delete_result_with_failures">%1$s · %2$d failed</string>
+  <string name="delete_result_failed">Couldn\'t delete</string>
   <string name="dialog_create_folder_title">Create new folder</string>
   <string name="dialog_folder_name">Folder name</string>
   <string name="dialog_remove_from_playlist_title">Remove from playlist?</string>

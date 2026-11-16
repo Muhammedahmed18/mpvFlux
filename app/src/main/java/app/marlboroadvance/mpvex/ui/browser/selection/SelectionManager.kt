@@ -2,6 +2,7 @@ package app.marlboroadvance.mpvex.ui.browser.selection
 
 import android.content.Context
 import android.widget.Toast
+import androidx.annotation.PluralsRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -10,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +29,7 @@ class SelectionManager<T, ID>(
   private val onDeleteItems: suspend (List<T>, Boolean) -> Pair<Int, Int>,
   private val onRenameItem: (suspend (T, String) -> Result<Unit>)?,
   private val onOperationComplete: () -> Unit,
+  @PluralsRes private val deletedMessage: Int = R.plurals.delete_result_items,
 ) {
   var state by mutableStateOf(SelectionState<ID>())
     private set
@@ -88,11 +91,20 @@ class SelectionManager<T, ID>(
     scope.launch {
       runCatching {
         val (deleted, failed) = onDeleteItems(selected, deleteFiles)
-        if (deleted > 0) {
-          Toast.makeText(context, "Deleted successfully", Toast.LENGTH_SHORT).show()
-        } else if (failed > 0) {
-          Toast.makeText(context, "Failed to delete", Toast.LENGTH_SHORT).show()
-        }
+        // e.g. "12 videos deleted" or "10 videos deleted · 2 failed".
+        val message =
+          when {
+            deleted > 0 && failed > 0 ->
+              context.getString(
+                R.string.delete_result_with_failures,
+                context.resources.getQuantityString(deletedMessage, deleted, deleted),
+                failed,
+              )
+            deleted > 0 -> context.resources.getQuantityString(deletedMessage, deleted, deleted)
+            failed > 0 -> context.getString(R.string.delete_result_failed)
+            else -> null
+          }
+        message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
       }.onFailure {
         Toast.makeText(context, "Failed to delete: ${it.message}", Toast.LENGTH_SHORT).show()
       }
@@ -162,6 +174,7 @@ class SelectionManager<T, ID>(
  * @param onDeleteItems Callback to delete items (includes boolean to delete original files)
  * @param onRenameItem Optional callback to rename an item
  * @param onOperationComplete Callback when an operation completes (to refresh list)
+ * @param deletedMessage Plural for the "N deleted" message, e.g. [R.plurals.delete_result_videos]
  */
 @Composable
 fun <T, ID> rememberSelectionManager(
@@ -170,6 +183,7 @@ fun <T, ID> rememberSelectionManager(
   onDeleteItems: suspend (List<T>, Boolean) -> Pair<Int, Int>,
   onRenameItem: (suspend (T, String) -> Result<Unit>)? = null,
   onOperationComplete: () -> Unit = {},
+  @PluralsRes deletedMessage: Int = R.plurals.delete_result_items,
 ): SelectionManager<T, ID> {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -183,6 +197,7 @@ fun <T, ID> rememberSelectionManager(
       onDeleteItems = onDeleteItems,
       onRenameItem = onRenameItem,
       onOperationComplete = onOperationComplete,
+      deletedMessage = deletedMessage,
     )
   }
 }

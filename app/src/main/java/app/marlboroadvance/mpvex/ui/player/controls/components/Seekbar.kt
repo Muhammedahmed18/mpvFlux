@@ -5,11 +5,8 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.interaction.collectIsDraggedAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.offset
@@ -68,7 +65,6 @@ import app.marlboroadvance.mpvex.ui.theme.spacing
 import dev.vivvvek.seeker.Segment
 import `is`.xyz.mpv.Utils
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
@@ -309,46 +305,13 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
     val loopColor = MaterialTheme.colorScheme.tertiary
     val interactionSource = remember { MutableInteractionSource() }
     val isThick = seekbarStyle == SeekbarStyle.Thick
-    // Reuse a single Animatable across pause/scrub toggles instead of allocating a new
-    // one each time the effect re-runs.
-    val heightAnimatable = remember { Animatable(1f) }
-    // Both styles ease the track to 70% height while dragging (pausing keeps full height).
-    // Expressive motion: a spatial spring (slight overshoot, then settle) instead of a
-    // linear tween.
-    LaunchedEffect(isScrubbing) {
-        val shouldFlatten = isScrubbing
-        val targetHeight = if (shouldFlatten) 0.7f else 1f
-        delay(if (shouldFlatten) 0L else 60L)
-        heightAnimatable.animateTo(
-            targetValue = targetHeight,
-            animationSpec = spring(dampingRatio = SeekbarSprings.DefaultSpatialDamping, stiffness = SeekbarSprings.DefaultSpatialStiffness),
-        )
-    }
-    val trackHeightDp = (if (isThick) ThickTrackHeight else StandardTrackHeight) * heightAnimatable.value
+    // The track and handle keep the same size while dragging: nothing shrinks or grows,
+    // so the bar never jumps under the finger. The time bubble above it still shows.
+    val trackHeightDp = if (isThick) ThickTrackHeight else StandardTrackHeight
     // Chapter start times as fractions of the video (the first chapter at 0 isn't a cut).
     val chapterFractions = remember(chapters, duration) { chapterFractions(chapters, duration) }
-
-    // Handle reacts to touch: it narrows to half its width while pressed or dragged, on a
-    // bouncy fast spring. The track gap follows the handle so the visible clearance stays
-    // 4dp either side.
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val isDragged by interactionSource.collectIsDraggedAsState()
-    val handleActive = isPressed || isDragged || isScrubbing
-    val handleSpring = spring<Dp>(dampingRatio = SeekbarSprings.FastSpatialDamping, stiffness = SeekbarSprings.FastSpatialStiffness)
-    val handleRestWidth = seekbarThumbSlotWidth(isThick)
-    val handleWidth by animateDpAsState(
-        targetValue = if (handleActive) handleRestWidth / 2 else handleRestWidth,
-        animationSpec = handleSpring,
-        label = "seekHandleWidth",
-    )
-    // Standard: a pill standing above the track that grows 4dp taller while pressed.
-    // Thick: a block exactly as tall as the track (it follows the track's height animation).
-    val standardHandleHeight by animateDpAsState(
-        targetValue = if (handleActive) StandardHandlePressedHeight else StandardHandleHeight,
-        animationSpec = handleSpring,
-        label = "seekHandleHeight",
-    )
-    val handleHeight = if (isThick) trackHeightDp else standardHandleHeight
+    val handleWidth = seekbarThumbSlotWidth(isThick)
+    val handleHeight = if (isThick) trackHeightDp else StandardHandleHeight
 
     Slider(value = position, onValueChange = onSeek, onValueChangeFinished = onSeekFinished, valueRange = 0f..duration.coerceAtLeast(0.1f), modifier = modifier.fillMaxWidth().height(48.dp), interactionSource = interactionSource,
         track = { sliderState ->
@@ -371,39 +334,28 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
             }
         },
         thumb = {
-            // The slot keeps a fixed size so the Slider's track layout never shifts; only
-            // the handle inside animates.
-            // Standard: 6×24dp pill → 3×28dp while pressed.
-            // Thick: 10dp-wide block as tall as the 20dp track, 4dp corners → 5dp wide
-            // while pressed.
+            // Fixed-size handle (same at rest and while dragging).
+            // Standard: 6×24dp pill. Thick: 10dp-wide block as tall as the 20dp track.
             Box(
                 modifier = Modifier
-                    .width(handleRestWidth)
-                    .height(if (isThick) ThickTrackHeight else StandardHandlePressedHeight),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(handleWidth.coerceAtLeast(1.dp))
-                        .height(handleHeight)
-                        .background(activeColor, if (isThick) RoundedCornerShape(ThickHandleCorner) else CircleShape),
-                )
-            }
+                    .width(handleWidth)
+                    .height(handleHeight)
+                    .background(activeColor, if (isThick) RoundedCornerShape(ThickHandleCorner) else CircleShape),
+            )
         }
     )
 }
 
-// Seekbar sizes. Standard = 8dp track with a 6×24dp pill handle (3×28dp while pressed).
+// Seekbar sizes. Standard = 8dp track with a 6×24dp pill handle.
 // Thick = 20dp track with a 10dp-wide block handle exactly as tall as the track and 4dp
-// corners (5dp wide while pressed). The track always leaves 4dp clear either side of
-// the handle.
+// corners. Sizes don't change while dragging. The track always leaves 4dp clear either
+// side of the handle.
 internal val StandardTrackHeight = 8.dp
 internal val ThickTrackHeight = 20.dp
 internal val SeekbarThumbWidth = 6.dp
 private val ThickThumbWidth = 10.dp
 private val ThickHandleCorner = 4.dp
 private val StandardHandleHeight = 24.dp
-private val StandardHandlePressedHeight = 28.dp
 private val SeekbarHandleClearance = 4.dp
 
 /**

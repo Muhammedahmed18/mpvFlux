@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -45,11 +47,15 @@ abstract class BaseBrowserViewModel(
 
   private val _deleteProgress = MutableStateFlow<DeleteProgress?>(null)
 
-  /** Live progress of an in-flight folder deletion, or null when none is running. Drives the
-   *  determinate "X / N deleted" dialog. */
+  /** Live progress of an in-flight folder or multi-video deletion, or null when none is running.
+   *  Drives the determinate "X / N deleted" dialog. */
   val deleteProgress: StateFlow<DeleteProgress?> = _deleteProgress.asStateFlow()
 
   private var deleteJob: Deferred<Pair<Int, Int>>? = null
+
+  /** Deletions share one progress dialog, so they run one after another (e.g. a mixed
+   *  folder + video selection in the file browser) instead of fighting over it. */
+  private val deleteMutex = Mutex()
   /**
    * Observable recently played file path for highlighting
    * Automatically filters out non-existent files
@@ -94,7 +100,7 @@ abstract class BaseBrowserViewModel(
     }
   }
 
-  /** Cancel an in-flight folder deletion. Files already removed stay removed and their traces are
+  /** Cancel an in-flight deletion. Files already removed stay removed and their traces are
    *  still purged; the remaining files are left in place. */
   fun cancelDeletion() {
     deleteJob?.cancel()
@@ -106,20 +112,60 @@ abstract class BaseBrowserViewModel(
    * (not the caller's scope) so a user-triggered [cancelDeletion] stops it cleanly and the deletion
    * survives if the caller's composition leaves mid-operation. Returns (deletedFolders, failedFolders).
    */
-  protected suspend fun deleteFoldersWithProgress(folderPaths: List<String>): Pair<Int, Int> {
-    val deferred = viewModelScope.async(Dispatchers.IO) { performFolderDeletion(folderPaths) }
-    deleteJob = deferred
-    return try {
-      deferred.await()
-    } catch (e: CancellationException) {
-      // The user hit Cancel (the child job was cancelled), not the caller's scope dying — swallow
-      // it and report neutral counts so no spurious success toast fires.
-      Pair(0, 0)
-    } finally {
-      deleteJob = null
-      _deleteProgress.value = null
+  protected suspend fun deleteFoldersWithProgress(folderPaths: List<String>): Pair<Int, Int> =
+    runDeletion { performFolderDeletion(folderPaths) }
+
+  /**
+   * Delete [videos] one by one, publishing "X / N deleted" to [deleteProgress]. A single video
+   * skips the dialog since it is gone instantly. Cancelling keeps what was already deleted and
+   * reports that count, so the result message still says how many went.
+   */
+  suspend fun deleteVideosWithProgress(videos: List<Video>): Pair<Int, Int> {
+    if (videos.size < 2) return deleteVideos(videos)
+
+    var deletedSoFar = 0
+    return runDeletion(onCancelled = { Pair(deletedSoFar, 0) }) {
+      val total = videos.size
+      var completed = 0
+      val deleted = ArrayList<Video>(total)
+      _deleteProgress.value = DeleteProgress(total, 0, kind = DeleteProgress.Kind.Videos)
+      try {
+        StorageOps.deleteVideos(getApplication(), videos) { video, ok ->
+          if (ok) {
+            deleted += video
+            deletedSoFar++
+          }
+          completed++
+          _deleteProgress.value = DeleteProgress(total, completed, video.displayName, DeleteProgress.Kind.Videos)
+        }
+      } finally {
+        // Purge thumbnails/metadata/history for whatever was removed, even on cancel.
+        withContext(NonCancellable) { purgeVideoTraces(deleted) }
+      }
     }
   }
+
+  /**
+   * Run [work] on [viewModelScope] (not the caller's scope) so [cancelDeletion] stops it cleanly
+   * and it survives if the caller's composition leaves mid-operation. Only one runs at a time.
+   */
+  private suspend fun runDeletion(
+    onCancelled: () -> Pair<Int, Int> = { Pair(0, 0) },
+    work: suspend () -> Pair<Int, Int>,
+  ): Pair<Int, Int> =
+    deleteMutex.withLock {
+      val deferred = viewModelScope.async(Dispatchers.IO) { work() }
+      deleteJob = deferred
+      try {
+        deferred.await()
+      } catch (e: CancellationException) {
+        // The user hit Cancel (the child job was cancelled), not the caller's scope dying.
+        onCancelled()
+      } finally {
+        deleteJob = null
+        _deleteProgress.value = null
+      }
+    }
 
   private suspend fun performFolderDeletion(folderPaths: List<String>): Pair<Int, Int> {
     // Enumerate every file in each tree up-front. walkTopDown is recursive, so this also reaches

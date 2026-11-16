@@ -104,7 +104,7 @@ object SelectionToolbarDefaults {
  * M3 Expressive floating toolbar shown while items are selected.
  *
  * Layout: up to [SelectionToolbarDefaults.MaxVisibleActions] icon buttons, a "More" menu for
- * the rest, and an optional FAB for the [primaryAction] (e.g. Play). When [expanded] is false
+ * the rest, and an optional FAB for the [primaryAction] (e.g. Delete). When [expanded] is false
  * (the list is scrolling down) the toolbar collapses so only the FAB stays on screen.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
@@ -154,8 +154,20 @@ fun SelectionToolbar(
           colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
           floatingActionButton = {
             ToolbarTooltip(primaryAction.label) {
-              FloatingToolbarDefaults.VibrantFloatingActionButton(onClick = primaryAction.onClick) {
-                Icon(primaryAction.icon, contentDescription = primaryAction.label)
+              if (primaryAction.destructive) {
+                // A destructive main action (Delete) gets the error container so it can't be
+                // mistaken for a harmless primary action.
+                FloatingToolbarDefaults.VibrantFloatingActionButton(
+                  onClick = primaryAction.onClick,
+                  containerColor = MaterialTheme.colorScheme.errorContainer,
+                  contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ) {
+                  Icon(primaryAction.icon, contentDescription = primaryAction.label)
+                }
+              } else {
+                FloatingToolbarDefaults.VibrantFloatingActionButton(onClick = primaryAction.onClick) {
+                  Icon(primaryAction.icon, contentDescription = primaryAction.label)
+                }
               }
             }
           },
