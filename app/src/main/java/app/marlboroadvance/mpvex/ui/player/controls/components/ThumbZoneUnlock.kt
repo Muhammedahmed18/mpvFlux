@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.ui.player.controls.LocalPlayerButtonsClickEvent
 import app.marlboroadvance.mpvex.ui.player.controls.playerControlsEnterAnimationSpec
 import app.marlboroadvance.mpvex.ui.player.controls.playerControlsExitAnimationSpec
 import kotlinx.coroutines.delay
@@ -67,8 +68,9 @@ private const val PRESSED_SCALE = 0.96f
 private const val TRACK_ALPHA = 0.24f
 
 /**
- * Unlock button for the locked player: a flat Material 3 Expressive tonal circle shown at
- * the bottom center (see PlayerControls).
+ * Unlock button for the locked player: a flat Material 3 Expressive tonal circle shown in
+ * the top-left corner (see PlayerControls). It auto-hides with the other controls; pressing
+ * it restarts the auto-hide timer so it never disappears during a hold.
  *
  * Hold-to-unlock: pressing scales the button to 96% with a light haptic tick and starts a
  * progress ring at 12 o'clock that fills clockwise, linearly, over 800 ms. Releasing early
@@ -82,6 +84,8 @@ fun ThumbZoneUnlock(
   modifier: Modifier = Modifier,
 ) {
   val haptic = LocalHapticFeedback.current
+  // Restarts the player's auto-hide timer, so the button can't fade out mid-hold.
+  val resetAutoHide = LocalPlayerButtonsClickEvent.current
   val currentOnUnlock by rememberUpdatedState(onUnlock)
 
   var isPressed by remember { mutableStateOf(false) }
@@ -168,6 +172,7 @@ fun ThumbZoneUnlock(
         if (isUnlocked) return@pointerInput
         detectTapGestures(
           onPress = {
+            resetAutoHide()
             isPressed = true
             // tryAwaitRelease returns false (instead of throwing) when the gesture is
             // cancelled; either way the hold ends here.

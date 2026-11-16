@@ -138,8 +138,8 @@ import kotlin.math.abs
 /** Gap kept between a shown system bar and the nearest player control. */
 private val EdgeInsetGap = 8.dp
 
-/** Gap between the unlock button's touch area and the bottom safe-area edge (visible gap ≈ 28dp). */
-private val LockedUnlockButtonBottomMargin = 12.dp
+/** Gap between the unlock button's touch area and the top/start safe-area edges (visible gap ≈ 24dp). */
+private val LockedUnlockButtonEdgeMargin = 8.dp
 
 @Suppress("CompositionLocalAllowlist")
 val LocalPlayerButtonsClickEvent = staticCompositionLocalOf { {} }
@@ -468,23 +468,22 @@ fun PlayerControls(
             },
           )
 
-          // Locked player: a single hold-to-unlock button at the bottom center. It stays on
-          // screen for as long as the player is locked (independent of controlsShown), and
-          // is centred within the safe area so it clears navigation bars and cutouts. The
-          // 60dp circle sits 16dp inside its 92dp touch area, so the visible button ends up
-          // 16 + 12 = 28dp above the bottom safe-area edge.
+          // Locked player: a single hold-to-unlock button in the top-left corner. Like the
+          // other controls it follows controlsShown: a tap shows it, and it hides again after
+          // the locked auto-hide delay (the LaunchedEffect above). safeDrawing insets keep it
+          // clear of status/navigation bars and cutouts. The 60dp circle sits 16dp inside its
+          // 92dp touch area, so the visible button ends up 16 + 8 = 24dp from each edge.
           AnimatedVisibility(
-            visible = areControlsLocked,
+            visible = controlsShown && areControlsLocked,
             enter = fadeIn(playerControlsEnterAnimationSpec()),
             exit = fadeOut(playerControlsExitAnimationSpec()),
             modifier = Modifier
               .windowInsetsPadding(
-                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Start + WindowInsetsSides.Top),
               )
               .constrainAs(unlockControlsButton) {
-                start.linkTo(parent.start)
-                end.linkTo(parent.end)
-                bottom.linkTo(parent.bottom, LockedUnlockButtonBottomMargin)
+                start.linkTo(parent.start, LockedUnlockButtonEdgeMargin)
+                top.linkTo(parent.top, LockedUnlockButtonEdgeMargin)
               },
           ) {
             ThumbZoneUnlock(
