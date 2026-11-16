@@ -312,10 +312,11 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
     // Reuse a single Animatable across pause/scrub toggles instead of allocating a new
     // one each time the effect re-runs.
     val heightAnimatable = remember { Animatable(1f) }
-    // Both styles ease the track to 70% height while paused or dragging. Expressive motion:
-    // a spatial spring (slight overshoot, then settle) instead of a linear tween.
-    LaunchedEffect(isPaused, isScrubbing) {
-        val shouldFlatten = isPaused || isScrubbing
+    // Both styles ease the track to 70% height while dragging (pausing keeps full height).
+    // Expressive motion: a spatial spring (slight overshoot, then settle) instead of a
+    // linear tween.
+    LaunchedEffect(isScrubbing) {
+        val shouldFlatten = isScrubbing
         val targetHeight = if (shouldFlatten) 0.7f else 1f
         delay(if (shouldFlatten) 0L else 60L)
         heightAnimatable.animateTo(

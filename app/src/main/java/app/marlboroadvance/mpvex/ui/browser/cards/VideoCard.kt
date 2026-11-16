@@ -69,6 +69,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
@@ -78,6 +79,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
@@ -107,6 +109,76 @@ data class VideoCardSettings(
   val unplayedOldVideoDays: Int = 7
 )
 
+/**
+ * Row sizes for a video card, chosen from the screen width and the user's font size.
+ *
+ * Width tiers follow Material's window size classes (compact < 600dp, medium < 840dp,
+ * expanded), with an extra tier for very small phones (< 360dp). Lists can call
+ * [rememberVideoCardDimens] once and pass the result to every row.
+ */
+@Immutable
+data class VideoCardDimens(
+  val rowPadding: Dp,
+  val thumbTextGap: Dp,
+  // The thumbnail takes this share of the row, kept between the min and max widths.
+  val thumbnailFraction: Float,
+  val thumbnailMinWidth: Dp,
+  val thumbnailMaxWidth: Dp,
+  val detailsSpacing: Dp,
+  val chipSpacing: Dp,
+  val chipSize: UnifiedChipSize,
+  // Very large fonts on a phone: thumbnail on top, text underneath at full width.
+  val stackThumbnail: Boolean,
+) {
+  companion object {
+    fun forScreen(screenWidthDp: Int, fontScale: Float): VideoCardDimens {
+      val base = when {
+        screenWidthDp < 360 -> VideoCardDimens(
+          rowPadding = 6.dp, thumbTextGap = 10.dp,
+          thumbnailFraction = 0.45f, thumbnailMinWidth = 112.dp, thumbnailMaxWidth = 150.dp,
+          detailsSpacing = 6.dp, chipSpacing = 4.dp, chipSize = UnifiedChipSize.Compact,
+          stackThumbnail = false,
+        )
+        screenWidthDp < 600 -> VideoCardDimens(
+          rowPadding = 8.dp, thumbTextGap = 12.dp,
+          thumbnailFraction = 0.45f, thumbnailMinWidth = 128.dp, thumbnailMaxWidth = 184.dp,
+          detailsSpacing = 8.dp, chipSpacing = 6.dp, chipSize = UnifiedChipSize.Medium,
+          stackThumbnail = false,
+        )
+        screenWidthDp < 840 -> VideoCardDimens(
+          rowPadding = 10.dp, thumbTextGap = 16.dp,
+          thumbnailFraction = 0.36f, thumbnailMinWidth = 176.dp, thumbnailMaxWidth = 240.dp,
+          detailsSpacing = 8.dp, chipSpacing = 6.dp, chipSize = UnifiedChipSize.Medium,
+          stackThumbnail = false,
+        )
+        else -> VideoCardDimens(
+          rowPadding = 12.dp, thumbTextGap = 20.dp,
+          thumbnailFraction = 0.30f, thumbnailMinWidth = 200.dp, thumbnailMaxWidth = 280.dp,
+          detailsSpacing = 10.dp, chipSpacing = 8.dp, chipSize = UnifiedChipSize.Medium,
+          stackThumbnail = false,
+        )
+      }
+      return when {
+        fontScale >= 1.7f && screenWidthDp < 600 -> base.copy(stackThumbnail = true)
+        // Bigger text needs more room beside the thumbnail, so the thumbnail gives some up.
+        fontScale >= 1.3f -> base.copy(
+          thumbnailFraction = base.thumbnailFraction * 0.85f,
+          thumbnailMinWidth = base.thumbnailMinWidth - 16.dp,
+        )
+        else -> base
+      }
+    }
+  }
+}
+
+/** Card sizes for the current screen width and font size; updates on rotation or resize. */
+@Composable
+fun rememberVideoCardDimens(): VideoCardDimens {
+  val screenWidthDp = LocalConfiguration.current.screenWidthDp
+  val fontScale = LocalDensity.current.fontScale
+  return remember(screenWidthDp, fontScale) { VideoCardDimens.forScreen(screenWidthDp, fontScale) }
+}
+
 @Composable
 fun VideoCard(
   video: Video,
@@ -131,6 +203,8 @@ fun VideoCard(
   groupPosition: VideoCardGroupPosition = VideoCardGroupPosition.Single,
   // True while multi-select is active: every row shows a selection circle at its end.
   inSelectionMode: Boolean = false,
+  // Sizes for this screen. Lists can compute this once and pass it to every row.
+  dimens: VideoCardDimens = rememberVideoCardDimens(),
 ) {
   val isNew = remember(video.dateModified, settings.showUnplayedOldVideoLabel, isOldAndUnplayed, isMarkedNew, settings.unplayedOldVideoDays) {
     if (isMarkedNew) {
@@ -197,12 +271,7 @@ fun VideoCard(
     color = containerColor,
     contentColor = contentColor,
   ) {
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(8.dp),
-      verticalAlignment = Alignment.Top,
-    ) {
+    val thumbnail: @Composable (Modifier) -> Unit = { thumbModifier ->
       VideoThumbnail(
         video = video,
         isNew = isNew,
@@ -214,20 +283,14 @@ fun VideoCard(
         allowThumbnailGeneration = allowThumbnailGeneration,
         onThumbClick = onThumbClick,
         onLongClick = onLongClick,
-        // Steady size: 160dp wide (90dp tall) on phones, never below 144dp on very narrow screens.
-        modifier = Modifier
-          .fillMaxWidth(0.5f)
-          .widthIn(min = 144.dp, max = 160.dp)
-          .aspectRatio(16f / 9f),
+        modifier = thumbModifier,
       )
+    }
 
-      Spacer(Modifier.width(12.dp))
-
+    val details: @Composable (Modifier) -> Unit = { detailsModifier ->
       Column(
-        modifier = Modifier
-          .weight(1f)
-          .padding(top = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = detailsModifier,
+        verticalArrangement = Arrangement.spacedBy(dimens.detailsSpacing),
       ) {
         Text(
           text = displayTitle,
@@ -237,29 +300,74 @@ fun VideoCard(
           overflow = TextOverflow.Ellipsis,
         )
         FlowRow(
-          horizontalArrangement = Arrangement.spacedBy(6.dp),
-          verticalArrangement = Arrangement.spacedBy(6.dp),
+          horizontalArrangement = Arrangement.spacedBy(dimens.chipSpacing),
+          verticalArrangement = Arrangement.spacedBy(dimens.chipSpacing),
         ) {
-          subtitleNames?.let { InfoPill(text = it, style = InfoPillStyle.Subtitles) }
-          quality?.let { InfoPill(text = it, style = if (is4K) InfoPillStyle.Accent else InfoPillStyle.Neutral) }
-          if (showSizeChip && video.size > 0) InfoPill(text = video.sizeFormatted)
-          date?.let { InfoPill(text = it) }
+          subtitleNames?.let {
+            UnifiedChip(text = it, isTertiary = true, bold = true, size = dimens.chipSize)
+          }
+          quality?.let {
+            UnifiedChip(text = it, isPrimary = is4K, bold = is4K, size = dimens.chipSize)
+          }
+          if (showSizeChip && video.size > 0) {
+            UnifiedChip(text = video.sizeFormatted, size = dimens.chipSize)
+          }
+          date?.let { UnifiedChip(text = it, size = dimens.chipSize) }
         }
       }
+    }
 
-      // Selection lives at the row's end, away from the thumbnail's watched tick.
-      // It is shown when either flag is set, so the long-pressed row appears already
-      // checked instead of flashing empty first; the fill change is animated.
+    // Selection lives at the row's end, away from the thumbnail's watched tick.
+    // It is shown when either flag is set, so the long-pressed row appears already
+    // checked instead of flashing empty first; the fill change is animated.
+    val selection: @Composable (Modifier) -> Unit = { selectionModifier ->
       AnimatedVisibility(
         visible = inSelectionMode || isSelected,
         enter = fadeIn(tween(150)) + expandHorizontally(tween(150), expandFrom = Alignment.Start),
         exit = fadeOut(tween(150)) + shrinkHorizontally(tween(150), shrinkTowards = Alignment.Start),
-        modifier = Modifier.align(Alignment.CenterVertically),
+        modifier = selectionModifier,
       ) {
         SelectionCircle(
           checked = isSelected,
-          modifier = Modifier.padding(start = 12.dp, end = 4.dp),
+          modifier = Modifier.padding(start = dimens.thumbTextGap, end = 4.dp),
         )
+      }
+    }
+
+    if (dimens.stackThumbnail) {
+      // Very large fonts on a phone: full-width thumbnail on top, text gets the whole row.
+      Column(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(dimens.rowPadding),
+        verticalArrangement = Arrangement.spacedBy(dimens.thumbTextGap),
+      ) {
+        thumbnail(Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+          details(Modifier.weight(1f))
+          selection(Modifier.align(Alignment.CenterVertically))
+        }
+      }
+    } else {
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(dimens.rowPadding),
+        verticalAlignment = Alignment.Top,
+      ) {
+        // A share of the row, kept within the limits for this screen size.
+        thumbnail(
+          Modifier
+            .fillMaxWidth(dimens.thumbnailFraction)
+            .widthIn(min = dimens.thumbnailMinWidth, max = dimens.thumbnailMaxWidth)
+            .aspectRatio(16f / 9f),
+        )
+
+        Spacer(Modifier.width(dimens.thumbTextGap))
+
+        details(Modifier.weight(1f).padding(top = 2.dp))
+
+        selection(Modifier.align(Alignment.CenterVertically))
       }
     }
   }
@@ -328,39 +436,62 @@ private fun qualityLabel(video: Video, showFramerate: Boolean): String? {
   return if (showFramerate && video.fps > 0) "$base${video.fps.roundToInt()}" else base
 }
 
+@Deprecated("Video rows now use UnifiedChip; kept only so old references still compile.")
 enum class InfoPillStyle { Neutral, Accent, Subtitles }
 
-/** Pill-shaped, non-interactive label (One UI / M3 style) for video details. */
-@Composable
-private fun InfoPill(text: String, style: InfoPillStyle = InfoPillStyle.Neutral) {
-  val colors = MaterialTheme.colorScheme
-  val (container, content) = when (style) {
-    InfoPillStyle.Neutral -> colors.surfaceContainerHighest to colors.onSurfaceVariant
-    InfoPillStyle.Accent -> colors.primaryContainer to colors.onPrimaryContainer
-    // Subtitles stand out: filled with the theme's tertiary accent.
-    InfoPillStyle.Subtitles -> colors.tertiary to colors.onTertiary
-  }
-  Surface(color = container, contentColor = content, shape = CircleShape) {
-    Text(
-      text = text,
-      style = MaterialTheme.typography.labelMedium,
-      fontWeight = if (style == InfoPillStyle.Neutral) FontWeight.Normal else FontWeight.SemiBold,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-      modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-    )
+private enum class ThumbnailTier { Small, Regular, Large }
+
+/** Sizes of everything drawn over the thumbnail, picked from the thumbnail's own width. */
+@Immutable
+private data class ThumbnailOverlayDimens(
+  val tier: ThumbnailTier,
+  val inset: Dp,
+  val gap: Dp,
+  val badgeSize: Dp,
+  val badgeIconSize: Dp,
+  val progressHeight: Dp,
+  val placeholderIconSize: Dp,
+  val pillHorizontalPadding: Dp,
+) {
+  companion object {
+    fun forWidth(width: Dp): ThumbnailOverlayDimens = when {
+      width < 136.dp -> ThumbnailOverlayDimens(
+        tier = ThumbnailTier.Small, inset = 4.dp, gap = 4.dp, badgeSize = 22.dp, badgeIconSize = 14.dp,
+        progressHeight = 4.dp, placeholderIconSize = 28.dp, pillHorizontalPadding = 6.dp,
+      )
+      width < 208.dp -> ThumbnailOverlayDimens(
+        tier = ThumbnailTier.Regular, inset = 6.dp, gap = 6.dp, badgeSize = 26.dp, badgeIconSize = 16.dp,
+        progressHeight = 5.dp, placeholderIconSize = 32.dp, pillHorizontalPadding = 8.dp,
+      )
+      else -> ThumbnailOverlayDimens(
+        tier = ThumbnailTier.Large, inset = 8.dp, gap = 8.dp, badgeSize = 32.dp, badgeIconSize = 20.dp,
+        progressHeight = 6.dp, placeholderIconSize = 40.dp, pillHorizontalPadding = 10.dp,
+      )
+    }
   }
 }
 
 /** Pill drawn over the thumbnail image. */
 @Composable
-private fun ThumbnailPill(text: String, container: Color, content: Color, modifier: Modifier = Modifier) {
+private fun ThumbnailPill(
+  text: String,
+  container: Color,
+  content: Color,
+  overlay: ThumbnailOverlayDimens,
+  modifier: Modifier = Modifier,
+) {
+  val baseStyle = when (overlay.tier) {
+    ThumbnailTier.Small -> MaterialTheme.typography.labelSmall
+    ThumbnailTier.Regular -> MaterialTheme.typography.labelMedium
+    ThumbnailTier.Large -> MaterialTheme.typography.labelLarge
+  }
   Surface(modifier = modifier, color = container, contentColor = content, shape = CircleShape) {
     Text(
       text = text,
-      style = MaterialTheme.typography.labelMedium.copy(fontFeatureSettings = "tnum"),
+      style = baseStyle.copy(fontFeatureSettings = "tnum"),
       fontWeight = FontWeight.SemiBold,
-      modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+      maxLines = 1,
+      modifier = Modifier.padding(horizontal = overlay.pillHorizontalPadding, vertical = 2.dp),
     )
   }
 }
@@ -399,8 +530,12 @@ fun VideoThumbnail(
         ),
       contentAlignment = Alignment.Center,
     ) {
+      val overlay = remember(maxWidth) { ThumbnailOverlayDimens.forWidth(maxWidth) }
       val thumbWidthPx = with(density) { maxWidth.roundToPx() }
-      val thumbHeightPx = (thumbWidthPx / aspect).roundToInt()
+      // Request a size rounded up to a 64px step, so tiny layout changes don't trigger
+      // a new decode, but a real change (rotation, unfolding) does.
+      val requestWidthPx = ((thumbWidthPx + 63) / 64) * 64
+      val requestHeightPx = (requestWidthPx / aspect).roundToInt()
 
       val thumbnailKey = remember(video.size, video.dateModified) {
         thumbnailRepository?.thumbnailKey(video) ?: ""
@@ -429,22 +564,34 @@ fun VideoThumbnail(
         label = "thumbnail_fade"
       )
 
-      // Single effect replaces two competing ones
-      LaunchedEffect(thumbnailKey, allowThumbnailGeneration, showThumbnails) {
-        if (thumbnail == null && showThumbnails && thumbnailRepository != null) {
-          isLoading = true
-          loadFailed = false
+      // Single effect replaces two competing ones. It also re-runs when the thumbnail
+      // gets noticeably bigger, so a cached small bitmap isn't stretched and blurry.
+      LaunchedEffect(thumbnailKey, allowThumbnailGeneration, showThumbnails, requestWidthPx) {
+        val current = thumbnail
+        val tooSmall = current != null &&
+          current.width < requestWidthPx * 0.75f &&
+          current.height < requestHeightPx * 0.75f
+        if ((current == null || tooSmall) && showThumbnails && thumbnailRepository != null) {
+          // Upgrading a too-small bitmap keeps showing it meanwhile: no shimmer.
+          if (current == null) {
+            isLoading = true
+            loadFailed = false
+          }
           val result = withContext(Dispatchers.IO) {
             if (allowThumbnailGeneration) {
-              thumbnailRepository.getThumbnail(video, thumbWidthPx, thumbHeightPx)
+              thumbnailRepository.getThumbnail(video, requestWidthPx, requestHeightPx)
             } else {
-              thumbnailRepository.getCachedThumbnail(video, thumbWidthPx, thumbHeightPx)
+              thumbnailRepository.getCachedThumbnail(video, requestWidthPx, requestHeightPx)
             }
           }
-          thumbnail = result
-          isLoading = false
-          if (thumbnail == null) {
-            loadFailed = true
+          if (result != null && (current == null || result.width > current.width)) {
+            thumbnail = result
+          }
+          if (current == null) {
+            isLoading = false
+            if (thumbnail == null) {
+              loadFailed = true
+            }
           }
         }
         // Guarantees Compose sees false -> true transition
@@ -474,7 +621,7 @@ fun VideoThumbnail(
           Icon(
             imageVector = ImageVector.vectorResource(R.drawable.ic_sym_movie),
             contentDescription = null,
-            modifier = Modifier.size(32.dp),
+            modifier = Modifier.size(overlay.placeholderIconSize),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
           )
         }
@@ -482,22 +629,23 @@ fun VideoThumbnail(
         Icon(
           imageVector = ImageVector.vectorResource(R.drawable.ic_sym_movie),
           contentDescription = null,
-          modifier = Modifier.size(32.dp),
+          modifier = Modifier.size(overlay.placeholderIconSize),
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
 
       val showProgress =
         progressPercentage != null && progressPercentage > 0f && showProgressBar && !isWatched && video.duration > 0
-      // Top start: NEW pill (the selection check takes this corner while selected).
+      // Top start: NEW pill.
       if (isNew && !isWatched) {
         ThumbnailPill(
           text = stringResource(R.string.video_status_new).uppercase(Locale.getDefault()),
           container = MaterialTheme.colorScheme.primary,
           content = MaterialTheme.colorScheme.onPrimary,
+          overlay = overlay,
           modifier = Modifier
             .align(Alignment.TopStart)
-            .padding(6.dp),
+            .padding(overlay.inset),
         )
       }
 
@@ -506,8 +654,8 @@ fun VideoThumbnail(
         Box(
           modifier = Modifier
             .align(Alignment.BottomStart)
-            .padding(6.dp)
-            .size(26.dp)
+            .padding(overlay.inset)
+            .size(overlay.badgeSize)
             .clip(MaterialShapes.Cookie9Sided.toShape())
             .background(MaterialTheme.colorScheme.primary),
           contentAlignment = Alignment.Center,
@@ -516,39 +664,46 @@ fun VideoThumbnail(
             imageVector = Icons.Rounded.Check,
             contentDescription = stringResource(R.string.video_status_watched),
             tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(overlay.badgeIconSize),
           )
         }
       }
 
-      // Bottom end: length, lifted above the progress bar when there is one.
-      if (video.durationFormatted.isNotBlank()) {
-        ThumbnailPill(
-          text = video.durationFormatted,
-          container = Color.Black.copy(alpha = 0.72f),
-          content = Color.White,
-          modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(end = 6.dp, bottom = if (showProgress) 17.dp else 6.dp),
-        )
-      }
-
-      // Bottom: watch progress as a thick rounded bar across the image.
-      if (showProgress) {
-        LinearProgressIndicator(
-          progress = { progressPercentage!!.coerceIn(0f, 1f) },
+      // Bottom: the length pill stacked above the progress bar. Laying them out together
+      // keeps the pill clear of the bar whatever size either one is.
+      val hasDuration = video.durationFormatted.isNotBlank()
+      if (hasDuration || showProgress) {
+        Column(
           modifier = Modifier
             .align(Alignment.BottomCenter)
-            .padding(horizontal = 6.dp, vertical = 6.dp)
             .fillMaxWidth()
-            .height(5.dp)
-            .clip(CircleShape),
-          color = MaterialTheme.colorScheme.primary,
-          trackColor = Color.White.copy(alpha = 0.4f),
-          strokeCap = StrokeCap.Round,
-          gapSize = 0.dp,
-          drawStopIndicator = {},
-        )
+            .padding(overlay.inset),
+          horizontalAlignment = Alignment.End,
+          verticalArrangement = Arrangement.spacedBy(overlay.gap),
+        ) {
+          if (hasDuration) {
+            ThumbnailPill(
+              text = video.durationFormatted,
+              container = Color.Black.copy(alpha = 0.72f),
+              content = Color.White,
+              overlay = overlay,
+            )
+          }
+          if (showProgress) {
+            LinearProgressIndicator(
+              progress = { progressPercentage!!.coerceIn(0f, 1f) },
+              modifier = Modifier
+                .fillMaxWidth()
+                .height(overlay.progressHeight)
+                .clip(CircleShape),
+              color = MaterialTheme.colorScheme.primary,
+              trackColor = Color.White.copy(alpha = 0.4f),
+              strokeCap = StrokeCap.Round,
+              gapSize = 0.dp,
+              drawStopIndicator = {},
+            )
+          }
+        }
       }
     }
 
@@ -722,6 +877,38 @@ fun VideoCardLongTitlePreview() {
     Box(modifier = Modifier.padding(16.dp)) {
       VideoCard(video = sampleVideo, settings = VideoCardSettings(), onClick = {})
     }
+  }
+}
+
+@Preview(showBackground = true, name = "Small phone (320dp)", device = "spec:width=320dp,height=640dp")
+@Composable
+fun VideoCardSmallPhonePreview() {
+  MaterialTheme {
+    VideoCard(video = getSampleVideo(), settings = VideoCardSettings(), onClick = {}, progressPercentage = 0.45f)
+  }
+}
+
+@Preview(showBackground = true, name = "Large font (1.5x)", fontScale = 1.5f, device = "spec:width=411dp,height=891dp")
+@Composable
+fun VideoCardLargeFontPreview() {
+  MaterialTheme {
+    VideoCard(video = getSampleVideo(), settings = VideoCardSettings(), onClick = {})
+  }
+}
+
+@Preview(showBackground = true, name = "Huge font (2x, stacked)", fontScale = 2f, device = "spec:width=411dp,height=891dp")
+@Composable
+fun VideoCardHugeFontPreview() {
+  MaterialTheme {
+    VideoCard(video = getSampleVideo(), settings = VideoCardSettings(), onClick = {}, progressPercentage = 0.45f)
+  }
+}
+
+@Preview(showBackground = true, name = "Landscape / foldable", device = "spec:width=891dp,height=411dp")
+@Composable
+fun VideoCardLandscapePreview() {
+  MaterialTheme {
+    VideoCard(video = getSampleVideo(), settings = VideoCardSettings(), onClick = {}, isWatched = true)
   }
 }
 
