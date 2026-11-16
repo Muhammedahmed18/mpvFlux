@@ -111,7 +111,7 @@ private fun PlayerChromePreview() {
 private fun SeekbarStylesPreview() {
   PreviewPlayerSurface {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      // Standard: thin track + bar thumb with a gap around it.
+      // Standard: slim 6dp track + 5x24dp pill thumb with a gap around it.
       StandardSeekbar(
         position = 400f,
         duration = 1000f,
@@ -120,7 +120,7 @@ private fun SeekbarStylesPreview() {
         onSeek = {},
         onSeekFinished = {},
       )
-      // Thick: thick track, no thumb.
+      // Thick: bold 14dp track + 7x24dp pill thumb, with A-B loop markers.
       StandardSeekbar(
         position = 400f,
         duration = 1000f,
@@ -131,20 +131,30 @@ private fun SeekbarStylesPreview() {
         loopStart = 550f,
         loopEnd = 700f,
       )
+      // Expressive: asymmetric 18dp played / 8dp unplayed track + 7x30dp pill thumb.
+      StandardSeekbar(
+        position = 400f,
+        duration = 1000f,
+        chapters = persistentListOf(),
+        seekbarStyle = SeekbarStyle.Expressive,
+        onSeek = {},
+        onSeekFinished = {},
+      )
     }
   }
 }
 
-@Preview(name = "Strong glass · light", uiMode = UI_MODE_NIGHT_NO)
-@Preview(name = "Strong glass · dark", uiMode = UI_MODE_NIGHT_YES)
+@Preview(name = "Vertical slider · light", uiMode = UI_MODE_NIGHT_NO)
+@Preview(name = "Vertical slider · dark", uiMode = UI_MODE_NIGHT_YES)
 @Composable
-private fun StrongGlassPreview() {
+private fun VerticalSliderPreview() {
   PreviewPlayerSurface {
     Row(
       horizontalArrangement = Arrangement.spacedBy(24.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      VerticalSlider(value = 0.6f, range = 0f..1f, icon = Icons.Default.Lock, label = "60")
+      // Tonal capsule slider at mid-level, plus the tonal unlock button beside it.
+      VerticalSlider(value = 0.6f, range = 0f..1f, icon = Icons.Default.Lock, label = "60%")
       Box(modifier = Modifier.width(96.dp)) { ThumbZoneUnlock(onUnlock = {}) }
     }
   }

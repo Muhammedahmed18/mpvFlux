@@ -3,6 +3,7 @@ package app.marlboroadvance.mpvex.ui.player.controls.components
 import androidx.compose.ui.res.vectorResource
 import app.marlboroadvance.mpvex.R
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -11,10 +12,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,19 +21,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import app.marlboroadvance.mpvex.ui.player.controls.GlassWeight
-import app.marlboroadvance.mpvex.ui.player.controls.playerGlass
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
@@ -54,6 +54,29 @@ private val sliderSpring = spring<Float>(
   dampingRatio = Spring.DampingRatioNoBouncy,
 )
 
+// ---------------------------------------------------------------------------
+// M3 Expressive floating tonal capsule, shared by the volume and brightness
+// gesture sliders:
+//
+//   [ value pill ]   <- current value, stable above the capsule, never under the fill
+//   (  capsule    )  <- solid surface-container track; primary fill grows up from
+//   (   fill      )     the bottom, volume boost overlays in tertiary
+//   (   icon      )  <- 24dp Material Symbols icon pinned near the capsule's bottom
+//
+// The capsule is a solid tonal surface (no glass, borders, gradients or shadows) so
+// it stays readable over bright and dark video in both themes. The value itself
+// updates instantly; only the fill glides.
+// ---------------------------------------------------------------------------
+
+private val SliderCapsuleWidth = 56.dp
+private val SliderCapsuleHeight = 200.dp
+private val SliderInnerPadding = 4.dp
+private val SliderIconSize = 24.dp
+private val SliderIconBottomPadding = 14.dp
+
+/** Fraction of the inner track the icon zone occupies; past it the fill sits behind the icon. */
+private const val IconCoveredThreshold = 0.16f
+
 @Composable
 fun VerticalSlider(
   value: Float,
@@ -68,77 +91,101 @@ fun VerticalSlider(
 ) {
   val coercedValue = value.coerceIn(range)
   val currentPercentage = percentage(coercedValue, range)
-  val sliderShape = MaterialTheme.shapes.extraLarge
+  val capsuleColor = MaterialTheme.colorScheme.surfaceContainerHigh
 
-  Box(
-    modifier =
-      modifier
-        .width(52.dp)
-        .height(200.dp)
-        // Strong player glass (PlayerChromeStyle). Sliders are gesture feedback, so
-        // they keep their fill even with "hide button background" on.
-        .playerGlass(sliderShape, hideBackground = false, weight = GlassWeight.Strong),
-    contentAlignment = Alignment.BottomCenter,
+  // Fill height glides; the gesture's value (and the label) update immediately.
+  val fillFraction by animateFloatAsState(
+    targetValue = currentPercentage,
+    animationSpec = sliderSpring,
+    label = "vsliderheight",
+  )
+
+  val overflowPercentage = if (overflowRange != null && overflowValue != null) {
+    percentage(overflowValue, overflowRange)
+  } else {
+    0f
+  }
+  val overflowFraction by animateFloatAsState(
+    targetValue = overflowPercentage,
+    animationSpec = sliderSpring,
+    label = "vslideroverflowheight",
+  )
+
+  Column(
+    modifier = modifier,
+    horizontalAlignment = Alignment.CenterHorizontally,
   ) {
-    val targetHeight by animateFloatAsState(
-      targetValue = currentPercentage,
-      animationSpec = sliderSpring,
-      label = "vsliderheight",
-    )
-
-    Box(
-      Modifier
-        .fillMaxWidth()
-        .fillMaxHeight(targetHeight)
-        // Same fill whether or not volume boost is active; the boost amount is drawn
-        // separately as the tertiary overlay below.
-        .background(MaterialTheme.colorScheme.primary),
-    )
-
-    if (overflowRange != null && overflowValue != null) {
-      val overflowPercentage = percentage(overflowValue, overflowRange)
-      val overflowHeight by animateFloatAsState(
-        targetValue = overflowPercentage,
-        animationSpec = sliderSpring,
-        label = "vslideroverflowheight",
-      )
+    // Value indicator: a small tonal pill at a stable position above the capsule, so
+    // it never collides with the moving fill and stays readable over the video.
+    if (label != null) {
       Box(
-        Modifier
-          .fillMaxWidth()
-          .fillMaxHeight(overflowHeight)
-          .background(MaterialTheme.colorScheme.tertiary.copy(alpha = 0.85f)),
-      )
-    }
-
-    Column(
-      modifier = Modifier
-        .fillMaxSize()
-        .padding(vertical = 20.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-      if (label != null) {
+        modifier = Modifier
+          .padding(bottom = 8.dp)
+          .clip(CircleShape)
+          .background(capsuleColor)
+          .padding(horizontal = 10.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+      ) {
         Text(
           text = label,
-          style = MaterialTheme.typography.labelMedium,
-          color = if (currentPercentage > 0.85f) {
-            MaterialTheme.colorScheme.onPrimary
-          } else {
-            MaterialTheme.colorScheme.onSurface
-          },
+          style = MaterialTheme.typography.labelLarge.copy(
+            fontWeight = FontWeight.SemiBold,
+            fontFeatureSettings = "tnum",
+          ),
+          color = MaterialTheme.colorScheme.onSurface,
           textAlign = TextAlign.Center,
-          modifier = Modifier.padding(horizontal = 4.dp),
+          maxLines = 1,
         )
-      } else {
-        Spacer(modifier = Modifier.height(1.dp))
+      }
+    }
+
+    Box(
+      modifier = Modifier
+        .width(SliderCapsuleWidth)
+        .height(SliderCapsuleHeight)
+        .clip(CircleShape)
+        .background(capsuleColor),
+      contentAlignment = Alignment.BottomCenter,
+    ) {
+      // Inner track, inset so the fill reads as floating inside the capsule.
+      Box(
+        modifier = Modifier
+          .fillMaxSize()
+          .padding(SliderInnerPadding)
+          .clip(CircleShape),
+        contentAlignment = Alignment.BottomCenter,
+      ) {
+        Box(
+          Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(fillFraction)
+            .background(MaterialTheme.colorScheme.primary),
+        )
+
+        // Volume boost above 100%: a tertiary overlay growing from the bottom, so the
+        // boosted amount is clearly told apart from the (full) primary fill under it.
+        if (overflowRange != null && overflowValue != null) {
+          Box(
+            Modifier
+              .fillMaxWidth()
+              .fillMaxHeight(overflowFraction)
+              .background(MaterialTheme.colorScheme.tertiary),
+          )
+        }
       }
 
       if (icon != null) {
-        val iconTint = if (currentPercentage > 0.12f) {
-          MaterialTheme.colorScheme.onPrimary
-        } else {
-          MaterialTheme.colorScheme.onSurfaceVariant
-        }
+        // The icon sits near the capsule's bottom; its tint follows whatever is behind
+        // it (track, primary fill or tertiary boost) so it stays readable at any level.
+        val iconTint by animateColorAsState(
+          targetValue = when {
+            isBoost && overflowFraction > IconCoveredThreshold -> MaterialTheme.colorScheme.onTertiary
+            fillFraction > IconCoveredThreshold -> MaterialTheme.colorScheme.onPrimary
+            else -> MaterialTheme.colorScheme.onSurfaceVariant
+          },
+          animationSpec = tween(150),
+          label = "vslidericontint",
+        )
         val crossColor = MaterialTheme.colorScheme.error
         AnimatedContent(
           targetState = icon,
@@ -150,7 +197,8 @@ fun VerticalSlider(
             contentDescription = null,
             tint = iconTint,
             modifier = Modifier
-              .size(20.dp)
+              .padding(bottom = SliderIconBottomPadding)
+              .size(SliderIconSize)
               .drawWithContent {
                 drawContent()
                 if (isZero) {
@@ -208,7 +256,7 @@ fun BrightnessSlider(
     value = coercedBrightness,
     range = range,
     modifier = modifier,
-    label = (percentage * 100).toInt().toString(),
+    label = "${(percentage * 100).toInt()}%",
     icon = when (percentage) {
       in 0f..0.3f -> ImageVector.vectorResource(R.drawable.ic_sym_brightness_low_fill)
       in 0.3f..0.6f -> ImageVector.vectorResource(R.drawable.ic_sym_brightness_medium_fill)
@@ -255,10 +303,10 @@ val getVolumeSliderText: @Composable (Int, Int, Int, Int, Boolean) -> String =
   { volume, mpvVolume, boostVolume, percentage, displayAsPercentage ->
     when {
       mpvVolume > 100 -> {
-        if (displayAsPercentage) "${percentage + boostVolume}" else "${volume}+${boostVolume}"
+        if (displayAsPercentage) "${percentage + boostVolume}%" else "${volume}+${boostVolume}"
       }
       else -> {
-        if (displayAsPercentage) "$percentage" else "$volume"
+        if (displayAsPercentage) "$percentage%" else "$volume"
       }
     }
   }
