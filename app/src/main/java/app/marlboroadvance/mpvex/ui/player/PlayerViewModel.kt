@@ -891,9 +891,17 @@ class PlayerViewModel(
   @Volatile
   var subtitlesTurnedOffByUser: Boolean = false
 
+  /**
+   * Current subtitle track id for [property] ("sid" or "secondary-sid"), or 0 when off.
+   * Read as a string because mpv reports "no" when subtitles are off, and reading that as an
+   * integer fails ("unsupported format for accessing property").
+   */
+  private fun currentSubtitleId(property: String): Int =
+    MPVLib.getPropertyString(property)?.toIntOrNull() ?: 0
+
   fun toggleSubtitle(id: Int) {
-    val primarySid = MPVLib.getPropertyInt("sid") ?: 0
-    val secondarySid = MPVLib.getPropertyInt("secondary-sid") ?: 0
+    val primarySid = currentSubtitleId("sid")
+    val secondarySid = currentSubtitleId("secondary-sid")
 
     subtitlesTurnedOffByUser = id == primarySid
     when {
@@ -906,8 +914,8 @@ class PlayerViewModel(
   }
 
   fun isSubtitleSelected(id: Int): Boolean {
-    val primarySid = MPVLib.getPropertyInt("sid") ?: 0
-    val secondarySid = MPVLib.getPropertyInt("secondary-sid") ?: 0
+    val primarySid = currentSubtitleId("sid")
+    val secondarySid = currentSubtitleId("secondary-sid")
     return (id == primarySid && primarySid > 0) || (id == secondarySid && secondarySid > 0)
   }
 

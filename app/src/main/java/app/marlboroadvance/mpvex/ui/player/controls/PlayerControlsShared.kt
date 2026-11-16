@@ -374,8 +374,10 @@ fun RenderPlayerButton(
 
     PlayerButton.SUBTITLES -> {
       // Filled CC icon while a subtitle track is showing.
-      val sid by MPVLib.propInt["sid"].collectAsState()
-      val subtitlesOn = (sid ?: 0) > 0
+      // Read as a string: mpv reports "no" when subtitles are off, which an integer flow
+      // cannot represent, so the icon stayed filled after turning subtitles off.
+      val sid by MPVLib.propString["sid"].collectAsState()
+      val subtitlesOn = (sid?.toIntOrNull() ?: 0) > 0
       PlayerIconButton(
         icon           = if (subtitlesOn) {
           ImageVector.vectorResource(R.drawable.ic_sym_closed_caption_fill)

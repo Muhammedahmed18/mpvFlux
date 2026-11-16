@@ -224,7 +224,8 @@ class TrackSelector(
     subtitlesOffByUser: Boolean,
   ) {
     try {
-      val currentSid = MPVLib.getPropertyInt("sid") ?: 0
+      // Read as a string: "no" (subtitles off) cannot be read as an integer.
+      val currentSid = MPVLib.getPropertyString("sid")?.toIntOrNull() ?: 0
 
       // Respect "Subtitles Off" only when the user turned them off themselves.
       if (hasState && currentSid == 0 && subtitlesOffByUser) {
