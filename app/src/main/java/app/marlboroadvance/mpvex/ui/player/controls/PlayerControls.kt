@@ -120,8 +120,6 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.MultipleSpeedPlay
 import app.marlboroadvance.mpvex.ui.player.controls.components.SpeedControlSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.TextPlayerUpdate
 import app.marlboroadvance.mpvex.ui.player.controls.components.ThumbZoneUnlock
-import app.marlboroadvance.mpvex.ui.player.controls.components.LockedClockPill
-import app.marlboroadvance.mpvex.ui.player.controls.components.LockedInfoPill
 import app.marlboroadvance.mpvex.ui.player.controls.components.VolumeSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarWithTimers
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
@@ -139,6 +137,9 @@ import kotlin.math.abs
 
 /** Gap kept between a shown system bar and the nearest player control. */
 private val EdgeInsetGap = 8.dp
+
+/** Gap between the unlock button's touch area and the bottom safe-area edge (visible gap ≈ 28dp). */
+private val LockedUnlockButtonBottomMargin = 12.dp
 
 @Suppress("CompositionLocalAllowlist")
 val LocalPlayerButtonsClickEvent = staticCompositionLocalOf { {} }
@@ -400,7 +401,6 @@ fun PlayerControls(
           val (topLeftControls, topRightControls) = createRefs()
           val (volumeSlider, brightnessSlider) = createRefs()
           val unlockControlsButton = createRef()
-          val (lockedInfoPill, lockedClockPill) = createRefs()
           val (bottomRightControls, bottomLeftControls) = createRefs()
           val playerPauseButton = createRef()
           val seekbar = createRef()
@@ -468,57 +468,33 @@ fun PlayerControls(
             },
           )
 
-          // Locked controls: unlock button where the right thumb naturally rests (inset from the
-          // edge, not flush against it), clock pill top-left and a small time-left/battery pill
-          // at the top center so it never covers subtitles (beside the clock in landscape,
-          // under it in portrait).
-          val lockedInsets = WindowInsets.safeDrawing
+          // Locked player: a single hold-to-unlock button at the bottom center. It stays on
+          // screen for as long as the player is locked (independent of controlsShown), and
+          // is centred within the safe area so it clears navigation bars and cutouts. The
+          // 60dp circle sits 16dp inside its 92dp touch area, so the visible button ends up
+          // 16 + 12 = 28dp above the bottom safe-area edge.
           AnimatedVisibility(
-            visible = controlsShown && areControlsLocked,
+            visible = areControlsLocked,
             enter = fadeIn(playerControlsEnterAnimationSpec()),
             exit = fadeOut(playerControlsExitAnimationSpec()),
             modifier = Modifier
-              .windowInsetsPadding(lockedInsets.only(WindowInsetsSides.End + WindowInsetsSides.Bottom))
+              .windowInsetsPadding(
+                WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom),
+              )
               .constrainAs(unlockControlsButton) {
-                top.linkTo(parent.top)
-                bottom.linkTo(parent.bottom)
-                // The 64dp circle sits 16dp inside its 96dp touch area, so the visible button is
-                // about 80dp from the edge in landscape and 32dp in portrait. safeDrawing insets
-                // keep it clear of a camera cutout on that side.
-                end.linkTo(parent.end, if (isCompactLayout) 16.dp else 64.dp)
-                verticalBias = if (isCompactLayout) 0.80f else 0.58f
-              },
-          ) { ThumbZoneUnlock(onUnlock = { viewModel.unlockControls() }) }
-
-          AnimatedVisibility(
-            visible = controlsShown && areControlsLocked,
-            enter = fadeIn(playerControlsEnterAnimationSpec()),
-            exit = fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier
-              .windowInsetsPadding(lockedInsets.only(WindowInsetsSides.Start + WindowInsetsSides.Top))
-              .constrainAs(lockedClockPill) {
-                top.linkTo(parent.top, if (isCompactLayout) spacing.extraLarge else spacing.medium)
-                start.linkTo(parent.start, spacing.large)
-              },
-          ) { LockedClockPill() }
-
-          AnimatedVisibility(
-            visible = controlsShown && areControlsLocked,
-            enter = fadeIn(playerControlsEnterAnimationSpec()),
-            exit = fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier
-              .windowInsetsPadding(lockedInsets.only(WindowInsetsSides.Top))
-              .constrainAs(lockedInfoPill) {
                 start.linkTo(parent.start)
                 end.linkTo(parent.end)
-                if (isCompactLayout) {
-                  // Portrait is too narrow for both pills on one row.
-                  top.linkTo(lockedClockPill.bottom, spacing.small)
-                } else {
-                  top.linkTo(parent.top, spacing.medium)
-                }
+                bottom.linkTo(parent.bottom, LockedUnlockButtonBottomMargin)
               },
-          ) { LockedInfoPill(viewModel = viewModel) }
+          ) {
+            ThumbZoneUnlock(
+              onUnlock = {
+                viewModel.unlockControls()
+                // Bring the normal controls back so the user lands on them after unlocking.
+                viewModel.showControls()
+              },
+            )
+          }
 
           AnimatedVisibility(
             visible = controlsShown && !areControlsLocked,

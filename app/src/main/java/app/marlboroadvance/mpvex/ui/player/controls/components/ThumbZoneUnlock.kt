@@ -1,261 +1,216 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components
 
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.vectorResource
-import app.marlboroadvance.mpvex.R
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
-import app.marlboroadvance.mpvex.ui.player.controls.GlassWeight
-import app.marlboroadvance.mpvex.ui.player.controls.PlayerChrome
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.ui.player.controls.playerControlsEnterAnimationSpec
-import app.marlboroadvance.mpvex.ui.player.controls.playerGlassFill
 import app.marlboroadvance.mpvex.ui.player.controls.playerControlsExitAnimationSpec
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+
+/** Visual diameter of the tonal circle. */
+private val ButtonSize = 60.dp
+
+/** Hit area around the circle; also leaves room for the progress ring. */
+private val TouchTargetSize = 92.dp
+
+private val IconSize = 26.dp
+private val RingStrokeWidth = 3.dp
+
+/** Gap between the circle edge and the inner edge of the progress ring. */
+private val RingGap = 4.dp
+
+/** Hold time needed to unlock. */
+private const val HOLD_TO_UNLOCK_MS = 800
+
+/** Time the success state (open-lock icon) is shown before the locked UI is dismissed. */
+private const val SUCCESS_SETTLE_MS = 220L
+
+private const val PRESSED_SCALE = 0.96f
+private const val TRACK_ALPHA = 0.24f
 
 /**
- * "Thumb Zone" unlock button for the locked player.
+ * Unlock button for the locked player: a flat Material 3 Expressive tonal circle shown at
+ * the bottom center (see PlayerControls).
  *
- * Placed on the right edge where the right thumb rests (see PlayerControls). A 64dp glass
- * circle inside a 96dp hit area, hold-to-unlock with a progress ring, a light haptic tick
- * when the hold starts and a strong one on unlock. A quick tap does nothing.
+ * Hold-to-unlock: pressing scales the button to 96% with a light haptic tick and starts a
+ * progress ring at 12 o'clock that fills clockwise, linearly, over 800 ms. Releasing early
+ * animates the ring back to zero; a quick tap does nothing. On completion a strong haptic
+ * fires, the icon switches to the open lock, and [onUnlock] is called once the short success
+ * state has been seen, so the parent's fade-out doesn't cut it off.
  */
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun ThumbZoneUnlock(
   onUnlock: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val haptic = LocalHapticFeedback.current
-  val scope  = rememberCoroutineScope()
+  val currentOnUnlock by rememberUpdatedState(onUnlock)
 
-  var isPressed  by remember { mutableStateOf(false) }
+  var isPressed by remember { mutableStateOf(false) }
   var isUnlocked by remember { mutableStateOf(false) }
   val progress = remember { Animatable(0f) }
 
-  val primaryColor = MaterialTheme.colorScheme.primary
+  val containerColor = MaterialTheme.colorScheme.secondaryContainer
+  val iconColor = MaterialTheme.colorScheme.onSecondaryContainer
+  val ringColor = MaterialTheme.colorScheme.primary
+  val trackColor = ringColor.copy(alpha = TRACK_ALPHA)
 
-  // Strong player glass (PlayerChromeStyle): same fill and rim light as Prev/Next and
-  // the volume/brightness sliders.
-  val glassColor = playerGlassFill(GlassWeight.Strong)
-  val glassRimBrush = PlayerChrome.RimBrush
-
-  // onPrimary replaces hardcoded Color.White for the unlocked state —
-  // semantically correct on a primary-tinted surface.
-  // onSurface replaces controlColor.copy(alpha = 0.8f) for the locked state —
-  // uses the M3 token directly, removes the custom extension dependency and manual alpha.
-  val lockedIconTint   = MaterialTheme.colorScheme.onSurface
-  val unlockedIconTint = MaterialTheme.colorScheme.onPrimary
-
-  // Handle the hold-to-unlock progress logic
+  // Hold timer. Cancelled (and so never unlocks) as soon as isPressed goes false.
   LaunchedEffect(isPressed) {
-    if (isPressed && !isUnlocked) {
-      // Light tick so the user feels the hold has started.
+    if (isUnlocked) return@LaunchedEffect
+    if (isPressed) {
       haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-      progress.animateTo(
-        targetValue   = 1f,
-        // FastOutSlowInEasing replaces LinearEasing — consistent with Phase 4 motion alignment.
-        // Hold progress now accelerates smoothly rather than ticking at a constant rate.
-        animationSpec = tween(800, easing = FastOutSlowInEasing),
-      )
-      // >= 0.99f replaces == 1f — eliminates fragile exact float equality check.
-      if (progress.value >= 0.99f) {
-        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+      // Linear and proportional to what's left, so the ring always shows the real time
+      // remaining, even when a new press starts while the ring is still rewinding.
+      val remainingMs = (HOLD_TO_UNLOCK_MS * (1f - progress.value)).toInt().coerceAtLeast(1)
+      progress.animateTo(1f, tween(durationMillis = remainingMs, easing = LinearEasing))
+      // Only reached if the hold wasn't interrupted.
+      if (!isUnlocked) {
         isUnlocked = true
-        onUnlock()
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
       }
-    } else if (!isUnlocked) {
-      // Snap-back on early release: DampingRatioMediumBouncy + StiffnessMediumLow gives a
-      // slight physical bounce, consistent with the Expressive motion language from Phase 1–3.
-      progress.animateTo(
-        targetValue   = 0f,
-        animationSpec = spring(
-          dampingRatio = Spring.DampingRatioMediumBouncy,
-          stiffness    = Spring.StiffnessMediumLow,
-        ),
-      )
+    } else {
+      progress.animateTo(0f, tween(durationMillis = 220, easing = FastOutSlowInEasing))
     }
   }
 
-  // Post-unlock visibility and payoff animations
-  var isVisible by remember { mutableStateOf(true) }
-  val auraFlashAlpha = remember { Animatable(0f) }
-  val successPopScale = remember { Animatable(1f) }
-
+  // Success: show the open lock briefly, then hand off to the parent, which fades this
+  // button out and restores the controls. isUnlocked guards against repeat callbacks.
   LaunchedEffect(isUnlocked) {
-    if (isUnlocked) {
-      scope.launch {
-        // Aura flash payoff — unchanged
-        auraFlashAlpha.animateTo(1f, tween(100))
-        auraFlashAlpha.animateTo(0f, tween(800))
-      }
-      scope.launch {
-        // Icon scale pop — unchanged (good spring feel, keep it)
-        successPopScale.animateTo(
-          targetValue      = 1f,
-          initialVelocity  = 15f,
-          animationSpec    = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness    = Spring.StiffnessLow,
-          ),
-        )
-      }
-      delay(1000)
-      isVisible = false
-    }
+    if (!isUnlocked) return@LaunchedEffect
+    delay(SUCCESS_SETTLE_MS)
+    currentOnUnlock()
+    // Normally the parent removes this composable after its exit fade. If the player is
+    // re-locked before that finishes, the same instance is reused, so return to the
+    // initial locked state once the fade is over.
+    delay(PARENT_EXIT_MS)
+    isUnlocked = false
+    isPressed = false
+    progress.snapTo(0f)
   }
 
-  // playerControlsExitAnimationSpec() (350ms) replaces tween(800) —
-  // consistent with all other controls leaving the screen in the player.
-  val componentAlpha by animateFloatAsState(
-    targetValue   = if (isVisible) 1f else 0f,
-    animationSpec = if (isVisible) playerControlsEnterAnimationSpec() else playerControlsExitAnimationSpec(),
-    label         = "ComponentAlpha",
-  )
-
-  // Press feedback scale — unchanged logic, aligned label
   val buttonScale by animateFloatAsState(
-    targetValue   = if (isUnlocked) 1f else if (isPressed) 0.92f else 1f,
-    animationSpec = spring(stiffness = Spring.StiffnessMedium),
-    label         = "ButtonScale",
+    targetValue = if (isPressed && !isUnlocked) PRESSED_SCALE else 1f,
+    animationSpec = spring(
+      dampingRatio = Spring.DampingRatioNoBouncy,
+      stiffness = Spring.StiffnessMediumLow,
+    ),
+    label = "UnlockButtonScale",
   )
-
-  val density          = LocalDensity.current
-  val arcStrokeWidth   = with(density) { 3.dp.toPx() }
-  val borderStrokeWidth = with(density) { PlayerChrome.RimWidth.toPx() }
 
   Box(
     modifier = modifier
-      .size(96.dp)
-      .graphicsLayer {
-        alpha = componentAlpha
-        scaleX = buttonScale
-        scaleY = buttonScale
-      }
+      .size(TouchTargetSize)
       .drawBehind {
-        // 64dp circle centered in the 96dp touch area.
-        val circleRadius = 32.dp.toPx()
-        val visualCenter = center
-
-        // 1. Atmospheric Aura Glow — unchanged
-        val baseAuraAlpha = if (isUnlocked) auraFlashAlpha.value else (progress.value * 0.12f)
-        if (baseAuraAlpha > 0f) {
-          drawCircle(
-            brush = Brush.radialGradient(
-              colors = listOf(
-                primaryColor.copy(alpha = baseAuraAlpha),
-                primaryColor.copy(alpha = baseAuraAlpha * 0.2f),
-                Color.Transparent,
-              ),
-              center = visualCenter,
-              radius = circleRadius * 2.5f,
-            ),
-            radius = circleRadius * 2.5f,
-            center = visualCenter,
-          )
-        }
-
-        // 2. Glass Background Circle
+        val p = progress.value
+        if (p <= 0f) return@drawBehind
+        val stroke = RingStrokeWidth.toPx()
+        val radius = (ButtonSize / 2 + RingGap).toPx() + stroke / 2
+        val topLeft = Offset(center.x - radius, center.y - radius)
+        val arcSize = Size(radius * 2, radius * 2)
+        // Subtle inactive track, only while a hold is in progress or rewinding.
         drawCircle(
-          color  = glassColor,
-          radius = circleRadius,
-          center = visualCenter,
+          color = trackColor,
+          radius = radius,
+          center = center,
+          style = Stroke(width = stroke),
         )
-
-        // 3. Glass rim light — shared PlayerChrome rim
-        drawCircle(
-          brush  = glassRimBrush,
-          radius = circleRadius,
-          center = visualCenter,
-          style  = Stroke(width = borderStrokeWidth),
+        // -90° is 12 o'clock; a positive sweep goes clockwise.
+        drawArc(
+          color = ringColor,
+          startAngle = -90f,
+          sweepAngle = 360f * p,
+          useCenter = false,
+          topLeft = topLeft,
+          size = arcSize,
+          style = Stroke(width = stroke, cap = StrokeCap.Round),
         )
-
-        // 4a. Progress Arc Track — faint full-circle baseline behind the progress arc.
-        // Consistent with LinearProgressIndicator having a trackColor in M3.
-        // Only drawn while progress is active and not yet unlocked.
-        if (progress.value > 0f && !isUnlocked) {
-          drawCircle(
-            color  = primaryColor.copy(alpha = 0.15f),
-            radius = circleRadius,
-            center = visualCenter,
-            style  = Stroke(width = arcStrokeWidth),
-          )
-        }
-
-        // 4b. Progress Arc — sweeps counter-clockwise (unchanged direction/logic)
-        if (progress.value > 0f && !isUnlocked) {
-          drawArc(
-            color      = primaryColor,
-            startAngle = 0f,
-            sweepAngle = progress.value * -360f,
-            useCenter  = false,
-            topLeft    = Offset(visualCenter.x - circleRadius, visualCenter.y - circleRadius),
-            size       = Size(circleRadius * 2, circleRadius * 2),
-            style      = Stroke(width = arcStrokeWidth),
-          )
-        }
       }
       .pointerInput(isUnlocked) {
-        if (!isUnlocked) {
-          detectTapGestures(
-            onPress = {
-              isPressed = true
-              try { awaitRelease() }
-              finally { isPressed = false }
+        if (isUnlocked) return@pointerInput
+        detectTapGestures(
+          onPress = {
+            isPressed = true
+            // tryAwaitRelease returns false (instead of throwing) when the gesture is
+            // cancelled; either way the hold ends here.
+            try {
+              tryAwaitRelease()
+            } finally {
+              isPressed = false
             }
-          )
-        }
+          },
+        )
       },
     contentAlignment = Alignment.Center,
   ) {
     Box(
+      modifier = Modifier
+        .size(ButtonSize)
+        .graphicsLayer {
+          scaleX = buttonScale
+          scaleY = buttonScale
+        }
+        .background(containerColor, CircleShape),
       contentAlignment = Alignment.Center,
     ) {
       AnimatedContent(
         targetState = isUnlocked,
         transitionSpec = {
-          // playerControlsEnterAnimationSpec / playerControlsExitAnimationSpec replace
-          // the bespoke tween(200, delayMillis = 50) / tween(100) values —
-          // lock icon transition timing now matches all other player controls.
-          // scaleIn spring kept — it provides the good entrance pop feel.
-          (fadeIn(animationSpec = playerControlsEnterAnimationSpec()) +
-            scaleIn(initialScale = 0.8f, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)))
-            .togetherWith(fadeOut(animationSpec = playerControlsExitAnimationSpec()))
+          (fadeIn(playerControlsEnterAnimationSpec()) + scaleIn(initialScale = 0.85f, animationSpec = tween(200)))
+            .togetherWith(fadeOut(playerControlsExitAnimationSpec()))
         },
-        label = "LockIconTransition",
+        label = "UnlockIconTransition",
       ) { unlocked ->
         Icon(
-          imageVector        = if (unlocked) ImageVector.vectorResource(R.drawable.ic_sym_lock_open_fill) else ImageVector.vectorResource(R.drawable.ic_sym_lock),
+          imageVector = ImageVector.vectorResource(
+            if (unlocked) R.drawable.ic_sym_lock_open_fill else R.drawable.ic_sym_lock,
+          ),
           contentDescription = null,
-          tint               = if (unlocked) unlockedIconTint else lockedIconTint,
-          modifier           = Modifier
-            .size(28.dp)
-            .graphicsLayer {
-              scaleX = successPopScale.value
-              scaleY = successPopScale.value
-            },
+          tint = iconColor,
+          modifier = Modifier.size(IconSize),
         )
       }
     }
   }
 }
+
+/** Slightly longer than playerControlsExitAnimationSpec(), the parent's fade-out. */
+private const val PARENT_EXIT_MS = 450L
