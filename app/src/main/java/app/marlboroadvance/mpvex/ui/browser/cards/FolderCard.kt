@@ -83,6 +83,8 @@ fun FolderCard(
   onThumbClick: () -> Unit = {},
   customIcon: ImageVector? = null,
   customChipContent: (@Composable () -> Unit)? = null,
+  // Sizes for this screen, shared with video rows. Lists can compute this once.
+  dimens: BrowserCardDimens = rememberBrowserCardDimens(),
 ) {
   val internalLabel = stringResource(R.string.card_storage_internal)
   val sdCardLabel = stringResource(R.string.card_storage_sd_card)
@@ -133,20 +135,21 @@ fun FolderCard(
     Row(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(16.dp),
+        .padding(dimens.rowPadding),
       verticalAlignment = Alignment.Top,
     ) {
       FolderIconContainer(
         isSelected = isSelected,
         customIcon = customIcon,
         onThumbClick = onThumbClick,
+        dimens = dimens,
       )
 
-      Spacer(modifier = Modifier.width(16.dp))
+      Spacer(modifier = Modifier.width(dimens.thumbTextGap))
 
       Column(
         modifier = Modifier.weight(1f),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(dimens.detailsSpacing),
       ) {
         Text(
           text = folder.name,
@@ -161,12 +164,12 @@ fun FolderCard(
             text = displayPath,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
+            maxLines = dimens.folderPathMaxLines,
             overflow = TextOverflow.Ellipsis,
           )
         }
 
-        FolderMetadataChips(folder, settings, customChipContent)
+        FolderMetadataChips(folder, settings, customChipContent, dimens)
       }
     }
   }
@@ -177,14 +180,15 @@ private fun FolderIconContainer(
   isSelected: Boolean,
   customIcon: ImageVector?,
   onThumbClick: () -> Unit,
+  dimens: BrowserCardDimens,
 ) {
   Box(
-    modifier = Modifier.size(56.dp),
+    modifier = Modifier.size(dimens.folderTileSize),
   ) {
     Box(
       modifier = Modifier
         .fillMaxWidth()
-        .height(56.dp)
+        .height(dimens.folderTileSize)
         .clip(MaterialTheme.shapes.large)
         // The selected card turns secondaryContainer, so the tile switches to
         // primaryContainer to stay visible against it.
@@ -199,7 +203,7 @@ private fun FolderIconContainer(
       Icon(
         imageVector = customIcon ?: Icons.Filled.Folder,
         contentDescription = null,
-        modifier = Modifier.size(28.dp),
+        modifier = Modifier.size(dimens.folderIconSize),
         tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
       )
     }
@@ -219,7 +223,7 @@ private fun FolderIconContainer(
       Surface(
         color = MaterialTheme.colorScheme.primaryContainer,
         shape = CircleShape,
-        modifier = Modifier.size(22.dp),
+        modifier = Modifier.size(dimens.folderBadgeSize),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
       ) {
         Icon(
@@ -238,31 +242,33 @@ private fun FolderIconContainer(
 private fun FolderMetadataChips(
   folder: VideoFolder,
   settings: FolderCardSettings,
-  customChipContent: (@Composable () -> Unit)?
+  customChipContent: (@Composable () -> Unit)?,
+  dimens: BrowserCardDimens,
 ) {
   FlowRow(
-    horizontalArrangement = Arrangement.spacedBy(8.dp),
-    verticalArrangement = Arrangement.spacedBy(8.dp),
+    horizontalArrangement = Arrangement.spacedBy(dimens.chipSpacing),
+    verticalArrangement = Arrangement.spacedBy(dimens.chipSpacing),
   ) {
     if (settings.showTotalVideosChip && folder.videoCount > 0) {
       UnifiedChip(
         text = pluralStringResource(R.plurals.card_video_count, folder.videoCount, folder.videoCount),
         isAccent = true,
+        size = dimens.chipSize,
       )
     }
 
     customChipContent?.invoke()
 
     if (settings.showTotalSizeChip && folder.totalSize > 0) {
-      UnifiedChip(text = formatFileSize(folder.totalSize))
+      UnifiedChip(text = formatFileSize(folder.totalSize), size = dimens.chipSize)
     }
 
     if (settings.showTotalDurationChip && folder.totalDuration > 0) {
-      UnifiedChip(text = formatDuration(folder.totalDuration))
+      UnifiedChip(text = formatDuration(folder.totalDuration), size = dimens.chipSize)
     }
 
     if (settings.showDateChip && folder.lastModified > 0) {
-      UnifiedChip(text = formatDate(folder.lastModified))
+      UnifiedChip(text = formatDate(folder.lastModified), size = dimens.chipSize)
     }
   }
 }

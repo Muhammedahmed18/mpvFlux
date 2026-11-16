@@ -8,10 +8,16 @@ package app.marlboroadvance.mpvex.ui.browser.cards
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.material3.ripple
+import androidx.compose.ui.draw.scale
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -69,7 +75,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.stringResource
@@ -109,76 +114,6 @@ data class VideoCardSettings(
   val unplayedOldVideoDays: Int = 7
 )
 
-/**
- * Row sizes for a video card, chosen from the screen width and the user's font size.
- *
- * Width tiers follow Material's window size classes (compact < 600dp, medium < 840dp,
- * expanded), with an extra tier for very small phones (< 360dp). Lists can call
- * [rememberVideoCardDimens] once and pass the result to every row.
- */
-@Immutable
-data class VideoCardDimens(
-  val rowPadding: Dp,
-  val thumbTextGap: Dp,
-  // The thumbnail takes this share of the row, kept between the min and max widths.
-  val thumbnailFraction: Float,
-  val thumbnailMinWidth: Dp,
-  val thumbnailMaxWidth: Dp,
-  val detailsSpacing: Dp,
-  val chipSpacing: Dp,
-  val chipSize: UnifiedChipSize,
-  // Very large fonts on a phone: thumbnail on top, text underneath at full width.
-  val stackThumbnail: Boolean,
-) {
-  companion object {
-    fun forScreen(screenWidthDp: Int, fontScale: Float): VideoCardDimens {
-      val base = when {
-        screenWidthDp < 360 -> VideoCardDimens(
-          rowPadding = 6.dp, thumbTextGap = 10.dp,
-          thumbnailFraction = 0.45f, thumbnailMinWidth = 112.dp, thumbnailMaxWidth = 150.dp,
-          detailsSpacing = 6.dp, chipSpacing = 4.dp, chipSize = UnifiedChipSize.Compact,
-          stackThumbnail = false,
-        )
-        screenWidthDp < 600 -> VideoCardDimens(
-          rowPadding = 8.dp, thumbTextGap = 12.dp,
-          thumbnailFraction = 0.45f, thumbnailMinWidth = 128.dp, thumbnailMaxWidth = 184.dp,
-          detailsSpacing = 8.dp, chipSpacing = 6.dp, chipSize = UnifiedChipSize.Medium,
-          stackThumbnail = false,
-        )
-        screenWidthDp < 840 -> VideoCardDimens(
-          rowPadding = 10.dp, thumbTextGap = 16.dp,
-          thumbnailFraction = 0.36f, thumbnailMinWidth = 176.dp, thumbnailMaxWidth = 240.dp,
-          detailsSpacing = 8.dp, chipSpacing = 6.dp, chipSize = UnifiedChipSize.Medium,
-          stackThumbnail = false,
-        )
-        else -> VideoCardDimens(
-          rowPadding = 12.dp, thumbTextGap = 20.dp,
-          thumbnailFraction = 0.30f, thumbnailMinWidth = 200.dp, thumbnailMaxWidth = 280.dp,
-          detailsSpacing = 10.dp, chipSpacing = 8.dp, chipSize = UnifiedChipSize.Medium,
-          stackThumbnail = false,
-        )
-      }
-      return when {
-        fontScale >= 1.7f && screenWidthDp < 600 -> base.copy(stackThumbnail = true)
-        // Bigger text needs more room beside the thumbnail, so the thumbnail gives some up.
-        fontScale >= 1.3f -> base.copy(
-          thumbnailFraction = base.thumbnailFraction * 0.85f,
-          thumbnailMinWidth = base.thumbnailMinWidth - 16.dp,
-        )
-        else -> base
-      }
-    }
-  }
-}
-
-/** Card sizes for the current screen width and font size; updates on rotation or resize. */
-@Composable
-fun rememberVideoCardDimens(): VideoCardDimens {
-  val screenWidthDp = LocalConfiguration.current.screenWidthDp
-  val fontScale = LocalDensity.current.fontScale
-  return remember(screenWidthDp, fontScale) { VideoCardDimens.forScreen(screenWidthDp, fontScale) }
-}
-
 @Composable
 fun VideoCard(
   video: Video,
@@ -201,10 +136,10 @@ fun VideoCard(
   allowThumbnailGeneration: Boolean = true,
   // Kept for API compatibility; rows no longer draw a grouped background.
   groupPosition: VideoCardGroupPosition = VideoCardGroupPosition.Single,
-  // True while multi-select is active: every row shows a selection circle at its end.
+  // True while multi-select is active: every thumbnail shows a selection circle.
   inSelectionMode: Boolean = false,
   // Sizes for this screen. Lists can compute this once and pass it to every row.
-  dimens: VideoCardDimens = rememberVideoCardDimens(),
+  dimens: BrowserCardDimens = rememberBrowserCardDimens(),
 ) {
   val isNew = remember(video.dateModified, settings.showUnplayedOldVideoLabel, isOldAndUnplayed, isMarkedNew, settings.unplayedOldVideoDays) {
     if (isMarkedNew) {
@@ -236,6 +171,18 @@ fun VideoCard(
   val supportingColor = colors.onSurfaceVariant
   val shape = MaterialTheme.shapes.large
 
+  // Pressing the row shrinks it slightly with a soft bounce, same as folder rows.
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+  val cardScale by animateFloatAsState(
+    targetValue = if (isPressed) 0.96f else 1f,
+    animationSpec = spring(
+      dampingRatio = Spring.DampingRatioLowBouncy,
+      stiffness = Spring.StiffnessMediumLow,
+    ),
+    label = "video_card_scale",
+  )
+
   val date = if (settings.showDateChip && video.dateModified > 0) {
     remember(video.dateModified) { formatDate(video.dateModified) }
   } else {
@@ -261,9 +208,12 @@ fun VideoCard(
   Surface(
     modifier = modifier
       .fillMaxWidth()
+      .scale(cardScale)
       .clip(shape)
       .semantics { selected = isSelected }
       .combinedClickable(
+        interactionSource = interactionSource,
+        indication = ripple(color = colors.primary),
         onClick = onClick,
         onLongClick = onLongClick,
       ),
@@ -276,6 +226,7 @@ fun VideoCard(
         video = video,
         isNew = isNew,
         isSelected = isSelected,
+        inSelectionMode = inSelectionMode,
         isWatched = isWatched,
         progressPercentage = progressPercentage,
         showThumbnails = settings.showThumbnails,
@@ -295,7 +246,12 @@ fun VideoCard(
         Text(
           text = displayTitle,
           style = MaterialTheme.typography.titleMedium,
-          color = if (isWatched) supportingColor else contentColor,
+          // Selected rows show the title in the accent colour, same as folder rows.
+          color = when {
+            isSelected -> colors.primary
+            isWatched -> supportingColor
+            else -> contentColor
+          },
           maxLines = if (settings.unlimitedNameLines) Int.MAX_VALUE else 2,
           overflow = TextOverflow.Ellipsis,
         )
@@ -317,23 +273,6 @@ fun VideoCard(
       }
     }
 
-    // Selection lives at the row's end, away from the thumbnail's watched tick.
-    // It is shown when either flag is set, so the long-pressed row appears already
-    // checked instead of flashing empty first; the fill change is animated.
-    val selection: @Composable (Modifier) -> Unit = { selectionModifier ->
-      AnimatedVisibility(
-        visible = inSelectionMode || isSelected,
-        enter = fadeIn(tween(150)) + expandHorizontally(tween(150), expandFrom = Alignment.Start),
-        exit = fadeOut(tween(150)) + shrinkHorizontally(tween(150), shrinkTowards = Alignment.Start),
-        modifier = selectionModifier,
-      ) {
-        SelectionCircle(
-          checked = isSelected,
-          modifier = Modifier.padding(start = dimens.thumbTextGap, end = 4.dp),
-        )
-      }
-    }
-
     if (dimens.stackThumbnail) {
       // Very large fonts on a phone: full-width thumbnail on top, text gets the whole row.
       Column(
@@ -343,10 +282,7 @@ fun VideoCard(
         verticalArrangement = Arrangement.spacedBy(dimens.thumbTextGap),
       ) {
         thumbnail(Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-          details(Modifier.weight(1f))
-          selection(Modifier.align(Alignment.CenterVertically))
-        }
+        details(Modifier.fillMaxWidth())
       }
     } else {
       Row(
@@ -366,8 +302,6 @@ fun VideoCard(
         Spacer(Modifier.width(dimens.thumbTextGap))
 
         details(Modifier.weight(1f).padding(top = 2.dp))
-
-        selection(Modifier.align(Alignment.CenterVertically))
       }
     }
   }
@@ -384,17 +318,25 @@ fun videoCardGroupPosition(hasPrevious: Boolean, hasNext: Boolean): VideoCardGro
   else -> VideoCardGroupPosition.Single
 }
 
-/** Material 3 style round checkbox: outlined when off, filled primary with a check when on. */
+/**
+ * Round checkbox drawn over the thumbnail: a white ring on a dark tint when off (readable
+ * on any image), filled primary with a check when on.
+ */
 @Composable
-private fun SelectionCircle(checked: Boolean, modifier: Modifier = Modifier) {
+private fun SelectionCircle(
+  checked: Boolean,
+  size: Dp,
+  iconSize: Dp,
+  modifier: Modifier = Modifier,
+) {
   val colors = MaterialTheme.colorScheme
   val fill by animateColorAsState(
-    targetValue = if (checked) colors.primary else Color.Transparent,
+    targetValue = if (checked) colors.primary else Color.Black.copy(alpha = 0.35f),
     animationSpec = tween(150),
     label = "selection_fill",
   )
   val outline by animateColorAsState(
-    targetValue = if (checked) colors.primary else colors.outline,
+    targetValue = if (checked) colors.primary else Color.White,
     animationSpec = tween(150),
     label = "selection_outline",
   )
@@ -405,7 +347,7 @@ private fun SelectionCircle(checked: Boolean, modifier: Modifier = Modifier) {
   )
   Box(
     modifier = modifier
-      .size(24.dp)
+      .size(size)
       .clip(CircleShape)
       .background(fill)
       .border(2.dp, outline, CircleShape),
@@ -416,7 +358,7 @@ private fun SelectionCircle(checked: Boolean, modifier: Modifier = Modifier) {
       contentDescription = if (checked) stringResource(R.string.card_cd_selected) else null,
       tint = colors.onPrimary,
       modifier = Modifier
-        .size(16.dp)
+        .size(iconSize)
         .alpha(checkAlpha),
     )
   }
@@ -510,6 +452,8 @@ fun VideoThumbnail(
   onLongClick: (() -> Unit)?,
   modifier: Modifier = Modifier,
   aspect: Float = 16f / 9f,
+  // While multi-select is active the selection circle sits in the top-end corner.
+  inSelectionMode: Boolean = false,
 ) {
   val isInspection = LocalInspectionMode.current
   val thumbnailRepository = if (isInspection) null else koinInject<ThumbnailRepository>()
@@ -636,6 +580,40 @@ fun VideoThumbnail(
 
       val showProgress =
         progressPercentage != null && progressPercentage > 0f && showProgressBar && !isWatched && video.duration > 0
+      // Selected: a light dark tint over the image so the choice reads at a glance.
+      val selectedScrimAlpha by animateFloatAsState(
+        targetValue = if (isSelected) 0.25f else 0f,
+        animationSpec = tween(150),
+        label = "selection_scrim",
+      )
+      if (selectedScrimAlpha > 0f) {
+        Box(
+          modifier = Modifier
+            .matchParentSize()
+            .background(Color.Black.copy(alpha = selectedScrimAlpha)),
+        )
+      }
+
+      // Top end: selection circle. Drawn over the image, so the row never changes size.
+      // Shown when either flag is set, so the long-pressed row appears already checked.
+      AnimatedVisibility(
+        visible = inSelectionMode || isSelected,
+        enter = fadeIn(tween(150)) + scaleIn(
+          spring(dampingRatio = Spring.DampingRatioNoBouncy),
+          initialScale = 0.6f,
+        ),
+        exit = fadeOut(tween(150)) + scaleOut(tween(150), targetScale = 0.6f),
+        modifier = Modifier
+          .align(Alignment.TopEnd)
+          .padding(overlay.inset),
+      ) {
+        SelectionCircle(
+          checked = isSelected,
+          size = overlay.badgeSize,
+          iconSize = overlay.badgeIconSize,
+        )
+      }
+
       // Top start: NEW pill.
       if (isNew && !isWatched) {
         ThumbnailPill(
