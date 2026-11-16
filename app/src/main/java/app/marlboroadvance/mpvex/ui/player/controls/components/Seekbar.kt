@@ -308,7 +308,6 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
     val metrics = seekbarMetrics(seekbarStyle)
     // Track geometry never changes while dragging: nothing shrinks or grows, so the bar
     // never jumps under the finger. Only the thumb reacts (below), plus the time bubble.
-    val chapterFractions = remember(chapters, duration) { chapterFractions(chapters, duration) }
 
     // Thumb micro-interaction, M3 Expressive fast-spatial spring:
     //  - Standard widens subtly (5 -> 7dp) while scrubbing.
@@ -332,7 +331,7 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
                 val fraction = ((sliderState.value - sliderState.valueRange.start) / range).coerceIn(0f, 1f)
                 drawSeekTrack(
                     fraction = fraction,
-                    chapterFractions = chapterFractions,
+                    chapterFractions = visibleChapterFractions(chapters, duration, size.width, 12.dp.toPx()),
                     activeColor = activeColor,
                     inactiveColor = inactiveColor,
                     activeTrackHeightPx = metrics.activeTrackHeight.toPx(),
@@ -425,6 +424,42 @@ internal fun seekbarInactiveColor(activeColor: Color) = activeColor.copy(alpha =
 internal fun chapterFractions(chapters: List<Segment>, duration: Float): List<Float> {
     if (duration <= 0f || chapters.size < 2) return emptyList()
     return chapters.map { it.start / duration }.filter { it > 0.005f && it < 0.995f }.sorted()
+}
+
+/**
+ * Visual-only chapter filtering shared by Standard, Thick and Expressive.
+ * Does not change the chapters used for seeking, scrubbing, haptics or chapter menus.
+ * Generic numbered scene markers are omitted; other boundaries are kept only when
+ * there is enough horizontal room for them to remain individually legible.
+ */
+private val genericSceneChapter = Regex("^scene(?:[\\s_.:#-]*)(?:\\d+|[ivxlcdm]+)$", RegexOption.IGNORE_CASE)
+
+internal fun visibleChapterFractions(
+    chapters: List<Segment>,
+    duration: Float,
+    widthPx: Float,
+    minimumSpacingPx: Float,
+): List<Float> {
+    if (!duration.isFinite() || duration <= 0f || chapters.size < 2 ||
+        !widthPx.isFinite() || widthPx <= 0f
+    ) return emptyList()
+
+    val candidates = chapters.asSequence()
+        .filterNot { genericSceneChapter.matches(it.name.trim()) }
+        .map { it.start / duration }
+        .filter { it.isFinite() && it > 0.005f && it < 0.995f }
+        .distinct()
+        .sorted()
+        .toList()
+
+    val minGap = minimumSpacingPx.coerceAtLeast(0f)
+    val selected = ArrayList<Float>(candidates.size)
+    for (fraction in candidates) {
+        if (selected.isEmpty() || (fraction - selected.last()) * widthPx >= minGap) {
+            selected.add(fraction)
+        }
+    }
+    return selected
 }
 
 /**

@@ -49,7 +49,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
@@ -73,6 +72,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -88,6 +88,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -119,6 +121,7 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.CompactSpeedIndic
 import app.marlboroadvance.mpvex.ui.player.controls.components.MultipleSpeedPlayerUpdate
 import app.marlboroadvance.mpvex.ui.player.controls.components.SpeedControlSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.TextPlayerUpdate
+import app.marlboroadvance.mpvex.ui.player.controls.components.SmartSkipOverlay
 import app.marlboroadvance.mpvex.ui.player.controls.components.ThumbZoneUnlock
 import app.marlboroadvance.mpvex.ui.player.controls.components.VolumeSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarWithTimers
@@ -134,6 +137,7 @@ import kotlinx.coroutines.flow.update
 import org.koin.compose.koinInject
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** Gap kept between a shown system bar and the nearest player control. */
 private val EdgeInsetGap = 8.dp
@@ -180,6 +184,18 @@ private fun Modifier.onLongPressNoConsume(enabled: Boolean = true, onLongPress: 
     }
   }
 
+// Reports how far this element's top edge is from the bottom of its parent, or 0 while
+// it has no height (a hidden AnimatedVisibility). Placed before the AnimatedVisibility's
+// own slide, so the value does not change during enter/exit animations.
+private fun Modifier.reportClearanceFromBottom(onClearance: (Int) -> Unit): Modifier =
+  onGloballyPositioned { coordinates ->
+    val parentHeight = coordinates.parentLayoutCoordinates?.size?.height
+    onClearance(
+      if (parentHeight == null || coordinates.size.height == 0) 0
+      else parentHeight - coordinates.positionInParent().y.roundToInt(),
+    )
+  }
+
 @OptIn(
   ExperimentalMaterial3Api::class,
   ExperimentalMaterial3ExpressiveApi::class,
@@ -196,6 +212,7 @@ fun PlayerControls(
   val appearancePreferences = koinInject<AppearancePreferences>()
   val hideBackground by appearancePreferences.hidePlayerButtonsBackground.collectAsState()
   val playerPreferences = koinInject<PlayerPreferences>()
+  val reduceMotion by playerPreferences.reduceMotion.collectAsState()
   val audioPreferences = koinInject<AudioPreferences>()
   val showSystemStatusBar by playerPreferences.showSystemStatusBar.collectAsState()
   val showSystemNavigationBar by playerPreferences.showSystemNavigationBar.collectAsState()
@@ -226,6 +243,12 @@ fun PlayerControls(
   // share it across the seekbar block and PlayerSheets instead of re-copying on every
   // controls-root recomposition (which fires on each scrub delta via resetControlsTimestamp).
   val chaptersImm = remember(chapters) { chapters.toImmutableList() }
+  // Smart-skip position/duration are collected inside SmartSkipOverlay, not here, so
+  // time-pos ticks don't recompose the whole controls tree. These two hold how far the
+  // bottom controls reach up from the bottom edge (0 while hidden); they are only read
+  // by the overlay, which lifts the skip chip above them.
+  var seekbarClearancePx by remember { mutableIntStateOf(0) }
+  var bottomRowClearancePx by remember { mutableIntStateOf(0) }
   val playlistMode by playerPreferences.playlistMode.collectAsState()
 
   val abLoopA by viewModel.abLoopA.collectAsState()
@@ -355,6 +378,7 @@ fun PlayerControls(
       val leftInset = with(density) { sideInsets.getLeft(this, LayoutDirection.Ltr).toDp() }
       val rightInset = with(density) { sideInsets.getRight(this, LayoutDirection.Ltr).toDp() }
       val topInset = with(density) { topInsets.getTop(this).toDp() }
+      val bottomInset = with(density) { sideInsets.getBottom(this).toDp() }
       fun edgeMargin(base: Dp, inset: Dp): Dp = if (inset > 0.dp) maxOf(base, inset + EdgeInsetGap) else base
       fun startMargin(base: Dp) = edgeMargin(base, leftInset)
       fun endMargin(base: Dp) = edgeMargin(base, rightInset)
@@ -409,7 +433,6 @@ fun PlayerControls(
           val isBrightnessSliderShown by viewModel.isBrightnessSliderShown.collectAsState()
           val isVolumeSliderShown by viewModel.isVolumeSliderShown.collectAsState()
           val swapVolumeAndBrightness by playerPreferences.swapVolumeAndBrightness.collectAsState()
-          val reduceMotion by playerPreferences.reduceMotion.collectAsState()
 
           val videoZoom by viewModel.videoZoom.collectAsState()
 
@@ -763,7 +786,7 @@ fun PlayerControls(
             modifier = Modifier.constrainAs(seekbar) {
               if (isCompactLayout) bottom.linkTo(playerPauseButton.top, spacing.medium) else bottom.linkTo(parent.bottom, spacing.medium)
               start.linkTo(parent.start, startMargin(24.dp)); end.linkTo(parent.end, endMargin(24.dp)); width = Dimension.fillToConstraints
-            },
+            }.reportClearanceFromBottom { seekbarClearancePx = it },
           ) {
             val invertDuration by playerPreferences.invertDuration.collectAsState()
             val seekbarStyle by appearancePreferences.seekbarStyle.collectAsState()
@@ -828,7 +851,7 @@ fun PlayerControls(
             visible = controlsShown && !areControlsLocked && (isCompactLayout || !areSlidersShown),
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.constrainAs(bottomRightControls) { if (isCompactLayout) { bottom.linkTo(parent.bottom, spacing.extraLarge); start.linkTo(parent.start, startMargin(spacing.large)); end.linkTo(parent.end, endMargin(spacing.large)); width = Dimension.fillToConstraints } else { bottom.linkTo(seekbar.top, spacing.small); end.linkTo(parent.end, endMargin(spacing.large)) } },
+            modifier = Modifier.constrainAs(bottomRightControls) { if (isCompactLayout) { bottom.linkTo(parent.bottom, spacing.extraLarge); start.linkTo(parent.start, startMargin(spacing.large)); end.linkTo(parent.end, endMargin(spacing.large)); width = Dimension.fillToConstraints } else { bottom.linkTo(seekbar.top, spacing.small); end.linkTo(parent.end, endMargin(spacing.large)) } }.reportClearanceFromBottom { bottomRowClearancePx = it },
           ) {
             if (isCompactLayout) BottomPlayerControlsPortrait(buttons = portraitBottomButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
             else BottomRightPlayerControlsLandscape(buttons = bottomRightButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
@@ -841,6 +864,21 @@ fun PlayerControls(
             modifier = Modifier.constrainAs(bottomLeftControls) { bottom.linkTo(seekbar.top, spacing.small); start.linkTo(parent.start, startMargin(spacing.large)); width = Dimension.fillToConstraints; end.linkTo(bottomRightControls.start, spacing.small) },
           ) { BottomLeftPlayerControlsLandscape(buttons = bottomLeftButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity) }
         }
+
+        // Independent overlay: intentionally remains tappable when normal controls are
+        // hidden or locked. Bottom-right: rests near the bottom edge and lifts above the
+        // seekbar (and the bottom-right buttons in landscape) while the controls are shown.
+        SmartSkipOverlay(
+          chapters = chaptersImm,
+          controlsRaised = controlsShown && !areControlsLocked,
+          raisedClearancePx = { maxOf(seekbarClearancePx, bottomRowClearancePx) },
+          restingBottom = edgeMargin(24.dp, bottomInset),
+          endPadding = endMargin(spacing.large),
+          hideBackground = hideBackground,
+          reduceMotion = reduceMotion,
+          onSeek = { target -> viewModel.seekTo(target) },
+          modifier = Modifier.align(Alignment.BottomEnd),
+        )
       }
     }
 
