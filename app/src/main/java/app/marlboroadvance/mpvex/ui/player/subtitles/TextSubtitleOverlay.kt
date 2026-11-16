@@ -75,8 +75,13 @@ fun TextSubtitleLayer(
   val preferences = koinInject<SubtitlesPreferences>()
   val enabled by preferences.usePhoneFontForTextSubs.collectAsState()
   val tracks by viewModel.subtitleTracks.collectStateFlowAsState()
-  val sid by MPVLib.propInt["sid"].collectStateFlowAsState()
-  val secondarySid by MPVLib.propInt["secondary-sid"].collectStateFlowAsState()
+  // Read sid/secondary-sid as strings: when subtitles are turned off mpv reports "no", which
+  // cannot be read as an integer. An integer flow then keeps the old track id, so the overlay
+  // stayed on and kept showing the last line until a track was picked again.
+  val sidValue by MPVLib.propString["sid"].collectStateFlowAsState()
+  val secondarySidValue by MPVLib.propString["secondary-sid"].collectStateFlowAsState()
+  val sid = sidValue?.toIntOrNull()
+  val secondarySid = secondarySidValue?.toIntOrNull()
 
   val primaryOverlay = enabled && isPlainTextSubtitle(tracks, sid)
   val secondaryOverlay = enabled && isPlainTextSubtitle(tracks, secondarySid)
