@@ -11,7 +11,20 @@ internal enum class SmartSkipKind(@StringRes val labelRes: Int) {
 
 internal data class SmartSkipRange(val kind: SmartSkipKind, val start: Float, val end: Float)
 
-/** Only explicit chapter labels are eligible; generic numbered scenes never trigger skipping. */
+/**
+ * Detects intro/outro chapters from their titles.
+ *
+ * A title is split into parts at separators ("/", "|", ":", " - ", brackets, ...).
+ * A part counts when every word in it is either an intro/outro keyword or a
+ * harmless filler word ("episode", "start", "theme", "part", numbers, ...).
+ * One matching part is enough, so all of these are detected:
+ *   "Episode Start/Opening Intro", "OP - Gurenge", "NCOP2", "Opening (Creditless)",
+ *   "Ending Credits", "ED + Preview", "Title Sequence", "オープニング".
+ * These are deliberately rejected, because they have other real words in them:
+ *   "Intro to the case", "Pre-Credits Scene", "Prologue", "Episode Start".
+ * If a title names both an intro and an outro ("Opening & Ending") it is ambiguous
+ * and ignored. Generic numbered scenes ("Chapter 3") never trigger skipping.
+ */
 internal object SmartSkipDetector {
   /** Ranges shorter than this are almost certainly marker chapters, not real intros/outros. */
   private const val MIN_RANGE_SECONDS = 1f
@@ -19,24 +32,63 @@ internal object SmartSkipDetector {
   // Compiled once instead of on every chapter lookup.
   private val nonAlphanumeric = Regex("[^\\p{L}\\p{N}]+")
 
-  // Optional trailing index, e.g. "Intro 2", "Opening Part 1", "OP1".
-  private const val INDEX = "(?: ?(?:part )?\\d+)?"
-  private val intro = Regex(
-    "^(?:intro|introduction|opening|opening credits|opening theme|title sequence|op)$INDEX$",
-  )
-  private val outro = Regex(
-    "^(?:outro|ending|ending credits|ending theme|end credits|closing|closing credits|closing theme|ed)$INDEX$",
+  // Where a title splits into independent parts. A bare hyphen is NOT a separator
+  // ("Pre-Credits" must stay one part), but a spaced dash (" - ") or en/em dash is.
+  private val partSeparators = Regex("""[/|\\:;,+&~()\[\]{}<>«»「」『』【】]|\s-\s|[–—]""")
+
+  // Strong keywords, with optional "nc" (creditless) prefix and index: "op", "op2", "ncop1", "ending3".
+  private val introWord = Regex("^(?:nc)?(?:op|opening|intro|introduction)\\d*$")
+  private val outroWord = Regex("^(?:nc)?(?:ed|ending|outro|closing)\\d*$")
+  private val introWordsOther = setOf("オープニング", "片头", "片頭", "오프닝")
+  private val outroWordsOther = setOf("エンディング", "片尾", "엔딩")
+
+  /** Means outro only when no strong keyword is present ("End Credits" vs "Opening Credits"). */
+  private val weakOutroWords = setOf("credits", "credit")
+
+  /** Multi-word intro names rewritten to a single keyword before matching. */
+  private val phrases = listOf(
+    "title sequence" to "opening",
+    "main titles" to "opening",
+    "main title" to "opening",
   )
 
-  private fun kind(title: String): SmartSkipKind? {
-    // Any punctuation ("_", "-", brackets, colons, ...) becomes a single space.
-    val normalized = title.lowercase().replace(nonAlphanumeric, " ").trim()
+  /** Words allowed next to a keyword without blocking the match. */
+  private val fillerWords = setOf(
+    "episode", "ep", "start", "begin", "beginning", "end", "part", "pt", "the", "a", "of", "and",
+    "main", "theme", "song", "songs", "music", "sequence", "title", "titles", "full", "clean",
+    "creditless", "nc", "version", "ver", "v", "tv", "size", "anime", "animation", "series",
+    "show", "staff", "roll",
+  )
+
+  private fun classifyPart(part: String): SmartSkipKind? {
+    var text = " " + part.lowercase().replace(nonAlphanumeric, " ").trim() + " "
+    if (text.isBlank()) return null
+    for ((from, to) in phrases) text = text.replace(" $from ", " $to ")
+
+    var intro = false
+    var outro = false
+    var weakOutro = false
+    for (word in text.split(' ')) {
+      when {
+        word.isEmpty() -> Unit
+        introWord.matches(word) || word in introWordsOther -> intro = true
+        outroWord.matches(word) || word in outroWordsOther -> outro = true
+        word in weakOutroWords -> weakOutro = true
+        word in fillerWords || word.all(Char::isDigit) -> Unit
+        else -> return null // any other real word means this part is content, not an intro/outro
+      }
+    }
     return when {
-      intro.matches(normalized) -> SmartSkipKind.INTRO
-      outro.matches(normalized) -> SmartSkipKind.OUTRO
+      intro && outro -> null
+      intro -> SmartSkipKind.INTRO
+      outro || weakOutro -> SmartSkipKind.OUTRO
       else -> null
     }
   }
+
+  internal fun kind(title: String): SmartSkipKind? =
+    // Exactly one kind across all parts; a title naming both is ambiguous.
+    title.split(partSeparators).mapNotNull(::classifyPart).toSet().singleOrNull()
 
   fun ranges(chapters: List<Segment>, duration: Int): List<SmartSkipRange> {
     if (duration <= 0 || chapters.isEmpty()) return emptyList()
