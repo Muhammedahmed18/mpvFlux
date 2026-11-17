@@ -1730,7 +1730,9 @@ class PlayerActivity :
 
     return PlaybackStateSnapshot(
       mediaIdentifier = mediaIdentifier,
-      position = viewModel.pos ?: 0,
+      // A video closed within the first few seconds was never really started, so save it
+      // as "from the beginning" instead of resuming at 0:01–0:02 next time.
+      position = (viewModel.pos ?: 0).let { if (it < MIN_RESUME_POSITION_SECONDS) 0 else it },
       duration = viewModel.duration ?: 0,
       playbackSpeed = MPVLib.getPropertyDouble("speed") ?: DEFAULT_PLAYBACK_SPEED,
       videoZoom = MPVLib.getPropertyDouble("video-zoom")?.toFloat() ?: 0f,
@@ -1827,7 +1829,8 @@ class PlayerActivity :
     MPVLib.setPropertyDouble("video-zoom", state.videoZoom.toDouble())
     viewModel.setVideoZoom(state.videoZoom)
 
-    if (playerPreferences.savePositionOnQuit.get() && state.lastPosition != 0) {
+    // Also ignores tiny positions already stored by older versions.
+    if (playerPreferences.savePositionOnQuit.get() && state.lastPosition >= MIN_RESUME_POSITION_SECONDS) {
       MPVLib.setPropertyInt("time-pos", state.lastPosition)
     }
   }
@@ -2681,6 +2684,9 @@ class PlayerActivity :
     private const val DEFAULT_PLAYBACK_SPEED = 1.0
     private const val DEFAULT_SUB_SPEED = 1.0
     private const val NOTIFICATION_ARTWORK_SIZE = 256
+
+    // Positions below this (in seconds) are treated as "not started": saved as 0 and not resumed.
+    private const val MIN_RESUME_POSITION_SECONDS = 5
     const val TAG = "mpvex"
   }
 }
