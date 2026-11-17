@@ -3,9 +3,12 @@ package app.marlboroadvance.mpvex.ui.browser.sheets
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +43,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -53,6 +57,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -76,6 +81,7 @@ import app.marlboroadvance.mpvex.utils.media.VideoMark
 import app.marlboroadvance.mpvex.utils.media.VideoMarkOps
 import kotlin.math.abs
 import kotlin.math.sign
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -264,7 +270,12 @@ private fun MarkToastPopup(
   val scope = rememberCoroutineScope()
   val appear = remember { Animatable(0f) } // 0 = hidden, 1 = resting; the spring overshoots
   val countdown = remember { Animatable(1f) } // 1 = full bar, 0 = time is up
-  val offsetX = remember { Animatable(0f) } // swipe-to-dismiss offset in px
+  // Swipe offset in px. Plain state (not an Animatable) so drag updates are applied
+  // synchronously and can never interrupt the fling-out animation.
+  var dragX by remember { mutableFloatStateOf(0f) }
+  var touching by remember { mutableStateOf(false) } // finger down: countdown is paused
+  var flinging by remember { mutableStateOf(false) } // flying off: ignore further drags
+  var settleJob by remember { mutableStateOf<Job?>(null) } // spring-back after a short drag
   var pillWidth by remember { mutableIntStateOf(0) }
   val message = if (toast.plural != null) {
     pluralStringResource(toast.plural, toast.count, toast.count)
@@ -280,7 +291,14 @@ private fun MarkToastPopup(
       targetValue = 1f,
       animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
     )
-    countdown.animateTo(0f, tween(TOAST_DURATION_MS, easing = LinearEasing))
+  }
+
+  // Restarts whenever the finger goes down or up, so the countdown pauses while touching
+  // and resumes with the time that was left.
+  LaunchedEffect(touching) {
+    if (touching) return@LaunchedEffect
+    val remainingMs = (TOAST_DURATION_MS * countdown.value).toInt()
+    countdown.animateTo(0f, tween(remainingMs, easing = LinearEasing))
     appear.animateTo(0f, tween(180))
     onDismissed()
   }
@@ -300,10 +318,55 @@ private fun MarkToastPopup(
       modifier = Modifier
         // The padding also leaves room for the shadow and the spring overshoot.
         .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = navBarInset + TOAST_BOTTOM_GAP)
+        // Gesture modifiers sit before graphicsLayer on purpose: inside the moving layer
+        // the finger position would be measured relative to the pill it is moving.
+        .pointerInput(Unit) {
+          awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            touching = true
+            try {
+              do {
+                val event = awaitPointerEvent()
+              } while (event.changes.any { it.pressed })
+            } finally {
+              touching = false
+            }
+          }
+        }
+        .draggable(
+          orientation = Orientation.Horizontal,
+          state = rememberDraggableState { delta -> if (!flinging) dragX += delta },
+          onDragStarted = { settleJob?.cancel() },
+          onDragStopped = { velocity ->
+            if (!flinging) {
+              val far = abs(dragX) > pillWidth * 0.2f
+              val fast = abs(velocity) > 600f
+              if (pillWidth > 0 && (far || fast)) {
+                flinging = true
+                val direction = if (fast) sign(velocity) else sign(dragX)
+                // Launched in the popup's own scope so nothing in the gesture can cancel it.
+                scope.launch {
+                  animate(dragX, direction * pillWidth * 1.2f, animationSpec = tween(160)) { value, _ ->
+                    dragX = value
+                  }
+                  onDismissed()
+                }
+              } else {
+                settleJob = scope.launch {
+                  animate(
+                    initialValue = dragX,
+                    targetValue = 0f,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                  ) { value, _ -> dragX = value }
+                }
+              }
+            }
+          },
+        )
         .graphicsLayer {
           val a = appear.value
-          val swiped = if (pillWidth > 0) (abs(offsetX.value) / pillWidth).coerceIn(0f, 1f) else 0f
-          translationX = offsetX.value
+          val swiped = if (pillWidth > 0) (abs(dragX) / pillWidth).coerceIn(0f, 1f) else 0f
+          translationX = dragX
           translationY = (1f - a) * 56.dp.toPx()
           scaleX = 0.85f + 0.15f * a
           scaleY = 0.85f + 0.15f * a
@@ -319,24 +382,7 @@ private fun MarkToastPopup(
         modifier = Modifier
           .widthIn(max = 480.dp)
           .onSizeChanged { pillWidth = it.width }
-          .semantics { liveRegion = LiveRegionMode.Polite }
-          .draggable(
-            orientation = Orientation.Horizontal,
-            state = rememberDraggableState { delta ->
-              scope.launch { offsetX.snapTo(offsetX.value + delta) }
-            },
-            onDragStopped = { velocity ->
-              val far = abs(offsetX.value) > pillWidth * 0.35f
-              val fast = abs(velocity) > 1500f
-              if (pillWidth > 0 && (far || fast)) {
-                val direction = if (offsetX.value != 0f) sign(offsetX.value) else sign(velocity)
-                offsetX.animateTo(direction * pillWidth * 1.2f, tween(160))
-                onDismissed()
-              } else {
-                offsetX.animateTo(0f, spring(dampingRatio = Spring.DampingRatioMediumBouncy))
-              }
-            },
-          ),
+          .semantics { liveRegion = LiveRegionMode.Polite },
       ) {
         Row(
           modifier = Modifier

@@ -278,6 +278,9 @@ fun VolumeSlider(
 ) {
   val percentageValue = (percentage(volume, range) * 100).roundToInt()
   val boostVolume = (mpvVolume - 100).coerceAtLeast(0)
+  // The gesture drives the device volume, so "zero" follows it rather than mpv's own
+  // volume (which normally stays at 100 while the device volume is swiped down).
+  val isDeviceMuted = volume <= range.start
 
   val label = getVolumeSliderText(volume, mpvVolume, boostVolume, percentageValue, displayAsPercentage)
 
@@ -287,15 +290,18 @@ fun VolumeSlider(
     modifier = modifier,
     label = label,
     icon = when {
+      // Plain speaker (no built-in slash) so only the red cross line marks zero.
+      isDeviceMuted -> ImageVector.vectorResource(R.drawable.ic_sym_volume_mute_fill)
       mpvVolume == 0 -> ImageVector.vectorResource(R.drawable.ic_sym_volume_off_fill)
-      mpvVolume in 1..30 -> ImageVector.vectorResource(R.drawable.ic_sym_volume_mute_fill)
-      mpvVolume in 31..60 -> ImageVector.vectorResource(R.drawable.ic_sym_volume_down_fill)
+      // Tiers follow the device volume level, i.e. what the slider fill shows.
+      percentageValue <= 30 -> ImageVector.vectorResource(R.drawable.ic_sym_volume_mute_fill)
+      percentageValue <= 60 -> ImageVector.vectorResource(R.drawable.ic_sym_volume_down_fill)
       else -> ImageVector.vectorResource(R.drawable.ic_sym_volume_up_fill)
     },
     overflowValue = if (mpvVolume > 100) boostVolume.toFloat() else null,
     overflowRange = boostRange?.let { it.start.toFloat()..it.endInclusive.toFloat() },
     isBoost = mpvVolume > 100,
-    isZero = mpvVolume == 0,
+    isZero = isDeviceMuted,
   )
 }
 

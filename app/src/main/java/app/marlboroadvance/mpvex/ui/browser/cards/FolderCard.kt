@@ -5,7 +5,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import app.marlboroadvance.mpvex.R
 import androidx.compose.ui.res.stringResource
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -13,7 +13,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -26,11 +26,9 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Folder
@@ -50,11 +48,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -182,57 +178,57 @@ private fun FolderIconContainer(
   onThumbClick: () -> Unit,
   dimens: BrowserCardDimens,
 ) {
+  // When selected, the whole tile becomes the tick: it fills with the accent
+  // colour and the folder icon swaps to a check, instead of a badge on top.
+  val tileColor by animateColorAsState(
+    targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
+    animationSpec = tween(durationMillis = 150),
+    label = "folder_tile_color",
+  )
+  val iconTint by animateColorAsState(
+    targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
+    animationSpec = tween(durationMillis = 150),
+    label = "folder_tile_icon_tint",
+  )
+
   Box(
-    modifier = Modifier.size(dimens.folderTileSize),
+    modifier = Modifier
+      .size(dimens.folderTileSize)
+      .clip(MaterialTheme.shapes.large)
+      .background(tileColor)
+      .combinedClickable(
+        onClick = onThumbClick,
+        indication = ripple(bounded = true),
+        interactionSource = remember { MutableInteractionSource() }
+      ),
+    contentAlignment = Alignment.Center,
   ) {
-    Box(
-      modifier = Modifier
-        .fillMaxWidth()
-        .height(dimens.folderTileSize)
-        .clip(MaterialTheme.shapes.large)
-        // The selected card turns secondaryContainer, so the tile switches to
-        // primaryContainer to stay visible against it.
-        .background(if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer)
-        .combinedClickable(
-          onClick = onThumbClick,
-          indication = ripple(bounded = true),
-          interactionSource = remember { MutableInteractionSource() }
-        ),
+    AnimatedContent(
+      targetState = isSelected,
+      transitionSpec = {
+        val enter = fadeIn(tween(durationMillis = 150)) + scaleIn(
+          animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium,
+          ),
+          initialScale = 0.6f,
+        )
+        val exit = fadeOut(tween(durationMillis = 90)) + scaleOut(
+          animationSpec = tween(durationMillis = 90),
+          targetScale = 0.6f,
+        )
+        enter togetherWith exit
+      },
       contentAlignment = Alignment.Center,
-    ) {
+      label = "folder_tile_icon",
+    ) { selected ->
       Icon(
-        imageVector = customIcon ?: Icons.Filled.Folder,
+        imageVector = if (selected) Icons.Filled.Check else customIcon ?: Icons.Filled.Folder,
+        // The row itself already reports "selected" to screen readers.
         contentDescription = null,
         modifier = Modifier.size(dimens.folderIconSize),
-        tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+        tint = iconTint,
       )
-    }
-
-    AnimatedVisibility(
-      visible = isSelected,
-      enter = fadeIn(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleIn(
-        spring(dampingRatio = Spring.DampingRatioNoBouncy),
-        transformOrigin = TransformOrigin(1f, 1f)
-      ),
-      exit = fadeOut(spring(dampingRatio = Spring.DampingRatioNoBouncy)) + scaleOut(
-        spring(dampingRatio = Spring.DampingRatioNoBouncy),
-        transformOrigin = TransformOrigin(1f, 1f)
-      ),
-      modifier = Modifier.align(Alignment.BottomEnd),
-    ) {
-      Surface(
-        color = MaterialTheme.colorScheme.primaryContainer,
-        shape = CircleShape,
-        modifier = Modifier.size(dimens.folderBadgeSize),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-      ) {
-        Icon(
-          imageVector = Icons.Filled.Check,
-          contentDescription = stringResource(R.string.card_cd_selected),
-          modifier = Modifier.padding(3.dp),
-          tint = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
-      }
     }
   }
 }

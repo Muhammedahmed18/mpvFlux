@@ -29,10 +29,9 @@ data class BrowserCardDimens(
   val chipSize: UnifiedChipSize,
   // Very large fonts on a phone: video thumbnail on top, text underneath at full width.
   val stackThumbnail: Boolean,
-  // Folder tile, its icon, and the selection badge on it.
+  // Folder tile and its icon (the tile itself turns into the tick when selected).
   val folderTileSize: Dp,
   val folderIconSize: Dp,
-  val folderBadgeSize: Dp,
   val folderPathMaxLines: Int,
 ) {
   companion object {
@@ -43,28 +42,28 @@ data class BrowserCardDimens(
           thumbnailFraction = 0.45f, thumbnailMinWidth = 112.dp, thumbnailMaxWidth = 150.dp,
           detailsSpacing = 6.dp, chipSpacing = 4.dp, chipSize = UnifiedChipSize.Compact,
           stackThumbnail = false,
-          folderTileSize = 48.dp, folderIconSize = 24.dp, folderBadgeSize = 20.dp, folderPathMaxLines = 2,
+          folderTileSize = 48.dp, folderIconSize = 24.dp, folderPathMaxLines = 2,
         )
         screenWidthDp < 600 -> BrowserCardDimens(
           rowPadding = 8.dp, thumbTextGap = 12.dp,
           thumbnailFraction = 0.45f, thumbnailMinWidth = 128.dp, thumbnailMaxWidth = 184.dp,
           detailsSpacing = 8.dp, chipSpacing = 6.dp, chipSize = UnifiedChipSize.Medium,
           stackThumbnail = false,
-          folderTileSize = 56.dp, folderIconSize = 28.dp, folderBadgeSize = 22.dp, folderPathMaxLines = 2,
+          folderTileSize = 56.dp, folderIconSize = 28.dp, folderPathMaxLines = 2,
         )
         screenWidthDp < 840 -> BrowserCardDimens(
           rowPadding = 10.dp, thumbTextGap = 16.dp,
           thumbnailFraction = 0.36f, thumbnailMinWidth = 176.dp, thumbnailMaxWidth = 240.dp,
           detailsSpacing = 8.dp, chipSpacing = 6.dp, chipSize = UnifiedChipSize.Medium,
           stackThumbnail = false,
-          folderTileSize = 64.dp, folderIconSize = 32.dp, folderBadgeSize = 26.dp, folderPathMaxLines = 2,
+          folderTileSize = 64.dp, folderIconSize = 32.dp, folderPathMaxLines = 2,
         )
         else -> BrowserCardDimens(
           rowPadding = 12.dp, thumbTextGap = 20.dp,
           thumbnailFraction = 0.30f, thumbnailMinWidth = 200.dp, thumbnailMaxWidth = 280.dp,
           detailsSpacing = 10.dp, chipSpacing = 8.dp, chipSize = UnifiedChipSize.Medium,
           stackThumbnail = false,
-          folderTileSize = 72.dp, folderIconSize = 36.dp, folderBadgeSize = 28.dp, folderPathMaxLines = 2,
+          folderTileSize = 72.dp, folderIconSize = 36.dp, folderPathMaxLines = 2,
         )
       }
       return when {
