@@ -15,9 +15,8 @@ import androidx.compose.ui.unit.dp
 
 // ---------------------------------------------------------------------------
 // Player chrome style — the single source of truth for every control drawn
-// over the video (buttons, chips, timers, title pill, transport, sliders).
-// The locked-player unlock button is the exception: it is a flat tonal
-// secondaryContainer circle (see ThumbZoneUnlock), not glass.
+// over the video (buttons, chips, timers, title pill, transport, sliders,
+// and the locked-player unlock button).
 //
 // MPV draws to a SurfaceView, which can't be sampled for a real backdrop blur,
 // so "glass" is approximated with a translucent tonal fill. There are exactly
@@ -27,8 +26,9 @@ import androidx.compose.ui.unit.dp
 //              title pill. These are small and numerous; a rim on each would
 //              be visual noise.
 //   Strong   → denser fill + white rim light. Prev/Next, volume/brightness
-//              sliders. Fixed-shape, larger surfaces that sit
-//              alone over the video and need a defined edge.
+//              sliders, the locked-player unlock button (ThumbZoneUnlock).
+//              Fixed-shape, larger surfaces that sit alone over the video
+//              and need a defined edge.
 //
 // Play/Pause is the one exception: it stays a solid `primary` focal.
 // ---------------------------------------------------------------------------

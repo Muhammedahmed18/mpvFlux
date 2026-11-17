@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -41,7 +42,10 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.ui.player.controls.GlassWeight
 import app.marlboroadvance.mpvex.ui.player.controls.LocalPlayerButtonsClickEvent
+import app.marlboroadvance.mpvex.ui.player.controls.playerChromeContentColor
+import app.marlboroadvance.mpvex.ui.player.controls.playerGlass
 import app.marlboroadvance.mpvex.ui.player.controls.playerControlsEnterAnimationSpec
 import app.marlboroadvance.mpvex.ui.player.controls.playerControlsExitAnimationSpec
 import kotlinx.coroutines.delay
@@ -68,19 +72,23 @@ private const val PRESSED_SCALE = 0.96f
 private const val TRACK_ALPHA = 0.24f
 
 /**
- * Unlock button for the locked player: a flat Material 3 Expressive tonal circle shown in
- * the top-left corner (see PlayerControls). It auto-hides with the other controls; pressing
- * it restarts the auto-hide timer so it never disappears during a hold.
+ * Unlock button for the locked player, shown in the top-left corner (see PlayerControls).
+ * It uses the same Strong player glass as Prev/Next (PlayerChromeStyle) and obeys
+ * [hideBackground] like every other control: with it on, only the lock glyph is drawn. The
+ * button auto-hides with the other controls; pressing it restarts the auto-hide timer so
+ * it never disappears during a hold.
  *
  * Hold-to-unlock: pressing scales the button to 96% with a light haptic tick and starts a
  * progress ring at 12 o'clock that fills clockwise, linearly, over 800 ms. Releasing early
  * animates the ring back to zero; a quick tap does nothing. On completion a strong haptic
- * fires, the icon switches to the open lock, and [onUnlock] is called once the short success
- * state has been seen, so the parent's fade-out doesn't cut it off.
+ * fires, the circle fills with primaryContainer (the player's "checked" state, as in
+ * PlayerIconButton) while the icon switches to the open lock, and [onUnlock] is called once
+ * the short success state has been seen, so the parent's fade-out doesn't cut it off.
  */
 @Composable
 fun ThumbZoneUnlock(
   onUnlock: () -> Unit,
+  hideBackground: Boolean,
   modifier: Modifier = Modifier,
 ) {
   val haptic = LocalHapticFeedback.current
@@ -92,8 +100,24 @@ fun ThumbZoneUnlock(
   var isUnlocked by remember { mutableStateOf(false) }
   val progress = remember { Animatable(0f) }
 
-  val containerColor = MaterialTheme.colorScheme.secondaryContainer
-  val iconColor = MaterialTheme.colorScheme.onSecondaryContainer
+  // At rest: glass + chrome content colour, like the other player buttons. On success:
+  // primaryContainer / onPrimaryContainer, the same "on" colours PlayerIconButton uses.
+  // The success fill is drawn over the glass and faded in, so the glass itself never changes.
+  val successFillAlpha by animateFloatAsState(
+    targetValue = if (isUnlocked) 1f else 0f,
+    animationSpec = tween(200),
+    label = "UnlockSuccessFill",
+  )
+  val successFill = MaterialTheme.colorScheme.primaryContainer
+  val iconColor by animateColorAsState(
+    targetValue = if (isUnlocked) {
+      MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+      playerChromeContentColor(hideBackground)
+    },
+    animationSpec = tween(200),
+    label = "UnlockIconColor",
+  )
   val ringColor = MaterialTheme.colorScheme.primary
   val trackColor = ringColor.copy(alpha = TRACK_ALPHA)
 
@@ -193,7 +217,10 @@ fun ThumbZoneUnlock(
           scaleX = buttonScale
           scaleY = buttonScale
         }
-        .background(containerColor, CircleShape),
+        // Same Strong glass (fill + rim) as Prev/Next. playerGlass clips to the shape
+        // itself; with hideBackground on it only clips, so nothing is drawn.
+        .playerGlass(CircleShape, hideBackground, GlassWeight.Strong)
+        .background(successFill.copy(alpha = successFillAlpha * successFill.alpha)),
       contentAlignment = Alignment.Center,
     ) {
       AnimatedContent(

@@ -515,6 +515,7 @@ fun PlayerControls(
                 // Bring the normal controls back so the user lands on them after unlocking.
                 viewModel.showControls()
               },
+              hideBackground = hideBackground,
             )
           }
 
