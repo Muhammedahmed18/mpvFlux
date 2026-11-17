@@ -26,7 +26,19 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsTopHeight
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -489,17 +501,39 @@ class PlayerActivity :
     }
     binding.controls.setContent {
       MpvexTheme {
-        PlayerControls(
-          viewModel = viewModel,
-          onBackPress = {
-            saveVideoProgress(isImmediate = true)
-            isUserFinishing = true
-            finish()
-          },
-          modifier = Modifier,
-        )
+        val showStatusBar by remember { playerPreferences.showSystemStatusBar.changes() }
+          .collectAsState(initial = playerPreferences.showSystemStatusBar.get())
+        Box(modifier = Modifier.fillMaxSize()) {
+          // Drawn first so it sits underneath the controls.
+          if (showStatusBar) StatusBarScrim()
+          PlayerControls(
+            viewModel = viewModel,
+            onBackPress = {
+              saveVideoProgress(isImmediate = true)
+              isUserFinishing = true
+              finish()
+            },
+            modifier = Modifier,
+          )
+        }
       }
     }
+  }
+
+  /**
+   * Translucent tint behind the status bar, so its icons stay readable over bright video.
+   * Replaces window.statusBarColor, which is deprecated and ignored on Android 15+ where
+   * edge-to-edge is enforced. Its height follows the status bar inset, so it's zero (and
+   * invisible) while the bar is hidden.
+   */
+  @Composable
+  private fun StatusBarScrim() {
+    Box(
+      modifier = Modifier
+        .fillMaxWidth()
+        .windowInsetsTopHeight(WindowInsets.statusBars)
+        .background(Color(STATUS_BAR_SCRIM_COLOR)),
+    )
   }
 
   private fun setupPipHelper() {
@@ -799,10 +833,7 @@ class PlayerActivity :
     window.attributes.layoutInDisplayCutoutMode =
       WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
 
-    if (playerPreferences.showSystemStatusBar.get()) {
-      window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-      window.statusBarColor = android.graphics.Color.parseColor("#80000000")
-    }
+    // The status bar tint is drawn in Compose (StatusBarScrim in setupPlayerControls).
 
     try {
       @Suppress("DEPRECATION")
@@ -2684,6 +2715,9 @@ class PlayerActivity :
     private const val DEFAULT_PLAYBACK_SPEED = 1.0
     private const val DEFAULT_SUB_SPEED = 1.0
     private const val NOTIFICATION_ARTWORK_SIZE = 256
+
+    // 50% black, the same tint the status bar used to get from window.statusBarColor.
+    private const val STATUS_BAR_SCRIM_COLOR = 0x80000000
 
     // Positions below this (in seconds) are treated as "not started": saved as 0 and not resumed.
     private const val MIN_RESUME_POSITION_SECONDS = 5

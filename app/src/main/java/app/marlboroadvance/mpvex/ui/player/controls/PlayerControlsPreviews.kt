@@ -153,9 +153,11 @@ private fun VerticalSliderPreview() {
       horizontalArrangement = Arrangement.spacedBy(24.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      // Tonal capsule slider at mid-level, plus the tonal unlock button beside it.
+      // Tonal capsule slider at mid-level, plus the unlock button beside it with
+      // "hide button background" off and on.
       VerticalSlider(value = 0.6f, range = 0f..1f, icon = Icons.Default.Lock, label = "60%")
-      Box(modifier = Modifier.width(96.dp)) { ThumbZoneUnlock(onUnlock = {}) }
+      Box(modifier = Modifier.width(96.dp)) { ThumbZoneUnlock(onUnlock = {}, hideBackground = false) }
+      Box(modifier = Modifier.width(96.dp)) { ThumbZoneUnlock(onUnlock = {}, hideBackground = true) }
     }
   }
 }
