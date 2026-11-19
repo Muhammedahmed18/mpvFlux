@@ -22,6 +22,7 @@ fun TopLeftPlayerControlsLandscape(
   onOpenSheet: (Sheets) -> Unit,
   viewModel: PlayerViewModel,
   activity: PlayerActivity,
+  isPlaying: Boolean = true,
 ) {
   // spacing.medium (16dp) between back arrow and title chip — consistent with all other rows
   Row(
@@ -59,6 +60,7 @@ fun TopLeftPlayerControlsLandscape(
       viewModel = viewModel,
       activity = activity,
       modifier = Modifier.weight(1f, fill = false),
+      isPlaying = isPlaying,
     )
   }
 }

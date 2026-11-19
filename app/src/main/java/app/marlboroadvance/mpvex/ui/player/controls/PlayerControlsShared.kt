@@ -122,6 +122,7 @@ fun RenderPlayerButton(
   activity: PlayerActivity,
   modifier: Modifier = Modifier,
   buttonSize: Dp = 48.dp,
+  isPlaying: Boolean = true,
 ) {
   val clickEvent = LocalPlayerButtonsClickEvent.current
   val context    = LocalContext.current
@@ -239,11 +240,16 @@ fun RenderPlayerButton(
           verticalAlignment     = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-          // Latch overflow once per title: ellipsis first, then switch to
-          // marquee. Latch-only (never reset to false here) so the two layout
-          // passes can't oscillate; remember is keyed on the title so a new
-          // (possibly shorter) title re-evaluates from scratch.
-          var isTitleOverflowing by remember(mediaTitle) { mutableStateOf(false) }
+          // Latch overflow per (title, width cap, orientation): ellipsis first, then
+          // marquee. Latch-only within a key so the two layout passes can't oscillate;
+          // remember is keyed on everything that changes the available width, so a
+          // new title, a rotation, or a new cap re-evaluates from scratch and a title
+          // that now fits goes back to stationary text instead of staying in marquee.
+          // The marquee itself only runs while playing; paused keeps the ellipsis.
+          var isTitleOverflowing by remember(mediaTitle, titleMaxWidth, titleConfiguration.orientation) {
+            mutableStateOf(false)
+          }
+          val isMarqueeActive = isTitleOverflowing && isPlaying
 
           // No fixed width cap: the title takes whatever room the top row leaves it
           // (weight with fill = false keeps the capsule snug for short titles).
@@ -252,12 +258,12 @@ fun RenderPlayerButton(
             style = MaterialTheme.typography.titleMediumEmphasized,
             color = playerChromeContentColor(hideBackground),
             maxLines = 1,
-            overflow = if (isTitleOverflowing) TextOverflow.Clip else TextOverflow.Ellipsis,
+            overflow = if (isMarqueeActive) TextOverflow.Clip else TextOverflow.Ellipsis,
             onTextLayout = { if (it.hasVisualOverflow) isTitleOverflowing = true },
             modifier = Modifier
               .weight(1f, fill = false)
               .then(
-                if (isTitleOverflowing) {
+                if (isMarqueeActive) {
                   Modifier.basicMarquee(
                     iterations         = Int.MAX_VALUE,
                     initialDelayMillis = 1500,

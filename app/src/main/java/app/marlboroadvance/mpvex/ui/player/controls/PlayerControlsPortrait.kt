@@ -28,6 +28,7 @@ fun TopPlayerControlsPortrait(
   onOpenSheet: (Sheets) -> Unit,
   viewModel: PlayerViewModel,
   activity: PlayerActivity,
+  isPlaying: Boolean = true,
 ) {
   Column {
     Row(
@@ -68,6 +69,7 @@ fun TopPlayerControlsPortrait(
         viewModel = viewModel,
         activity = activity,
         modifier = Modifier.weight(1f, fill = false),
+        isPlaying = isPlaying,
       )
     }
   }

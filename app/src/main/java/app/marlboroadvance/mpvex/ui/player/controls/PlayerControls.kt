@@ -840,8 +840,8 @@ fun PlayerControls(
               if (isCompactLayout) { width = Dimension.fillToConstraints; end.linkTo(parent.end, endMargin(spacing.large)) } else { width = Dimension.fillToConstraints; end.linkTo(topRightControls.start, spacing.extraSmall) }
             },
           ) {
-            if (isCompactLayout) TopPlayerControlsPortrait(mediaTitle = mediaTitle, hideBackground = hideBackground, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
-            else TopLeftPlayerControlsLandscape(mediaTitle = mediaTitle, hideBackground = hideBackground, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
+            if (isCompactLayout) TopPlayerControlsPortrait(mediaTitle = mediaTitle, hideBackground = hideBackground, isPlaying = paused == false, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
+            else TopLeftPlayerControlsLandscape(mediaTitle = mediaTitle, hideBackground = hideBackground, isPlaying = paused == false, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
           }
 
           AnimatedVisibility(
