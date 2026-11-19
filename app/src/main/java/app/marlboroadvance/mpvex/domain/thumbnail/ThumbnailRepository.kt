@@ -7,6 +7,7 @@ import android.os.Build
 import android.provider.MediaStore
 import android.util.LruCache
 import app.marlboroadvance.mpvex.domain.media.model.Video
+import app.marlboroadvance.mpvex.preferences.ThumbnailPosition
 import app.marlboroadvance.mpvex.utils.media.MediaInfoOps
 import app.marlboroadvance.mpvex.utils.perf.PerfTrace
 import `is`.xyz.mpv.FastThumbnails
@@ -144,7 +145,10 @@ class ThumbnailRepository(
   ): Bitmap? =
     withContext(Dispatchers.IO) {
       PerfTrace.time("ThumbnailRepository", "getThumbnail", thresholdMs = 50) {
-        val key = thumbnailKey(video)
+        // Read the setting once so the cache key, disk file and generated frame all agree
+        // even if the user changes the preference while this request is in flight.
+        val position = currentThumbnailPosition()
+        val key = thumbnailKey(video, position)
 
         if (isNetworkUrl(video.path) && !appearancePreferences.showNetworkThumbnails.get()) {
           return@time null
@@ -158,7 +162,7 @@ class ThumbnailRepository(
         val deferred = ongoingOperations.computeIfAbsent(key) {
           async {
             try {
-              loadFromDisk(video)?.let { thumbnail ->
+              loadFromDisk(video, position)?.let { thumbnail ->
                 memoryCache.put(key, thumbnail)
                 _thumbnailReadyKeys.tryEmit(key)
                 return@async thumbnail
@@ -182,7 +186,7 @@ class ThumbnailRepository(
                 val thumbnail = if (useMediaStoreForVideo.containsKey(videoKey)) {
                   generateWithMediaStore(video, targetWidth, targetHeight)
                 } else {
-                  val fastResult = generateWithFastThumbnails(video, targetWidth, targetHeight)
+                  val fastResult = generateWithFastThumbnails(video, targetWidth, targetHeight, position)
                   if (fastResult == null) {
                     useMediaStoreForVideo[videoKey] = true
                     generateWithMediaStore(video, targetWidth, targetHeight)
@@ -197,7 +201,7 @@ class ThumbnailRepository(
 
                 memoryCache.put(key, thumbnail)
                 _thumbnailReadyKeys.tryEmit(key)
-                writeToDisk(video, thumbnail)
+                writeToDisk(video, thumbnail, position)
 
                 thumbnail
               }
@@ -221,9 +225,10 @@ class ThumbnailRepository(
         return@withContext null
       }
 
-      val key = thumbnailKey(video)
+      val position = currentThumbnailPosition()
+      val key = thumbnailKey(video, position)
       synchronized(memoryCache) { memoryCache.get(key) }?.let { return@withContext it }
-      loadFromDisk(video)?.let { thumbnail ->
+      loadFromDisk(video, position)?.let { thumbnail ->
         synchronized(memoryCache) { memoryCache.put(key, thumbnail) }
         return@withContext thumbnail
       }
@@ -256,18 +261,22 @@ class ThumbnailRepository(
    * of leaving an orphan that lingers until the disk-budget LRU trim evicts it.
    */
   fun removeThumbnail(video: Video) {
-    val key = thumbnailKey(video)
+    useMediaStoreForVideo.remove(videoBaseKey(video))
 
-    ongoingOperations.remove(key)?.cancel()
-    useMediaStoreForVideo.remove(key)
+    // Thumbnails are cached per frame position, so reap every position's copy.
+    ThumbnailPosition.entries.forEach { position ->
+      val key = thumbnailKey(video, position)
 
-    synchronized(memoryCache) {
-      memoryCache.remove(key)
-    }
+      ongoingOperations.remove(key)?.cancel()
 
-    runCatching {
-      val diskFile = File(diskDir, keyToFileName(diskKey(video)))
-      if (diskFile.exists()) diskFile.delete()
+      synchronized(memoryCache) {
+        memoryCache.remove(key)
+      }
+
+      runCatching {
+        val diskFile = File(diskDir, keyToFileName(diskKey(video, position)))
+        if (diskFile.exists()) diskFile.delete()
+      }
     }
   }
 
@@ -367,7 +376,7 @@ class ThumbnailRepository(
       }
     }
 
-    val signature = folderSignature(filteredVideos, widthPx, heightPx)
+    val signature = folderSignature(filteredVideos, widthPx, heightPx, currentThumbnailPosition())
     val state =
       folderStates.compute(folderId) { _, existing ->
         if (existing == null || existing.signature != signature) {
@@ -392,7 +401,17 @@ class ThumbnailRepository(
       }
   }
 
-  fun thumbnailKey(video: Video): String = videoBaseKey(video)
+  /** The configured frame position, read from preferences. */
+  private fun currentThumbnailPosition(): ThumbnailPosition = appearancePreferences.thumbnailPosition.get()
+
+  /**
+   * Cache key for a video's thumbnail. Includes the frame position so changing the setting
+   * yields fresh thumbnails instead of reusing ones taken from a different frame.
+   */
+  fun thumbnailKey(
+    video: Video,
+    position: ThumbnailPosition = currentThumbnailPosition(),
+  ): String = "${videoBaseKey(video)}|pos:${position.name}"
 
   private fun videoBaseKey(video: Video): String {
     if (isNetworkUrl(video.path)) {
@@ -416,17 +435,18 @@ class ThumbnailRepository(
     return "$hex.jpg"
   }
 
-  private fun diskKey(video: Video): String {
-    val baseKey = videoBaseKey(video)
-    return if (isNetworkUrl(video.path)) {
-      "$baseKey|disk|d$diskCacheDimension|v$diskCacheSchema|pos3"
-    } else {
-      "$baseKey|disk|d$diskCacheDimension|v$diskCacheSchema"
-    }
-  }
+  // The position is part of the file name hash, so switching positions never needs a schema
+  // bump or a wipe: other positions' files are simply left to the LRU trim.
+  private fun diskKey(
+    video: Video,
+    position: ThumbnailPosition,
+  ): String = "${videoBaseKey(video)}|disk|d$diskCacheDimension|v$diskCacheSchema|pos:${position.name}"
 
-  private fun loadFromDisk(video: Video): Bitmap? {
-    val diskFile = File(diskDir, keyToFileName(diskKey(video)))
+  private fun loadFromDisk(
+    video: Video,
+    position: ThumbnailPosition,
+  ): Bitmap? {
+    val diskFile = File(diskDir, keyToFileName(diskKey(video, position)))
     if (!diskFile.exists()) return null
     return runCatching {
       val options =
@@ -440,14 +460,14 @@ class ThumbnailRepository(
     }
   }
 
-  private fun writeToDisk(video: Video, bitmap: Bitmap) {
+  private fun writeToDisk(video: Video, bitmap: Bitmap, position: ThumbnailPosition) {
     // Delete-race guard: if the source file was removed while this thumbnail was being
     // generated, don't resurrect an orphan on disk that a folder delete just purged.
     // Network videos have no local file to check, so they're exempt.
     if (!isNetworkUrl(video.path) && video.path.isNotBlank() && !File(video.path).exists()) {
       return
     }
-    val diskFile = File(diskDir, keyToFileName(diskKey(video)))
+    val diskFile = File(diskDir, keyToFileName(diskKey(video, position)))
     runCatching {
       FileOutputStream(diskFile).use { out ->
         bitmap.compress(Bitmap.CompressFormat.JPEG, diskJpegQuality, out)
@@ -528,19 +548,127 @@ class ThumbnailRepository(
     video: Video,
     width: Int,
     height: Int,
+    position: ThumbnailPosition,
   ): Bitmap? {
     return runCatching {
-      val positionSec = preferredPositionSeconds(video)
+      val source = video.path.ifBlank { video.uri.toString() }
       val dimension = maxOf(width, height)
-      val bmp = FastThumbnails.generateAsync(
-        video.path.ifBlank { video.uri.toString() },
-        positionSec,
-        dimension,
-        useHwDec = false
-      ) ?: return@runCatching null
+
+      val raw: Bitmap? = if (position == ThumbnailPosition.Smart && !isNetworkUrl(video.path)) {
+        generateSmartFrame(video, source, dimension)
+      } else {
+        FastThumbnails.generateAsync(
+          source,
+          positionSecondsFor(video, position),
+          dimension,
+          useHwDec = false
+        )
+      }
+      val bmp = raw ?: return@runCatching null
 
       rotateIfNeeded(video, bmp)
     }.getOrNull()
+  }
+
+  /**
+   * Smart mode: sample a few candidate frames and keep the one that looks best. Stops early
+   * as soon as a candidate is clearly good, so most videos only pay for one decode.
+   * Losing candidates are recycled immediately to keep peak memory at two bitmaps.
+   */
+  private suspend fun generateSmartFrame(
+    video: Video,
+    source: String,
+    dimension: Int,
+  ): Bitmap? {
+    var best: Bitmap? = null
+    var bestScore = Double.NEGATIVE_INFINITY
+
+    for (positionSec in smartCandidatePositions(video)) {
+      val candidate = FastThumbnails.generateAsync(
+        source,
+        positionSec,
+        dimension,
+        useHwDec = false
+      ) ?: continue
+
+      val score = frameScore(candidate)
+      if (score > bestScore) {
+        best?.recycle()
+        best = candidate
+        bestScore = score
+      } else {
+        candidate.recycle()
+      }
+
+      if (bestScore >= SMART_GOOD_ENOUGH_SCORE) break
+    }
+    return best
+  }
+
+  /** ~20%, 35% and 50% of the duration; a single frame at 0 when the duration is unknown. */
+  private fun smartCandidatePositions(video: Video): List<Double> {
+    val durationSec = video.duration / 1000.0
+    if (durationSec <= 0.0) return listOf(0.0)
+    val maxPos = max(0.0, durationSec - 0.1)
+    return SMART_CANDIDATE_FRACTIONS
+      .map { (durationSec * it).coerceIn(0.0, maxPos) }
+      .distinct()
+  }
+
+  /**
+   * Cheap quality heuristic on a tiny downscaled copy: contrast (luma standard deviation)
+   * plus edge density rewards detailed frames, while near-black and near-white frames
+   * (fades, title cards, solid colors) are penalised. Higher is better.
+   */
+  private fun frameScore(bitmap: Bitmap): Double =
+    runCatching {
+      val w = SCORE_SAMPLE_WIDTH
+      val h = max(1, SCORE_SAMPLE_WIDTH * bitmap.height / max(1, bitmap.width))
+      val small = Bitmap.createScaledBitmap(bitmap, w, h, true)
+      val pixels = IntArray(w * h)
+      small.getPixels(pixels, 0, w, 0, 0, w, h)
+      if (small !== bitmap) small.recycle()
+
+      val luma = DoubleArray(pixels.size) { i ->
+        val p = pixels[i]
+        0.299 * ((p shr 16) and 0xFF) + 0.587 * ((p shr 8) and 0xFF) + 0.114 * (p and 0xFF)
+      }
+
+      val mean = luma.average()
+      var variance = 0.0
+      for (l in luma) variance += (l - mean) * (l - mean)
+      val stdDev = kotlin.math.sqrt(variance / luma.size)
+
+      var edgeSum = 0.0
+      var edgeCount = 0
+      for (y in 0 until h) {
+        for (x in 1 until w) {
+          edgeSum += kotlin.math.abs(luma[y * w + x] - luma[y * w + x - 1])
+          edgeCount++
+        }
+      }
+      val edge = if (edgeCount > 0) edgeSum / edgeCount else 0.0
+
+      val brightnessPenalty = when {
+        mean < DARK_LUMA_LIMIT -> (DARK_LUMA_LIMIT - mean) * 3.0
+        mean > BRIGHT_LUMA_LIMIT -> (mean - BRIGHT_LUMA_LIMIT) * 3.0
+        else -> 0.0
+      }
+
+      stdDev + 2.0 * edge - brightnessPenalty
+    }.getOrDefault(0.0)
+
+  /** Timestamp for the fixed percentage positions, clamped to the video's length. */
+  private fun positionSecondsFor(
+    video: Video,
+    position: ThumbnailPosition,
+  ): Double {
+    val fraction = position.fraction ?: return preferredPositionSeconds(video)
+    val durationSec = video.duration / 1000.0
+    if (durationSec <= 0.0) {
+      return if (isNetworkUrl(video.path)) 2.0 else 0.0
+    }
+    return (durationSec * fraction).coerceIn(0.0, max(0.0, durationSec - 0.1))
   }
 
   private suspend fun generateWithMediaStore(
@@ -665,9 +793,10 @@ class ThumbnailRepository(
     videos: List<Video>,
     widthPx: Int,
     heightPx: Int,
+    position: ThumbnailPosition,
   ): String {
     val md = MessageDigest.getInstance("MD5")
-    md.update("$widthPx|$heightPx|".toByteArray())
+    md.update("$widthPx|$heightPx|${position.name}|".toByteArray())
     for (v in videos) {
       md.update(v.path.toByteArray())
       md.update("|".toByteArray())
@@ -682,5 +811,12 @@ class ThumbnailRepository(
   private companion object {
     const val MAX_MEMORY_CACHE_KB = 32 * 1024
     const val DISK_TRIM_INTERVAL = 25
+
+    // Smart thumbnail mode
+    val SMART_CANDIDATE_FRACTIONS = listOf(0.20, 0.35, 0.50)
+    const val SMART_GOOD_ENOUGH_SCORE = 40.0
+    const val SCORE_SAMPLE_WIDTH = 64
+    const val DARK_LUMA_LIMIT = 25.0
+    const val BRIGHT_LUMA_LIMIT = 230.0
   }
 }

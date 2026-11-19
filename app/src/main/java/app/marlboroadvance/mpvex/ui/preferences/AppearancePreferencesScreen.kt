@@ -3,7 +3,16 @@ package app.marlboroadvance.mpvex.ui.preferences
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.Role
+import app.marlboroadvance.mpvex.preferences.ThumbnailPosition
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -332,6 +341,77 @@ object AppearancePreferencesScreen : Screen {
                                         )
                                     }
                                 )
+
+                                PreferenceDivider()
+
+                                val thumbnailPosition by preferences.thumbnailPosition.collectAsState()
+                                var showThumbnailPositionDialog by remember { mutableStateOf(false) }
+                                Preference(
+                                    title = {
+                                        Text(
+                                            text = stringResource(R.string.pref_appearance_thumbnail_position_title),
+                                            style = MaterialTheme.typography.titleMediumEmphasized
+                                        )
+                                    },
+                                    summary = {
+                                        Text(
+                                            text = stringResource(
+                                                R.string.pref_appearance_thumbnail_position_summary,
+                                                stringResource(thumbnailPosition.titleRes),
+                                            ),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    onClick = { showThumbnailPositionDialog = true },
+                                )
+
+                                if (showThumbnailPositionDialog) {
+                                    AlertDialog(
+                                        onDismissRequest = { showThumbnailPositionDialog = false },
+                                        title = {
+                                            Text(stringResource(R.string.pref_appearance_thumbnail_position_title))
+                                        },
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    text = stringResource(R.string.pref_appearance_thumbnail_position_dialog_summary),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.padding(bottom = 8.dp),
+                                                )
+                                                ThumbnailPosition.entries.forEach { option ->
+                                                    Row(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .selectable(
+                                                                selected = option == thumbnailPosition,
+                                                                onClick = {
+                                                                    preferences.thumbnailPosition.set(option)
+                                                                    showThumbnailPositionDialog = false
+                                                                },
+                                                                role = Role.RadioButton,
+                                                            )
+                                                            .padding(vertical = 8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                    ) {
+                                                        RadioButton(selected = option == thumbnailPosition, onClick = null)
+                                                        Text(
+                                                            text = stringResource(option.titleRes),
+                                                            style = MaterialTheme.typography.bodyLarge,
+                                                            modifier = Modifier.padding(start = 16.dp),
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        confirmButton = {
+                                            TextButton(onClick = { showThumbnailPositionDialog = false }) {
+                                                Text(stringResource(R.string.generic_cancel))
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
 

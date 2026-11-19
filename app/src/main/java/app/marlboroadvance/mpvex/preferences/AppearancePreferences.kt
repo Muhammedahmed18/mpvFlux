@@ -17,6 +17,21 @@ import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import kotlinx.collections.immutable.ImmutableList
 
+/**
+ * Which frame of a video is used for its thumbnail. [fraction] is the position as a share of
+ * the duration; null means Smart mode, which samples several candidates and picks the best.
+ */
+enum class ThumbnailPosition(
+  val titleRes: Int,
+  val fraction: Double?,
+) {
+  Smart(R.string.thumbnail_position_smart, null),
+  P10(R.string.thumbnail_position_10, 0.10),
+  P25(R.string.thumbnail_position_25, 0.25),
+  P50(R.string.thumbnail_position_50, 0.50),
+  P75(R.string.thumbnail_position_75, 0.75),
+}
+
 class AppearancePreferences(
   preferenceStore: PreferenceStore,
 ) {
@@ -28,6 +43,7 @@ class AppearancePreferences(
   val showUnplayedOldVideoLabel = preferenceStore.getBoolean("show_unplayed_old_video_label", true)
   val unplayedOldVideoDays = preferenceStore.getInt("unplayed_old_video_days", 7)
   val showNetworkThumbnails = preferenceStore.getBoolean("show_network_thumbnails", false)
+  val thumbnailPosition = preferenceStore.getEnum("thumbnail_position", ThumbnailPosition.Smart)
   val seekbarStyle = preferenceStore.getEnum("seekbar_style", SeekbarStyle.Thick)
 
   /** Split the seekbar at chapter starts (OP / Part A / ED…) when the file has chapters. */
