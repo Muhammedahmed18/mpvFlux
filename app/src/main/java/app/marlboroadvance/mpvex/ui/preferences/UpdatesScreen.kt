@@ -23,10 +23,8 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -36,9 +34,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,28 +45,24 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.UpdatePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.update.ReleaseNotes
-import app.marlboroadvance.mpvex.ui.update.formatBytes
 import app.marlboroadvance.mpvex.ui.update.updateErrorText
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
-import app.marlboroadvance.mpvex.update.ApkInstaller
 import app.marlboroadvance.mpvex.update.GitHubReleases
 import app.marlboroadvance.mpvex.update.ReleaseInfo
-import app.marlboroadvance.mpvex.update.UpdateError
 import app.marlboroadvance.mpvex.update.UpdateManager
 import app.marlboroadvance.mpvex.update.UpdateState
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 
 /**
- * Settings → Updates: current status with the main action (check / download / install),
- * release notes, the "Install unknown apps" permission, and updater settings.
+ * Settings → Updates: current status with check action, release notes (when available),
+ * auto-check toggle, last-checked timestamp, and a link to view the release on GitHub.
  */
 @Serializable
 object UpdatesScreen : Screen {
@@ -81,29 +72,7 @@ object UpdatesScreen : Screen {
     val backstack = LocalBackStack.current
     val manager = koinInject<UpdateManager>()
     val preferences = koinInject<UpdatePreferences>()
-    val context = LocalContext.current
     val state by manager.state.collectAsState()
-
-    // Re-read the install permission each time the screen comes back (e.g. from Android's
-    // settings page) and continue an install that was waiting for it.
-    var canInstall by remember { mutableStateOf(ApkInstaller.canInstallPackages(context)) }
-    // Set when "Download and install" sent the user to grant the permission first.
-    var downloadAfterPermission by remember { mutableStateOf(false) }
-    LifecycleResumeEffect(Unit) {
-      canInstall = ApkInstaller.canInstallPackages(context)
-      if (canInstall) {
-        manager.retryAfterPermission()
-        if (downloadAfterPermission) {
-          downloadAfterPermission = false
-          manager.download()
-        }
-      }
-      onPauseOrDispose {}
-    }
-    val openPermissionSettings = {
-      runCatching { context.startActivity(ApkInstaller.unknownAppSourcesIntent(context)) }
-      Unit
-    }
 
     val backgroundColor = rememberPreferenceBackgroundColor()
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -147,12 +116,6 @@ object UpdatesScreen : Screen {
           StatusCard(
             state = state,
             manager = manager,
-            canInstall = canInstall,
-            onAllowInstall = openPermissionSettings,
-            onDownloadNeedsPermission = {
-              downloadAfterPermission = true
-              openPermissionSettings()
-            },
           )
         }
 
@@ -173,17 +136,9 @@ object UpdatesScreen : Screen {
           }
         }
 
-        item { PreferenceSectionHeader(title = stringResource(R.string.update_permission_header)) }
-        item {
-          PreferenceCard {
-            PermissionRow(canInstall = canInstall, onAllow = openPermissionSettings)
-          }
-        }
-
         item { PreferenceSectionHeader(title = stringResource(R.string.update_settings_header)) }
         item {
           val autoCheck by preferences.autoCheck.collectAsState()
-          val includePre by preferences.includePrereleases.collectAsState()
           val lastCheck by preferences.lastCheckTime.collectAsState()
           PreferenceCard {
             SwitchRow(
@@ -191,16 +146,6 @@ object UpdatesScreen : Screen {
               summary = stringResource(R.string.update_auto_check_summary),
               checked = autoCheck,
               onCheckedChange = { preferences.autoCheck.set(it) },
-            )
-            PreferenceDivider()
-            SwitchRow(
-              title = stringResource(R.string.update_beta),
-              summary = stringResource(R.string.update_beta_summary),
-              checked = includePre,
-              onCheckedChange = {
-                preferences.includePrereleases.set(it)
-                manager.check()
-              },
             )
             PreferenceDivider()
             Row(
@@ -222,7 +167,7 @@ object UpdatesScreen : Screen {
               )
               TextButton(
                 onClick = { manager.check() },
-                enabled = manager.isSupported && state !is UpdateState.Checking && state !is UpdateState.Downloading,
+                enabled = manager.isSupported && state !is UpdateState.Checking,
               ) { Text(stringResource(R.string.update_check_now)) }
             }
           }
@@ -237,10 +182,6 @@ object UpdatesScreen : Screen {
 private fun releaseOf(state: UpdateState): ReleaseInfo? =
   when (state) {
     is UpdateState.Available -> state.release
-    is UpdateState.Downloading -> state.release
-    is UpdateState.ReadyToInstall -> state.release
-    is UpdateState.Installing -> state.release
-    is UpdateState.Failed -> state.release
     else -> null
   }
 
@@ -253,9 +194,6 @@ private fun releaseOf(state: UpdateState): ReleaseInfo? =
 private fun StatusCard(
   state: UpdateState,
   manager: UpdateManager,
-  canInstall: Boolean,
-  onAllowInstall: () -> Unit,
-  onDownloadNeedsPermission: () -> Unit,
 ) {
   val highlighted = releaseOf(state) != null
   Surface(
@@ -297,59 +235,22 @@ private fun StatusCard(
           is UpdateState.Available -> {
             StatusIcon(R.drawable.ic_sym_system_update)
             StatusTitle(stringResource(R.string.update_available_title, state.release.version.toString()))
-            ReleaseMeta(state.release, manager.currentVersion)
+            StatusText(stringResource(R.string.update_installed_version, manager.currentVersion))
             Spacer(Modifier.height(4.dp))
+            val context = LocalContext.current
             Button(onClick = {
-              if (canInstall) manager.download() else onDownloadNeedsPermission()
-            }) {
-              Icon(ImageVector.vectorResource(R.drawable.ic_sym_download), null, Modifier.size(18.dp))
-              Spacer(Modifier.width(8.dp))
-              Text(stringResource(R.string.update_download_install))
-            }
-            if (!canInstall) StatusText(stringResource(R.string.update_permission_needed_first))
-            if (!state.skipped) {
-              TextButton(onClick = { manager.skip(state.release) }) {
-                Text(stringResource(R.string.update_skip_version))
+              val url = state.release.htmlUrl.ifBlank {
+                "https://github.com/${GitHubReleases.OWNER}/${GitHubReleases.REPO}/releases"
               }
-            } else {
-              StatusText(stringResource(R.string.update_skipped))
+              try {
+                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+              } catch (_: ActivityNotFoundException) {
+              }
+            }) {
+              Icon(ImageVector.vectorResource(R.drawable.ic_sym_open_in_new), null, Modifier.size(18.dp))
+              Spacer(Modifier.width(8.dp))
+              Text(stringResource(R.string.update_view_on_github))
             }
-          }
-
-          is UpdateState.Downloading -> {
-            StatusIcon(R.drawable.ic_sym_download)
-            StatusTitle(stringResource(R.string.update_downloading, state.release.version.toString()))
-            LinearWavyProgressIndicator(
-              progress = { state.progress },
-              modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-            )
-            StatusText(
-              stringResource(
-                R.string.update_download_progress,
-                (state.progress * 100).toInt(),
-                formatBytes(state.downloaded),
-                formatBytes(state.total),
-              ),
-            )
-            OutlinedButton(onClick = { manager.cancelDownload() }) {
-              Text(stringResource(android.R.string.cancel))
-            }
-          }
-
-          is UpdateState.ReadyToInstall -> {
-            StatusIcon(R.drawable.ic_sym_check_circle_fill)
-            StatusTitle(stringResource(R.string.update_ready_title, state.release.version.toString()))
-            StatusText(stringResource(R.string.update_ready_text))
-            Spacer(Modifier.height(4.dp))
-            Button(onClick = { manager.install() }) {
-              Text(stringResource(R.string.update_install))
-            }
-          }
-
-          is UpdateState.Installing -> {
-            LoadingIndicator(modifier = Modifier.size(48.dp))
-            StatusTitle(stringResource(R.string.update_installing))
-            StatusText(stringResource(R.string.update_installing_text))
           }
 
           is UpdateState.Failed -> {
@@ -357,30 +258,14 @@ private fun StatusCard(
             StatusTitle(stringResource(R.string.update_failed_title))
             StatusText(updateErrorText(state.error))
             Spacer(Modifier.height(4.dp))
-            when {
-              state.error == UpdateError.PermissionMissing -> Button(onClick = onAllowInstall) {
-                Text(stringResource(R.string.update_allow))
-              }
-              state.release != null && state.error != UpdateError.SignatureMismatch -> Button(onClick = { manager.download() }) {
-                Text(stringResource(R.string.update_try_again))
-              }
-              else -> FilledTonalButton(onClick = { manager.check() }) {
-                Text(stringResource(R.string.update_check_now))
-              }
+            FilledTonalButton(onClick = { manager.check() }) {
+              Text(stringResource(R.string.update_check_now))
             }
           }
         }
       }
     }
   }
-}
-
-@Composable
-private fun ReleaseMeta(release: ReleaseInfo, installed: String) {
-  StatusText(
-    stringResource(R.string.update_release_meta, installed, release.abi, formatBytes(release.apkSize)) +
-      if (release.isPreRelease) " · " + stringResource(R.string.update_beta_label) else "",
-  )
 }
 
 @Composable
@@ -411,40 +296,6 @@ private fun StatusText(text: String) {
 // ---------------------------------------------------------------------------
 // Rows
 // ---------------------------------------------------------------------------
-
-@Composable
-private fun PermissionRow(canInstall: Boolean, onAllow: () -> Unit) {
-  Row(
-    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(16.dp),
-  ) {
-    Icon(
-      ImageVector.vectorResource(R.drawable.ic_sym_verified_user),
-      contentDescription = null,
-      tint = if (canInstall) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-    )
-    Column(modifier = Modifier.weight(1f)) {
-      Text(stringResource(R.string.update_permission_title), style = MaterialTheme.typography.titleMediumEmphasized)
-      Text(
-        text = stringResource(
-          if (canInstall) R.string.update_permission_allowed else R.string.update_permission_not_allowed,
-        ),
-        style = MaterialTheme.typography.bodyMedium,
-        color = if (canInstall) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
-      )
-    }
-    if (canInstall) {
-      Icon(
-        ImageVector.vectorResource(R.drawable.ic_sym_check_circle_fill),
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.primary,
-      )
-    } else {
-      FilledTonalButton(onClick = onAllow) { Text(stringResource(R.string.update_allow)) }
-    }
-  }
-}
 
 @Composable
 private fun SwitchRow(
