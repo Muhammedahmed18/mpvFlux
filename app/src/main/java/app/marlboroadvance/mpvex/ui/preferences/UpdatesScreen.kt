@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.text.format.DateUtils
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,11 +13,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -34,6 +39,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -120,18 +128,14 @@ object UpdatesScreen : Screen {
         }
 
         releaseOf(state)?.let { release ->
-          item { PreferenceSectionHeader(title = stringResource(R.string.update_whats_new_in, release.version.toString())) }
-          item {
-            PreferenceCard {
-              ReleaseNotes(
-                markdown = release.notes.ifBlank { stringResource(R.string.update_no_notes) },
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+          if (release.notes.isNotBlank()) {
+            item {
+              PreferenceSectionHeader(
+                title = stringResource(R.string.update_whats_new_in, release.version.toString()),
               )
-              PreferenceDivider()
-              LinkRow(
-                text = stringResource(R.string.update_view_on_github),
-                url = release.htmlUrl.ifBlank { RELEASES_URL },
-              )
+            }
+            item {
+              WhatsNewCard(release = release)
             }
           }
         }
@@ -175,8 +179,6 @@ object UpdatesScreen : Screen {
       }
     }
   }
-
-  private const val RELEASES_URL = "https://github.com/${GitHubReleases.OWNER}/${GitHubReleases.REPO}/releases"
 }
 
 private fun releaseOf(state: UpdateState): ReleaseInfo? =
@@ -184,6 +186,79 @@ private fun releaseOf(state: UpdateState): ReleaseInfo? =
     is UpdateState.Available -> state.release
     else -> null
   }
+
+// ---------------------------------------------------------------------------
+// What's new (preview + full dialog)
+// ---------------------------------------------------------------------------
+
+/** Number of markdown blocks shown in the collapsed preview. */
+private const val PREVIEW_MAX_BLOCKS = 6
+
+@Composable
+private fun WhatsNewCard(release: ReleaseInfo) {
+  var showFull by remember { mutableStateOf(false) }
+
+  PreferenceCard {
+    ReleaseNotes(
+      markdown = release.notes,
+      maxBlocks = PREVIEW_MAX_BLOCKS,
+      modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+    )
+    PreferenceDivider()
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 12.dp, vertical = 4.dp),
+      horizontalArrangement = Arrangement.Start,
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      TextButton(onClick = { showFull = true }) {
+        Text(stringResource(R.string.update_show_all))
+      }
+    }
+  }
+
+  if (showFull) {
+    FullReleaseNotesDialog(
+      version = release.version.toString(),
+      notes = release.notes,
+      onDismiss = { showFull = false },
+    )
+  }
+}
+
+@Composable
+private fun FullReleaseNotesDialog(
+  version: String,
+  notes: String,
+  onDismiss: () -> Unit,
+) {
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = {
+      Text(
+        text = stringResource(R.string.update_whats_new_in, version),
+        style = MaterialTheme.typography.titleLargeEmphasized,
+      )
+    },
+    text = {
+      Box(
+        modifier = Modifier
+          .fillMaxWidth()
+          .heightIn(max = 420.dp)
+          .verticalScroll(rememberScrollState()),
+      ) {
+        ReleaseNotes(markdown = notes)
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = onDismiss) {
+        Text(stringResource(R.string.update_got_it))
+      }
+    },
+  )
+}
+
 
 // ---------------------------------------------------------------------------
 // Status card
@@ -304,7 +379,6 @@ private fun SwitchRow(
   checked: Boolean,
   onCheckedChange: (Boolean) -> Unit,
 ) {
-  // The whole row toggles, and TalkBack reads title + summary + on/off as one switch.
   Row(
     modifier = Modifier
       .fillMaxWidth()
@@ -317,33 +391,5 @@ private fun SwitchRow(
       Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     Switch(checked = checked, onCheckedChange = null)
-  }
-}
-
-@Composable
-private fun LinkRow(text: String, url: String) {
-  val context = LocalContext.current
-  Surface(
-    onClick = {
-      try {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-      } catch (_: ActivityNotFoundException) {
-      }
-    },
-    color = Color.Transparent,
-  ) {
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-      Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
-      Icon(
-        ImageVector.vectorResource(R.drawable.ic_sym_open_in_new),
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.size(20.dp),
-      )
-    }
   }
 }

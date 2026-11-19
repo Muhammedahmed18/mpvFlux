@@ -1072,6 +1072,7 @@
   <string name="update_dialog_title">Update available</string>
   <string name="update_dialog_version">MpvFlux %1$s</string>
   <string name="update_dialog_update">Update</string>
+    <string name="update_show_all">Show all</string>
   <string name="codec_support_section">Device</string>
   <string name="codec_support_row_summary">See which video formats play in hardware</string>
   <string name="codec_support_row_count">%1$d of %2$d formats play in hardware</string>

@@ -116,7 +116,7 @@ class GitHubReleases(
     return ReleaseInfo(
       version = version,
       tag = tagName,
-      notes = body.orEmpty(),
+      notes = body.orEmpty().trim(),
       htmlUrl = htmlUrl,
     )
   }
@@ -128,28 +128,94 @@ class GitHubReleases(
   /**
    * Finds the newest stable release without the API:
    * 1. github.com/<owner>/<repo>/releases/latest redirects to .../releases/tag/<tag>.
+   * 2. The tag page HTML contains the release body in a .markdown-body div.
    */
   private fun fetchFromWebsite(): ReleaseInfo? {
     val base = "https://github.com/$owner/$repo/releases"
 
-    val (tag, releaseUrl) = getPage("$base/latest") { response, _ ->
-      // After the redirect: /<owner>/<repo>/releases/tag/<tag>. Without any release GitHub
-      // redirects to /releases instead, which has no "tag" part.
+    val page = getPage("$base/latest") { response, html ->
       val segments = response.request.url.pathSegments
       val tagIndex = segments.indexOf("tag")
-      if (tagIndex < 0 || tagIndex == segments.lastIndex) return null
-      segments.drop(tagIndex + 1).joinToString("/") to response.request.url.toString()
+      if (tagIndex < 0 || tagIndex == segments.lastIndex) return@getPage null
+      val tag = segments.drop(tagIndex + 1).joinToString("/")
+      val releaseUrl = response.request.url.toString()
+      Triple(tag, releaseUrl, html)
     } ?: return null
-    val version = AppVersion.parse(tag) ?: return null
 
-    // Notes are not reliably available from the fallback HTML without heavier parsing;
-    // leave them empty. The HTML URL is still useful.
+    val (tag, releaseUrl, html) = page
+    val version = AppVersion.parse(tag) ?: return null
+    val notes = extractNotesFromHtml(html)
+
     return ReleaseInfo(
       version = version,
       tag = tag,
-      notes = "",
+      notes = notes,
       htmlUrl = releaseUrl,
     )
+  }
+
+  /**
+   * Pulls the release description from GitHub's rendered HTML and turns common tags
+   * into a lightweight Markdown subset that [ReleaseNotes] can render.
+   */
+  private fun extractNotesFromHtml(html: String): String {
+    val startMarker = """class="markdown-body"""
+    val start = html.indexOf(startMarker)
+    if (start < 0) return ""
+    val contentStart = html.indexOf('>', start) + 1
+    if (contentStart <= 0) return ""
+    // Find the matching close of this div (simple depth walk).
+    var depth = 1
+    var i = contentStart
+    while (i < html.length && depth > 0) {
+      val nextOpen = html.indexOf("<div", i)
+      val nextClose = html.indexOf("</div>", i)
+      when {
+        nextClose < 0 -> break
+        nextOpen in 0 until nextClose -> {
+          depth++
+          i = nextOpen + 4
+        }
+        else -> {
+          depth--
+          if (depth == 0) {
+            val raw = html.substring(contentStart, nextClose)
+            return htmlToMarkdown(raw).trim()
+          }
+          i = nextClose + 6
+        }
+      }
+    }
+    return ""
+  }
+
+  private fun htmlToMarkdown(html: String): String {
+    var s = html
+      .replace("\r\n", "\n")
+      .replace(Regex("<br\\s*/?>", RegexOption.IGNORE_CASE), "\n")
+      .replace(Regex("</p>", RegexOption.IGNORE_CASE), "\n\n")
+      .replace(Regex("</h1>", RegexOption.IGNORE_CASE), "\n\n")
+      .replace(Regex("</h2>", RegexOption.IGNORE_CASE), "\n\n")
+      .replace(Regex("</h3>", RegexOption.IGNORE_CASE), "\n\n")
+      .replace(Regex("</li>", RegexOption.IGNORE_CASE), "\n")
+      .replace(Regex("<li[^>]*>", RegexOption.IGNORE_CASE), "- ")
+      .replace(Regex("<h1[^>]*>", RegexOption.IGNORE_CASE), "# ")
+      .replace(Regex("<h2[^>]*>", RegexOption.IGNORE_CASE), "## ")
+      .replace(Regex("<h3[^>]*>", RegexOption.IGNORE_CASE), "### ")
+      .replace(Regex("<strong[^>]*>|</strong>|<b[^>]*>|</b>", RegexOption.IGNORE_CASE), "**")
+      .replace(Regex("<em[^>]*>|</em>|<i[^>]*>|</i>", RegexOption.IGNORE_CASE), "*")
+      .replace(Regex("<code[^>]*>|</code>", RegexOption.IGNORE_CASE), "`")
+      .replace(Regex("""<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>""", RegexOption.IGNORE_CASE), "[$2]($1)")
+      .replace(Regex("<[^>]+>"), "")
+      .replace("&amp;", "&")
+      .replace("&lt;", "<")
+      .replace("&gt;", ">")
+      .replace("&quot;", "\"")
+      .replace("&#39;", "'")
+      .replace("&nbsp;", " ")
+    // Collapse excessive blank lines
+    s = s.replace(Regex("\n{3,}"), "\n\n")
+    return s.trim()
   }
 
   private inline fun <T> getPage(url: String, read: (okhttp3.Response, String) -> T?): T? {
