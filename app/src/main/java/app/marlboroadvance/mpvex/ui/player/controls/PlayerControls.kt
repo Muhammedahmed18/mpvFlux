@@ -50,6 +50,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -654,8 +655,8 @@ fun PlayerControls(
               // softens the corner further (expressive squeeze) and `heroScale`
               // shrinks the whole button. reduceMotion holds the press squeeze flat
               // but the shape still settles via the spring.
-              val baseCorner = if (isPlaying) 26.dp else 44.dp
-              val targetCorner = if (playPressed && !reduceMotion) baseCorner - 8.dp else baseCorner
+              val baseCorner = if (isPlaying) 17.dp else 28.dp
+              val targetCorner = if (playPressed && !reduceMotion) baseCorner - 5.dp else baseCorner
               val heroCorner by animateDpAsState(
                 targetValue   = targetCorner,
                 animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow),
@@ -669,13 +670,14 @@ fun PlayerControls(
                 // as the same button thinking — not a different component swapping in.
                 Box(
                   modifier = Modifier
-                    .size(88.dp)
+                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .size(56.dp)
                     .clip(CircleShape)
                     .then(if (!hideBackground) Modifier.background(primaryColor) else Modifier),
                   contentAlignment = Alignment.Center,
                 ) {
                   LoadingIndicator(
-                    modifier = Modifier.size(52.dp),
+                    modifier = Modifier.size(34.dp),
                     color    = if (hideBackground) primaryColor else onPrimaryColor,
                   )
                 }
@@ -693,7 +695,8 @@ fun PlayerControls(
                       scaleX = beatScale
                       scaleY = beatScale
                     }
-                    .size(88.dp)
+                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .size(56.dp)
                     .clip(heroShape)
                     .then(if (!hideBackground) Modifier.background(primaryColor) else Modifier)
                     .semantics { contentDescription = playPauseLabel }
@@ -728,7 +731,7 @@ fun PlayerControls(
                       imageVector        = if (playing) ImageVector.vectorResource(R.drawable.ic_sym_pause_fill) else ImageVector.vectorResource(R.drawable.ic_sym_play_arrow_fill),
                       contentDescription = null,
                       tint               = if (hideBackground) primaryColor else onPrimaryColor,
-                      modifier           = Modifier.size(44.dp),
+                      modifier           = Modifier.size(28.dp),
                     )
                   }
                 }
