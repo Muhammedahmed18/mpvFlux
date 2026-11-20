@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
@@ -63,13 +64,11 @@ import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbar
 import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbarDefaults
 import app.marlboroadvance.mpvex.ui.browser.dialogs.AddToPlaylistDialog
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionHaptics
-import app.marlboroadvance.mpvex.ui.browser.selection.playVideosAsQueue
 import app.marlboroadvance.mpvex.ui.browser.sheets.MarkAsHost
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
-import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -122,6 +121,7 @@ object FolderListScreen : Screen {
   @Composable
   private fun MediaStoreFolderListContent() {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val backstack = LocalBackStack.current
 
     val viewModel: FolderListViewModel = viewModel(
@@ -303,31 +303,38 @@ object FolderListScreen : Screen {
           }
         }
 
-        val playLabel = stringResource(R.string.cd_play)
         val markAsLabel = stringResource(R.string.mark_as_title)
         val playlistLabel = stringResource(R.string.add_to_playlist)
         val renameLabel = stringResource(R.string.rename)
         val deleteLabel = stringResource(R.string.delete)
         val hideLabel = stringResource(R.string.selection_hide_folder)
+        val undoLabel = stringResource(R.string.mark_as_undo)
         val markAsIcon = ImageVector.vectorResource(R.drawable.ic_sym_done_all)
 
+        // One folder:  Hide · Add to playlist · Rename · Mark as   [Delete]
+        // Several:     Hide · Add to playlist · Mark as            [Delete]
+        // Matches the video toolbar; Hide takes the slot Copy/Move has there.
         SelectionToolbar(
           visible = selectionManager.isInSelectionMode,
           expanded = toolbarExpanded,
           modifier = Modifier.align(Alignment.BottomCenter),
-          primaryAction =
-            SelectionAction(Icons.Rounded.PlayArrow, playLabel, {
-              withSelectedFolderVideos { videos ->
-                playVideosAsQueue(context, videos)
-                selectionManager.clear()
-              }
-            }),
+          primaryAction = SelectionAction(Icons.Rounded.Delete, deleteLabel, { deleteDialogOpen.value = true }, destructive = true),
           actions = buildList {
             add(
-              SelectionAction(markAsIcon, markAsLabel, {
-                withSelectedFolderVideos { videos ->
-                  folderVideos = videos
-                  markAsOpen.value = true
+              SelectionAction(Icons.Rounded.VisibilityOff, hideLabel, {
+                val folders = selectionManager.getSelectedItems()
+                if (folders.isNotEmpty()) {
+                  val previous = viewModel.hideFolders(folders)
+                  selectionManager.clear()
+                  scope.launch {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    val result = snackbarHostState.showSnackbar(
+                      message = resources.getQuantityString(R.plurals.selection_folders_hidden, folders.size, folders.size),
+                      actionLabel = undoLabel,
+                      duration = SnackbarDuration.Short,
+                    )
+                    if (result == SnackbarResult.ActionPerformed) viewModel.restoreBlacklist(previous)
+                  }
                 }
               }),
             )
@@ -343,26 +350,15 @@ object FolderListScreen : Screen {
             if (selectionManager.isSingleSelection) {
               add(SelectionAction(Icons.Rounded.DriveFileRenameOutline, renameLabel, { renameDialogOpen.value = true }))
             }
-            add(SelectionAction(Icons.Rounded.Delete, deleteLabel, { deleteDialogOpen.value = true }, destructive = true))
-          },
-          overflowActions = listOf(
-            SelectionAction(Icons.Rounded.VisibilityOff, hideLabel, {
-              val folders = selectionManager.getSelectedItems()
-              if (folders.isNotEmpty()) {
-                val previous = viewModel.hideFolders(folders)
-                selectionManager.clear()
-                scope.launch {
-                  snackbarHostState.currentSnackbarData?.dismiss()
-                  val result = snackbarHostState.showSnackbar(
-                    message = context.resources.getQuantityString(R.plurals.selection_folders_hidden, folders.size, folders.size),
-                    actionLabel = context.getString(R.string.mark_as_undo),
-                    duration = SnackbarDuration.Short,
-                  )
-                  if (result == SnackbarResult.ActionPerformed) viewModel.restoreBlacklist(previous)
+            add(
+              SelectionAction(markAsIcon, markAsLabel, {
+                withSelectedFolderVideos { videos ->
+                  folderVideos = videos
+                  markAsOpen.value = true
                 }
-              }
-            }),
-          ),
+              }),
+            )
+          },
         )
       }
 
