@@ -14,11 +14,17 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -31,6 +37,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import app.marlboroadvance.mpvex.R
 
 /**
  * Small Markdown renderer for GitHub release notes: headings, bullet and numbered lists,
@@ -137,6 +144,31 @@ fun ReleaseNotes(
             }
           }
         }
+      }
+    }
+  }
+}
+
+/**
+ * [ReleaseNotes] cut to the first [collapsedBlocks] blocks, with a "Show more" / "Show less"
+ * button when the notes are longer than that.
+ */
+@Composable
+fun CollapsibleReleaseNotes(
+  markdown: String,
+  modifier: Modifier = Modifier,
+  collapsedBlocks: Int = 6,
+) {
+  val total = remember(markdown) { parseBlocks(stripChecksums(markdown)).size }
+  var expanded by rememberSaveable(markdown) { mutableStateOf(false) }
+  Column(modifier = modifier) {
+    ReleaseNotes(
+      markdown = markdown,
+      maxBlocks = if (expanded) Int.MAX_VALUE else collapsedBlocks,
+    )
+    if (total > collapsedBlocks) {
+      TextButton(onClick = { expanded = !expanded }) {
+        Text(stringResource(if (expanded) R.string.update_show_less else R.string.update_show_more))
       }
     }
   }
