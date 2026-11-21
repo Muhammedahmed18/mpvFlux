@@ -477,6 +477,54 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
   }
 }
 
+/**
+ * Migration from version 10 to version 11
+ * Adds the persistent per-folder index (folder_index + folder_video). Existing data is untouched.
+ */
+val MIGRATION_10_11 = object : Migration(10, 11) {
+  override fun migrate(db: SupportSQLiteDatabase) {
+    db.execSQL(
+      """
+      CREATE TABLE IF NOT EXISTS `folder_index` (
+        `path` TEXT NOT NULL,
+        `name` TEXT NOT NULL,
+        `videoCount` INTEGER NOT NULL,
+        `totalSize` INTEGER NOT NULL,
+        `totalDuration` INTEGER NOT NULL,
+        `lastModified` INTEGER NOT NULL,
+        `hasSubfolders` INTEGER NOT NULL,
+        `signature` TEXT NOT NULL,
+        `videosIndexedAt` INTEGER NOT NULL,
+        `lastIndexed` INTEGER NOT NULL,
+        PRIMARY KEY(`path`)
+      )
+      """.trimIndent()
+    )
+    db.execSQL(
+      """
+      CREATE TABLE IF NOT EXISTS `folder_video` (
+        `path` TEXT NOT NULL,
+        `folderPath` TEXT NOT NULL,
+        `mediaId` INTEGER NOT NULL,
+        `uri` TEXT NOT NULL,
+        `displayName` TEXT NOT NULL,
+        `size` INTEGER NOT NULL,
+        `duration` INTEGER NOT NULL,
+        `dateModified` INTEGER NOT NULL,
+        `dateAdded` INTEGER NOT NULL,
+        `mimeType` TEXT NOT NULL,
+        `width` INTEGER NOT NULL,
+        `height` INTEGER NOT NULL,
+        `fps` REAL NOT NULL,
+        `hasEmbeddedSubtitles` INTEGER NOT NULL,
+        `subtitleCodec` TEXT NOT NULL,
+        PRIMARY KEY(`path`)
+      )
+      """.trimIndent()
+    )
+    db.execSQL("CREATE INDEX IF NOT EXISTS `index_folder_video_folderPath` ON `folder_video` (`folderPath`)")
+  }
+}
 
 val DatabaseModule =
   module {
@@ -492,7 +540,7 @@ val DatabaseModule =
       Room
         .databaseBuilder(context, MpvExDatabase::class.java, "mpvex.db")
         .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
         .fallbackToDestructiveMigration(true) // Fallback if migration fails (last resort)
         .build()
     }
@@ -509,6 +557,15 @@ val DatabaseModule =
       app.marlboroadvance.mpvex.database.repository.VideoMetadataCacheRepository(
         context = androidContext(),
         dao = get<MpvExDatabase>().videoMetadataDao(),
+      )
+    }
+
+    single { get<MpvExDatabase>().folderIndexDao() }
+
+    single {
+      app.marlboroadvance.mpvex.utils.storage.FolderIndexRepository(
+        context = androidContext(),
+        dao = get(),
       )
     }
 

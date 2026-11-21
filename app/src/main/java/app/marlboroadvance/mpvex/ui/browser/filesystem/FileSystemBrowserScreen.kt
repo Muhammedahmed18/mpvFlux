@@ -309,7 +309,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
 
   // Permissions
   val permissionState = PermissionUtils.handleStoragePermission(
-    onPermissionGranted = { viewModel.refresh() },
+    onPermissionGranted = { viewModel.revalidate(force = true) },
   )
 
   // Combined NavigationBarState updates for better performance and responsiveness
@@ -399,11 +399,11 @@ fun FileSystemBrowserScreen(path: String? = null) {
     }
   }
 
-  // Listen for lifecycle resume events
+  // Listen for lifecycle resume events: revalidate only this folder (cheap; skipped right after a load)
   DisposableEffect(lifecycleOwner) {
     val observer = LifecycleEventObserver { _, event ->
       if (event == Lifecycle.Event.ON_RESUME) {
-        viewModel.refresh()
+        viewModel.revalidate()
       }
     }
     lifecycleOwner.lifecycle.addObserver(observer)

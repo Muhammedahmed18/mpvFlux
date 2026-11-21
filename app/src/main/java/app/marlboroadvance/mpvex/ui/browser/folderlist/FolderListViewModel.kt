@@ -10,7 +10,7 @@ import app.marlboroadvance.mpvex.repository.MediaFileRepository
 import app.marlboroadvance.mpvex.preferences.FoldersPreferences
 import app.marlboroadvance.mpvex.ui.browser.base.BaseBrowserViewModel
 import app.marlboroadvance.mpvex.utils.media.MediaLibraryEvents
-import app.marlboroadvance.mpvex.utils.storage.FolderViewScanner
+import app.marlboroadvance.mpvex.utils.storage.FolderIndexRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
@@ -26,12 +26,10 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
 
 class FolderListViewModel(
@@ -40,6 +38,10 @@ class FolderListViewModel(
   KoinComponent {
   private val foldersPreferences: FoldersPreferences by inject()
   private val browserPreferences: app.marlboroadvance.mpvex.preferences.BrowserPreferences by inject()
+
+  // The persistent per-folder index (Room) is the cache: it survives restarts and is updated
+  // one folder at a time.
+  private val folderIndex: FolderIndexRepository by inject()
 
   private val _allVideoFolders = MutableStateFlow<List<VideoFolder>>(emptyList())
   private val _videoFolders = MutableStateFlow<List<VideoFolder>>(emptyList())
@@ -55,13 +57,12 @@ class FolderListViewModel(
   val hasCompletedInitialLoad: StateFlow<Boolean> = _hasCompletedInitialLoad.asStateFlow()
 
   private var currentScanJob: Job? = null
-  private var cacheLoadJob: Job? = null
+
+  // Folder/file paths reported by MediaLibraryEvents since the last debounced refresh.
+  private val pendingChangedPaths: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
   companion object {
     private const val TAG = "FolderListViewModel"
-
-    // ignoreUnknownKeys keeps an older on-disk cache readable after the model gains/loses a field.
-    private val folderCacheJson = Json { ignoreUnknownKeys = true }
 
     fun factory(application: Application) =
       object : ViewModelProvider.Factory {
@@ -71,9 +72,27 @@ class FolderListViewModel(
   }
 
   init {
-    loadCachedFolders()
+    // Cached folders show immediately; later index writes (any screen) flow in here too.
+    observeIndex()
 
     observeLibraryChanges()
+
+    // Reconcile quietly in the background when there is already an index (no spinner).
+    // An empty index is seeded once the storage permission callback fires.
+    viewModelScope.launch {
+      if (!folderIndex.isEmpty()) loadVideoFolders()
+    }
+
+    // Drop the old SharedPreferences folder cache; the Room index replaces it.
+    viewModelScope.launch(Dispatchers.IO) {
+      runCatching {
+        getApplication<Application>()
+          .getSharedPreferences("folder_cache", android.content.Context.MODE_PRIVATE)
+          .edit()
+          .remove("folders")
+          .apply()
+      }
+    }
 
     combine(_allVideoFolders, foldersPreferences.blacklistedFolders.changes()) { folders, blacklist ->
       Pair(folders, blacklist)
@@ -85,56 +104,56 @@ class FolderListViewModel(
       .launchIn(viewModelScope)
   }
 
+  private fun observeIndex() {
+    folderIndex
+      .observeVideoFolders()
+      .onEach { folders ->
+        if (folders.isNotEmpty()) {
+          _allVideoFolders.value = folders
+          _hasCompletedInitialLoad.value = true
+        } else if (_hasCompletedInitialLoad.value) {
+          // Index was emptied after a completed load (all videos removed).
+          _allVideoFolders.value = emptyList()
+        }
+      }.launchIn(viewModelScope)
+  }
+
   // debounce(Long) is a @FlowPreview API; opt in at the narrowest scope.
   @OptIn(FlowPreview::class)
   private fun observeLibraryChanges() {
+    MediaLibraryEvents.changedPaths
+      .onEach { pendingChangedPaths += it }
+      .launchIn(viewModelScope)
+
     MediaLibraryEvents.changes
       .debounce(500L)
-      .onEach { loadVideoFolders() }
+      .onEach { onLibraryChanged() }
       .launchIn(viewModelScope)
   }
 
-  private suspend fun applyFiltersAndNotify(allFolders: List<VideoFolder>, blacklist: Set<String>) {
-    val filtered = allFolders.filter { it.path !in blacklist && it.videoCount > 0 }
-    // Skip the disk-cache write when nothing changed. (The StateFlow itself already dedups equal
-    // values, so this guard exists to avoid the redundant SharedPreferences write, not the emission.)
-    if (_videoFolders.value != filtered) {
-      _videoFolders.value = filtered
-      saveFoldersToCache(filtered)
-    }
-  }
-
-  private fun loadCachedFolders() {
-    cacheLoadJob = viewModelScope.launch(Dispatchers.IO) {
-      val prefs = getApplication<Application>().getSharedPreferences("folder_cache", android.content.Context.MODE_PRIVATE)
-      val cachedJson = prefs.getString("folders", null)
-
-      if (cachedJson != null) {
+  private fun onLibraryChanged() {
+    val paths = pendingChangedPaths.toList()
+    pendingChangedPaths.removeAll(paths.toSet())
+    if (paths.isEmpty()) {
+      // Unscoped change: cheap diff of the library, only changed folders are written.
+      loadVideoFolders()
+    } else {
+      // Scoped change: re-read just the affected folders.
+      viewModelScope.launch {
         try {
-          val folders = folderCacheJson.decodeFromString<List<VideoFolder>>(cachedJson)
-          if (folders.isNotEmpty()) {
-            withContext(Dispatchers.Main) {
-              _allVideoFolders.value = folders
-              _hasCompletedInitialLoad.value = true
-            }
-          }
+          folderIndex.refreshAffected(paths)
         } catch (e: Exception) {
-          Log.e(TAG, "Error loading cached folders", e)
+          if (e is CancellationException) throw e
+          Log.e(TAG, "Error refreshing affected folders", e)
         }
       }
     }
   }
 
-  private fun saveFoldersToCache(folders: List<VideoFolder>) {
-    viewModelScope.launch(Dispatchers.IO) {
-      try {
-        val prefs = getApplication<Application>().getSharedPreferences("folder_cache", android.content.Context.MODE_PRIVATE)
-        val json = folderCacheJson.encodeToString(folders)
-        prefs.edit().putString("folders", json).apply()
-      } catch (e: Exception) {
-        Log.e(TAG, "Error saving folders to cache", e)
-      }
-    }
+  private fun applyFiltersAndNotify(allFolders: List<VideoFolder>, blacklist: Set<String>) {
+    val filtered = allFolders.filter { it.path !in blacklist && it.videoCount > 0 }
+    // The StateFlow dedups equal values itself.
+    _videoFolders.value = filtered
   }
 
   override fun refresh() {
@@ -148,25 +167,22 @@ class FolderListViewModel(
   }
 
   fun onPermissionGranted() {
-    performFullSystemScan()
+    // Granted on every launch too: only do the heavy scan when there is nothing indexed yet,
+    // otherwise show the cache and reconcile quietly in the background.
+    viewModelScope.launch {
+      if (folderIndex.isEmpty()) performFullSystemScan() else loadVideoFolders()
+    }
   }
 
   private fun performFullSystemScan() {
-    cacheLoadJob?.cancel()
     currentScanJob?.cancel()
     currentScanJob = viewModelScope.launch {
       _isScanning.value = true
       try {
         withContext(Dispatchers.IO) {
-          MediaFileRepository.clearCache()
-          FolderViewScanner.clearCache()
           triggerMediaScanAwait()
+          folderIndex.reconcileAll()
         }
-
-        val folders = withContext(Dispatchers.IO) {
-          MediaFileRepository.getAllVideoFolders(getApplication())
-        }
-        _allVideoFolders.value = folders
         _hasCompletedInitialLoad.value = true
       } catch (e: Exception) {
         if (e is CancellationException) throw e
@@ -212,16 +228,8 @@ class FolderListViewModel(
       if (newFile.exists()) return@withContext Result.failure(Exception("Exists"))
 
       if (oldFile.renameTo(newFile)) {
-        val updatedFolders = _allVideoFolders.value.map { f ->
-          if (f.path == folder.path) {
-            f.copy(name = newName, path = newFile.absolutePath, bucketId = newFile.absolutePath)
-          } else {
-            f
-          }
-        }
-        withContext(Dispatchers.Main) {
-          _allVideoFolders.value = updatedFolders
-        }
+        // Move the index row so the list updates in place instead of dropping the folder.
+        folderIndex.renameFolder(folder.path, newFile.absolutePath)
         android.media.MediaScannerConnection.scanFile(getApplication(), arrayOf(oldFile.path, newFile.path), null) { _, _ -> }
         Result.success(Unit)
       } else {
@@ -232,8 +240,14 @@ class FolderListViewModel(
     }
   }
 
-  suspend fun deleteFolders(folders: List<VideoFolder>): Pair<Int, Int> =
-    deleteFoldersWithProgress(folders.map { it.path })
+  suspend fun deleteFolders(folders: List<VideoFolder>): Pair<Int, Int> {
+    val result = deleteFoldersWithProgress(folders.map { it.path })
+    // Drop only the folders that are really gone; a partial failure keeps its row.
+    withContext(Dispatchers.IO) {
+      folders.filter { !File(it.path).exists() }.forEach { folderIndex.removeSubtree(it.path) }
+    }
+    return result
+  }
 
   /**
    * All videos in [folders], folder by folder in the given order, each folder's videos in the
@@ -272,23 +286,19 @@ class FolderListViewModel(
     foldersPreferences.blacklistedFolders.set(previous)
   }
 
+  /**
+   * Brings the index up to date in the background. The spinner is only shown while the index is
+   * empty (first launch); otherwise cached folders stay on screen and changes flow in.
+   */
   fun loadVideoFolders(forceShowScanning: Boolean = false) {
-    val hasExistingData = _allVideoFolders.value.isNotEmpty()
-
-    cacheLoadJob?.cancel()
     currentScanJob?.cancel()
     currentScanJob = viewModelScope.launch {
-      if (!hasExistingData) _isLoading.value = true
-      
-      if (!hasExistingData || forceShowScanning) {
-        _isScanning.value = true
-      }
+      val indexEmpty = folderIndex.isEmpty()
+      if (indexEmpty) _isLoading.value = true
+      if (indexEmpty || forceShowScanning) _isScanning.value = true
 
       try {
-        val folders = withContext(Dispatchers.IO) {
-          MediaFileRepository.getAllVideoFolders(getApplication())
-        }
-        _allVideoFolders.value = folders
+        withContext(Dispatchers.IO) { folderIndex.reconcileAll() }
         _hasCompletedInitialLoad.value = true
       } catch (e: Exception) {
         if (e is CancellationException) throw e

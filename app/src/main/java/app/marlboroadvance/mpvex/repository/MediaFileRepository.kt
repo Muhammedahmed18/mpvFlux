@@ -9,12 +9,13 @@ import app.marlboroadvance.mpvex.domain.browser.FileSystemItem
 import app.marlboroadvance.mpvex.domain.browser.PathComponent
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
-import app.marlboroadvance.mpvex.utils.storage.FolderViewScanner
+import app.marlboroadvance.mpvex.utils.storage.FolderIndexRepository
 import app.marlboroadvance.mpvex.utils.storage.TreeViewScanner
 import app.marlboroadvance.mpvex.utils.storage.VideoScanUtils
 import app.marlboroadvance.mpvex.utils.storage.StorageVolumeUtils
 import app.marlboroadvance.mpvex.utils.storage.FileTypeUtils
 import app.marlboroadvance.mpvex.utils.media.MediaInfoOps
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -38,13 +39,13 @@ object MediaFileRepository {
   private const val TAG = "MediaFileRepository"
 
   /**
-   * Clears all caches
-   * Call this when media library changes are detected or when forcing a hard refresh
+   * Kept for source compatibility. Folder data now lives in the persistent per-folder index
+   * ([FolderIndexRepository]); there is no global in-memory cache to drop, and refreshing is
+   * done per folder instead of by clearing everything.
    */
+  @Suppress("unused")
   fun clearCache() {
-    Log.d(TAG, "Clearing all caches (FolderViewScanner + TreeViewScanner)")
-    FolderViewScanner.clearCache()
-    TreeViewScanner.clearCache()
+    Log.d(TAG, "clearCache() is a no-op; folders are refreshed individually")
   }
 
   // =============================================================================
@@ -59,7 +60,7 @@ object MediaFileRepository {
   ): List<VideoFolder> =
     withContext(Dispatchers.IO) {
       try {
-        FolderViewScanner.getAllVideoFolders(context)
+        FolderIndexRepository.get().getVideoFolders()
       } catch (e: Exception) {
         Log.e(TAG, "Error scanning for video folders", e)
         emptyList()
@@ -99,7 +100,16 @@ object MediaFileRepository {
   ): List<Video> =
     withContext(Dispatchers.IO) {
       try {
-        VideoScanUtils.getVideosInFolder(context, bucketId)
+        val videos = VideoScanUtils.getVideosInFolder(context, bucketId)
+        // Keep the persistent index in step with what was just read.
+        try {
+          FolderIndexRepository.get().updateFolderVideos(bucketId, videos)
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          Log.w(TAG, "Index update failed for $bucketId", e)
+        }
+        videos
       } catch (e: Exception) {
         Log.e(TAG, "Error getting videos for bucket $bucketId", e)
         emptyList()
@@ -295,10 +305,31 @@ object MediaFileRepository {
   }
 
   /**
-   * Scans a directory and returns its contents (folders and video files)
-   * OPTIMIZED: Uses UnifiedMediaScanner for fast, consistent results
+   * Instant, index-only view of a directory: child folders (recursive counts) and the folder's
+   * direct videos, read from the persistent index. No MediaStore or filesystem scan.
+   * Returns null when this folder's videos have not been indexed yet.
+   */
+  suspend fun scanDirectoryCached(
+    context: Context,
+    path: String,
+  ): List<FileSystemItem>? =
+    withContext(Dispatchers.IO) {
+      try {
+        val videos = FolderIndexRepository.get().getCachedVideos(path) ?: return@withContext null
+        val folders = TreeViewScanner.getFoldersInDirectory(context, path)
+        buildItems(folders, videos)
+      } catch (e: Exception) {
+        Log.w(TAG, "Cached directory read failed: $path", e)
+        null
+      }
+    }
+
+  /**
+   * Scans a directory and returns its contents (folders and video files).
+   * Child folders come from the persistent index; videos are read live from MediaStore (with
+   * filesystem fallback) and written back to the index when they changed.
    * @param showAllFileTypes If true, shows all files. If false, shows only videos.
-   * @param useFastCount If true, uses fast shallow counting (immediate children only). If false, uses deep recursive counting.
+   * @param useFastCount Unused, kept for source compatibility.
    */
   suspend fun scanDirectory(
     context: Context,
@@ -312,6 +343,7 @@ object MediaFileRepository {
 
         // Validation checks
         if (!directory.exists()) {
+          FolderIndexRepository.get().removeSubtree(path)
           return@withContext Result.failure(Exception("Directory does not exist: $path"))
         }
 
@@ -323,38 +355,23 @@ object MediaFileRepository {
           return@withContext Result.failure(Exception("Path is not a directory: $path"))
         }
 
-        val items = mutableListOf<FileSystemItem>()
-
-        // Get folders using TreeViewScanner (instant from cache)
-        val folders = TreeViewScanner.getFoldersInDirectory(context, path)
-        folders.forEach { folderData ->
-          items.add(
-            FileSystemItem.Folder(
-              name = folderData.name,
-              path = folderData.path,
-              lastModified = File(folderData.path).lastModified(),
-              videoCount = folderData.videoCount,
-              totalSize = folderData.totalSize,
-              totalDuration = folderData.totalDuration,
-              hasSubfolders = folderData.hasSubfolders,
-            ),
-          )
-        }
-
-        // Get videos in current directory
+        // Live videos of this folder only, then persist them if they changed.
         val videos = VideoScanUtils.getVideosInFolder(context, path)
-        videos.forEach { video ->
-          items.add(
-            FileSystemItem.VideoFile(
-              name = video.displayName,
-              path = video.path,
-              lastModified = File(video.path).lastModified(),
-              video = video,
-            ),
-          )
+        try {
+          FolderIndexRepository.get().updateFolderVideos(path, videos)
+        } catch (e: CancellationException) {
+          throw e
+        } catch (e: Exception) {
+          Log.w(TAG, "Index update failed for $path", e)
         }
 
-        Result.success(items)
+        // Child folders from the index (recursive counts).
+        val folders = TreeViewScanner.getFoldersInDirectory(context, path)
+
+        Result.success(buildItems(folders, videos))
+      } catch (e: CancellationException) {
+        // A newer load replaced this one: don't report it as a scan failure.
+        throw e
       } catch (e: SecurityException) {
         Log.e(TAG, "Security exception scanning directory: $path", e)
         Result.failure(Exception("Permission denied: ${e.message}"))
@@ -363,6 +380,37 @@ object MediaFileRepository {
         Result.failure(e)
       }
     }
+
+  private fun buildItems(
+    folders: List<TreeViewScanner.FolderData>,
+    videos: List<Video>,
+  ): List<FileSystemItem> {
+    val items = ArrayList<FileSystemItem>(folders.size + videos.size)
+    folders.forEach { folderData ->
+      items.add(
+        FileSystemItem.Folder(
+          name = folderData.name,
+          path = folderData.path,
+          lastModified = File(folderData.path).lastModified(),
+          videoCount = folderData.videoCount,
+          totalSize = folderData.totalSize,
+          totalDuration = folderData.totalDuration,
+          hasSubfolders = folderData.hasSubfolders,
+        ),
+      )
+    }
+    videos.forEach { video ->
+      items.add(
+        FileSystemItem.VideoFile(
+          name = video.displayName,
+          path = video.path,
+          lastModified = File(video.path).lastModified(),
+          video = video,
+        ),
+      )
+    }
+    return items
+  }
 
   /**
    * Gets all storage volume roots with recursive video counts

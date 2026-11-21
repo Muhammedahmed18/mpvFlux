@@ -4,12 +4,15 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import app.marlboroadvance.mpvex.database.converters.NetworkProtocolConverter
+import app.marlboroadvance.mpvex.database.dao.FolderIndexDao
 import app.marlboroadvance.mpvex.database.dao.NetworkConnectionDao
 import app.marlboroadvance.mpvex.database.dao.PlaybackStateDao
 import app.marlboroadvance.mpvex.database.dao.PlaylistDao
 import app.marlboroadvance.mpvex.database.dao.RecentlyPlayedDao
 import app.marlboroadvance.mpvex.database.dao.VideoMarkDao
 import app.marlboroadvance.mpvex.database.dao.VideoMetadataDao
+import app.marlboroadvance.mpvex.database.entities.FolderIndexEntity
+import app.marlboroadvance.mpvex.database.entities.FolderVideoEntity
 import app.marlboroadvance.mpvex.database.entities.PlaybackStateEntity
 import app.marlboroadvance.mpvex.database.entities.PlaylistEntity
 import app.marlboroadvance.mpvex.database.entities.PlaylistItemEntity
@@ -27,8 +30,10 @@ import app.marlboroadvance.mpvex.domain.network.NetworkConnection
     PlaylistEntity::class,
     PlaylistItemEntity::class,
     VideoMarkEntity::class,
+    FolderIndexEntity::class,
+    FolderVideoEntity::class,
   ],
-  version = 10,
+  version = 11,
   exportSchema = true,
 )
 @TypeConverters(NetworkProtocolConverter::class)
@@ -44,4 +49,6 @@ abstract class MpvExDatabase : RoomDatabase() {
   abstract fun playlistDao(): PlaylistDao
 
   abstract fun videoMarkDao(): VideoMarkDao
+
+  abstract fun folderIndexDao(): FolderIndexDao
 }

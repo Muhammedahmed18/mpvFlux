@@ -17,9 +17,11 @@ import app.marlboroadvance.mpvex.utils.media.MediaLibraryEvents
 import app.marlboroadvance.mpvex.utils.media.MetadataRetrieval
 import app.marlboroadvance.mpvex.utils.media.PlaybackProgressEvents
 import app.marlboroadvance.mpvex.utils.sort.SortUtils
-import app.marlboroadvance.mpvex.utils.storage.FolderViewScanner
-import app.marlboroadvance.mpvex.utils.storage.TreeViewScanner
+import app.marlboroadvance.mpvex.utils.storage.FolderIndexRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -47,6 +49,13 @@ class FileSystemBrowserViewModel(
   // playbackStateRepository is provided by BaseBrowserViewModel
   private val browserPreferences: BrowserPreferences by inject()
   private val appearancePreferences: app.marlboroadvance.mpvex.preferences.AppearancePreferences by inject()
+
+  // Persistent per-folder index (Room): directories render from it first, then revalidate live.
+  private val folderIndex: FolderIndexRepository by inject()
+
+  // The directory load currently running (a newer load cancels it) and when the last one ended.
+  private var loadJob: Job? = null
+  private var lastLoadFinishedAt = 0L
 
   // Special marker for "show storage volumes" mode
   // Similar to Fossify's root/home folder detection
@@ -99,6 +108,7 @@ class FileSystemBrowserViewModel(
 
   companion object {
     private const val TAG = "FileSystemBrowserVM"
+    private const val RESUME_REVALIDATE_MIN_INTERVAL_MS = 2_000L
 
     fun factory(
       application: Application,
@@ -137,11 +147,10 @@ class FileSystemBrowserViewModel(
     }
 
     // Refresh on global media library changes
-    // Similar to Fossify's media scan completion listener
+    // Similar to Fossify's media scan completion listener.
+    // Only this folder is revalidated; nothing global is cleared or rescanned.
     viewModelScope.launch(Dispatchers.IO) {
       MediaLibraryEvents.changes.collectLatest {
-        // Clear cache when media library changes
-        MediaFileRepository.clearCache()
         loadCurrentDirectory()
       }
     }
@@ -173,8 +182,8 @@ class FileSystemBrowserViewModel(
   }
 
   /**
-   * Refresh current directory
-   * Equivalent to Fossify's refreshFragment() callback
+   * Refresh current directory (pull-to-refresh, after file operations).
+   * Rescans only this folder; the rest of the index is untouched.
    */
   override fun refresh() {
     Log.d(TAG, "Refreshing current directory: ${_currentPath.value}")
@@ -184,15 +193,22 @@ class FileSystemBrowserViewModel(
       _isLoading.value = true
     }
     
-    // Clear all caches to force fresh data from filesystem
-    MediaFileRepository.clearCache()
-    FolderViewScanner.clearCache()
-    TreeViewScanner.clearCache()
-    
     // Trigger media scan in background
     triggerMediaScan()
     
     // Reload directory immediately without artificial delay
+    loadCurrentDirectory()
+  }
+
+  /**
+   * Cheap revalidation for screen resume: skipped while a load is running or just finished,
+   * so opening a folder doesn't load it twice. [force] always reloads (e.g. permission granted).
+   */
+  fun revalidate(force: Boolean = false) {
+    if (!force) {
+      if (loadJob?.isActive == true) return
+      if (System.currentTimeMillis() - lastLoadFinishedAt < RESUME_REVALIDATE_MIN_INTERVAL_MS) return
+    }
     loadCurrentDirectory()
   }
   
@@ -254,8 +270,14 @@ class FileSystemBrowserViewModel(
    * Delete folders (and their contents) file-by-file with live progress, cancellation, and full
    * trace cleanup. Shared with the album view via [deleteFoldersWithProgress] in the base ViewModel.
    */
-  suspend fun deleteFolders(folders: List<FileSystemItem.Folder>): Pair<Int, Int> =
-    deleteFoldersWithProgress(folders.map { it.path })
+  suspend fun deleteFolders(folders: List<FileSystemItem.Folder>): Pair<Int, Int> {
+    val result = deleteFoldersWithProgress(folders.map { it.path })
+    // Drop only folders that are really gone from the index; a partial failure keeps its row.
+    withContext(Dispatchers.IO) {
+      folders.filter { !File(it.path).exists() }.forEach { folderIndex.removeSubtree(it.path) }
+    }
+    return result
+  }
 
   /**
    * Delete videos - delegates to base class implementation
@@ -291,6 +313,9 @@ class FileSystemBrowserViewModel(
             }
         }
         _unsortedItems.value = updatedItems
+
+        // Move the folder's index row so lists don't lose it until the next reconcile
+        folderIndex.renameFolder(oldFile.absolutePath, newFile.absolutePath)
 
         // Notify MediaStore about both paths to trigger indexing updates
         android.media.MediaScannerConnection.scanFile(
@@ -348,7 +373,9 @@ class FileSystemBrowserViewModel(
    * Main loading logic based on Fossify's getItems() and getRegularItemsOf()
    */
   private fun loadCurrentDirectory() {
-    viewModelScope.launch(Dispatchers.IO) {
+    loadJob?.cancel()
+    loadJob = viewModelScope.launch(Dispatchers.IO) {
+      val thisJob = currentCoroutineContext()[Job]
       _isLoading.value = true
       _error.value = null
 
@@ -368,6 +395,15 @@ class FileSystemBrowserViewModel(
           // Similar to Fossify's Breadcrumbs.setBreadcrumb()
           _breadcrumbs.value = MediaFileRepository.getPathComponents(path)
           Log.d(TAG, "Breadcrumbs updated: ${_breadcrumbs.value.size} components")
+
+          // Show the persisted index first (no MediaStore/filesystem work), so an already
+          // visited folder appears instantly. The live scan below then revalidates it.
+          if (_unsortedItems.value.isEmpty()) {
+            MediaFileRepository.scanDirectoryCached(getApplication(), path)?.let { cachedItems ->
+              _unsortedItems.value = cachedItems
+              loadPlaybackInfo(cachedItems)
+            }
+          }
 
           // Get hidden files preference
           // Scan directory - equivalent to Fossify's getRegularItemsOf()
@@ -447,11 +483,16 @@ class FileSystemBrowserViewModel(
             }
         }
       } catch (e: Exception) {
+        if (e is CancellationException) throw e
         _error.value = e.message
         _unsortedItems.value = emptyList()
         Log.e(TAG, "Exception loading directory", e)
       } finally {
-        _isLoading.value = false
+        // A newer load may have replaced this one; it owns the loading flag then.
+        if (loadJob === thisJob || loadJob == null) {
+          _isLoading.value = false
+          lastLoadFinishedAt = System.currentTimeMillis()
+        }
       }
     }
   }

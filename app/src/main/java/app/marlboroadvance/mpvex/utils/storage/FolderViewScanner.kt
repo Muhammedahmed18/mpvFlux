@@ -1,42 +1,35 @@
 package app.marlboroadvance.mpvex.utils.storage
 
 import android.content.Context
-import android.net.Uri
-import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
-import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
-import app.marlboroadvance.mpvex.utils.perf.PerfTrace
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.koin.java.KoinJavaComponent
 import java.io.File
 import java.util.Locale
 
 /**
- * Folder View Scanner - Optimized for folder list view
- * 
- * Only shows folders with immediate video children (not recursive)
- * Fast scanning using MediaStore + filesystem fallback
+ * Folder View Scanner - library-wide scan used to SEED / RECONCILE the persistent folder index.
+ *
+ * Opening a folder never calls this; only [FolderIndexRepository.seedIfEmpty] and
+ * [FolderIndexRepository.reconcileAll] do. Results are not cached here any more: the
+ * persistent index in Room is the cache.
  */
 object FolderViewScanner {
     private const val TAG = "FolderViewScanner"
-    
-    // Smart cache with short TTL (10 seconds)
-    private var cachedFolderList: List<VideoFolder>? = null
-    private var cacheTimestamp: Long = 0
-    private const val CACHE_TTL_MS = 300_000L // 5 minutes for fewer rescans
-    
+
     /**
-     * Clear cache (call when media library changes)
+     * Kept for source compatibility. There is no in-memory cache to clear any more;
+     * use [FolderIndexRepository] to invalidate folders.
      */
+    @Suppress("unused")
     fun clearCache() {
-        cachedFolderList = null
-        cacheTimestamp = 0
     }
-    
+
     /**
-     * Folder metadata
+     * Folder metadata (direct children only)
      */
     data class FolderData(
         val path: String,
@@ -47,7 +40,7 @@ object FolderViewScanner {
         val lastModified: Long,
         val hasSubfolders: Boolean = false
     )
-    
+
     /**
      * Helper data class for folder stats during scanning
      */
@@ -57,60 +50,35 @@ object FolderViewScanner {
         var duration: Long = 0L,
         var lastModified: Long = 0L
     )
-    
+
     /**
-     * Get all video folders for folder list view
-     * Only shows folders with immediate video children (not recursive)
+     * Get all video folders for folder list view. Served from the persistent index
+     * (seeded on first use). Kept for source compatibility.
      */
-    suspend fun getAllVideoFolders(context: Context): List<VideoFolder> = withContext(Dispatchers.IO) {
-        val now = System.currentTimeMillis()
-        
-        // Return cached data if still valid
-        cachedFolderList?.let { cached ->
-            if (now - cacheTimestamp < CACHE_TTL_MS) {
-                return@withContext cached
-            }
-        }
-        
-        PerfTrace.section("FolderViewScanner.getAllVideoFolders") {
-            PerfTrace.time(TAG, "getAllVideoFolders", thresholdMs = 50) {
-                val allFolders = mutableMapOf<String, FolderData>()
+    suspend fun getAllVideoFolders(context: Context): List<VideoFolder> =
+        KoinJavaComponent.get<FolderIndexRepository>(FolderIndexRepository::class.java).getVideoFolders()
 
-                PerfTrace.time(TAG, "scanMediaStoreImmediateChildren", thresholdMs = 50) {
-                    scanMediaStoreImmediateChildren(context, allFolders)
-                }
-
-                PerfTrace.time(TAG, "scanExternalVolumes", thresholdMs = 50) {
-                    scanExternalVolumes(context, allFolders)
-                }
-
-                val result = allFolders.values.map { data ->
-                    VideoFolder(
-                        bucketId = data.path,
-                        name = data.name,
-                        path = data.path,
-                        videoCount = data.videoCount,
-                        totalSize = data.totalSize,
-                        totalDuration = data.totalDuration,
-                        lastModified = data.lastModified
-                    )
-                }.sortedBy { it.name.lowercase(Locale.getDefault()) }
-
-                cachedFolderList = result
-                cacheTimestamp = now
-
-                result
-            }
-        }
-    }
-    
     /**
-     * Scan MediaStore for all videos and build folder map (immediate children only)
+     * Library-wide scan: MediaStore plus a filesystem walk of external volumes.
+     * Returns null when MediaStore could not be queried, so callers never treat a
+     * failed scan as "the library is empty".
+     */
+    suspend fun scanAllFolders(context: Context): Map<String, FolderData>? = withContext(Dispatchers.IO) {
+        val allFolders = mutableMapOf<String, FolderData>()
+        val mediaStoreOk = scanMediaStoreImmediateChildren(context, allFolders)
+        if (!mediaStoreOk) return@withContext null
+        scanExternalVolumes(context, allFolders)
+        allFolders
+    }
+
+    /**
+     * Scan MediaStore for all videos and build folder map (immediate children only).
+     * Returns false if the query failed.
      */
     private fun scanMediaStoreImmediateChildren(
         context: Context,
         folders: MutableMap<String, FolderData>
-    ) {
+    ): Boolean {
         val projection = arrayOf(
             MediaStore.Video.Media.DATA,
             MediaStore.Video.Media.SIZE,
@@ -136,7 +104,7 @@ object FolderViewScanner {
                 val sep = File.separatorChar
 
                 while (cursor.moveToNext()) {
-                    val videoPath = cursor.getString(dataColumn)
+                    val videoPath = cursor.getString(dataColumn) ?: continue
                     val file = File(videoPath)
                     
                     if (!file.exists()) continue
@@ -175,8 +143,10 @@ object FolderViewScanner {
                     )
                 }
             }
+            return true
         } catch (e: Exception) {
             Log.e(TAG, "MediaStore scan error", e)
+            return false
         }
     }
     
