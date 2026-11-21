@@ -269,6 +269,16 @@ class PlayerActivity :
   /** Increases with every load so a slow, older load can't unpause a newer one. */
   @Volatile private var loadGeneration = 0
 
+  /**
+   * True once mpv has reported the pause that [beginFileLoad] requested. Until then a
+   * "pause=false" event is mpv's own initial/echo report of the previous state, not the
+   * user pressing play, so it must not block the automatic unpause.
+   */
+  @Volatile private var loadHoldConfirmed = false
+
+  /** Generation of the last load that [finishFileLoad] already completed (makes it idempotent). */
+  @Volatile private var finishedGeneration = -1
+
   /** Saved state for the file being opened, read from the database while mpv opens it. */
   @Volatile private var prefetchedState: Pair<String, Deferred<PlaybackStateEntity?>>? = null
 
@@ -1373,10 +1383,17 @@ class PlayerActivity :
     if (lastPauseState == isPaused) return
     lastPauseState = isPaused
 
-    // While a file is loading it is held paused by beginFileLoad(). A play event in that
-    // window comes from the user (UI, notification, headset), so finishFileLoad() leaves
-    // the pause state alone afterwards.
-    if (loadingFile && !isPaused) pauseChangedDuringLoad = true
+    // While a file is loading it is held paused by beginFileLoad(). Once that hold has been
+    // reported by mpv, a play event in the window comes from the user (UI, notification,
+    // headset), so finishFileLoad() leaves the pause state alone afterwards. A play event
+    // before the hold is confirmed is mpv's own initial report and is ignored.
+    if (loadingFile) {
+      if (isPaused) {
+        loadHoldConfirmed = true
+      } else if (loadHoldConfirmed) {
+        pauseChangedDuringLoad = true
+      }
+    }
 
     if (isPaused) {
       // No save while loading: the position belongs to the previous file (or is 0) and
@@ -1571,7 +1588,17 @@ class PlayerActivity :
 
     setIntentExtras(intent.extras)
 
+    // A file mpv opened by itself (e.g. next m3u entry) never went through beginFileLoad();
+    // give it its own generation so finishFileLoad() still runs once for it.
+    if (!loadingFile) loadGeneration++
     val generation = loadGeneration
+
+    // Safety net: if restoring state or selecting tracks hangs, still start playback.
+    lifecycleScope.launch {
+      kotlinx.coroutines.delay(LOAD_WATCHDOG_MS)
+      finishFileLoad(generation)
+    }
+
     lifecycleScope.launch(Dispatchers.IO) {
       val hasState = try {
         viewModel.subtitlesTurnedOffByUser = false
@@ -1863,6 +1890,11 @@ class PlayerActivity :
     loadGeneration++
     loadingFile = true
     pauseChangedDuringLoad = false
+    // If mpv is already paused, setting pause=true again fires no event, so the hold is
+    // confirmed right away; otherwise it is confirmed by the pause=true event.
+    val alreadyPaused = mpvInitialized &&
+      runCatching { MPVLib.getPropertyBoolean("pause") }.getOrNull() == true
+    loadHoldConfirmed = alreadyPaused
     if (mpvInitialized) {
       runCatching { MPVLib.setPropertyBoolean("pause", true) }
         .onFailure { e -> Log.e(TAG, "Failed to hold playback paused while loading", e) }
@@ -1888,11 +1920,19 @@ class PlayerActivity :
    */
   private fun finishFileLoad(generation: Int) {
     if (generation != loadGeneration) return
+    // Called by both the normal path and the watchdog; only the first call per load acts.
+    if (generation == finishedGeneration) return
+    finishedGeneration = generation
     val heldByUs = loadingFile
     loadingFile = false
     prefetchedState = null
     if (isDestroyed || !mpvInitialized || player.isExiting) return
-    if (!heldByUs || !pauseChangedDuringLoad) viewModel.unpause()
+    if (!heldByUs || !pauseChangedDuringLoad) {
+      Log.d(TAG, "finishFileLoad: starting playback (gen=$generation)")
+      viewModel.unpause()
+    } else {
+      Log.d(TAG, "finishFileLoad: pause changed during load, leaving state alone (gen=$generation)")
+    }
   }
 
   private suspend fun loadVideoPlaybackState(): Boolean {
@@ -2808,6 +2848,9 @@ class PlayerActivity :
     private const val DEFAULT_PLAYBACK_SPEED = 1.0
     private const val DEFAULT_SUB_SPEED = 1.0
     private const val NOTIFICATION_ARTWORK_SIZE = 256
+
+    // Longest a file is held paused while saved state and tracks are applied.
+    private const val LOAD_WATCHDOG_MS = 3000L
 
     // 50% black, the same tint the status bar used to get from window.statusBarColor.
     private const val STATUS_BAR_SCRIM_COLOR = 0x80000000
