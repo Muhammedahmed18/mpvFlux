@@ -93,6 +93,7 @@ import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.MarkAsHost
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
+import app.marlboroadvance.mpvex.LocalSafeBack
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.utils.media.CopyPasteOps
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
@@ -118,6 +119,7 @@ data class VideoListScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val backstack = LocalBackStack.current
+    val safeBack = LocalSafeBack.current
     val browserPreferences = koinInject<BrowserPreferences>()
     val appearancePreferences = koinInject<AppearancePreferences>()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -305,7 +307,7 @@ data class VideoListScreen(
             if (selectionManager.isInSelectionMode) {
               selectionManager.clear()
             } else {
-              backstack.removeLastOrNull()
+              safeBack()
             }
           },
           onCancelSelection = { selectionManager.clear() },

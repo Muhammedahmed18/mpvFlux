@@ -1,8 +1,10 @@
 package app.marlboroadvance.mpvex
 
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -23,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,6 +53,15 @@ import org.koin.android.ext.android.inject
 
 // Added correct import for Navigation3 Scene
 import androidx.navigation3.scene.Scene
+
+/** Minimum gap between handled back presses (matches the 220 ms navigation transition). */
+private const val BACK_DEBOUNCE_MS = 220L
+
+/**
+ * Guarded "go back": pops one screen, never the root; at root moves the app to the background.
+ * Use this instead of calling removeLastOrNull() on the back stack.
+ */
+val LocalSafeBack = compositionLocalOf<() -> Unit> { {} }
 
 /**
  * Main entry point for the application
@@ -150,6 +162,34 @@ class MainActivity : ComponentActivity() {
     @Suppress("UNCHECKED_CAST")
     val typedBackstack = backstack as NavBackStack<Screen>
 
+    // RESTORE GUARD: an empty stack (NavDisplay would crash) or a stack that doesn't start
+    // with MainScreen (stale/invalid restored state) is reset to the root.
+    if (typedBackstack.firstOrNull() != MainScreen) {
+      typedBackstack.clear()
+      typedBackstack.add(MainScreen)
+    }
+
+    // SAFE BACK: never pops the root; at root the app moves to the background instead.
+    // Taps closer together than the transition time are ignored so one tap pops one screen.
+    val lastBackAt = remember { longArrayOf(0L) }
+    val safeBack: () -> Unit = remember(typedBackstack) {
+      {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastBackAt[0] >= BACK_DEBOUNCE_MS) {
+          lastBackAt[0] = now
+          if (typedBackstack.size > 1) {
+            typedBackstack.removeLastOrNull()
+          } else {
+            moveTaskToBack(true)
+          }
+        }
+      }
+    }
+
+    // At root NavDisplay's own handler is disabled, so system back/gesture would finish the
+    // activity. Screen-level selection BackHandlers are composed deeper and keep priority.
+    BackHandler(enabled = typedBackstack.size <= 1) { safeBack() }
+
     // MEMOIZED: Navigation Transitions to keep UI transactions stable.
     val popTransitionSpec = remember {
       { scope: AnimatedContentTransitionScope<Scene<Screen>> ->
@@ -197,11 +237,12 @@ class MainActivity : ComponentActivity() {
 
     // Provide LocalBackStack to all screens
     CompositionLocalProvider(
-      LocalBackStack provides typedBackstack
+      LocalBackStack provides typedBackstack,
+      LocalSafeBack provides safeBack,
     ) {
       NavDisplay(
         backStack = typedBackstack,
-        onBack = { typedBackstack.removeLastOrNull() },
+        onBack = { safeBack() },
         entryProvider = { route -> NavEntry(route) { route.Content() } },
         popTransitionSpec = popTransitionSpec,
         transitionSpec = transitionSpec,
@@ -234,7 +275,7 @@ class MainActivity : ComponentActivity() {
         installedVersion = updateManager.currentVersion,
         onView = {
           dismissedVersion = release.version.toString()
-          backstack.add(updatesScreen)
+          if (backstack.isNotEmpty()) backstack.add(updatesScreen)
         },
         onLater = { dismissedVersion = release.version.toString() },
       )

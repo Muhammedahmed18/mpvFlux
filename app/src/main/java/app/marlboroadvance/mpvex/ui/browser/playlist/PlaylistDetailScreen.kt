@@ -7,16 +7,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -34,19 +27,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.components.pullrefresh.PullRefreshBox
-import app.marlboroadvance.mpvex.ui.browser.LocalNavigationBarHeight
 import app.marlboroadvance.mpvex.ui.browser.cards.VideoCard
 import app.marlboroadvance.mpvex.ui.browser.cards.videoCardGroupPosition
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
@@ -67,6 +57,7 @@ import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
+import app.marlboroadvance.mpvex.LocalSafeBack
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
@@ -76,7 +67,6 @@ import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
 import org.koin.compose.koinInject
 import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyGridState
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Serializable
@@ -86,6 +76,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
   override fun Content() {
     val context = LocalContext.current
     val backStack = LocalBackStack.current
+    val safeBack = LocalSafeBack.current
     val coroutineScope = rememberCoroutineScope()
 
     val viewModel: PlaylistDetailViewModel = viewModel(
@@ -159,6 +150,8 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
       }
     }
 
+    val urlCopiedText = stringResource(R.string.url_copied)
+
     val extractAudio = app.marlboroadvance.mpvex.ui.browser.sheets.rememberExtractAudioController()
     app.marlboroadvance.mpvex.ui.browser.sheets.ExtractAudioHost(extractAudio)
 
@@ -183,7 +176,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
             when {
               isReorderMode -> isReorderMode = false
               selectionManager.isInSelectionMode -> selectionManager.clear()
-              else -> backStack.removeLastOrNull()
+              else -> safeBack()
             }
           },
           onCancelSelection = { selectionManager.clear() },
@@ -393,7 +386,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
         onCopy = {
           val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
           cm.setPrimaryClip(ClipData.newPlainText("URL", urlDialogContent))
-          Toast.makeText(context, context.getString(R.string.url_copied), Toast.LENGTH_SHORT).show()
+          Toast.makeText(context, urlCopiedText, Toast.LENGTH_SHORT).show()
         }
       )
     }

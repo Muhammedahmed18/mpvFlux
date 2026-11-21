@@ -94,6 +94,7 @@ import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
 import app.marlboroadvance.mpvex.ui.browser.sheets.MarkAsHost
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.browser.states.PermissionDeniedState
+import app.marlboroadvance.mpvex.LocalSafeBack
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.utils.media.CopyPasteOps
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
@@ -132,6 +133,7 @@ data class FileSystemDirectoryScreen(
 fun FileSystemBrowserScreen(path: String? = null) {
   val context = LocalContext.current
   val backstack = LocalBackStack.current
+  val safeBack = LocalSafeBack.current
   val coroutineScope = rememberCoroutineScope()
   val browserPreferences = koinInject<BrowserPreferences>()
   val playerPreferences = koinInject<app.marlboroadvance.mpvex.preferences.PlayerPreferences>()
@@ -465,7 +467,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
           onBackClick = if (isAtRoot) {
             null
           } else {
-            { backstack.removeLastOrNull() }
+            { safeBack() }
           },
           onCancelSelection = {
             folderSelectionManager.clear()
