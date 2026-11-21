@@ -13,11 +13,17 @@ import app.marlboroadvance.mpvex.ui.browser.base.BaseBrowserViewModel
 import app.marlboroadvance.mpvex.utils.history.RecentlyPlayedOps
 import app.marlboroadvance.mpvex.utils.media.MediaLibraryEvents
 import app.marlboroadvance.mpvex.utils.media.MetadataRetrieval
-import app.marlboroadvance.mpvex.utils.media.PlaybackProgressEvents
+import app.marlboroadvance.mpvex.utils.history.PlaybackHistoryCache
 import app.marlboroadvance.mpvex.utils.storage.FolderViewScanner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -40,6 +46,14 @@ data class VideoWithPlaybackInfo(
   val isOldAndUnplayed: Boolean = false, // true if video is older than threshold and never played
   val isWatched: Boolean = false, // true if video has any playback history
   val isMarkedNew: Boolean = false, // marked as New from "Mark as" and not played since
+  val isNew: Boolean = false, // precomputed: shows the NEW chip (marked New, or old-and-unplayed within the day limit)
+)
+
+/** Settings the badge snapshot depends on; a change in any of them rebuilds the snapshot. */
+private data class BadgeSettings(
+  val watchedFraction: Float,
+  val showNewLabel: Boolean,
+  val newLabelDays: Int,
 )
 
 class VideoListViewModel(
@@ -127,15 +141,9 @@ class VideoListViewModel(
       }
     }
 
-    // Saved playback progress changed (the player paused, finished or closed): refresh only
-    // the progress bars and watched badges from the database. The file list itself didn't
-    // change, so don't rescan storage or clear any caches.
-    viewModelScope.launch(Dispatchers.IO) {
-      PlaybackProgressEvents.changes.collectLatest {
-        val videos = _videos.value
-        if (videos.isNotEmpty()) loadPlaybackInfo(videos)
-      }
-    }
+    // Progress bars, watched ticks and NEW chips follow the video list, the shared playback
+    // history and the related settings; Room re-emits when saved progress or marks change.
+    observePlaybackInfo()
   }
 
   override fun refresh() {
@@ -166,11 +174,8 @@ class VideoListViewModel(
       Log.d(tag, "ensureDataLoaded: No data found, triggering load")
       loadVideos()
     } else {
+      // Playback info is flow-driven, so progress bars already follow the database.
       Log.d(tag, "ensureDataLoaded: Data already present, skipping redundant scan")
-      // Still refresh playback info to update progress bars
-      viewModelScope.launch {
-        loadPlaybackInfo(_videos.value)
-      }
     }
   }
 
@@ -195,7 +200,6 @@ class VideoListViewModel(
         }
       }
       _videos.value = updatedVideos
-      loadPlaybackInfo(updatedVideos)
     }
     return result
   }
@@ -225,7 +229,7 @@ class VideoListViewModel(
 
         // Show initial list immediately so thumbnails can start generating
         _videos.value = mergedList
-        loadPlaybackInfo(mergedList)
+        awaitPlaybackInfo(mergedList.size)
         _isLoading.value = false // Stop loading spinner as soon as we have the basic list
 
         // Step 2: Enrich with detailed metadata (framerate, resolution, codec) if needed
@@ -240,7 +244,6 @@ class VideoListViewModel(
           
           // Update list with enriched metadata
           _videos.value = enrichedList
-          loadPlaybackInfo(enrichedList)
         }
 
         if (freshVideoList.isEmpty()) {
@@ -249,7 +252,6 @@ class VideoListViewModel(
           delay(1000)
           val retryVideoList = MediaFileRepository.getVideosInFolder(getApplication(), bucketId)
           _videos.value = retryVideoList
-          loadPlaybackInfo(retryVideoList)
 
           if (MetadataRetrieval.isVideoMetadataNeeded(browserPreferences) && retryVideoList.isNotEmpty()) {
             val enrichedRetryList = MetadataRetrieval.enrichVideosIfNeeded(
@@ -259,66 +261,100 @@ class VideoListViewModel(
               metadataCache = metadataCache
             )
             _videos.value = enrichedRetryList
-            loadPlaybackInfo(enrichedRetryList)
           }
         }
       } catch (e: Exception) {
         Log.e(tag, "Error loading videos for bucket $bucketId", e)
         _videos.value = emptyList()
-        _videosWithPlaybackInfo.value = emptyList()
       } finally {
         _isLoading.value = false
       }
     }
   }
 
-  private suspend fun loadPlaybackInfo(videos: List<Video>) {
-    val markedNew = app.marlboroadvance.mpvex.utils.media.VideoMarkOps.getMarkedNewTitles()
-    val videosWithInfo =
-      videos.map { video ->
-        val playbackState = playbackStateRepository.getVideoDataByTitle(video.displayName)
-        val watchedThreshold = browserPreferences.watchedThreshold.get()
-
-        // Calculate watch progress (0.0 to 1.0)
-        val progress = if (playbackState != null && video.duration > 0) {
-          // Duration is in milliseconds, convert to seconds
-          val durationSeconds = video.duration / 1000
-          val timeRemaining = playbackState.timeRemaining.toLong()
-          val watched = durationSeconds - timeRemaining
-          val progressValue = (watched.toFloat() / durationSeconds.toFloat()).coerceIn(0f, 1f)
-
-          // Only show progress for videos that are 1-99% complete
-          if (progressValue in 0.01f..0.99f) progressValue else null
-        } else {
-          null
-        }
-
-        // Check if video is old and unplayed
-        // Video is old if it's been more than threshold days since it was added/modified
-        // Video is unplayed if there's no playback state record
-        val isOldAndUnplayed = playbackState == null
-
-        val isWatched = if (playbackState != null && video.duration > 0) {
-           val durationSeconds = video.duration / 1000
-           val timeRemaining = playbackState.timeRemaining.toLong()
-           val watched = durationSeconds - timeRemaining
-           val progressValue = (watched.toFloat() / durationSeconds.toFloat()).coerceIn(0f, 1f)
-           val calculatedWatched = progressValue >= (watchedThreshold / 100f)
-           playbackState.hasBeenWatched || calculatedWatched
-        } else {
-           false
-        }
-
-        VideoWithPlaybackInfo(
-          video = video,
-          timeRemaining = playbackState?.timeRemaining?.toLong(),
-          progressPercentage = progress,
-          isOldAndUnplayed = isOldAndUnplayed,
-          isWatched = isWatched,
-          isMarkedNew = playbackState == null && video.displayName in markedNew,
+  /**
+   * Keeps [videosWithPlaybackInfo] in step with the video list, the shared playback history
+   * (one map, no per-video queries), the "marked New" titles and the badge settings. The
+   * snapshot is built in memory off the main thread, and unchanged rows keep their previous
+   * instance so only rows whose badge state changed recompose.
+   */
+  private fun observePlaybackInfo() {
+    val settings =
+      combine(
+        browserPreferences.watchedThreshold.changes(),
+        appearancePreferences.showUnplayedOldVideoLabel.changes(),
+        appearancePreferences.unplayedOldVideoDays.changes(),
+      ) { threshold, showNewLabel, days ->
+        BadgeSettings(
+          watchedFraction = threshold / 100f,
+          showNewLabel = showNewLabel,
+          newLabelDays = days,
         )
       }
-    _videosWithPlaybackInfo.value = videosWithInfo
+
+    combine(
+      _videos,
+      PlaybackHistoryCache.playback.filterNotNull(),
+      PlaybackHistoryCache.markedNew.filterNotNull(),
+      settings,
+    ) { videos, history, markedNew, badgeSettings ->
+      buildPlaybackInfo(videos, history, markedNew, badgeSettings, _videosWithPlaybackInfo.value)
+    }
+      .flowOn(Dispatchers.Default)
+      .onEach { _videosWithPlaybackInfo.value = it }
+      .launchIn(viewModelScope)
+  }
+
+  /** Waits (briefly) until the snapshot for a list of [size] videos exists, so the list never flashes empty. */
+  private suspend fun awaitPlaybackInfo(size: Int) {
+    withTimeoutOrNull(3_000) { _videosWithPlaybackInfo.first { it.size == size } }
+  }
+
+  private fun buildPlaybackInfo(
+    videos: List<Video>,
+    history: Map<String, app.marlboroadvance.mpvex.database.dao.PlaybackBadgeRow>,
+    markedNew: Set<String>,
+    settings: BadgeSettings,
+    previous: List<VideoWithPlaybackInfo>,
+  ): List<VideoWithPlaybackInfo> {
+    val previousById = previous.associateBy { it.video.id }
+    val now = System.currentTimeMillis()
+    val newLabelMillis = settings.newLabelDays * 24 * 60 * 60 * 1000L
+
+    return videos.map { video ->
+      val state = history[video.displayName]
+
+      var progress: Float? = null
+      var isWatched = false
+      if (state != null && video.duration > 0) {
+        // Duration is in milliseconds, convert to seconds
+        val durationSeconds = video.duration / 1000
+        val watchedSeconds = durationSeconds - state.timeRemaining.toLong()
+        val progressValue = (watchedSeconds.toFloat() / durationSeconds.toFloat()).coerceIn(0f, 1f)
+
+        // Only show progress for videos that are 1-99% complete
+        if (progressValue in 0.01f..0.99f) progress = progressValue
+        isWatched = state.hasBeenWatched || progressValue >= settings.watchedFraction
+      }
+
+      // Unplayed means there is no playback state record.
+      val isOldAndUnplayed = state == null
+      val isMarkedNew = state == null && video.displayName in markedNew
+      val isNew = isMarkedNew ||
+        (settings.showNewLabel && isOldAndUnplayed && now - video.dateModified * 1000 <= newLabelMillis)
+
+      val info = VideoWithPlaybackInfo(
+        video = video,
+        timeRemaining = state?.timeRemaining?.toLong(),
+        progressPercentage = progress,
+        isOldAndUnplayed = isOldAndUnplayed,
+        isWatched = isWatched,
+        isMarkedNew = isMarkedNew,
+        isNew = isNew,
+      )
+      // Reuse the previous instance when nothing changed for this video.
+      previousById[video.id]?.takeIf { it == info } ?: info
+    }
   }
 
   private fun triggerMediaScan() {

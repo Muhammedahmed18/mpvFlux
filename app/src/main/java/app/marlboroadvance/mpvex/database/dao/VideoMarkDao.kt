@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Query
 import androidx.room.Upsert
 import app.marlboroadvance.mpvex.database.entities.VideoMarkEntity
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface VideoMarkDao {
@@ -12,6 +13,9 @@ interface VideoMarkDao {
 
   @Query("SELECT mediaTitle FROM video_marks")
   suspend fun getMarkedTitles(): List<String>
+
+  @Query("SELECT mediaTitle FROM video_marks")
+  fun observeMarkedTitles(): Flow<List<String>>
 
   @Query("SELECT * FROM video_marks WHERE mediaTitle IN (:titles)")
   suspend fun getByTitles(titles: List<String>): List<VideoMarkEntity>

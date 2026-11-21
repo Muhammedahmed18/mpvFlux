@@ -135,6 +135,7 @@ object FolderListScreen : Screen {
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val isScanning by viewModel.isScanning.collectAsStateWithLifecycle()
     val hasCompletedInitialLoad by viewModel.hasCompletedInitialLoad.collectAsStateWithLifecycle()
+    val hasCheckedIndex by viewModel.hasCheckedIndex.collectAsStateWithLifecycle()
     val deleteProgress by viewModel.deleteProgress.collectAsStateWithLifecycle()
 
     val folderSortType by browserPreferences.folderSortType.collectAsState()
@@ -278,6 +279,7 @@ object FolderListScreen : Screen {
               isLoading = isLoading,
               isScanning = isScanning,
               hasCompletedInitialLoad = hasCompletedInitialLoad,
+              hasCheckedIndex = hasCheckedIndex,
               tapThumbnailToSelect = { currentTapThumbnailToSelect },
               bottomPadding =
                 if (selectionManager.isInSelectionMode) {
@@ -446,6 +448,7 @@ private fun FolderListContent(
   isLoading: Boolean,
   isScanning: Boolean,
   hasCompletedInitialLoad: Boolean,
+  hasCheckedIndex: Boolean,
   tapThumbnailToSelect: () -> Boolean,
   bottomPadding: Dp,
   navigationBarHeight: androidx.compose.ui.unit.Dp,
@@ -457,7 +460,10 @@ private fun FolderListContent(
   onFolderClick: (VideoFolder) -> Unit,
   onFolderLongClick: (VideoFolder) -> Unit,
 ) {
-  val showFullScreenLoading = (isLoading && folders.isEmpty()) || (!hasCompletedInitialLoad && folders.isEmpty())
+  // Before the saved index has been read the list is just not ready yet: show nothing instead of
+  // a spinner that would vanish a frame later. A real first scan still shows the full screen.
+  val showFullScreenLoading =
+    hasCheckedIndex && ((isLoading && folders.isEmpty()) || (!hasCompletedInitialLoad && folders.isEmpty()))
   val showEmpty = folders.isEmpty() && !isLoading && !isScanning && hasCompletedInitialLoad
 
   // A3: Anti-flicker for scanning indicator. 

@@ -753,6 +753,7 @@ private fun VideoListContent(
                   isSelected = isSelected,
                   isOldAndUnplayed = videoWithInfo.isOldAndUnplayed,
                   isMarkedNew = videoWithInfo.isMarkedNew,
+                  isNew = videoWithInfo.isNew,
                   isWatched = videoWithInfo.isWatched,
                   onClick = currentOnClick,
                   onLongClick = currentOnLongClick,

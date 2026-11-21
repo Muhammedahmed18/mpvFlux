@@ -56,6 +56,11 @@ class FolderListViewModel(
   private val _hasCompletedInitialLoad = MutableStateFlow(false)
   val hasCompletedInitialLoad: StateFlow<Boolean> = _hasCompletedInitialLoad.asStateFlow()
 
+  // True once the saved index has been read and reflected in [videoFolders] (or is known to be
+  // empty). Until then the list is simply not ready, which is not the same as "scanning".
+  private val _hasCheckedIndex = MutableStateFlow(false)
+  val hasCheckedIndex: StateFlow<Boolean> = _hasCheckedIndex.asStateFlow()
+
   private var currentScanJob: Job? = null
 
   // Folder/file paths reported by MediaLibraryEvents since the last debounced refresh.
@@ -114,6 +119,9 @@ class FolderListViewModel(
         } else if (_hasCompletedInitialLoad.value) {
           // Index was emptied after a completed load (all videos removed).
           _allVideoFolders.value = emptyList()
+        } else {
+          // Nothing indexed yet (first launch): the scan state may show right away.
+          _hasCheckedIndex.value = true
         }
       }.launchIn(viewModelScope)
   }
@@ -154,6 +162,9 @@ class FolderListViewModel(
     val filtered = allFolders.filter { it.path !in blacklist && it.videoCount > 0 }
     // The StateFlow dedups equal values itself.
     _videoFolders.value = filtered
+    // Only the saved index can make this non-empty, so the cached list is now on its way to
+    // the screen (set after the list so the screen never sees the flag with an empty list).
+    if (allFolders.isNotEmpty()) _hasCheckedIndex.value = true
   }
 
   override fun refresh() {

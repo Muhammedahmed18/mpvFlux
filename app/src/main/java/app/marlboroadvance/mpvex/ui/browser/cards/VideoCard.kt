@@ -126,6 +126,9 @@ fun VideoCard(
   isOldAndUnplayed: Boolean = false,
   // Marked as New from the "Mark as" sheet: shows the NEW chip whatever the file date.
   isMarkedNew: Boolean = false,
+  // Precomputed NEW state from the list's badge snapshot. When null, it is worked out here
+  // from the other flags and settings.
+  isNew: Boolean? = null,
   isWatched: Boolean = false,
   isRecentlyPlayed: Boolean = false,
   onThumbClick: () -> Unit = {},
@@ -141,7 +144,7 @@ fun VideoCard(
   // Sizes for this screen. Lists can compute this once and pass it to every row.
   dimens: BrowserCardDimens = rememberBrowserCardDimens(),
 ) {
-  val isNew = remember(video.dateModified, settings.showUnplayedOldVideoLabel, isOldAndUnplayed, isMarkedNew, settings.unplayedOldVideoDays) {
+  val showNew = isNew ?: remember(video.dateModified, settings.showUnplayedOldVideoLabel, isOldAndUnplayed, isMarkedNew, settings.unplayedOldVideoDays) {
     if (isMarkedNew) {
       true
     } else if (settings.showUnplayedOldVideoLabel && isOldAndUnplayed) {
@@ -224,7 +227,7 @@ fun VideoCard(
     val thumbnail: @Composable (Modifier) -> Unit = { thumbModifier ->
       VideoThumbnail(
         video = video,
-        isNew = isNew,
+        isNew = showNew,
         isSelected = isSelected,
         inSelectionMode = inSelectionMode,
         isWatched = isWatched,
