@@ -171,6 +171,11 @@ class FolderListViewModel(
     performFullSystemScan()
   }
 
+  /** Pull-to-refresh: suspends until the scan finishes so the pull spinner tracks it. */
+  suspend fun refreshAndAwait() {
+    performFullSystemScan().join()
+  }
+
   fun ensureDataLoaded() {
     if (_allVideoFolders.value.isEmpty() && !_isLoading.value && !_isScanning.value) {
       loadVideoFolders()
@@ -185,9 +190,9 @@ class FolderListViewModel(
     }
   }
 
-  private fun performFullSystemScan() {
+  private fun performFullSystemScan(): Job {
     currentScanJob?.cancel()
-    currentScanJob = viewModelScope.launch {
+    val job = viewModelScope.launch {
       _isScanning.value = true
       try {
         withContext(Dispatchers.IO) {
@@ -203,6 +208,8 @@ class FolderListViewModel(
         _isLoading.value = false
       }
     }
+    currentScanJob = job
+    return job
   }
 
   private suspend fun triggerMediaScanAwait() = withContext(Dispatchers.IO) {

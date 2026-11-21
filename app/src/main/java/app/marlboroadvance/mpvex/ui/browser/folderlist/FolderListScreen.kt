@@ -226,7 +226,7 @@ object FolderListScreen : Screen {
       selectionManager.clear()
     }
 
-    val onRefresh: suspend () -> Unit = remember(viewModel) { { viewModel.refresh() } }
+    val onRefresh: suspend () -> Unit = remember(viewModel) { { viewModel.refreshAndAwait() } }
 
     val currentTapThumbnailToSelect by androidx.compose.runtime.rememberUpdatedState(tapThumbnailToSelect)
 
@@ -466,15 +466,16 @@ private fun FolderListContent(
     hasCheckedIndex && ((isLoading && folders.isEmpty()) || (!hasCompletedInitialLoad && folders.isEmpty()))
   val showEmpty = folders.isEmpty() && !isLoading && !isScanning && hasCompletedInitialLoad
 
-  // A3: Anti-flicker for scanning indicator. 
-  // We wait for 400ms before showing the bar to prevent flashes on fast background scans.
-  var showScanningIndicator by remember { mutableStateOf(false) }
-  LaunchedEffect(isScanning) {
-    if (isScanning) {
-      delay(400)
-      showScanningIndicator = true
+  // The scanning screen only appears when there is nothing cached to show (first launch), and
+  // only if it lasts long enough to matter, so a quick scan never flashes it. Scans on startup
+  // and pull-to-refresh scans show no "scanning" UI of their own (the pull spinner is enough).
+  var showScanningScreen by remember { mutableStateOf(false) }
+  LaunchedEffect(showFullScreenLoading) {
+    if (showFullScreenLoading) {
+      delay(350)
+      showScanningScreen = true
     } else {
-      showScanningIndicator = false
+      showScanningScreen = false
     }
   }
 
@@ -493,7 +494,7 @@ private fun FolderListContent(
   ) {
     if (showFullScreenLoading || showEmpty) {
       if (showFullScreenLoading) {
-        LoadingState(
+        if (showScanningScreen) LoadingState(
           title = stringResource(R.string.scanning_for_videos),
           message = stringResource(R.string.please_wait),
           modifier = Modifier.fillMaxSize(),
@@ -546,19 +547,6 @@ private fun FolderListContent(
             ),
           ) {}
         }
-      }
-
-      // A3: Replaced direct isScanning check with showScanningIndicator
-      if (showScanningIndicator) {
-        Box(
-          modifier = Modifier
-            .fillMaxWidth()
-            .height(4.dp)
-            .padding(horizontal = 16.dp)
-            .align(Alignment.TopCenter)
-            .clip(RoundedCornerShape(2.dp))
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.5f))
-        )
       }
     }
   }
