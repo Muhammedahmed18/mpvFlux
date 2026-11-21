@@ -70,6 +70,11 @@ class TrackSelector(
     val image: Boolean
   )
 
+  /**
+   * Must run while the new file is still held paused (PlayerActivity unpauses only after
+   * this returns). Switching `aid` once audio is playing restarts mpv's audio output and
+   * cuts off the start of the audio.
+   */
   suspend fun onFileLoaded(hasState: Boolean = false, subtitlesOffByUser: Boolean = false) {
     var attempts = 0
     val maxAttempts = 20

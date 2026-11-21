@@ -67,7 +67,9 @@ import com.github.k1rakishou.fsaf.FileManager
 import `is`.xyz.mpv.MPVLib
 import `is`.xyz.mpv.MPVNode
 import `is`.xyz.mpv.Utils
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -252,6 +254,24 @@ class PlayerActivity :
   /** Last pause value handled by [handlePauseStateChange], used to skip repeated events. */
   private var lastPauseState: Boolean? = null
 
+  // ==================== File Loading ====================
+  // Every file is opened paused and only unpaused once the saved state (audio track,
+  // position, audio delay, speed) and the automatic track choice have been applied.
+  // Applying them while audio was already playing made mpv restart its audio output and
+  // flush the decoder, which cut off the start of the audio.
+
+  /** True from [beginFileLoad] until [finishFileLoad] for the same load. */
+  @Volatile private var loadingFile = false
+
+  /** Set when the user (or audio focus / noisy route) changed the pause state mid-load. */
+  @Volatile private var pauseChangedDuringLoad = false
+
+  /** Increases with every load so a slow, older load can't unpause a newer one. */
+  @Volatile private var loadGeneration = 0
+
+  /** Saved state for the file being opened, read from the database while mpv opens it. */
+  @Volatile private var prefetchedState: Pair<String, Deferred<PlaybackStateEntity?>>? = null
+
   // ==================== Progress Save Management ====================
 
   /**
@@ -307,6 +327,7 @@ class PlayerActivity :
         intent: Intent?,
       ) {
         if (intent?.action == AudioManager.ACTION_AUDIO_BECOMING_NOISY) {
+          if (loadingFile) pauseChangedDuringLoad = true
           viewModel.pause()
           window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
@@ -318,6 +339,7 @@ class PlayerActivity :
       when (focusChange) {
         AudioManager.AUDIOFOCUS_LOSS -> {
           // Permanent loss (another app started playing): pause and give focus up.
+          if (loadingFile) pauseChangedDuringLoad = true
           viewModel.pause()
         }
 
@@ -326,7 +348,10 @@ class PlayerActivity :
           // so AUDIOFOCUS_GAIN is delivered afterwards and playback resumes. viewModel.pause()
           // abandons focus, which meant the gain never arrived and playback never resumed.
           val oldRestore = restoreAudioFocus
-          val wasPlayerPaused = viewModel.paused ?: false
+          // A file still loading is only paused by us; it was about to play.
+          val loadingWouldPlay = loadingFile && !pauseChangedDuringLoad
+          val wasPlayerPaused = !loadingWouldPlay && (viewModel.paused ?: false)
+          if (loadingFile) pauseChangedDuringLoad = true
           if (mpvInitialized) runCatching { MPVLib.setPropertyBoolean("pause", true) }
           restoreAudioFocus = {
             oldRestore()
@@ -423,7 +448,10 @@ class PlayerActivity :
 
     setHttpHeadersFromExtras(intent.extras)
 
-    getPlayableUri(intent)?.let(player::playFile)
+    getPlayableUri(intent)?.let {
+      beginFileLoad()
+      player.playFile(it)
+    }
 
     if (playerPreferences.orientation.get() != PlayerOrientation.Video) {
       setOrientation()
@@ -1345,8 +1373,15 @@ class PlayerActivity :
     if (lastPauseState == isPaused) return
     lastPauseState = isPaused
 
+    // While a file is loading it is held paused by beginFileLoad(). A play event in that
+    // window comes from the user (UI, notification, headset), so finishFileLoad() leaves
+    // the pause state alone afterwards.
+    if (loadingFile && !isPaused) pauseChangedDuringLoad = true
+
     if (isPaused) {
-      saveVideoProgress(isImmediate = true)
+      // No save while loading: the position belongs to the previous file (or is 0) and
+      // would overwrite the new file's resume point.
+      if (!loadingFile) saveVideoProgress(isImmediate = true)
 
       if (!playerPreferences.keepScreenOnWhenPaused.get()) {
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -1536,11 +1571,21 @@ class PlayerActivity :
 
     setIntentExtras(intent.extras)
 
+    val generation = loadGeneration
     lifecycleScope.launch(Dispatchers.IO) {
-      viewModel.subtitlesTurnedOffByUser = false
-      val hasState = loadVideoPlaybackState()
+      val hasState = try {
+        viewModel.subtitlesTurnedOffByUser = false
+        val restored = loadVideoPlaybackState()
 
-      trackSelector.onFileLoaded(hasState, viewModel.subtitlesTurnedOffByUser)
+        trackSelector.onFileLoaded(restored, viewModel.subtitlesTurnedOffByUser)
+        restored
+      } finally {
+        // Track, position, delay and speed are in place: start playback now, so audio
+        // output opens once, on the right track, at the right position.
+        withContext(Dispatchers.Main + kotlinx.coroutines.NonCancellable) {
+          finishFileLoad(generation)
+        }
+      }
 
       if (!hasState) {
         withContext(Dispatchers.Main) {
@@ -1592,7 +1637,7 @@ class PlayerActivity :
 
     updateDisplayTitle()
 
-    viewModel.unpause()
+    // Playback is started by finishFileLoad() once the saved state has been applied.
 
     if (subtitlesPreferences.autoloadMatchingSubtitles.get()) {
       // With subtitles set to "Off", matching files are added to the list but not turned on.
@@ -1809,11 +1854,57 @@ class PlayerActivity :
     progressSaveManager.saveProgressBlocking(snapshot)
   }
 
+  /**
+   * Call on the main thread right before a file is loaded (playFile / loadfile), after
+   * [mediaIdentifier] is set for it. Holds mpv paused until [finishFileLoad] and starts
+   * reading the file's saved state, so the read overlaps mpv opening the file.
+   */
+  private fun beginFileLoad() {
+    loadGeneration++
+    loadingFile = true
+    pauseChangedDuringLoad = false
+    if (mpvInitialized) {
+      runCatching { MPVLib.setPropertyBoolean("pause", true) }
+        .onFailure { e -> Log.e(TAG, "Failed to hold playback paused while loading", e) }
+    }
+
+    prefetchedState?.second?.cancel()
+    val identifier = mediaIdentifier
+    prefetchedState = if (identifier.isBlank()) {
+      null
+    } else {
+      identifier to lifecycleScope.async(Dispatchers.IO) {
+        runCatching { playbackStateRepository.getVideoDataByTitle(identifier) }.getOrNull()
+      }
+    }
+  }
+
+  /**
+   * Ends the load started by [beginFileLoad] once the saved state and track choice are
+   * applied, and starts playback unless the user paused or played in the meantime.
+   * A stale call from an older load (the user skipped ahead) is ignored. A file mpv
+   * opened by itself (e.g. the next entry of an m3u) wasn't held paused and keeps the old
+   * behaviour of always unpausing once loaded.
+   */
+  private fun finishFileLoad(generation: Int) {
+    if (generation != loadGeneration) return
+    val heldByUs = loadingFile
+    loadingFile = false
+    prefetchedState = null
+    if (isDestroyed || !mpvInitialized || player.isExiting) return
+    if (!heldByUs || !pauseChangedDuringLoad) viewModel.unpause()
+  }
+
   private suspend fun loadVideoPlaybackState(): Boolean {
     if (mediaIdentifier.isBlank()) return false
 
+    val identifier = mediaIdentifier
     return runCatching {
-      val state = playbackStateRepository.getVideoDataByTitle(mediaIdentifier)
+      // Use the read started in beginFileLoad() when it is for this file; it ran while
+      // mpv was opening the file, so it is usually finished by now.
+      val prefetched = prefetchedState?.takeIf { it.first == identifier }?.second
+      val state = prefetched?.let { runCatching { it.await() }.getOrNull() }
+        ?: playbackStateRepository.getVideoDataByTitle(identifier)
 
       applyPlaybackState(state)
       applyDefaultSettings(state)
@@ -2024,6 +2115,7 @@ class PlayerActivity :
       }
       currentUri?.let { viewModel.calculateVideoHash(it) }
 
+      beginFileLoad()
       lifecycleScope.launch(Dispatchers.Default) {
         MPVLib.command("loadfile", uri)
       }
@@ -2436,6 +2528,7 @@ class PlayerActivity :
     val displayTitle = formatTitle(rawFileName, isUriM3U(uri))
     viewModel.setMediaTitle(displayTitle)
 
+    beginFileLoad()
     lifecycleScope.launch(Dispatchers.Default) {
       // Step 1: Open content FD and load file as fast as possible
       val playableUri = uri.openContentFd(this@PlayerActivity) ?: uri.toString()
