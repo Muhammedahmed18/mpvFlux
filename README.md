@@ -131,8 +131,6 @@ Bug reports, suggestions and focused pull requests are welcome.
 - **[Suggest a feature](https://github.com/Muhammedahmed18/mpvFlux/issues/new?template=feature_request.md)** — describe the use case and expected behavior.
 - **Submit a pull request** — keep changes focused and use [Conventional Commits](https://www.conventionalcommits.org/) such as `feat:`, `fix:`, `perf:` or `ui:`.
 
-> **Project status:** mpvFlux v1.5.9 is planned as the final regularly maintained release. Issues remain welcome, but future fixes and features are not guaranteed.
-
 ## Credits
 
 mpvFlux is a fork of **[mpvEx](https://github.com/marlboro-advance/mpvEx)**, built on excellent open-source projects:
