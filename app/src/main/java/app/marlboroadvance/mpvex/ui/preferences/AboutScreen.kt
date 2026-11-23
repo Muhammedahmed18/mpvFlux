@@ -64,7 +64,7 @@ import org.koin.compose.koinInject
 @Serializable
 object AboutScreen : Screen {
 
-    private const val GITHUB_URL = "https://github.com/Muhammedahmed18/mpvFlux"
+    private const val GITHUB_URL = "https://github.com/MpvFlux/mpvFlux"
     private const val DISCUSSIONS_URL = "$GITHUB_URL/discussions"
     private const val LATEST_RELEASE_URL = "$GITHUB_URL/releases/latest"
     private const val FEATURE_REQUEST_URL = "$GITHUB_URL/issues/new?template=feature_request.md"

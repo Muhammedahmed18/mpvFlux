@@ -9,13 +9,13 @@
 A fast, battery-conscious Android video player powered by **mpv**, built with **Material 3 Expressive** and made with anime in mind.
 
 <p>
-  <a href="https://github.com/Muhammedahmed18/mpvFlux/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/Muhammedahmed18/mpvFlux?style=flat-square&label=Release" /></a>
-  <a href="https://github.com/Muhammedahmed18/mpvFlux/releases"><img alt="Total downloads" src="https://img.shields.io/github/downloads/Muhammedahmed18/mpvFlux/total?style=flat-square&label=Downloads" /></a>
+  <a href="https://github.com/MpvFlux/mpvFlux/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/MpvFlux/mpvFlux?style=flat-square&label=Release" /></a>
+  <a href="https://github.com/MpvFlux/mpvFlux/releases"><img alt="Total downloads" src="https://img.shields.io/github/downloads/MpvFlux/mpvFlux/total?style=flat-square&label=Downloads" /></a>
   <img alt="Android 8.0 or later" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?style=flat-square&logo=android&logoColor=white" />
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/Muhammedahmed18/mpvFlux?style=flat-square" /></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/MpvFlux/mpvFlux?style=flat-square" /></a>
 </p>
 
-**[Download latest APK](https://github.com/Muhammedahmed18/mpvFlux/releases/latest)** · **[Explore features](#features)** · **[View screenshots](#screenshots)** · **[Report an issue](https://github.com/Muhammedahmed18/mpvFlux/issues)**
+**[Download latest APK](https://github.com/MpvFlux/mpvFlux/releases/latest)** · **[Explore features](#features)** · **[View screenshots](#screenshots)** · **[Report an issue](https://github.com/MpvFlux/mpvFlux/issues)**
 
 </div>
 
@@ -89,7 +89,7 @@ A fast, battery-conscious Android video player powered by **mpv**, built with **
 
 ## Download
 
-Get the APK from **[GitHub Releases](https://github.com/Muhammedahmed18/mpvFlux/releases/latest)**.
+Get the APK from **[GitHub Releases](https://github.com/MpvFlux/mpvFlux/releases/latest)**.
 
 **Minimum Android version:** Android 8.0 (API 26).
 
@@ -114,7 +114,7 @@ Since version 1.2.0, mpvFlux uses the app ID `app.marlboroadvance.mpvflux`. It i
 **Requirements:** Android Studio (latest stable) and JDK 17.
 
 ```bash
-git clone https://github.com/Muhammedahmed18/mpvFlux.git
+git clone https://github.com/MpvFlux/mpvFlux.git
 cd mpvFlux
 ./gradlew assembleDebug
 ```
@@ -127,8 +127,8 @@ For a release build, use `./gradlew assembleRelease` or **Build → Generate Sig
 
 Bug reports, suggestions and focused pull requests are welcome.
 
-- **[Report a bug](https://github.com/Muhammedahmed18/mpvFlux/issues/new?template=bug_report.md)** — include your device model, Android version and relevant video details.
-- **[Suggest a feature](https://github.com/Muhammedahmed18/mpvFlux/issues/new?template=feature_request.md)** — describe the use case and expected behavior.
+- **[Report a bug](https://github.com/MpvFlux/mpvFlux/issues/new?template=bug_report.md)** — include your device model, Android version and relevant video details.
+- **[Suggest a feature](https://github.com/MpvFlux/mpvFlux/issues/new?template=feature_request.md)** — describe the use case and expected behavior.
 - **Submit a pull request** — keep changes focused and use [Conventional Commits](https://www.conventionalcommits.org/) such as `feat:`, `fix:`, `perf:` or `ui:`.
 
 ## Credits

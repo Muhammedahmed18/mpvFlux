@@ -179,7 +179,7 @@ class GitHubReleases(
   )
 
   companion object {
-    const val OWNER = "Muhammedahmed18"
+    const val OWNER = "MpvFlux"
     const val REPO = "mpvFlux"
 
     private const val TAG = "GitHubReleases"
