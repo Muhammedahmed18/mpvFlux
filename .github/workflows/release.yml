@@ -4,6 +4,7 @@ permissions:
   contents: write
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v[0-9]+.[0-9]+.[0-9]+'
@@ -43,8 +44,13 @@ jobs:
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Get tag name
-        if: startsWith(github.ref, 'refs/tags/')
-        run: echo "VERSION_TAG=$(basename $GITHUB_REF)" >> $GITHUB_ENV
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            echo "VERSION_TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
+          else
+            echo "VERSION_TAG=signing-test" >> "$GITHUB_ENV"
+          fi
 
       - name: Verify build output
         run: |
@@ -112,6 +118,7 @@ jobs:
           ls -lah mpvFlux-*.apk
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.VERSION_TAG }}
