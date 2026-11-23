@@ -5,10 +5,8 @@ permissions:
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
-      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  release:
+    types: [published]
 
 jobs:
   release-for-github:
@@ -20,6 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4
@@ -43,11 +42,17 @@ jobs:
       - name: Build release with Gradle
         run: ./gradlew assembleRelease --stacktrace
 
-      - name: Get tag name
+      - name: Determine version tag
         shell: bash
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            echo "VERSION_TAG=${GITHUB_REF#refs/tags/}" >> "$GITHUB_ENV"
+          if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
+            if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "::error::Unsupported release tag: $RELEASE_TAG"
+              exit 1
+            fi
+            echo "VERSION_TAG=$RELEASE_TAG" >> "$GITHUB_ENV"
           else
             echo "VERSION_TAG=signing-test" >> "$GITHUB_ENV"
           fi
@@ -117,32 +122,21 @@ jobs:
 
           ls -lah mpvFlux-*.apk
 
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.VERSION_TAG }}
-          name: MpvFlux ${{ env.VERSION_TAG }}
-          body: |
-            ---
-            ### Checksums
-
-            | Variant | SHA-256 |
-            | ------- | ------- |
-            | arm64-v8a | ${{ env.apk_arm64_v8a_sha256 }} |
-            | armeabi-v7a | ${{ env.apk_armeabi_v7a_sha256 }} |
-            | Universal | ${{ env.apk_universal_sha256 }} |
-            | x86 | ${{ env.apk_x86_sha256 }} |
-            | x86_64 | ${{ env.apk_x86_64_sha256 }} |
-
-          files: |
-            mpvFlux-universal-${{ env.VERSION_TAG }}.apk
-            mpvFlux-arm64-v8a-${{ env.VERSION_TAG }}.apk
-            mpvFlux-armeabi-v7a-${{ env.VERSION_TAG }}.apk
-            mpvFlux-x86-${{ env.VERSION_TAG }}.apk
-            mpvFlux-x86_64-${{ env.VERSION_TAG }}.apk
-          draft: true
-          # Tags with a suffix (e.g. v1.5.0-beta1) are published as pre-releases.
-          prerelease: ${{ contains(env.VERSION_TAG, '-') }}
+      - name: Upload APKs to published GitHub Release
+        if: github.event_name == 'release'
+        shell: bash
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release upload "$VERSION_TAG" mpvFlux-*.apk --clobber
+          echo "Uploaded five signed APKs to $VERSION_TAG."
+
+      - name: Upload manual test APKs as workflow artifact
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mpvFlux-signing-test
+          path: mpvFlux-*.apk
+          retention-days: 1
