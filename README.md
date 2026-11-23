@@ -111,17 +111,45 @@ Since version 1.2.0, mpvFlux uses the app ID `app.marlboroadvance.mpvflux`. It i
 
 ## Build from source
 
-**Requirements:** Android Studio (latest stable) and JDK 17.
+**Requirements:** Android Studio (latest stable), JDK 17, and the prebuilt mpv-android AAR.
+
+mpvFlux uses a custom **mpv-android v1.1.0** library containing **mpv 0.42.0**, **FFmpeg 9.1**, and **libplacebo 7.387.0**. The AAR is distributed separately to keep large native binaries out of this repository.
+
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/MpvFlux/mpvFlux.git
 cd mpvFlux
+```
+
+### 2. Install the native playback library
+
+1. **[Download mpv-android-lib-v1.1.0.aar](https://github.com/MpvFlux/mpv-android/releases/download/v1.1.0/mpv-android-lib-v1.1.0.aar)** from the [mpvFlux/mpv-android](https://github.com/MpvFlux/mpv-android) release.
+2. Keep the downloaded filename as `mpv-android-lib-v1.1.0.aar`.
+3. Create `app/libs/` if it doesn't already exist.
+4. Place the downloaded AAR at this exact path:
+
+   ```text
+   app/libs/mpv-android-lib-v1.1.0.aar
+   ```
+
+The AAR must be present before Gradle can build the app. It is intentionally excluded from Git by `.gitignore`; do not commit it to this repository.
+
+### 3. Build the app
+
+Open the project in Android Studio, allow Gradle to sync, then run:
+
+```bash
 ./gradlew assembleDebug
 ```
 
+On Windows, use `gradlew.bat assembleDebug` instead.
+
 Find the debug APK in `app/build/outputs/apk/debug/`.
 
-For a release build, use `./gradlew assembleRelease` or **Build → Generate Signed APK** in Android Studio. Release APKs are generated under `app/build/outputs/apk/release/` or your selected output folder; naming follows the release variant and version.
+For a release build, use `./gradlew assembleRelease` or **Build → Generate Signed APK** in Android Studio. Release APKs are generated under `app/build/outputs/apk/release/` or your selected output folder; signing must be configured for distributable release builds.
+
+**Build troubleshooting:** If Gradle reports that `app/libs/mpv-android-lib-v1.1.0.aar` is missing, verify the folder, filename, and downloaded file before syncing again.
 
 ## Contributing and feedback
 
@@ -135,7 +163,7 @@ Bug reports, suggestions and focused pull requests are welcome.
 
 mpvFlux is a fork of **[mpvEx](https://github.com/marlboro-advance/mpvEx)**, built on excellent open-source projects:
 
-- **[mpv](https://mpv.io/)** and **[mpv-android](https://github.com/mpv-android/mpv-android)** — playback engine and Android integration.
+- **[mpv](https://mpv.io/)** and **[mpv-android](https://github.com/mpv-android/mpv-android)** — playback engine and Android integration, with a [custom mpv-android build](https://github.com/MpvFlux/mpv-android) used by mpvFlux.
 - **[libass](https://github.com/libass/libass)** — ASS/SSA subtitle rendering.
 
 ## License
