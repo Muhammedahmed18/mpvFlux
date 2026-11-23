@@ -29,6 +29,16 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Download mpv-android AAR
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p app/libs
+          curl --fail --location --retry 3 \
+            --output app/libs/mpv-android-lib-v1.1.0.aar \
+            "https://github.com/MpvFlux/mpv-android/releases/download/v1.1.0/mpv-android-lib-v1.1.0.aar"
+          unzip -t app/libs/mpv-android-lib-v1.1.0.aar
+
       - name: Build release with Gradle
         run: ./gradlew assembleRelease --stacktrace
 
