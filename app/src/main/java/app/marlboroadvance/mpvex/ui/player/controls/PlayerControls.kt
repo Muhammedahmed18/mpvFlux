@@ -126,6 +126,7 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.SmartSkipOverlay
 import app.marlboroadvance.mpvex.ui.player.controls.components.ThumbZoneUnlock
 import app.marlboroadvance.mpvex.ui.player.controls.components.VolumeSlider
 import app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarWithTimers
+import app.marlboroadvance.mpvex.preferences.ControlsPosition
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
 import app.marlboroadvance.mpvex.ui.theme.MpvexTheme
 import app.marlboroadvance.mpvex.ui.theme.playerRippleConfiguration
@@ -301,6 +302,12 @@ fun PlayerControls(
 
   // Chapter gaps on the seekbar: Settings > Player layout > "Show chapters on seekbar".
   val showChapterMarkers by appearancePreferences.showSeekbarChapters.collectAsState()
+
+  // Settings > Player layout > "Control buttons position". Below puts the button rows
+  // under the seekbar; Above (default) keeps the original stacking.
+  val controlsPosition by appearancePreferences.controlsPosition.collectAsState()
+  val controlsBelowSeekbar = controlsPosition == ControlsPosition.Below
+  val hasLandscapeBottomButtons = bottomLeftButtons.isNotEmpty() || bottomRightButtons.isNotEmpty()
 
   LaunchedEffect(
     controlsShown,
@@ -527,8 +534,11 @@ fun PlayerControls(
             modifier = Modifier.constrainAs(playerPauseButton) {
               end.linkTo(parent.absoluteRight)
               start.linkTo(parent.absoluteLeft)
-              if (isCompactLayout) bottom.linkTo(bottomRightControls.top, spacing.large)
-              else { top.linkTo(parent.top); bottom.linkTo(parent.bottom) }
+              if (isCompactLayout) {
+                // Below: play/pause sits above the seekbar, button row beneath it.
+                if (controlsBelowSeekbar) bottom.linkTo(seekbar.top, spacing.large)
+                else bottom.linkTo(bottomRightControls.top, spacing.large)
+              } else { top.linkTo(parent.top); bottom.linkTo(parent.bottom) }
             },
           ) {
             // pausedForCache is read here (not at PlayerControls root) so buffering
@@ -788,7 +798,13 @@ fun PlayerControls(
             enter = if (!reduceMotion) slideInVertically(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutVertically(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
             modifier = Modifier.constrainAs(seekbar) {
-              if (isCompactLayout) bottom.linkTo(playerPauseButton.top, spacing.medium) else bottom.linkTo(parent.bottom, spacing.medium)
+              if (isCompactLayout) {
+                if (controlsBelowSeekbar) bottom.linkTo(bottomRightControls.top, spacing.medium)
+                else bottom.linkTo(playerPauseButton.top, spacing.medium)
+              } else if (controlsBelowSeekbar && hasLandscapeBottomButtons) {
+                // Reserve one 48dp button row (+ gap) under the seekbar.
+                bottom.linkTo(parent.bottom, spacing.medium + 48.dp + spacing.small)
+              } else bottom.linkTo(parent.bottom, spacing.medium)
               start.linkTo(parent.start, startMargin(24.dp)); end.linkTo(parent.end, endMargin(24.dp)); width = Dimension.fillToConstraints
             }.reportClearanceFromBottom { seekbarClearancePx = it },
           ) {
@@ -855,7 +871,7 @@ fun PlayerControls(
             visible = controlsShown && !areControlsLocked && (isCompactLayout || !areSlidersShown),
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.constrainAs(bottomRightControls) { if (isCompactLayout) { bottom.linkTo(parent.bottom, spacing.extraLarge); start.linkTo(parent.start, startMargin(spacing.large)); end.linkTo(parent.end, endMargin(spacing.large)); width = Dimension.fillToConstraints } else { bottom.linkTo(seekbar.top, spacing.small); end.linkTo(parent.end, endMargin(spacing.large)) } }.reportClearanceFromBottom { bottomRowClearancePx = it },
+            modifier = Modifier.constrainAs(bottomRightControls) { if (isCompactLayout) { bottom.linkTo(parent.bottom, spacing.extraLarge); start.linkTo(parent.start, startMargin(spacing.large)); end.linkTo(parent.end, endMargin(spacing.large)); width = Dimension.fillToConstraints } else { if (controlsBelowSeekbar) bottom.linkTo(parent.bottom, spacing.medium) else bottom.linkTo(seekbar.top, spacing.small); end.linkTo(parent.end, endMargin(spacing.large)) } }.reportClearanceFromBottom { bottomRowClearancePx = it },
           ) {
             if (isCompactLayout) BottomPlayerControlsPortrait(buttons = portraitBottomButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
             else BottomRightPlayerControlsLandscape(buttons = bottomRightButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity)
@@ -865,7 +881,7 @@ fun PlayerControls(
             visible = controlsShown && !areControlsLocked && !isCompactLayout && !areSlidersShown,
             enter = if (!reduceMotion) slideInHorizontally(playerControlsEnterAnimationSpec()) { -it } + fadeIn(playerControlsEnterAnimationSpec()) else fadeIn(playerControlsEnterAnimationSpec()),
             exit = if (!reduceMotion) slideOutHorizontally(playerControlsExitAnimationSpec()) { -it } + fadeOut(playerControlsExitAnimationSpec()) else fadeOut(playerControlsExitAnimationSpec()),
-            modifier = Modifier.constrainAs(bottomLeftControls) { bottom.linkTo(seekbar.top, spacing.small); start.linkTo(parent.start, startMargin(spacing.large)); width = Dimension.fillToConstraints; end.linkTo(bottomRightControls.start, spacing.small) },
+            modifier = Modifier.constrainAs(bottomLeftControls) { if (controlsBelowSeekbar) bottom.linkTo(parent.bottom, spacing.medium) else bottom.linkTo(seekbar.top, spacing.small); start.linkTo(parent.start, startMargin(spacing.large)); width = Dimension.fillToConstraints; end.linkTo(bottomRightControls.start, spacing.small) },
           ) { BottomLeftPlayerControlsLandscape(buttons = bottomLeftButtons, chapters = chapters, currentChapter = currentChapter, isSpeedNonOne = isSpeedNonOne, currentZoom = videoZoom, mediaTitle = mediaTitle, hideBackground = hideBackground, decoder = decoder, playbackSpeed = playbackSpeed ?: 1f, onBackPress = onBackPress, onOpenSheet = onOpenSheet, viewModel = viewModel, activity = activity) }
         }
 

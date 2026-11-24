@@ -32,6 +32,15 @@ enum class ThumbnailPosition(
   P75(R.string.thumbnail_position_75, 0.75),
 }
 
+/**
+ * Where the player button rows sit relative to the seekbar. Stored by name, so new entries
+ * must be appended rather than renamed to keep existing saved preferences valid.
+ */
+enum class ControlsPosition {
+  Above,
+  Below,
+}
+
 class AppearancePreferences(
   preferenceStore: PreferenceStore,
 ) {
@@ -48,6 +57,9 @@ class AppearancePreferences(
 
   /** Split the seekbar at chapter starts (OP / Part A / ED…) when the file has chapters. */
   val showSeekbarChapters = preferenceStore.getBoolean("seekbar_show_chapters", true)
+
+  /** Whether the player button rows sit above (default) or below the seekbar. */
+  val controlsPosition = preferenceStore.getEnum("controls_position", ControlsPosition.Above)
 
   val topLeftControls =
     preferenceStore.getString(

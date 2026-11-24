@@ -48,6 +48,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
+import app.marlboroadvance.mpvex.preferences.ControlsPosition
 import app.marlboroadvance.mpvex.preferences.PlayerButton
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
 import app.marlboroadvance.mpvex.preferences.SeekbarStyle
@@ -239,6 +240,33 @@ object PlayerControlsPreferencesScreen : Screen {
               }
             }
             
+            item {
+              val controlsPosition by appearancePrefs.controlsPosition.collectAsState()
+              val aboveText = stringResource(R.string.pref_controls_position_above)
+              val belowText = stringResource(R.string.pref_controls_position_below)
+              PreferenceCard {
+                ListPreference(
+                  value = controlsPosition,
+                  onValueChange = { appearancePrefs.controlsPosition.set(it) },
+                  values = ControlsPosition.entries.toList(),
+                  valueToText = { AnnotatedString(if (it == ControlsPosition.Below) belowText else aboveText) },
+                  title = {
+                    Text(
+                      text = stringResource(R.string.pref_controls_position_title),
+                      style = MaterialTheme.typography.titleMediumEmphasized,
+                    )
+                  },
+                  summary = {
+                    Text(
+                      text = if (controlsPosition == ControlsPosition.Below) belowText else aboveText,
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                  },
+                )
+              }
+            }
+
             item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_appearance_title))
             }
