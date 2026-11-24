@@ -936,6 +936,7 @@
   <string name="about_metric_android">Android</string>
   <string name="about_metric_device">Device</string>
   <string name="about_metric_hardware">Hardware</string>
+  <string name="about_metric_copied">%1$s copied</string>
   <string name="sort_oldest">Oldest</string>
   <string name="sort_newest">Newest</string>
   <string name="sort_smallest">Smallest</string>
