@@ -5,9 +5,10 @@ import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
 import android.os.Build
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -33,33 +34,34 @@ import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import app.marlboroadvance.mpvex.BuildConfig
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.presentation.crash.CrashActivity.Companion.collectDeviceInfo
-import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import `is`.xyz.mpv.Utils
 import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import org.koin.compose.koinInject
 
 @Serializable
 object AboutScreen : Screen {
@@ -69,22 +71,37 @@ object AboutScreen : Screen {
     private const val LATEST_RELEASE_URL = "$GITHUB_URL/releases/latest"
     private const val FEATURE_REQUEST_URL = "$GITHUB_URL/issues/new?template=feature_request.md"
 
+    private val CardShape = RoundedCornerShape(28.dp)
+    private val TileShape = RoundedCornerShape(24.dp)
+
     /** New bug report with the template and the app version already in the title. */
     private fun bugReportUrl(): String {
         val version = BuildConfig.VERSION_NAME.substringBefore('-')
         return "$GITHUB_URL/issues/new?template=bug_report.md&title=" + Uri.encode("[v$version] ")
     }
 
-    /** Opens a link in the browser; shows a short message instead of crashing if none exists. */
-    private fun openLink(context: Context, url: String) {
+    /** Opens a link in the browser. Returns false (instead of crashing) if no browser exists. */
+    private fun openLink(context: Context, url: String): Boolean =
         try {
             context.startActivity(
                 Intent(Intent.ACTION_VIEW, url.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
+            true
         } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, context.getString(R.string.about_no_browser), Toast.LENGTH_SHORT).show()
+            false
         }
-    }
+
+    private data class LinkItem(
+        val icon: ImageVector,
+        val label: String,
+        val onClick: () -> Unit,
+    )
+
+    private data class MetricItem(
+        val icon: ImageVector,
+        val label: String,
+        val value: String,
+    )
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -92,10 +109,93 @@ object AboutScreen : Screen {
         val backstack = LocalBackStack.current
         val clipboard = LocalClipboard.current
         val context = LocalContext.current
+        val resources = LocalResources.current
         val scope = rememberCoroutineScope()
+        val snackbarHostState = remember { SnackbarHostState() }
 
         val backgroundColor = rememberPreferenceBackgroundColor()
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
+        val noBrowserMessage = stringResource(R.string.about_no_browser)
+        val debugCopiedMessage = stringResource(R.string.about_debug_info_copied)
+
+        val showMessage: (String) -> Unit = { message ->
+            scope.launch {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(message)
+            }
+        }
+        val open: (String) -> Unit = { url ->
+            if (!openLink(context, url)) showMessage(noBrowserMessage)
+        }
+        val copyText: (String, suspend () -> String, String) -> Unit = { label, text, message ->
+            scope.launch {
+                clipboard.setClipEntry(ClipEntry(ClipData.newPlainText(label, text())))
+                showMessage(message)
+            }
+        }
+
+        val links = listOf(
+            LinkItem(Icons.Outlined.BugReport, stringResource(R.string.about_report_bug)) {
+                // Copy debug info first so it can be pasted into the report.
+                scope.launch {
+                    clipboard.setClipEntry(
+                        ClipEntry(ClipData.newPlainText("Debug Info", collectDeviceInfo())),
+                    )
+                    showMessage(debugCopiedMessage)
+                    open(bugReportUrl())
+                }
+            },
+            LinkItem(Icons.Outlined.Lightbulb, stringResource(R.string.about_request_feature)) {
+                open(FEATURE_REQUEST_URL)
+            },
+            LinkItem(Icons.Outlined.Forum, stringResource(R.string.about_discussions)) {
+                open(DISCUSSIONS_URL)
+            },
+            LinkItem(Icons.Outlined.NewReleases, stringResource(R.string.about_whats_new)) {
+                open(LATEST_RELEASE_URL)
+            },
+            LinkItem(Icons.Outlined.StarOutline, stringResource(R.string.about_star_github)) {
+                open(GITHUB_URL)
+            },
+            LinkItem(Icons.Outlined.Code, stringResource(R.string.about_source_code)) {
+                open(GITHUB_URL)
+            },
+        )
+
+        val metrics = listOf(
+            MetricItem(
+                Icons.Outlined.Android,
+                stringResource(R.string.about_metric_android),
+                "${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}",
+            ),
+            MetricItem(
+                Icons.Outlined.PhoneAndroid,
+                stringResource(R.string.about_metric_device),
+                Build.MODEL,
+            ),
+            MetricItem(
+                Icons.Outlined.Memory,
+                stringResource(R.string.about_metric_hardware),
+                Build.HARDWARE,
+            ),
+            MetricItem(
+                Icons.Outlined.DeveloperBoard,
+                "ABI",
+                Build.SUPPORTED_ABIS.firstOrNull() ?: "Unknown",
+            ),
+            MetricItem(Icons.Outlined.Code, "MPV", Utils.VERSIONS.mpv),
+            MetricItem(Icons.Outlined.Movie, "FFmpeg", Utils.VERSIONS.ffmpeg),
+        )
+        val libPlacebo = MetricItem(Icons.Outlined.Settings, "libplacebo", Utils.VERSIONS.libPlacebo)
+
+        val onCopyMetric: (MetricItem) -> Unit = { metric ->
+            copyText(
+                metric.label,
+                { metric.value },
+                resources.getString(R.string.about_metric_copied, metric.label),
+            )
+        }
 
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -104,6 +204,7 @@ object AboutScreen : Screen {
             Scaffold(
                 modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
                 containerColor = Color.Transparent,
+                snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
                 topBar = {
                     PreferenceTopBar(
                         title = {
@@ -135,89 +236,33 @@ object AboutScreen : Screen {
                     contentPadding = PaddingValues(
                         start = 20.dp,
                         end = 20.dp,
-                        top = paddingValues.calculateTopPadding(),
+                        top = paddingValues.calculateTopPadding() + 4.dp,
                         bottom = 24.dp,
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     item { HeroSection() }
-                    item { DescriptionCard() }
 
                     item { SectionHeader(text = stringResource(R.string.about_core_highlights)) }
                     item { HighlightsGrid() }
 
                     item { SectionHeader(text = stringResource(R.string.about_community)) }
-                    item {
-                        val copiedMessage = stringResource(R.string.about_debug_info_copied)
-                        ActionRow(
-                            icon = Icons.Outlined.BugReport,
-                            label = stringResource(R.string.about_report_bug),
-                            onClick = {
-                                // Copy debug info first so it can be pasted into the report.
-                                scope.launch {
-                                    clipboard.setClipEntry(
-                                        ClipEntry(ClipData.newPlainText("Debug Info", collectDeviceInfo())),
-                                    )
-                                    Toast.makeText(context, copiedMessage, Toast.LENGTH_LONG).show()
-                                    openLink(context, bugReportUrl())
-                                }
-                            },
-                        )
-                    }
-                    item {
-                        ActionRow(
-                            icon = Icons.Outlined.Lightbulb,
-                            label = stringResource(R.string.about_request_feature),
-                            onClick = { openLink(context, FEATURE_REQUEST_URL) },
-                        )
-                    }
-                    item {
-                        ActionRow(
-                            icon = Icons.Outlined.Forum,
-                            label = stringResource(R.string.about_discussions),
-                            onClick = { openLink(context, DISCUSSIONS_URL) },
-                        )
-                    }
-                    item {
-                        ActionRow(
-                            icon = Icons.Outlined.NewReleases,
-                            label = stringResource(R.string.about_whats_new),
-                            onClick = { openLink(context, LATEST_RELEASE_URL) },
-                        )
-                    }
-                    item {
-                        ActionRow(
-                            icon = Icons.Outlined.StarOutline,
-                            label = stringResource(R.string.about_star_github),
-                            onClick = { openLink(context, GITHUB_URL) },
-                        )
-                    }
-                    item {
-                        ActionRow(
-                            icon = Icons.Outlined.Code,
-                            label = stringResource(R.string.about_source_code),
-                            onClick = { openLink(context, GITHUB_URL) },
-                        )
-                    }
+                    item { LinksCard(links = links) }
 
                     item { SectionHeader(text = stringResource(R.string.about_system_info)) }
-                    item { SystemGrid() }
-                    item { LibPlaceboCard() }
+                    item { SystemGrid(metrics = metrics, onCopy = onCopyMetric) }
+                    item { MetricTile(metric = libPlacebo, onCopy = onCopyMetric, modifier = Modifier.fillMaxWidth()) }
 
                     item {
                         Spacer(modifier = Modifier.height(4.dp))
                         FilledTonalButton(
                             onClick = {
-                                scope.launch {
-                                    clipboard.setClipEntry(
-                                        ClipEntry(ClipData.newPlainText("Debug Info", collectDeviceInfo())),
-                                    )
-                                }
+                                copyText("Debug Info", { collectDeviceInfo() }, debugCopiedMessage)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(52.dp),
-                            shape = MaterialTheme.shapes.large,
+                                .height(56.dp),
+                            shape = CircleShape,
                         ) {
                             Icon(
                                 imageVector = Icons.Outlined.ContentCopy,
@@ -234,12 +279,12 @@ object AboutScreen : Screen {
                     item {
                         Text(
                             text = stringResource(R.string.about_forked_from),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                             textAlign = TextAlign.Center,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(top = 4.dp),
+                                .padding(top = 8.dp),
                         )
                     }
                 }
@@ -249,79 +294,80 @@ object AboutScreen : Screen {
 
     @Composable
     private fun HeroSection() {
-        Column(
+        val cleanVersion = BuildConfig.VERSION_NAME.substringBefore('-')
+        val channel = stringResource(
+            if (BuildConfig.DEBUG) R.string.about_channel_debug else R.string.about_channel_stable,
+        )
+        val colors = MaterialTheme.colorScheme
+
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+                .clip(RoundedCornerShape(36.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            colors.primaryContainer,
+                            colors.tertiaryContainer.copy(alpha = 0.55f),
+                        ),
+                    ),
+                )
+                .padding(horizontal = 24.dp, vertical = 28.dp),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                // Soft "glow" rings (glass approximation — no real blur over the SurfaceView)
-                Box(
-                    modifier = Modifier
-                        .size(132.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.06f),
-                            shape = CircleShape,
-                        ),
-                )
-                Box(
-                    modifier = Modifier
-                        .size(104.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                            shape = CircleShape,
-                        ),
-                )
-                Surface(
-                    shape = RoundedCornerShape(22.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(76.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_launcher_monochrome),
-                            contentDescription = stringResource(R.string.about_app_icon),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(56.dp),
-                        )
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "mpvFlux",
-                style = MaterialTheme.typography.headlineMediumEmphasized,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            val cleanVersion = BuildConfig.VERSION_NAME.substringBefore('-')
-            val channel = stringResource(if (BuildConfig.DEBUG) R.string.about_channel_debug else R.string.about_channel_stable)
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_about_logo),
+                    contentDescription = stringResource(R.string.about_app_icon),
+                    modifier = Modifier.size(104.dp),
+                )
+                Spacer(modifier = Modifier.height(18.dp))
                 Text(
-                    text = "v$cleanVersion ($channel)",
-                    style = MaterialTheme.typography.labelLargeEmphasized,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    text = "mpvFlux",
+                    style = MaterialTheme.typography.headlineLargeEmphasized,
+                    color = colors.onPrimaryContainer,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    InfoChip(
+                        text = "v$cleanVersion",
+                        containerColor = colors.primary,
+                        contentColor = colors.onPrimary,
+                    )
+                    InfoChip(
+                        text = channel,
+                        containerColor = colors.secondaryContainer,
+                        contentColor = colors.onSecondaryContainer,
+                    )
+                }
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = stringResource(R.string.about_description),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onPrimaryContainer.copy(alpha = 0.85f),
+                    textAlign = TextAlign.Center,
                 )
             }
         }
     }
 
     @Composable
-    private fun DescriptionCard() {
-        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
+    private fun InfoChip(
+        text: String,
+        containerColor: Color,
+        contentColor: Color,
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = containerColor,
+            contentColor = contentColor,
+        ) {
             Text(
-                text = stringResource(R.string.about_description),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 18.dp),
+                text = text,
+                style = MaterialTheme.typography.labelLargeEmphasized,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             )
         }
     }
@@ -332,12 +378,13 @@ object AboutScreen : Screen {
             text = text,
             style = MaterialTheme.typography.titleMediumEmphasized,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 4.dp, top = 8.dp),
+            modifier = Modifier.padding(start = 8.dp, top = 12.dp),
         )
     }
 
     @Composable
     private fun HighlightsGrid() {
+        val colors = MaterialTheme.colorScheme
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(
                 modifier = Modifier
@@ -350,12 +397,16 @@ object AboutScreen : Screen {
                     icon = Icons.Outlined.Bolt,
                     title = "High-Performance",
                     subtitle = stringResource(R.string.about_highlight_libmpv),
+                    containerColor = colors.primaryContainer,
+                    contentColor = colors.onPrimaryContainer,
                 )
                 HighlightCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Outlined.AutoAwesome,
                     title = "libplacebo",
                     subtitle = stringResource(R.string.about_highlight_libplacebo),
+                    containerColor = colors.secondaryContainer,
+                    contentColor = colors.onSecondaryContainer,
                 )
             }
             Row(
@@ -369,12 +420,16 @@ object AboutScreen : Screen {
                     icon = Icons.Outlined.Movie,
                     title = stringResource(R.string.about_highlight_formats),
                     subtitle = "MKV · MP4 · AVI · HEVC · AV1",
+                    containerColor = colors.tertiaryContainer,
+                    contentColor = colors.onTertiaryContainer,
                 )
                 HighlightCard(
                     modifier = Modifier.weight(1f),
                     icon = Icons.Outlined.Palette,
                     title = "Material You",
                     subtitle = stringResource(R.string.about_highlight_material_you),
+                    containerColor = colors.surfaceContainerHigh,
+                    contentColor = colors.onSurface,
                 )
             }
         }
@@ -386,185 +441,181 @@ object AboutScreen : Screen {
         icon: ImageVector,
         title: String,
         subtitle: String,
+        containerColor: Color,
+        contentColor: Color,
     ) {
-        OutlinedCard(modifier = modifier.fillMaxHeight()) {
+        Surface(
+            modifier = modifier.fillMaxHeight(),
+            shape = CardShape,
+            color = containerColor,
+            contentColor = contentColor,
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(contentColor.copy(alpha = 0.12f), CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleSmallEmphasized,
-                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = contentColor.copy(alpha = 0.8f),
                 )
             }
         }
     }
 
     @Composable
-    private fun ActionRow(
-        icon: ImageVector,
-        label: String,
-        onClick: () -> Unit,
-    ) {
-        OutlinedCard(
-            onClick = onClick,
+    private fun LinksCard(links: List<LinkItem>) {
+        Surface(
             modifier = Modifier.fillMaxWidth(),
+            shape = CardShape,
+            color = MaterialTheme.colorScheme.surfaceContainer,
         ) {
-            Row(
+            Column {
+                links.forEachIndexed { index, link ->
+                    LinkRow(link = link)
+                    if (index != links.lastIndex) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp, end = 16.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun LinkRow(link: LinkItem) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = link.onClick)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    .size(40.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = RoundedCornerShape(14.dp),
+                    ),
+                contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = icon,
+                    imageVector = link.icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.bodyLargeEmphasized,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                Icon(
-                    imageVector = Icons.Rounded.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.size(22.dp),
                 )
             }
-        }
-    }
-
-    @Composable
-    private fun SystemGrid() {
-        val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "Unknown"
-        val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-            Column {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Min),
-                ) {
-                    MetricCell(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Outlined.Android,
-                        label = stringResource(R.string.about_metric_android),
-                        value = "${Build.VERSION.RELEASE} · API ${Build.VERSION.SDK_INT}",
-                    )
-                    VerticalDivider(color = dividerColor)
-                    MetricCell(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Outlined.PhoneAndroid,
-                        label = stringResource(R.string.about_metric_device),
-                        value = Build.MODEL,
-                    )
-                }
-                HorizontalDivider(color = dividerColor)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Min),
-                ) {
-                    MetricCell(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Outlined.Memory,
-                        label = stringResource(R.string.about_metric_hardware),
-                        value = Build.HARDWARE,
-                    )
-                    VerticalDivider(color = dividerColor)
-                    MetricCell(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Outlined.DeveloperBoard,
-                        label = "ABI",
-                        value = abi,
-                    )
-                }
-                HorizontalDivider(color = dividerColor)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(IntrinsicSize.Min),
-                ) {
-                    MetricCell(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Outlined.Code,
-                        label = "MPV",
-                        value = Utils.VERSIONS.mpv,
-                    )
-                    VerticalDivider(color = dividerColor)
-                    MetricCell(
-                        modifier = Modifier.weight(1f),
-                        icon = Icons.Outlined.Movie,
-                        label = "FFmpeg",
-                        value = Utils.VERSIONS.ffmpeg,
-                    )
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun LibPlaceboCard() {
-        OutlinedCard(modifier = Modifier.fillMaxWidth()) {
-            MetricCell(
-                modifier = Modifier.fillMaxWidth(),
-                icon = Icons.Outlined.Settings,
-                label = "libplacebo",
-                value = Utils.VERSIONS.libPlacebo,
+            Text(
+                text = link.label,
+                style = MaterialTheme.typography.bodyLargeEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
             )
-        }
-    }
-
-    @Composable
-    private fun MetricCell(
-        modifier: Modifier = Modifier,
-        icon: ImageVector,
-        label: String,
-        value: String,
-    ) {
-        Row(
-            modifier = modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
             Icon(
-                imageVector = icon,
+                imageVector = Icons.Rounded.ChevronRight,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(22.dp),
             )
-            Column {
-                Text(
-                    text = label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = value,
-                    style = MaterialTheme.typography.bodyMediumEmphasized,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                )
+        }
+    }
+
+    @Composable
+    private fun SystemGrid(
+        metrics: List<MetricItem>,
+        onCopy: (MetricItem) -> Unit,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            metrics.chunked(2).forEach { pair ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(IntrinsicSize.Min),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    pair.forEach { metric ->
+                        MetricTile(
+                            metric = metric,
+                            onCopy = onCopy,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        )
+                    }
+                    if (pair.size == 1) Spacer(modifier = Modifier.weight(1f))
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun MetricTile(
+        metric: MetricItem,
+        onCopy: (MetricItem) -> Unit,
+        modifier: Modifier = Modifier,
+    ) {
+        Surface(
+            onClick = { onCopy(metric) },
+            modifier = modifier,
+            shape = TileShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = metric.icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = metric.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = metric.value,
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
