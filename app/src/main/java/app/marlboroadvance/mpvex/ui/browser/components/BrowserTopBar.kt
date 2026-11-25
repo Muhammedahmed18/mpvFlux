@@ -17,7 +17,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
@@ -29,6 +32,7 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.RemoveCircle
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SelectAll
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
@@ -41,9 +45,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,11 +59,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
@@ -99,6 +110,13 @@ fun BrowserTopBar(
   /** Keep Select all / Deselect all (as an icon) next to the selection actions instead of
    *  only showing it when the bar has no other actions. */
   showSelectAllWithActions: Boolean = false,
+  /** Search: the icon shows when [onSearchClick] is set; [searchActive] swaps the bar for the field. */
+  onSearchClick: (() -> Unit)? = null,
+  searchActive: Boolean = false,
+  searchQuery: String = "",
+  onSearchQueryChange: (String) -> Unit = {},
+  onSearchClose: () -> Unit = {},
+  searchPlaceholder: String = "",
 ) {
   if (isInSelectionMode) {
     SelectionTopBar(
@@ -124,6 +142,14 @@ fun BrowserTopBar(
       summary = selectionSummary,
       showSelectAllWithActions = showSelectAllWithActions,
     )
+  } else if (searchActive && onSearchClick != null) {
+    SearchTopBar(
+      query = searchQuery,
+      onQueryChange = onSearchQueryChange,
+      onClose = onSearchClose,
+      placeholder = searchPlaceholder,
+      modifier = modifier,
+    )
   } else {
     NormalTopBar(
       title = title,
@@ -134,8 +160,69 @@ fun BrowserTopBar(
       additionalActions = additionalActions,
       modifier = modifier,
       onTitleLongPress = onTitleLongPress,
+      onSearchClick = onSearchClick,
     )
   }
+}
+
+/** Search field that takes over the top bar: back/close, the query, and a clear button. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SearchTopBar(
+  query: String,
+  onQueryChange: (String) -> Unit,
+  onClose: () -> Unit,
+  placeholder: String,
+  modifier: Modifier = Modifier,
+) {
+  val focusRequester = remember { FocusRequester() }
+  val keyboard = LocalSoftwareKeyboardController.current
+  LaunchedEffect(Unit) { focusRequester.requestFocus() }
+
+  TopAppBar(
+    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+    navigationIcon = {
+      IconButton(onClick = onClose) {
+        Icon(
+          Icons.AutoMirrored.Rounded.ArrowBack,
+          contentDescription = stringResource(R.string.search_close),
+          tint = MaterialTheme.colorScheme.secondary,
+        )
+      }
+    },
+    title = {
+      TextField(
+        value = query,
+        onValueChange = onQueryChange,
+        modifier = Modifier
+          .fillMaxWidth()
+          .focusRequester(focusRequester),
+        placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        trailingIcon = {
+          if (query.isNotEmpty()) {
+            IconButton(onClick = { onQueryChange("") }) {
+              Icon(
+                Icons.Rounded.Close,
+                contentDescription = stringResource(R.string.search_clear),
+              )
+            }
+          }
+        },
+        singleLine = true,
+        shape = MaterialTheme.shapes.extraLarge,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { keyboard?.hide() }),
+        colors = TextFieldDefaults.colors(
+          focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+          unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+          focusedIndicatorColor = Color.Transparent,
+          unfocusedIndicatorColor = Color.Transparent,
+          disabledIndicatorColor = Color.Transparent,
+        ),
+      )
+    },
+    modifier = modifier,
+  )
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -149,6 +236,7 @@ private fun NormalTopBar(
   additionalActions: @Composable RowScope.() -> Unit,
   modifier: Modifier = Modifier,
   onTitleLongPress: (() -> Unit)?,
+  onSearchClick: (() -> Unit)? = null,
 ) {
   val colors = TopAppBarDefaults.topAppBarColors(
     containerColor = Color.Transparent,
@@ -189,6 +277,15 @@ private fun NormalTopBar(
     }
   val actionsContent: @Composable RowScope.() -> Unit = {
       additionalActions()
+      if (onSearchClick != null) {
+        IconButton(onClick = onSearchClick) {
+          Icon(
+            Icons.Rounded.Search,
+            contentDescription = stringResource(R.string.search),
+            tint = MaterialTheme.colorScheme.secondary,
+          )
+        }
+      }
       if (onSortClick != null) {
         IconButton(onClick = onSortClick) {
           Icon(

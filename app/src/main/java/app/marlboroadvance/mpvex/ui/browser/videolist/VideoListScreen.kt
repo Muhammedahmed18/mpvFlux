@@ -76,6 +76,7 @@ import androidx.compose.material.icons.automirrored.rounded.DriveFileMove
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import androidx.compose.material.icons.rounded.Search
 import app.marlboroadvance.mpvex.ui.browser.components.selectionToolbarScroll
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.AddToPlaylistDialog
@@ -170,7 +171,7 @@ data class VideoListScreen(
     // Sorting
     val videoSortType by browserPreferences.videoSortType.collectAsState()
     val videoSortOrder by browserPreferences.videoSortOrder.collectAsState()
-    val sortedVideosWithInfo =
+    val allSortedVideosWithInfo =
       remember(videosWithPlaybackInfo, videoSortType, videoSortOrder) {
         val infoById = videosWithPlaybackInfo.associateBy { it.video.id }
         val sortedVideos = SortUtils.sortVideos(videosWithPlaybackInfo.map { it.video }, videoSortType, videoSortOrder)
@@ -178,6 +179,20 @@ data class VideoListScreen(
           infoById[video.id] ?: VideoWithPlaybackInfo(video)
         }
       }
+
+    // Search filters the folder's already-loaded videos in memory by filename only.
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val sortedVideosWithInfo = remember(allSortedVideosWithInfo, searchQuery) {
+      val query = searchQuery.trim()
+      if (query.isEmpty()) {
+        allSortedVideosWithInfo
+      } else {
+        allSortedVideosWithInfo.filter { it.video.displayName.contains(query, ignoreCase = true) }
+      }
+    }
+    val noSearchResults =
+      searchQuery.isNotBlank() && sortedVideosWithInfo.isEmpty() && allSortedVideosWithInfo.isNotEmpty()
 
     // Top bar subtitle, e.g. "12 videos · 8 watched" (M3 Expressive top app bar subtitle).
     val videoCountLabel = pluralStringResource(
@@ -282,6 +297,11 @@ data class VideoListScreen(
     BackHandler(enabled = selectionManager.isInSelectionMode) {
       selectionManager.clear()
     }
+    // Back closes search first (selection, when active, takes the back press before this).
+    BackHandler(enabled = searchActive && !selectionManager.isInSelectionMode) {
+      searchActive = false
+      searchQuery = ""
+    }
 
     val extractAudio = app.marlboroadvance.mpvex.ui.browser.sheets.rememberExtractAudioController()
 
@@ -311,6 +331,15 @@ data class VideoListScreen(
             }
           },
           onCancelSelection = { selectionManager.clear() },
+          onSearchClick = { searchActive = true },
+          searchActive = searchActive,
+          searchQuery = searchQuery,
+          onSearchQueryChange = { searchQuery = it },
+          onSearchClose = {
+            searchActive = false
+            searchQuery = ""
+          },
+          searchPlaceholder = stringResource(R.string.search_videos),
           onSortClick = { sortDialogOpen.value = true },
           onSettingsClick = {
             backstack.add(app.marlboroadvance.mpvex.ui.preferences.PreferencesScreen)
@@ -355,6 +384,9 @@ data class VideoListScreen(
         VideoListContent(
           folderId = bucketId,
           videosWithInfo = sortedVideosWithInfo,
+          searchActive = searchActive,
+          searchQuery = searchQuery,
+          noSearchResults = noSearchResults,
           videoCardSettings = videoCardSettings,
           isLoading = isLoading && videosWithPlaybackInfo.isEmpty(),
           isRefreshing = isRefreshing,
@@ -625,6 +657,9 @@ private fun VideoListDialogs(
 private fun VideoListContent(
   folderId: String,
   videosWithInfo: List<VideoWithPlaybackInfo>,
+  searchActive: Boolean,
+  searchQuery: String,
+  noSearchResults: Boolean,
   videoCardSettings: app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings,
   isLoading: Boolean,
   isRefreshing: androidx.compose.runtime.MutableState<Boolean>,
@@ -657,8 +692,9 @@ private fun VideoListContent(
     onDispose { thumbnailRepository.stopFolderGeneration(folderId) }
   }
 
-  LaunchedEffect(folderId, showVideoThumbnails, videosWithInfo.size, thumbWidthPx, thumbHeightPx) {
-    if (showVideoThumbnails && videosWithInfo.isNotEmpty()) {
+  // Not restarted for every filtered subset while searching; it resumes with the full list on close.
+  LaunchedEffect(folderId, showVideoThumbnails, videosWithInfo.size, thumbWidthPx, thumbHeightPx, searchActive) {
+    if (showVideoThumbnails && videosWithInfo.isNotEmpty() && !searchActive) {
       thumbnailRepository.startFolderThumbnailGeneration(
         folderId = folderId,
         videos = videosWithInfo.map { it.video },
@@ -674,7 +710,7 @@ private fun VideoListContent(
         LoadingIndicator(modifier = Modifier.size(64.dp), color = MaterialTheme.colorScheme.primary)
       }
     }
-    videosWithInfo.isEmpty() && !isLoading -> {
+    videosWithInfo.isEmpty() && !isLoading && !noSearchResults -> {
       EmptyState(
         icon = Icons.Filled.VideoLibrary,
         title = stringResource(R.string.no_videos_in_folder),
@@ -698,12 +734,33 @@ private fun VideoListContent(
             rememberedListOffset.intValue = offset
           }
       }
+      // Search keeps the browsing position: it is saved when search opens and restored when it
+      // closes; typing scrolls the matches to the top.
+      var preSearchScroll by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+      LaunchedEffect(searchActive) {
+        if (searchActive) {
+          preSearchScroll = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+        } else {
+          preSearchScroll?.let { (index, offset) -> listState.scrollToItem(index, offset) }
+          preSearchScroll = null
+        }
+      }
+      LaunchedEffect(searchQuery) {
+        if (searchActive) listState.scrollToItem(0)
+      }
       FabScrollHelper.trackScrollForFabVisibility(listState = listState, gridState = null, isFabVisible = isFabVisible, expanded = false, onExpandedChange = {})
       val isAtTop by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0 } }
       val hasEnoughItems = videosWithInfo.size > 20
       val scrollbarAlpha by animateFloatAsState(targetValue = if (isAtTop || !hasEnoughItems) 0f else 1f, animationSpec = tween(durationMillis = 200), label = "scrollbarAlpha")
 
-      PullRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, listState = listState, modifier = modifier.fillMaxSize()) {
+      if (noSearchResults) {
+        EmptyState(
+          icon = Icons.Rounded.Search,
+          title = stringResource(R.string.no_results_found),
+          message = stringResource(R.string.no_results_found_message),
+          modifier = modifier.fillMaxSize(),
+        )
+      } else PullRefreshBox(isRefreshing = isRefreshing, onRefresh = onRefresh, listState = listState, modifier = modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxSize().padding(bottom = navigationBarHeight)) {
           LazyColumnScrollbar(
             state = listState,

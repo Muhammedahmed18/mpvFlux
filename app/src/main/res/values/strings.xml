@@ -489,6 +489,12 @@
   <string name="search_videos">Search videos…</string>
   <string name="search_folders_and_videos">Search folders and videos…</string>
   <string name="search_playlists">Search playlists…</string>
+  <string name="search_folders">Search folders…</string>
+  <string name="search">Search</string>
+  <string name="search_clear">Clear search</string>
+  <string name="search_close">Close search</string>
+  <string name="no_results_found">No results found</string>
+  <string name="no_results_found_message">Try a different search term.</string>
   <string name="play_recently_played_or_first">Play recently played or first video</string>
   <string name="toggle_menu">Toggle menu</string>
   <string name="close">Close</string>

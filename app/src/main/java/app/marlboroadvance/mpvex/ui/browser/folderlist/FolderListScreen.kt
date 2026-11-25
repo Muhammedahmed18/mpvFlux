@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.VideoLibrary
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -156,8 +157,29 @@ object FolderListScreen : Screen {
     var folderVideos by remember { mutableStateOf<List<Video>>(emptyList()) }
     var toolbarExpanded by rememberSaveable { mutableStateOf(true) }
 
-    val sortedFolders = remember(videoFolders, folderSortType, folderSortOrder) {
+    val allSortedFolders = remember(videoFolders, folderSortType, folderSortOrder) {
       SortUtils.sortFolders(videoFolders, folderSortType, folderSortOrder)
+    }
+
+    // Search filters the already-indexed folders in memory by name only.
+    var searchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val sortedFolders = remember(allSortedFolders, searchQuery) {
+      val query = searchQuery.trim()
+      if (query.isEmpty()) allSortedFolders else allSortedFolders.filter { it.name.contains(query, ignoreCase = true) }
+    }
+    val noSearchResults = searchQuery.isNotBlank() && sortedFolders.isEmpty() && allSortedFolders.isNotEmpty()
+
+    // The browsing position is restored when search closes; typing scrolls matches to the top.
+    var preSearchScroll by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    LaunchedEffect(searchActive) {
+      if (!searchActive) {
+        preSearchScroll?.let { (index, offset) -> listState.scrollToItem(index, offset) }
+        preSearchScroll = null
+      }
+    }
+    LaunchedEffect(searchQuery) {
+      if (searchActive) listState.scrollToItem(0)
     }
 
     val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
@@ -225,6 +247,11 @@ object FolderListScreen : Screen {
     BackHandler(enabled = selectionManager.isInSelectionMode) {
       selectionManager.clear()
     }
+    // Back closes search first (selection, when active, takes the back press before this).
+    BackHandler(enabled = searchActive && !selectionManager.isInSelectionMode) {
+      searchActive = false
+      searchQuery = ""
+    }
 
     val onRefresh: suspend () -> Unit = remember(viewModel) { { viewModel.refreshAndAwait() } }
 
@@ -249,8 +276,20 @@ object FolderListScreen : Screen {
             isInSelectionMode = selectionManager.isInSelectionMode,
             selectionSummary = selectionSummary,
             selectedCount = selectionManager.selectedCount,
-            totalCount = videoFolders.size,
+            totalCount = sortedFolders.size,
             onCancelSelection = { selectionManager.clear() },
+            onSearchClick = {
+              preSearchScroll = listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+              searchActive = true
+            },
+            searchActive = searchActive,
+            searchQuery = searchQuery,
+            onSearchQueryChange = { searchQuery = it },
+            onSearchClose = {
+              searchActive = false
+              searchQuery = ""
+            },
+            searchPlaceholder = stringResource(R.string.search_folders),
             onSortClick = { sortDialogOpen.value = true },
             onSettingsClick = { backstack.add(PreferencesScreen) },
             isSingleSelection = selectionManager.isSingleSelection,
@@ -276,6 +315,7 @@ object FolderListScreen : Screen {
           PermissionStatus.Granted -> {
             FolderListContent(
               folders = sortedFolders,
+              noSearchResults = noSearchResults,
               isLoading = isLoading,
               isScanning = isScanning,
               hasCompletedInitialLoad = hasCompletedInitialLoad,
@@ -445,6 +485,7 @@ object FolderListScreen : Screen {
 @Composable
 private fun FolderListContent(
   folders: List<VideoFolder>,
+  noSearchResults: Boolean,
   isLoading: Boolean,
   isScanning: Boolean,
   hasCompletedInitialLoad: Boolean,
@@ -492,7 +533,14 @@ private fun FolderListContent(
     listState = listState,
     modifier = Modifier.fillMaxSize(),
   ) {
-    if (showFullScreenLoading || showEmpty) {
+    if (noSearchResults) {
+      EmptyState(
+        icon = Icons.Rounded.Search,
+        title = stringResource(R.string.no_results_found),
+        message = stringResource(R.string.no_results_found_message),
+        modifier = Modifier.fillMaxSize(),
+      )
+    } else if (showFullScreenLoading || showEmpty) {
       if (showFullScreenLoading) {
         if (showScanningScreen) LoadingState(
           title = stringResource(R.string.scanning_for_videos),
