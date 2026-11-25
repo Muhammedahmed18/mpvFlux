@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="fastlane/metadata/android/en-US/images/icon.png" width="112" alt="mpvFlux app icon" />
+<img src="fastlane/metadata/android/en-US/images/icon.svg" width="112" alt="mpvFlux app icon" />
 
 # mpvFlux
 
