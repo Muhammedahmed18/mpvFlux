@@ -302,6 +302,23 @@ class PlayerViewModel(
 
   val panelShown = MutableStateFlow(Panels.None)
 
+  // Single transition path for sheets and panels: opening one always clears the
+  // other, so the two flows are never both non-None.
+  fun openSheet(sheet: Sheets) {
+    panelShown.value = Panels.None
+    setSheetShown(sheet)
+  }
+
+  fun openPanel(panel: Panels) {
+    sheetShown.value = Sheets.None
+    panelShown.value = panel
+  }
+
+  fun dismissOverlay() {
+    sheetShown.value = Sheets.None
+    panelShown.value = Panels.None
+  }
+
   // Seek state
   private val _seekText = MutableStateFlow<String?>(null)
   val seekText: StateFlow<String?> = _seekText.asStateFlow()

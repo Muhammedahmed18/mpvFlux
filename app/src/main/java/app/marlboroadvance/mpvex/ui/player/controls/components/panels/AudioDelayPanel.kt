@@ -41,7 +41,7 @@ fun AudioDelayPanel(
 ) {
   val preferences = koinInject<AudioPreferences>()
 
-  DraggablePanel(
+  OverlayPanelContent(
     modifier = modifier,
     header = {
       AudioDelayCardTitle(onClose = onDismissRequest)
@@ -59,7 +59,7 @@ fun AudioDelayPanel(
   }
 }
 
-// Ensure the AudioDelayPanel also uses the content version as DraggablePanel wraps it
+// Ensure the AudioDelayPanel also uses the content version as OverlayPanelContent wraps it
 @Composable
 fun DelayCard(
     delay: Float,

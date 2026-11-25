@@ -35,7 +35,6 @@ sealed class OnlineSubtitleItem {
 
 @Composable
 fun OnlineSubtitleSearchSheet(
-  onDismissRequest: () -> Unit,
   onDownloadOnline: (WyzieSubtitle) -> Unit,
   isSearching: Boolean = false,
   isDownloading: Boolean = false,
@@ -90,7 +89,6 @@ fun OnlineSubtitleSearchSheet(
 
   GenericTracksSheet(
     tracks = items,
-    onDismissRequest = onDismissRequest,
     header = {
       val keyboardController = LocalSoftwareKeyboardController.current
       val mediaInfo = remember(mediaTitle) { MediaInfoParser.parse(mediaTitle) }

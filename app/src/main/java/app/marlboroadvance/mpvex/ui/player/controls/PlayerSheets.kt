@@ -3,6 +3,12 @@ package app.marlboroadvance.mpvex.ui.player.controls
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -25,6 +31,7 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.FrameNavig
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.MoreSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.OnlineSubtitleSearchSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaybackSpeedSheet
+import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlayerOverlayHost
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.PlaylistSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.SubtitlesSheet
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.VideoZoomSheet
@@ -77,286 +84,326 @@ fun PlayerSheets(
   onOpenPanel: (Panels) -> Unit,
   onShowSheet: (Sheets) -> Unit,
   onDismissRequest: () -> Unit,
+  // Panels share the sheet host so switching between them keeps one overlay and scrim.
+  panelShown: Panels,
 ) {
   val scope = rememberCoroutineScope()
 
-  when (sheetShown) {
-    Sheets.None -> {}
-    Sheets.SubtitleTracks -> {
-      val subtitlesPicker =
-        rememberLauncherForActivityResult(
-          ActivityResultContracts.OpenDocument(),
-        ) {
-          if (it == null) return@rememberLauncherForActivityResult
-          onAddSubtitle(it)
-        }
+  val sheetBody: @Composable (Sheets) -> Unit = sheetBody@{ shown ->
+    when (shown) {
+      Sheets.None -> {}
+      Sheets.SubtitleTracks -> {
+        val subtitlesPicker =
+          rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument(),
+          ) {
+            if (it == null) return@rememberLauncherForActivityResult
+            onAddSubtitle(it)
+          }
 
-      val subtitlesPreferences = koinInject<app.marlboroadvance.mpvex.preferences.SubtitlesPreferences>()
-      val savedPickerPath = subtitlesPreferences.pickerPath.get()
+        val subtitlesPreferences = koinInject<app.marlboroadvance.mpvex.preferences.SubtitlesPreferences>()
+        val savedPickerPath = subtitlesPreferences.pickerPath.get()
 
-      val currentMediaTitle = viewModel.currentMediaTitle
-      val matchToName = if (currentMediaTitle.isNotBlank()) {
-          // Remove extension if present to improve matching
-          currentMediaTitle.substringBeforeLast(".")
-      } else null
+        val currentMediaTitle = viewModel.currentMediaTitle
+        val matchToName = if (currentMediaTitle.isNotBlank()) {
+            // Remove extension if present to improve matching
+            currentMediaTitle.substringBeforeLast(".")
+        } else null
 
-      var showFilePicker by remember { mutableStateOf(false) }
+        var showFilePicker by remember { mutableStateOf(false) }
 
-      if (showFilePicker) {
-          app.marlboroadvance.mpvex.ui.browser.dialogs.FilePickerDialog(
-              isOpen = true,
-              currentPath = savedPickerPath ?: android.os.Environment.getExternalStorageDirectory().absolutePath,
-              onDismiss = { showFilePicker = false },
-              onPathChanged = { path ->
-                  if (path != null) {
-                      subtitlesPreferences.pickerPath.set(path)
-                  }
-              },
-              onFileSelected = { path ->
-                  showFilePicker = false
-                   onAddSubtitle(Uri.parse("file://$path"))
-              },
-              onSystemPickerRequest = {
-                  showFilePicker = false
-                  subtitlesPicker.launch(
-                    arrayOf(
-                      "text/plain",
-                      "text/srt",
-                      "text/vtt",
-                      "application/x-subrip",
-                      "application/x-subtitle",
-                      "text/x-ssa",
-                      "*/*",
-                    ),
-                  )
-              },
-              matchToName = matchToName
-          )
-      }
-
-      SubtitlesSheet(
-        tracks = subtitles.toImmutableList(),
-        onToggleSubtitle = onToggleSubtitle,
-        isSubtitleSelected = isSubtitleSelected,
-        onAddSubtitle = { showFilePicker = true },
-        onRemoveSubtitle = onRemoveSubtitle,
-        onOpenSubtitleSettings = { onOpenPanel(Panels.SubtitleSettings) },
-        onOpenSubtitleDelay = { onOpenPanel(Panels.SubtitleDelay) },
-        onOpenOnlineSearch = { onShowSheet(Sheets.OnlineSubtitleSearch) },
-        onDismissRequest = onDismissRequest
-      )
-    }
-
-    Sheets.OnlineSubtitleSearch -> {
-      val isSearching by viewModel.isSearchingSub.collectAsState()
-      val isDownloading by viewModel.isDownloadingSub.collectAsState()
-      val results by viewModel.wyzieSearchResults.collectAsState()
-      val isOnlineSectionExpanded by viewModel.isOnlineSectionExpanded.collectAsState()
-
-      // Media Search / Autocomplete
-      val mediaResults by viewModel.mediaSearchResults.collectAsState()
-      val isSearchingMedia by viewModel.isSearchingMedia.collectAsState()
-      
-      // TV Show / Seasons / Episodes
-      val selectedTvShow by viewModel.selectedTvShow.collectAsState()
-      val isFetchingTvDetails by viewModel.isFetchingTvDetails.collectAsState()
-      val selectedSeason by viewModel.selectedSeason.collectAsState()
-      val seasonEpisodes by viewModel.seasonEpisodes.collectAsState()
-      val isFetchingEpisodes by viewModel.isFetchingEpisodes.collectAsState()
-      val selectedEpisode by viewModel.selectedEpisode.collectAsState()
-
-      OnlineSubtitleSearchSheet(
-        onDismissRequest = onDismissRequest,
-        onDownloadOnline = { viewModel.downloadSubtitle(it) },
-        isSearching = isSearching,
-        isDownloading = isDownloading,
-        searchResults = results.toImmutableList(),
-        isOnlineSectionExpanded = isOnlineSectionExpanded,
-        onToggleOnlineSection = { viewModel.toggleOnlineSection() },
-        mediaTitle = viewModel.currentMediaTitle,
-        // Autocomplete & Series Selection
-        mediaSearchResults = mediaResults.toImmutableList(),
-        isSearchingMedia = isSearchingMedia,
-        onSearchMedia = { query ->
-          // Use clean title from query for TMDB search (strip S01E05 noise)
-          val queryInfo = MediaInfoParser.parse(query)
-          val searchTitle = queryInfo.title.ifBlank { query }
-          viewModel.searchMedia(searchTitle)
-        },
-        onSelectMedia = { viewModel.selectMedia(it) },
-        selectedTvShow = selectedTvShow,
-        isFetchingTvDetails = isFetchingTvDetails,
-        selectedSeason = selectedSeason,
-        onSelectSeason = { viewModel.selectSeason(it) },
-        seasonEpisodes = seasonEpisodes.toImmutableList(),
-        isFetchingEpisodes = isFetchingEpisodes,
-        selectedEpisode = selectedEpisode,
-        onSelectEpisode = { viewModel.selectEpisode(it) },
-        onClearMediaSelection = { viewModel.clearMediaSelection() },
-      )
-    }
-
-    Sheets.AudioTracks -> {
-      val audioPicker =
-        rememberLauncherForActivityResult(
-          ActivityResultContracts.OpenDocument(),
-        ) {
-          if (it == null) return@rememberLauncherForActivityResult
-          onAddAudio(it)
-        }
-      AudioTracksSheet(
-        tracks = audioTracks,
-        onSelect = onSelectAudio,
-        onAddAudioTrack = { audioPicker.launch(arrayOf("*/*")) },
-        onOpenDelayPanel = { onOpenPanel(Panels.AudioDelay) },
-        onDismissRequest,
-      )
-    }
-
-    Sheets.Chapters -> {
-      if (chapter == null) return
-      ChaptersSheet(
-        chapters,
-        currentChapter = chapter,
-        onClick = { onSeekToChapter(chapters.indexOf(it)) },
-        onDismissRequest,
-      )
-    }
-
-    Sheets.Decoders -> {
-      DecodersSheet(
-        selectedDecoder = decoder,
-        onSelect = onUpdateDecoder,
-        onDismissRequest,
-      )
-    }
-
-    Sheets.More -> {
-      MoreSheet(
-        remainingTime = sleepTimerTimeRemaining,
-        onStartTimer = onStartSleepTimer,
-        onDismissRequest = onDismissRequest,
-        onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
-        onOpenAspectRatio = { onShowSheet(Sheets.AspectRatios) },
-        onOpenFrameNavigation = { onShowSheet(Sheets.FrameNavigation) },
-      )
-    }
-
-    Sheets.PlaybackSpeed -> {
-      PlaybackSpeedSheet(
-        speed,
-        onSpeedChange = onSpeedChange,
-        speedPresets = speedPresets,
-        onAddSpeedPreset = onAddSpeedPreset,
-        onRemoveSpeedPreset = onRemoveSpeedPreset,
-        onResetPresets = onResetSpeedPresets,
-        onMakeDefault = onMakeDefaultSpeed,
-        onResetDefault = onResetDefaultSpeed,
-        onDismissRequest = onDismissRequest,
-      )
-    }
-
-    Sheets.VideoZoom -> {
-      val videoZoom by viewModel.videoZoom.collectAsState()
-      VideoZoomSheet(
-        videoZoom = videoZoom,
-        onSetVideoZoom = viewModel::setVideoZoom,
-        onResetVideoPan = viewModel::resetVideoPan,
-        onDismissRequest = onDismissRequest,
-      )
-    }
-
-    Sheets.AspectRatios -> {
-      val playerPreferences = koinInject<app.marlboroadvance.mpvex.preferences.PlayerPreferences>()
-      val customRatiosSet by playerPreferences.customAspectRatios.collectPreferenceAsState()
-      val currentRatio by viewModel.currentAspectRatio.collectAsState()
-      val customRatios =
-        customRatiosSet.mapNotNull { str ->
-          val parts = str.split("|")
-          if (parts.size == 2) {
-            app.marlboroadvance.mpvex.ui.player.controls.components.sheets.AspectRatio(
-              label = parts[0],
-              ratio = parts[1].toDoubleOrNull() ?: return@mapNotNull null,
-              isCustom = true,
+        if (showFilePicker) {
+            app.marlboroadvance.mpvex.ui.browser.dialogs.FilePickerDialog(
+                isOpen = true,
+                currentPath = savedPickerPath ?: android.os.Environment.getExternalStorageDirectory().absolutePath,
+                onDismiss = { showFilePicker = false },
+                onPathChanged = { path ->
+                    if (path != null) {
+                        subtitlesPreferences.pickerPath.set(path)
+                    }
+                },
+                onFileSelected = { path ->
+                    showFilePicker = false
+                     onAddSubtitle(Uri.parse("file://$path"))
+                },
+                onSystemPickerRequest = {
+                    showFilePicker = false
+                    subtitlesPicker.launch(
+                      arrayOf(
+                        "text/plain",
+                        "text/srt",
+                        "text/vtt",
+                        "application/x-subrip",
+                        "application/x-subtitle",
+                        "text/x-ssa",
+                        "*/*",
+                      ),
+                    )
+                },
+                matchToName = matchToName
             )
-          } else {
-            null
-          }
         }
 
-      AspectRatioSheet(
-        currentRatio = currentRatio,
-        customRatios = customRatios,
-        onSelectRatio = { ratio ->
-          if (ratio < 0) {
-            // Default selected - apply Fit mode
-            viewModel.changeVideoAspect(app.marlboroadvance.mpvex.ui.player.VideoAspect.Fit)
-          } else {
-            // Custom ratio selected
-            viewModel.setCustomAspectRatio(ratio)
-          }
-        },
-        onAddCustomRatio = { label, ratio ->
-          playerPreferences.customAspectRatios.set(customRatiosSet + "$label|$ratio")
-          viewModel.setCustomAspectRatio(ratio)
-        },
-        onDeleteCustomRatio = { ratio ->
-          val toRemove = "${ratio.label}|${ratio.ratio}"
-          playerPreferences.customAspectRatios.set(customRatiosSet - toRemove)
-          // If the deleted ratio is currently active, reset to default (Fit)
-          if (kotlin.math.abs(currentRatio - ratio.ratio) < 0.01) {
-            viewModel.changeVideoAspect(app.marlboroadvance.mpvex.ui.player.VideoAspect.Fit)
-          }
-        },
-        onDismissRequest = onDismissRequest,
-      )
-    }
-
-    Sheets.FrameNavigation -> {
-      val currentFrame by viewModel.currentFrame.collectAsState()
-      val totalFrames by viewModel.totalFrames.collectAsState()
-      FrameNavigationSheet(
-        currentFrame = currentFrame,
-        totalFrames = totalFrames,
-        onUpdateFrameInfo = viewModel::updateFrameInfo,
-        onPause = viewModel::pause,
-        onUnpause = viewModel::unpause,
-        onPauseUnpause = viewModel::pauseUnpause,
-        onSeekTo = { position, _ -> viewModel.seekTo(position) },
-        onDismissRequest = onDismissRequest,
-      )
-    }
-
-
-    Sheets.Playlist -> {
-      // Refresh playlist items when sheet is shown
-      LaunchedEffect(Unit) {
-        viewModel.refreshPlaylistItems()
+        SubtitlesSheet(
+          tracks = subtitles.toImmutableList(),
+          onToggleSubtitle = onToggleSubtitle,
+          isSubtitleSelected = isSubtitleSelected,
+          onAddSubtitle = { showFilePicker = true },
+          onRemoveSubtitle = onRemoveSubtitle,
+          onOpenSubtitleSettings = { onOpenPanel(Panels.SubtitleSettings) },
+          onOpenSubtitleDelay = { onOpenPanel(Panels.SubtitleDelay) },
+          onOpenOnlineSearch = { onShowSheet(Sheets.OnlineSubtitleSearch) },
+        )
       }
 
-      // Observe playlist updates and loading state
-      val playlist by viewModel.playlistItems.collectAsState()
-      val loadingItemIndex by viewModel.loadingItemIndex.collectAsState()
-      val playerPreferences = koinInject<app.marlboroadvance.mpvex.preferences.PlayerPreferences>()
+      Sheets.OnlineSubtitleSearch -> {
+        val isSearching by viewModel.isSearchingSub.collectAsState()
+        val isDownloading by viewModel.isDownloadingSub.collectAsState()
+        val results by viewModel.wyzieSearchResults.collectAsState()
+        val isOnlineSectionExpanded by viewModel.isOnlineSectionExpanded.collectAsState()
 
-      if (playlist.isNotEmpty()) {
-        val playlistImmutable = playlist.toImmutableList()
-        val isM3U = viewModel.isPlaylistM3U()
-        PlaylistSheet(
-          playlist = playlistImmutable,
+        // Media Search / Autocomplete
+        val mediaResults by viewModel.mediaSearchResults.collectAsState()
+        val isSearchingMedia by viewModel.isSearchingMedia.collectAsState()
+      
+        // TV Show / Seasons / Episodes
+        val selectedTvShow by viewModel.selectedTvShow.collectAsState()
+        val isFetchingTvDetails by viewModel.isFetchingTvDetails.collectAsState()
+        val selectedSeason by viewModel.selectedSeason.collectAsState()
+        val seasonEpisodes by viewModel.seasonEpisodes.collectAsState()
+        val isFetchingEpisodes by viewModel.isFetchingEpisodes.collectAsState()
+        val selectedEpisode by viewModel.selectedEpisode.collectAsState()
+
+        OnlineSubtitleSearchSheet(
+          onDownloadOnline = { viewModel.downloadSubtitle(it) },
+          isSearching = isSearching,
+          isDownloading = isDownloading,
+          searchResults = results.toImmutableList(),
+          isOnlineSectionExpanded = isOnlineSectionExpanded,
+          onToggleOnlineSection = { viewModel.toggleOnlineSection() },
+          mediaTitle = viewModel.currentMediaTitle,
+          // Autocomplete & Series Selection
+          mediaSearchResults = mediaResults.toImmutableList(),
+          isSearchingMedia = isSearchingMedia,
+          onSearchMedia = { query ->
+            // Use clean title from query for TMDB search (strip S01E05 noise)
+            val queryInfo = MediaInfoParser.parse(query)
+            val searchTitle = queryInfo.title.ifBlank { query }
+            viewModel.searchMedia(searchTitle)
+          },
+          onSelectMedia = { viewModel.selectMedia(it) },
+          selectedTvShow = selectedTvShow,
+          isFetchingTvDetails = isFetchingTvDetails,
+          selectedSeason = selectedSeason,
+          onSelectSeason = { viewModel.selectSeason(it) },
+          seasonEpisodes = seasonEpisodes.toImmutableList(),
+          isFetchingEpisodes = isFetchingEpisodes,
+          selectedEpisode = selectedEpisode,
+          onSelectEpisode = { viewModel.selectEpisode(it) },
+          onClearMediaSelection = { viewModel.clearMediaSelection() },
+        )
+      }
+
+      Sheets.AudioTracks -> {
+        val audioPicker =
+          rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument(),
+          ) {
+            if (it == null) return@rememberLauncherForActivityResult
+            onAddAudio(it)
+          }
+        AudioTracksSheet(
+          tracks = audioTracks,
+          onSelect = onSelectAudio,
+          onAddAudioTrack = { audioPicker.launch(arrayOf("*/*")) },
+          onOpenDelayPanel = { onOpenPanel(Panels.AudioDelay) },
+        )
+      }
+
+      Sheets.Chapters -> {
+        if (chapter == null) return@sheetBody
+        ChaptersSheet(
+          chapters,
+          currentChapter = chapter,
+          onClick = { onSeekToChapter(chapters.indexOf(it)) },
+        )
+      }
+
+      Sheets.Decoders -> {
+        DecodersSheet(
+          selectedDecoder = decoder,
+          onSelect = onUpdateDecoder,
+        )
+      }
+
+      Sheets.More -> {
+        MoreSheet(
+          remainingTime = sleepTimerTimeRemaining,
+          onStartTimer = onStartSleepTimer,
           onDismissRequest = onDismissRequest,
-          onItemClick = { item ->
-            scope.launch {
-              onDismissRequest()
-              delay(200)
-              viewModel.playPlaylistItem(item.index)
+          onEnterFiltersPanel = { onOpenPanel(Panels.VideoFilters) },
+          onOpenAspectRatio = { onShowSheet(Sheets.AspectRatios) },
+          onOpenFrameNavigation = { onShowSheet(Sheets.FrameNavigation) },
+        )
+      }
+
+      Sheets.PlaybackSpeed -> {
+        PlaybackSpeedSheet(
+          speed,
+          onSpeedChange = onSpeedChange,
+          speedPresets = speedPresets,
+          onAddSpeedPreset = onAddSpeedPreset,
+          onRemoveSpeedPreset = onRemoveSpeedPreset,
+          onResetPresets = onResetSpeedPresets,
+          onMakeDefault = onMakeDefaultSpeed,
+          onResetDefault = onResetDefaultSpeed,
+          onDismissRequest = onDismissRequest,
+        )
+      }
+
+      Sheets.VideoZoom -> {
+        val videoZoom by viewModel.videoZoom.collectAsState()
+        VideoZoomSheet(
+          videoZoom = videoZoom,
+          onSetVideoZoom = viewModel::setVideoZoom,
+          onResetVideoPan = viewModel::resetVideoPan,
+          onDismissRequest = onDismissRequest,
+        )
+      }
+
+      Sheets.AspectRatios -> {
+        val playerPreferences = koinInject<app.marlboroadvance.mpvex.preferences.PlayerPreferences>()
+        val customRatiosSet by playerPreferences.customAspectRatios.collectPreferenceAsState()
+        val currentRatio by viewModel.currentAspectRatio.collectAsState()
+        val customRatios =
+          customRatiosSet.mapNotNull { str ->
+            val parts = str.split("|")
+            if (parts.size == 2) {
+              app.marlboroadvance.mpvex.ui.player.controls.components.sheets.AspectRatio(
+                label = parts[0],
+                ratio = parts[1].toDoubleOrNull() ?: return@mapNotNull null,
+                isCustom = true,
+              )
+            } else {
+              null
+            }
+          }
+
+        AspectRatioSheet(
+          currentRatio = currentRatio,
+          customRatios = customRatios,
+          onSelectRatio = { ratio ->
+            if (ratio < 0) {
+              // Default selected - apply Fit mode
+              viewModel.changeVideoAspect(app.marlboroadvance.mpvex.ui.player.VideoAspect.Fit)
+            } else {
+              // Custom ratio selected
+              viewModel.setCustomAspectRatio(ratio)
             }
           },
-          isM3UPlaylist = isM3U,
-          playerPreferences = playerPreferences,
-          loadingItemIndex = loadingItemIndex,
+          onAddCustomRatio = { label, ratio ->
+            playerPreferences.customAspectRatios.set(customRatiosSet + "$label|$ratio")
+            viewModel.setCustomAspectRatio(ratio)
+          },
+          onDeleteCustomRatio = { ratio ->
+            val toRemove = "${ratio.label}|${ratio.ratio}"
+            playerPreferences.customAspectRatios.set(customRatiosSet - toRemove)
+            // If the deleted ratio is currently active, reset to default (Fit)
+            if (kotlin.math.abs(currentRatio - ratio.ratio) < 0.01) {
+              viewModel.changeVideoAspect(app.marlboroadvance.mpvex.ui.player.VideoAspect.Fit)
+            }
+          },
+          onDismissRequest = onDismissRequest,
         )
+      }
+
+      Sheets.FrameNavigation -> {
+        val currentFrame by viewModel.currentFrame.collectAsState()
+        val totalFrames by viewModel.totalFrames.collectAsState()
+        FrameNavigationSheet(
+          currentFrame = currentFrame,
+          totalFrames = totalFrames,
+          onUpdateFrameInfo = viewModel::updateFrameInfo,
+          onPause = viewModel::pause,
+          onUnpause = viewModel::unpause,
+          onPauseUnpause = viewModel::pauseUnpause,
+          onSeekTo = { position, _ -> viewModel.seekTo(position) },
+          onDismissRequest = onDismissRequest,
+        )
+      }
+
+
+      Sheets.Playlist -> {
+        // Refresh playlist items when sheet is shown
+        LaunchedEffect(Unit) {
+          viewModel.refreshPlaylistItems()
+        }
+
+        // Observe playlist updates and loading state
+        val playlist by viewModel.playlistItems.collectAsState()
+        val loadingItemIndex by viewModel.loadingItemIndex.collectAsState()
+        val playerPreferences = koinInject<app.marlboroadvance.mpvex.preferences.PlayerPreferences>()
+
+        if (playlist.isNotEmpty()) {
+          val playlistImmutable = playlist.toImmutableList()
+          val isM3U = viewModel.isPlaylistM3U()
+          PlaylistSheet(
+            playlist = playlistImmutable,
+            onDismissRequest = onDismissRequest,
+            onItemClick = { item ->
+              scope.launch {
+                onDismissRequest()
+                delay(200)
+                viewModel.playPlaylistItem(item.index)
+              }
+            },
+            isM3UPlaylist = isM3U,
+            playerPreferences = playerPreferences,
+            loadingItemIndex = loadingItemIndex,
+          )
+        }
       }
     }
   }
+
+  // Track sheets and every panel share one PlayerOverlayHost. It stays mounted while
+  // the content swaps, so tracks -> delay/settings never shows two overlays,
+  // duplicate scrims or a jump. Other sheets keep their own PlayerSheet layout.
+  val hosted = panelShown != Panels.None || sheetShown.usesOverlayHost()
+  if (hosted) {
+    val overlayKey: Any = if (panelShown != Panels.None) panelShown else sheetShown
+    PlayerOverlayHost(onDismissRequest = onDismissRequest) { dismiss ->
+      AnimatedContent(
+        targetState = overlayKey,
+        label = "player_overlay_content",
+        transitionSpec = {
+          // Fade-through: old content leaves first, then the new one arrives, while
+          // the size settles on the player's spring so the host never jumps.
+          (
+            fadeIn(tween(durationMillis = 210, delayMillis = 90)) togetherWith
+              fadeOut(tween(durationMillis = 90))
+          ).using(SizeTransform(clip = true) { _, _ -> playerControlsEnterAnimationSpec() })
+        },
+      ) { key ->
+        if (key is Panels) {
+          PlayerPanels(panelShown = key, onDismissRequest = dismiss, viewModel = viewModel)
+        } else {
+          sheetBody(key as Sheets)
+        }
+      }
+    }
+  } else {
+    sheetBody(sheetShown)
+  }
 }
+
+private fun Sheets.usesOverlayHost(): Boolean =
+  when (this) {
+    Sheets.SubtitleTracks,
+    Sheets.OnlineSubtitleSearch,
+    Sheets.AudioTracks,
+    Sheets.Chapters,
+    Sheets.Decoders,
+    -> true
+    else -> false
+  }

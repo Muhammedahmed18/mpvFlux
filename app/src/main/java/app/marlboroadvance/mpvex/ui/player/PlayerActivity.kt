@@ -509,14 +509,8 @@ class PlayerActivity :
 
   @RequiresApi(Build.VERSION_CODES.P)
   private fun handleBackPress() {
-    if (viewModel.sheetShown.value != Sheets.None) {
-      viewModel.setSheetShown(Sheets.None)
-      viewModel.showControls()
-      return
-    }
-
-    if (viewModel.panelShown.value != Panels.None) {
-      viewModel.panelShown.update { Panels.None }
+    if (viewModel.sheetShown.value != Sheets.None || viewModel.panelShown.value != Panels.None) {
+      viewModel.dismissOverlay()
       viewModel.showControls()
       return
     }

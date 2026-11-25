@@ -34,7 +34,7 @@ fun VideoSettingsPanel(
   onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  DraggablePanel(
+  OverlayPanelContent(
     modifier = modifier,
     header = {
       Row(

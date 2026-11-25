@@ -44,7 +44,6 @@ fun SubtitlesSheet(
   onOpenSubtitleDelay: () -> Unit,
   onRemoveSubtitle: (Int) -> Unit,
   onOpenOnlineSearch: () -> Unit,
-  onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   val embeddedLabel = stringResource(R.string.track_header_embedded)
@@ -72,7 +71,6 @@ fun SubtitlesSheet(
 
   GenericTracksSheet(
     tracks = items,
-    onDismissRequest = onDismissRequest,
     header = {
       Column {
         SheetHeader(

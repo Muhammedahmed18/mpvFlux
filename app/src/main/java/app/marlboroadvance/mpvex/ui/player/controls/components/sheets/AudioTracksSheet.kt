@@ -76,28 +76,24 @@ fun AudioTracksSheet(
   onSelect: (TrackNode) -> Unit,
   onAddAudioTrack: () -> Unit,
   onOpenDelayPanel: () -> Unit,
-  onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   // Orientation branching (side sheet vs bottom sheet) lives in the shared
-  // TracksSheetHost. `dismiss` animates the sheet out before clearing state,
-  // so e.g. picking an audio channel no longer pops the sheet instantly.
-  TracksSheetHost(onDismissRequest = onDismissRequest) { dismiss ->
-    AudioTracksSheetContent(
-      tracks            = tracks,
-      onSelect          = onSelect,
-      onAddAudioTrack   = onAddAudioTrack,
-      onOpenDelayPanel  = onOpenDelayPanel,
-      onDismissRequest  = dismiss,
-      modifier          = modifier,
-    )
-  }
+  // PlayerOverlayHost. The animated dismiss animates the sheet out before clearing
+  // state, so e.g. picking an audio channel no longer pops the sheet instantly.
+  AudioTracksSheetContent(
+    tracks            = tracks,
+    onSelect          = onSelect,
+    onAddAudioTrack   = onAddAudioTrack,
+    onOpenDelayPanel  = onOpenDelayPanel,
+    onDismissRequest  = LocalOverlayDismiss.current,
+    modifier          = modifier,
+  )
 }
 
 /**
  * Inner content of the audio tracks sheet — the AnimatedContent swap between the
- * main view and the channel selection view. Extracted so it can be re-hosted inside
- * either a `ModalBottomSheet` (portrait) or a side-sheet wrapper (landscape).
+ * main view and the channel selection view. Hosted by [PlayerOverlayHost].
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

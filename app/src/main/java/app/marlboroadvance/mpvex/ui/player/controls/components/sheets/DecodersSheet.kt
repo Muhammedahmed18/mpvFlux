@@ -32,7 +32,6 @@ import kotlinx.coroutines.withContext
 fun DecodersSheet(
   selectedDecoder: Decoder,
   onSelect: (Decoder) -> Unit,
-  onDismissRequest: () -> Unit,
 ) {
   val decoders = remember { Decoder.entries.minusElement(Decoder.Auto).toImmutableList() }
 
@@ -111,7 +110,6 @@ fun DecodersSheet(
         enabled = !blocked,
       )
     },
-    onDismissRequest = onDismissRequest,
   )
 }
 

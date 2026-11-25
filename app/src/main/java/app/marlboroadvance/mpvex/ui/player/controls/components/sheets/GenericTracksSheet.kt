@@ -59,9 +59,11 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -130,21 +132,28 @@ fun getTrackTitle(track: TrackNode): String {
 }
 
 /**
- * Shared orientation-aware host for every track-style sheet in the player —
- * single source of truth, used by both the subtitles and audio sheets (the
- * branching below was previously copy-pasted in each).
+ * Animated dismiss of the surrounding [PlayerOverlayHost]. Content calls it for
+ * programmatic dismissal (e.g. after picking an option) so the overlay slides out
+ * before the state is cleared, instead of popping instantly.
+ */
+internal val LocalOverlayDismiss = staticCompositionLocalOf<() -> Unit> { {} }
+
+/**
+ * Single orientation-aware host for every sheet and panel the player shows in a
+ * sheet-style overlay — one source of truth for anchoring, shape, scrim, insets,
+ * motion and dismissal.
  *
  *  - Landscape → right-anchored [PlayerSideSheet] so the video stays watchable.
  *  - Portrait  → canonical M3 [ModalBottomSheet] with built-in drag handle.
  *
- * Each host fully owns its entrance/exit animation. The content slot receives a
- * `dismiss` lambda that animates the sheet out **before** clearing the sheet
- * state — content should call it for programmatic dismissal (e.g. after the user
- * picks an option) instead of the raw `onDismissRequest`, which pops instantly.
+ * The host owns its entrance/exit animation. The content slot receives a `dismiss`
+ * lambda (also exposed as [LocalOverlayDismiss]) that animates the overlay out
+ * **before** [onDismissRequest] clears the state; the raw `onDismissRequest` pops
+ * instantly.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun TracksSheetHost(
+internal fun PlayerOverlayHost(
   onDismissRequest: () -> Unit,
   content: @Composable (dismiss: () -> Unit) -> Unit,
 ) {
@@ -156,8 +165,9 @@ internal fun TracksSheetHost(
       onDismissRequest = onDismissRequest,
       sheetWidth       = rememberSideSheetWidth(),
       surfaceColor     = MaterialTheme.colorScheme.surfaceContainerLow,
-      content          = content,
-    )
+    ) { dismiss ->
+      CompositionLocalProvider(LocalOverlayDismiss provides dismiss) { content(dismiss) }
+    }
   } else {
     // Partial expansion kept (no skipPartiallyExpanded): the sheet opens at
     // half height so the video stays visible while picking a track; drag up
@@ -167,6 +177,9 @@ internal fun TracksSheetHost(
     // Even fully expanded the sheet stops at ~75% of the screen, so it never
     // reads as a full-screen takeover of the player.
     val maxSheetHeight = LocalConfiguration.current.screenHeightDp.dp * 0.75f
+    val dismiss: () -> Unit = {
+      scope.launch { sheetState.hide() }.invokeOnCompletion { onDismissRequest() }
+    }
     ModalBottomSheet(
       onDismissRequest = onDismissRequest,
       sheetState       = sheetState,
@@ -177,9 +190,7 @@ internal fun TracksSheetHost(
       dragHandle       = { BottomSheetDefaults.DragHandle() },
     ) {
       Box(modifier = Modifier.heightIn(max = maxSheetHeight)) {
-        content {
-          scope.launch { sheetState.hide() }.invokeOnCompletion { onDismissRequest() }
-        }
+        CompositionLocalProvider(LocalOverlayDismiss provides dismiss) { content(dismiss) }
       }
     }
   }
@@ -188,29 +199,25 @@ internal fun TracksSheetHost(
 @Composable
 fun <T> GenericTracksSheet(
   tracks: ImmutableList<T>,
-  onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier,
   lazyListState: LazyListState? = null,
   header: @Composable () -> Unit = {},
   track: @Composable (T) -> Unit = {},
   footer: @Composable () -> Unit = {},
 ) {
-  TracksSheetHost(onDismissRequest = onDismissRequest) { _ ->
-    GenericTracksSheetContent(
-      tracks        = tracks,
-      modifier      = modifier,
-      lazyListState = lazyListState,
-      header        = header,
-      track         = track,
-      footer        = footer,
-    )
-  }
+  GenericTracksSheetContent(
+    tracks        = tracks,
+    modifier      = modifier,
+    lazyListState = lazyListState,
+    header        = header,
+    track         = track,
+    footer        = footer,
+  )
 }
 
 /**
  * Inner content of the tracks sheet — header + scrollable track list + footer.
- * Extracted so it can be re-hosted inside either a `ModalBottomSheet` (portrait)
- * or a side-sheet wrapper (landscape).
+ * Hosted by [PlayerOverlayHost] (`ModalBottomSheet` in portrait, side sheet in landscape).
  */
 @Composable
 private fun <T> GenericTracksSheetContent(

@@ -1128,6 +1128,11 @@
     <item quantity="one">%1$d TRACK</item>
     <item quantity="other">%1$d TRACKS</item>
   </plurals>
+  <plurals name="player_chapter_count">
+    <item quantity="one">%1$d CHAPTER</item>
+    <item quantity="other">%1$d CHAPTERS</item>
+  </plurals>
+  <string name="player_sheets_chapters_title">Chapters</string>
   <!-- Smart Skip -->
   <string name="smart_skip_intro">Skip Intro</string>
   <string name="smart_skip_outro">Skip Outro</string>

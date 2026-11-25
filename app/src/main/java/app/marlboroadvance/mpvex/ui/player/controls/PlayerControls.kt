@@ -259,22 +259,22 @@ fun PlayerControls(
   val activity = LocalActivity.current as PlayerActivity
 
   val onOpenSheet: (Sheets) -> Unit = {
-    viewModel.setSheetShown(it)
     if (it == Sheets.None) {
+      viewModel.dismissOverlay()
       viewModel.showControls()
     } else {
+      viewModel.openSheet(it)
       viewModel.hideControls()
-      viewModel.panelShown.update { Panels.None }
     }
   }
 
   val onOpenPanel: (Panels) -> Unit = {
-    viewModel.panelShown.update { _ -> it }
     if (it == Panels.None) {
+      viewModel.dismissOverlay()
       viewModel.showControls()
     } else {
+      viewModel.openPanel(it)
       viewModel.hideControls()
-      viewModel.sheetShown.update { Sheets.None }
     }
   }
 
@@ -903,6 +903,7 @@ fun PlayerControls(
     }
 
     val sheetShown by viewModel.sheetShown.collectAsState()
+    val panelShown by viewModel.panelShown.collectAsState()
     val subtitles by viewModel.subtitleTracks.collectAsState(persistentListOf())
     val audioTracks by viewModel.audioTracks.collectAsState(persistentListOf())
     val sleepTimerTimeRemaining by viewModel.remainingTime.collectAsState()
@@ -919,10 +920,7 @@ fun PlayerControls(
     // (portrait ModalBottomSheet animates inside its own dialog window; landscape
     // PlayerSideSheet slides in from the right). Wrapping them in a vertical slide
     // composited both motions into a diagonal "rises from the bottom" mush.
-    PlayerSheets(viewModel = viewModel, sheetShown = sheetShown, subtitles = subtitlesImm, onAddSubtitle = viewModel::addSubtitle, onToggleSubtitle = { id -> if (viewModel.isSubtitleSelected(id)) { viewModel.subtitlesTurnedOffByUser = true; MPVLib.setPropertyString("sid", "no"); MPVLib.setPropertyString("secondary-sid", "no") } else { viewModel.subtitlesTurnedOffByUser = false; MPVLib.setPropertyInt("sid", id); MPVLib.setPropertyString("secondary-sid", "no") } }, isSubtitleSelected = viewModel::isSubtitleSelected, onRemoveSubtitle = viewModel::removeSubtitle, audioTracks = audioTracksImm, onAddAudio = viewModel::addAudio, onSelectAudio = { if (MPVLib.getPropertyInt("aid") == it.id) MPVLib.setPropertyString("aid", "no") else MPVLib.setPropertyInt("aid", it.id) }, chapter = chaptersImm.getOrNull(currentChapter ?: 0), chapters = chaptersImm, onSeekToChapter = { MPVLib.setPropertyInt("chapter", it); viewModel.unpause() }, decoder = decoder, onUpdateDecoder = { MPVLib.setPropertyString("hwdec", it.value) }, speed = playbackSpeed ?: playerPreferences.defaultSpeed.get(), onSpeedChange = { MPVLib.setPropertyFloat("speed", it.toFixed(2)) }, onMakeDefaultSpeed = { playerPreferences.defaultSpeed.set(it.toFixed(2)) }, onAddSpeedPreset = { playerPreferences.speedPresets += it.toFixed(2).toString() }, onRemoveSpeedPreset = { playerPreferences.speedPresets -= it.toFixed(2).toString() }, onResetSpeedPresets = playerPreferences.speedPresets::delete, speedPresets = sortedSpeedPresets, onResetDefaultSpeed = { MPVLib.setPropertyFloat("speed", playerPreferences.defaultSpeed.deleteAndGet().toFixed(2)) }, sleepTimerTimeRemaining = sleepTimerTimeRemaining, onStartSleepTimer = viewModel::startTimer, onOpenPanel = onOpenPanel, onShowSheet = onOpenSheet, onDismissRequest = { onOpenSheet(Sheets.None) })
-
-    val panel by viewModel.panelShown.collectAsState()
-    PlayerPanels(panelShown = panel, onDismissRequest = { onOpenPanel(Panels.None) }, viewModel = viewModel)
+    PlayerSheets(viewModel = viewModel, sheetShown = sheetShown, subtitles = subtitlesImm, onAddSubtitle = viewModel::addSubtitle, onToggleSubtitle = { id -> if (viewModel.isSubtitleSelected(id)) { viewModel.subtitlesTurnedOffByUser = true; MPVLib.setPropertyString("sid", "no"); MPVLib.setPropertyString("secondary-sid", "no") } else { viewModel.subtitlesTurnedOffByUser = false; MPVLib.setPropertyInt("sid", id); MPVLib.setPropertyString("secondary-sid", "no") } }, isSubtitleSelected = viewModel::isSubtitleSelected, onRemoveSubtitle = viewModel::removeSubtitle, audioTracks = audioTracksImm, onAddAudio = viewModel::addAudio, onSelectAudio = { if (MPVLib.getPropertyInt("aid") == it.id) MPVLib.setPropertyString("aid", "no") else MPVLib.setPropertyInt("aid", it.id) }, chapter = chaptersImm.getOrNull(currentChapter ?: 0), chapters = chaptersImm, onSeekToChapter = { MPVLib.setPropertyInt("chapter", it); viewModel.unpause() }, decoder = decoder, onUpdateDecoder = { MPVLib.setPropertyString("hwdec", it.value) }, speed = playbackSpeed ?: playerPreferences.defaultSpeed.get(), onSpeedChange = { MPVLib.setPropertyFloat("speed", it.toFixed(2)) }, onMakeDefaultSpeed = { playerPreferences.defaultSpeed.set(it.toFixed(2)) }, onAddSpeedPreset = { playerPreferences.speedPresets += it.toFixed(2).toString() }, onRemoveSpeedPreset = { playerPreferences.speedPresets -= it.toFixed(2).toString() }, onResetSpeedPresets = playerPreferences.speedPresets::delete, speedPresets = sortedSpeedPresets, onResetDefaultSpeed = { MPVLib.setPropertyFloat("speed", playerPreferences.defaultSpeed.deleteAndGet().toFixed(2)) }, sleepTimerTimeRemaining = sleepTimerTimeRemaining, onStartSleepTimer = viewModel::startTimer, onOpenPanel = onOpenPanel, onShowSheet = onOpenSheet, onDismissRequest = { onOpenSheet(Sheets.None) }, panelShown = panelShown)
   }
 }
 

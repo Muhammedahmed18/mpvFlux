@@ -34,7 +34,7 @@ fun SubtitleSettingsPanel(
   onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  DraggablePanel(
+  OverlayPanelContent(
     modifier = modifier,
     header = {
       Row(

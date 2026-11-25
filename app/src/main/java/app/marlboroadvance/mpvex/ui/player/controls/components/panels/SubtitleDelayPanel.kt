@@ -63,7 +63,7 @@ fun SubtitleDelayPanel(
 ) {
   val preferences = koinInject<SubtitlesPreferences>()
 
-  DraggablePanel(
+  OverlayPanelContent(
     modifier = modifier,
     header = {
       SubtitleDelayTitle(onClose = onDismissRequest)
@@ -89,7 +89,7 @@ fun SubtitleDelayPanel(
   }
 }
 
-// Extracted content to avoid nested cards since DraggablePanel has a Card
+// Extracted content to avoid nested cards since the overlay host already provides the surface
 @Composable
 private fun SubtitleDelayCardContent(
   delay: Float,
@@ -131,7 +131,7 @@ fun DelayCardContent( // Renamed from DelayCard and removed the Card wrapper
   delayType: DelayType,
   extraSettings: @Composable ColumnScope.() -> Unit = {},
 ) {
-    // Note: verticalScroll is now handled by DraggablePanel
+    // Note: verticalScroll is now handled by OverlayPanelContent
     Column(
        Modifier.padding(MaterialTheme.spacing.medium),
        verticalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
