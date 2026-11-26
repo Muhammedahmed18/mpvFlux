@@ -17,11 +17,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.IntSize
-import app.marlboroadvance.mpvex.repository.wyzie.WyzieEpisode
-import app.marlboroadvance.mpvex.repository.wyzie.WyzieSeason
-import app.marlboroadvance.mpvex.repository.wyzie.WyzieSubtitle
-import app.marlboroadvance.mpvex.repository.wyzie.WyzieTmdbResult
-import app.marlboroadvance.mpvex.repository.wyzie.WyzieTvShowDetails
+import androidx.compose.animation.core.VisibilityThreshold
 import app.marlboroadvance.mpvex.ui.player.Decoder
 import app.marlboroadvance.mpvex.ui.player.Panels
 import app.marlboroadvance.mpvex.ui.player.Sheets
