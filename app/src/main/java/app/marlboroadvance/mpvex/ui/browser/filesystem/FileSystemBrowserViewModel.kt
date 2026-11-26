@@ -515,16 +515,19 @@ class FileSystemBrowserViewModel(
         val playbackState = playbackStateRepository.getVideoDataByTitle(video.displayName)
         if (playbackState == null && video.displayName in markedNewTitles) markedNewIds += video.id
 
-        if (playbackState != null && video.duration > 0) {
-          val durationSeconds = video.duration / 1000
-          val timeRemaining = playbackState.timeRemaining.toLong()
-          val watched = durationSeconds - timeRemaining
-          val progressValue = (watched.toFloat() / durationSeconds.toFloat()).coerceIn(0f, 1f)
+        if (playbackState != null) {
+          // Saved position + time remaining is the duration the player saw; fall back to
+          // the library duration (milliseconds) only when it was never saved.
+          val savedTotal = playbackState.lastPosition.toLong() + playbackState.timeRemaining.toLong()
+          val totalSeconds = if (savedTotal > 0) savedTotal else video.duration / 1000
+          if (totalSeconds > 0) {
+            val progressValue = (playbackState.lastPosition.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
 
-          // Only show progress for videos that are 1-99% complete
-          // Similar to how media players show partial progress
-          if (progressValue in 0.01f..0.99f) {
-            playbackMap[video.id] = progressValue
+            // Only show progress for videos that are 1-99% complete
+            // Similar to how media players show partial progress
+            if (progressValue in 0.01f..0.99f) {
+              playbackMap[video.id] = progressValue
+            }
           }
         }
       }

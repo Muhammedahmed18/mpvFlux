@@ -330,15 +330,20 @@ class VideoListViewModel(
 
       var progress: Float? = null
       var isWatched = false
-      if (state != null && video.duration > 0) {
-        // Duration is in milliseconds, convert to seconds
-        val durationSeconds = video.duration / 1000
-        val watchedSeconds = durationSeconds - state.timeRemaining.toLong()
-        val progressValue = (watchedSeconds.toFloat() / durationSeconds.toFloat()).coerceIn(0f, 1f)
+      if (state != null) {
+        // Saved position + time remaining is the duration the player saw. Fall back to the
+        // library duration (milliseconds) only when that total was never saved.
+        val savedTotal = state.lastPosition.toLong() + state.timeRemaining.toLong()
+        val totalSeconds = if (savedTotal > 0) savedTotal else video.duration / 1000
+        val progressValue = if (totalSeconds > 0) {
+          (state.lastPosition.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
+        } else {
+          null
+        }
 
-        // Only show progress for videos that are 1-99% complete
-        if (progressValue in 0.01f..0.99f) progress = progressValue
-        isWatched = state.hasBeenWatched || progressValue >= settings.watchedFraction
+        // Only show progress for videos that are 1-99% complete; none when duration is unknown
+        if (progressValue != null && progressValue in 0.01f..0.99f) progress = progressValue
+        isWatched = state.hasBeenWatched || (progressValue != null && progressValue >= settings.watchedFraction)
       }
 
       // Unplayed means there is no playback state record.

@@ -165,18 +165,23 @@ class RecentlyPlayedViewModel(application: Application) : AndroidViewModel(appli
           var progress: Float? = null
           var isWatched = false
 
-          if (playbackState != null && video.duration > 0) {
-            val durationSeconds = video.duration / 1000
-            val timeRemaining = playbackState.timeRemaining.toLong()
-            val watchedSeconds = durationSeconds - timeRemaining
-            val progressValue = (watchedSeconds.toFloat() / durationSeconds.toFloat()).coerceIn(0f, 1f)
+          if (playbackState != null) {
+            // Saved position + time remaining is the duration the player saw; fall back to
+            // the library duration (milliseconds) only when it was never saved.
+            val savedTotal = playbackState.lastPosition.toLong() + playbackState.timeRemaining.toLong()
+            val totalSeconds = if (savedTotal > 0) savedTotal else video.duration / 1000
+            val progressValue = if (totalSeconds > 0) {
+              (playbackState.lastPosition.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
+            } else {
+              null
+            }
 
             // Only show progress for videos that are 1-99% complete
-            if (progressValue in 0.01f..0.99f) {
+            if (progressValue != null && progressValue in 0.01f..0.99f) {
                 progress = progressValue
             }
 
-            val calculatedWatched = progressValue >= (watchedThreshold / 100f)
+            val calculatedWatched = progressValue != null && progressValue >= (watchedThreshold / 100f)
             isWatched = playbackState.hasBeenWatched || calculatedWatched
           }
 

@@ -289,6 +289,9 @@ class PlayerActivity :
    */
   private val progressSaveManager = ProgressSaveManager()
 
+  /** True once the watched-threshold save was made for the current file (see time-pos collector). */
+  private var watchedThresholdSaved = false
+
   // ==================== Background Playback ====================
 
   /**
@@ -406,6 +409,23 @@ class PlayerActivity :
       playerPreferences.showFileExtension.changes().collect {
         updateDisplayTitle()
         viewModel.refreshPlaylistItems()
+      }
+    }
+
+    // Save once as soon as playback reaches the watched threshold so the card dims right away.
+    // The flag re-arms when the position falls back below it (seek back / rewatch / new file).
+    lifecycleScope.launch {
+      MPVLib.propInt["time-pos"].collect { pos ->
+        if (pos == null || loadingFile || !mpvInitialized) return@collect
+        val duration = viewModel.duration ?: 0
+        if (duration <= 0) return@collect
+        val reached = pos >= duration * (browserPreferences.watchedThreshold.get() / 100f)
+        if (reached && !watchedThresholdSaved) {
+          watchedThresholdSaved = true
+          saveVideoProgress(isImmediate = true)
+        } else if (!reached) {
+          watchedThresholdSaved = false
+        }
       }
     }
 
@@ -1577,6 +1597,7 @@ class PlayerActivity :
     viewModel.clearABLoop()
 
     progressSaveManager.resetTracking()
+    watchedThresholdSaved = false
 
     viewModel.clearPlaylistLoadingState()
 

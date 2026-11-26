@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 /** The few playback-state columns the watched/progress/NEW badges need. */
 data class PlaybackBadgeRow(
   val mediaTitle: String,
+  val lastPosition: Int,
   val timeRemaining: Int,
   val hasBeenWatched: Boolean,
 )
@@ -16,7 +17,7 @@ data class PlaybackBadgeRow(
 @Dao
 interface PlaybackStateDao {
   /** All saved progress in one query; re-emits whenever the table changes. */
-  @Query("SELECT mediaTitle, timeRemaining, hasBeenWatched FROM PlaybackStateEntity")
+  @Query("SELECT mediaTitle, lastPosition, timeRemaining, hasBeenWatched FROM PlaybackStateEntity")
   fun observePlaybackBadgeRows(): Flow<List<PlaybackBadgeRow>>
 
   @Upsert

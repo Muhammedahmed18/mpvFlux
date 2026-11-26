@@ -59,6 +59,8 @@ class ProgressSaveManager : KoinComponent {
         private const val TAG = "ProgressSaveManager"
         private const val SAVE_DEBOUNCE_MS = 500L
         private const val BLOCKING_SAVE_TIMEOUT_MS = 1500L
+        // Same value as PlayerActivity's minimum resume position.
+        private const val MIN_REWATCH_POSITION_SECONDS = 5
     }
     
     /**
@@ -150,10 +152,16 @@ class ProgressSaveManager : KoinComponent {
         
         // Get watched threshold from preferences (default 95%)
         val thresholdPercent = browserPreferences.watchedThreshold.get()
-        val isWatched = if (duration > 0) {
-            currentPos >= (duration * (thresholdPercent / 100f))
-        } else {
-            false
+        val previouslyWatched = oldState?.hasBeenWatched == true
+        val isWatched = when {
+            // Unknown duration: nothing to compare against, so keep what was already stored.
+            duration <= 0 -> previouslyWatched
+            currentPos >= (duration * (thresholdPercent / 100f)) -> true
+            !previouslyWatched -> false
+            // Already watched: only a real rewatch clears it. Positions under the minimum
+            // resume point arrive as 0 (video opened or seeked at the very start).
+            currentPos >= MIN_REWATCH_POSITION_SECONDS -> false
+            else -> true
         }
 
         playbackStateRepository.upsert(
