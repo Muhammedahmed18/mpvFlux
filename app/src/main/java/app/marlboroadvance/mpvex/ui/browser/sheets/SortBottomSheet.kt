@@ -2,19 +2,15 @@ package app.marlboroadvance.mpvex.ui.browser.sheets
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -28,7 +24,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
@@ -221,7 +216,6 @@ private fun SectionContainer(
   }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SortByCard(
   sortType: String,
@@ -230,34 +224,42 @@ private fun SortByCard(
   icons: List<ImageVector>,
 ) {
   SectionContainer(title = stringResource(R.string.sort_by)) {
-    FlowRow(
+    Column(
       modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
       verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-      types.forEachIndexed { index, type ->
-        val selected = type == sortType
-        ToggleButton(
-          checked = selected,
-          onCheckedChange = { if (it) onSortTypeChange(type) },
-          modifier = Modifier
-            .minimumInteractiveComponentSize()
-            .semantics { role = Role.RadioButton },
+      types.chunked(2).forEachIndexed { rowIndex, rowTypes ->
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-          if (index < icons.size) {
-            Icon(
-              imageVector = icons[index],
-              contentDescription = null,
-              modifier = Modifier.size(ToggleButtonDefaults.IconSize),
-            )
-            Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
+          rowTypes.forEachIndexed { colIndex, type ->
+            val index = rowIndex * 2 + colIndex
+            ToggleButton(
+              checked = type == sortType,
+              onCheckedChange = { if (it) onSortTypeChange(type) },
+              modifier = Modifier
+                .weight(1f)
+                .minimumInteractiveComponentSize()
+                .semantics { role = Role.RadioButton },
+            ) {
+              if (index < icons.size) {
+                Icon(
+                  imageVector = icons[index],
+                  contentDescription = null,
+                  modifier = Modifier.size(ToggleButtonDefaults.IconSize),
+                )
+                Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
+              }
+              Text(
+                text = type,
+                style = MaterialTheme.typography.labelLargeEmphasized,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+            }
           }
-          Text(
-            text = type,
-            style = MaterialTheme.typography.labelLargeEmphasized,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-          )
+          if (rowTypes.size < 2) Spacer(Modifier.weight(1f))
         }
       }
     }
@@ -329,30 +331,33 @@ private fun ViewOptionsCard(
   toggles: List<VisibilityToggle>,
 ) {
   SectionContainer(title = stringResource(R.string.view_options)) {
-    Column {
-      toggles.forEach { toggle ->
+    Column(
+      modifier = Modifier.fillMaxWidth(),
+      verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+      toggles.chunked(3).forEach { rowToggles ->
         Row(
-          modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .toggleable(
-              value = toggle.checked,
-              role = Role.Switch,
-              onValueChange = { toggle.onCheckedChange(it) },
-            ),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(16.dp),
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-          Text(
-            text = toggle.label,
-            style = MaterialTheme.typography.labelLargeEmphasized,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-          )
-          Switch(
-            checked = toggle.checked,
-            onCheckedChange = null,
-          )
+          rowToggles.forEach { toggle ->
+            ToggleButton(
+              checked = toggle.checked,
+              onCheckedChange = toggle.onCheckedChange,
+              modifier = Modifier
+                .weight(1f)
+                .minimumInteractiveComponentSize()
+                .semantics { role = Role.Checkbox },
+            ) {
+              Text(
+                text = toggle.label,
+                style = MaterialTheme.typography.labelLargeEmphasized,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+              )
+            }
+          }
+          repeat(3 - rowToggles.size) { Spacer(Modifier.weight(1f)) }
         }
       }
     }
