@@ -62,6 +62,8 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationSheet
 import app.marlboroadvance.mpvex.ui.browser.playlist.PlaylistDetailScreen
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
+import app.marlboroadvance.mpvex.ui.browser.components.ActionFeedbackHost
+import app.marlboroadvance.mpvex.ui.browser.components.rememberActionFeedbackState
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
@@ -94,6 +96,8 @@ object RecentlyPlayedScreen : Screen {
     val browserPreferences = koinInject<BrowserPreferences>()
     val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
 
+    val feedback = rememberActionFeedbackState()
+
     val selectionManager =
       rememberSelectionManager(
         items = recentItems,
@@ -122,6 +126,7 @@ object RecentlyPlayedScreen : Screen {
         },
         onRenameItem = null,
         onOperationComplete = { },
+        feedback = feedback,
       )
 
     BackHandler(enabled = selectionManager.isInSelectionMode) {
@@ -192,6 +197,8 @@ object RecentlyPlayedScreen : Screen {
 
   val extractAudio = app.marlboroadvance.mpvex.ui.browser.sheets.rememberExtractAudioController()
   app.marlboroadvance.mpvex.ui.browser.sheets.ExtractAudioHost(extractAudio)
+
+  ActionFeedbackHost(feedback)
 
   Scaffold(
         topBar = {

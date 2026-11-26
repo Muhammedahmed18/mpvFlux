@@ -1,8 +1,11 @@
 package app.marlboroadvance.mpvex.ui.browser.selection
 
 import android.content.Context
-import android.widget.Toast
 import androidx.annotation.PluralsRes
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -13,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.Video
+import app.marlboroadvance.mpvex.ui.browser.components.ActionFeedbackState
 import app.marlboroadvance.mpvex.utils.media.MediaUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -29,6 +33,7 @@ class SelectionManager<T, ID>(
   private val onDeleteItems: suspend (List<T>, Boolean) -> Pair<Int, Int>,
   private val onRenameItem: (suspend (T, String) -> Result<Unit>)?,
   private val onOperationComplete: () -> Unit,
+  private val feedback: ActionFeedbackState,
   @PluralsRes private val deletedMessage: Int = R.plurals.delete_result_items,
 ) {
   var state by mutableStateOf(SelectionState<ID>())
@@ -91,7 +96,8 @@ class SelectionManager<T, ID>(
     scope.launch {
       runCatching {
         val (deleted, failed) = onDeleteItems(selected, deleteFiles)
-        // e.g. "12 videos deleted" or "10 videos deleted · 2 failed".
+        // One message per batch, e.g. "12 videos deleted" or "10 videos deleted · 2 failed".
+        // Deleting is not reversible, so there is no Undo.
         val message =
           when {
             deleted > 0 && failed > 0 ->
@@ -104,9 +110,9 @@ class SelectionManager<T, ID>(
             failed > 0 -> context.getString(R.string.delete_result_failed)
             else -> null
           }
-        message?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
+        message?.let { feedback.show(it, if (deleted > 0) Icons.Rounded.Delete else Icons.Rounded.ErrorOutline, isError = deleted == 0) }
       }.onFailure {
-        Toast.makeText(context, "Failed to delete: ${it.message}", Toast.LENGTH_SHORT).show()
+        feedback.show(context.getString(R.string.delete_result_failed), Icons.Rounded.ErrorOutline, isError = true)
       }
       clear()
       onOperationComplete()
@@ -125,12 +131,12 @@ class SelectionManager<T, ID>(
       runCatching {
         val result = onRenameItem(item, newName)
         result.onSuccess {
-          Toast.makeText(context, "Renamed successfully", Toast.LENGTH_SHORT).show()
-        }.onFailure { error ->
-          Toast.makeText(context, "Failed to rename: ${error.message}", Toast.LENGTH_SHORT).show()
+          feedback.show(context.getString(R.string.rename_success), Icons.Rounded.DriveFileRenameOutline)
+        }.onFailure {
+          feedback.show(context.getString(R.string.rename_failed), Icons.Rounded.ErrorOutline, isError = true)
         }
       }.onFailure {
-        Toast.makeText(context, "Failed to rename: ${it.message}", Toast.LENGTH_SHORT).show()
+        feedback.show(context.getString(R.string.rename_failed), Icons.Rounded.ErrorOutline, isError = true)
       }
       clear()
       onOperationComplete()
@@ -174,6 +180,7 @@ class SelectionManager<T, ID>(
  * @param onDeleteItems Callback to delete items (includes boolean to delete original files)
  * @param onRenameItem Optional callback to rename an item
  * @param onOperationComplete Callback when an operation completes (to refresh list)
+ * @param feedback Shared feedback state used for delete/rename results
  * @param deletedMessage Plural for the "N deleted" message, e.g. [R.plurals.delete_result_videos]
  */
 @Composable
@@ -183,6 +190,7 @@ fun <T, ID> rememberSelectionManager(
   onDeleteItems: suspend (List<T>, Boolean) -> Pair<Int, Int>,
   onRenameItem: (suspend (T, String) -> Result<Unit>)? = null,
   onOperationComplete: () -> Unit = {},
+  feedback: ActionFeedbackState,
   @PluralsRes deletedMessage: Int = R.plurals.delete_result_items,
 ): SelectionManager<T, ID> {
   val context = LocalContext.current
@@ -197,6 +205,7 @@ fun <T, ID> rememberSelectionManager(
       onDeleteItems = onDeleteItems,
       onRenameItem = onRenameItem,
       onOperationComplete = onOperationComplete,
+      feedback = feedback,
       deletedMessage = deletedMessage,
     )
   }

@@ -71,10 +71,6 @@ import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DriveFileRenameOutline
 import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
 import app.marlboroadvance.mpvex.ui.browser.components.selectionToolbarScroll
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.unit.Dp
@@ -85,6 +81,8 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
+import app.marlboroadvance.mpvex.ui.browser.components.ActionFeedbackHost
+import app.marlboroadvance.mpvex.ui.browser.components.rememberActionFeedbackState
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
 import app.marlboroadvance.mpvex.ui.browser.sheets.rememberSortOrderLabels
@@ -151,7 +149,7 @@ object FolderListScreen : Screen {
     val renameDialogOpen = rememberSaveable { mutableStateOf(false) }
     val markAsOpen = rememberSaveable { mutableStateOf(false) }
     val addToPlaylistOpen = rememberSaveable { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
+    val feedback = rememberActionFeedbackState()
     val scope = rememberCoroutineScope()
     // Videos of the selected folders, resolved when an action needs them (Play, Mark as, Playlist).
     var folderVideos by remember { mutableStateOf<List<Video>>(emptyList()) }
@@ -213,6 +211,7 @@ object FolderListScreen : Screen {
         viewModel.renameFolder(folder, newName)
       },
       onOperationComplete = { viewModel.refresh() },
+      feedback = feedback,
     )
 
     // The app's navigation bar steps aside while folders are selected so the selection
@@ -259,7 +258,6 @@ object FolderListScreen : Screen {
 
     Scaffold(
       contentWindowInsets = WindowInsets(0, 0, 0, 0),
-      snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
         if (permissionState.status !is PermissionStatus.Denied) {
           // Folder totals come from the scan; nothing is measured here.
@@ -350,7 +348,6 @@ object FolderListScreen : Screen {
         val renameLabel = stringResource(R.string.rename)
         val deleteLabel = stringResource(R.string.delete)
         val hideLabel = stringResource(R.string.selection_hide_folder)
-        val undoLabel = stringResource(R.string.mark_as_undo)
         val markAsIcon = ImageVector.vectorResource(R.drawable.ic_sym_done_all)
 
         // One folder:  Hide · Add to playlist · Rename · Mark as   [Delete]
@@ -368,15 +365,11 @@ object FolderListScreen : Screen {
                 if (folders.isNotEmpty()) {
                   val previous = viewModel.hideFolders(folders)
                   selectionManager.clear()
-                  scope.launch {
-                    snackbarHostState.currentSnackbarData?.dismiss()
-                    val result = snackbarHostState.showSnackbar(
-                      message = resources.getQuantityString(R.plurals.selection_folders_hidden, folders.size, folders.size),
-                      actionLabel = undoLabel,
-                      duration = SnackbarDuration.Short,
-                    )
-                    if (result == SnackbarResult.ActionPerformed) viewModel.restoreBlacklist(previous)
-                  }
+                  feedback.show(
+                    message = resources.getQuantityString(R.plurals.selection_folders_hidden, folders.size, folders.size),
+                    icon = Icons.Rounded.VisibilityOff,
+                    onUndo = { viewModel.restoreBlacklist(previous) },
+                  )
                 }
               }),
             )
@@ -404,12 +397,14 @@ object FolderListScreen : Screen {
         )
       }
 
+      ActionFeedbackHost(feedback)
+
       // "Mark as" for every video in the selected folders, with Undo.
       MarkAsHost(
         open = markAsOpen,
         selectedVideos = { folderVideos },
         allFinished = false,
-        snackbarHostState = snackbarHostState,
+        feedback = feedback,
         onApplied = { selectionManager.clear() },
       )
 

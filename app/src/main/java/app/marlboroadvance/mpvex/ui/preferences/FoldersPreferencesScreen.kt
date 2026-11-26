@@ -1,6 +1,11 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import android.app.Application
+import app.marlboroadvance.mpvex.ui.browser.components.rememberActionFeedbackState
+import app.marlboroadvance.mpvex.ui.browser.components.ActionFeedbackHost
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -98,6 +103,21 @@ object FoldersPreferencesScreen : Screen {
 
     val blacklistedFoldersList = remember(blacklistedFolders) { blacklistedFolders.toList() }
 
+    val feedback = rememberActionFeedbackState()
+    // Hidden folders are a plain preference set, so every change here can be undone by
+    // putting the previous set back. One message per change, whether it covers 1 or many.
+    fun updateHidden(newSet: Set<String>, plural: Int, count: Int, icon: ImageVector) {
+      val previous = preferences.blacklistedFolders.get()
+      preferences.blacklistedFolders.set(newSet)
+      feedback.show(
+        message = context.resources.getQuantityString(plural, count, count),
+        icon = icon,
+        onUndo = { preferences.blacklistedFolders.set(previous) },
+      )
+    }
+
+    ActionFeedbackHost(feedback)
+
     Scaffold(
       topBar = {
         BrowserTopBar(
@@ -108,10 +128,8 @@ object FoldersPreferencesScreen : Screen {
             onCancelSelection = { selectionState = selectionState.clear() },
             onBackClick = backstack::removeLastOrNull,
             onDeleteClick = {
-              val updated = blacklistedFolders.toMutableSet().apply {
-                removeAll(selectionState.selectedIds)
-              }
-              preferences.blacklistedFolders.set(updated)
+              val removed = selectionState.selectedIds.toSet()
+              updateHidden(blacklistedFolders - removed, R.plurals.selection_folders_unhidden, removed.size, Icons.Rounded.Visibility)
               selectionState = selectionState.clear()
             },
             onSelectAll = { selectionState = selectionState.selectAll(blacklistedFoldersList) },
@@ -169,8 +187,7 @@ object FoldersPreferencesScreen : Screen {
                 isSelected = selectionState.isSelected(folderPath),
                 isInSelectionMode = selectionState.isInSelectionMode,
                 onRemove = {
-                  val updated = blacklistedFolders.toMutableSet().apply { remove(folderPath) }
-                  preferences.blacklistedFolders.set(updated)
+                  updateHidden(blacklistedFolders - folderPath, R.plurals.selection_folders_unhidden, 1, Icons.Rounded.Visibility)
                 },
                 onLongClick = {
                   selectionState = selectionState.toggle(folderPath)
@@ -239,8 +256,7 @@ object FoldersPreferencesScreen : Screen {
           }
         },
         onAddFolders = { folderPaths ->
-          val updated = blacklistedFolders.toMutableSet().apply { addAll(folderPaths) }
-          preferences.blacklistedFolders.set(updated)
+          updateHidden(blacklistedFolders + folderPaths, R.plurals.selection_folders_hidden, folderPaths.size, Icons.Rounded.VisibilityOff)
         },
         sheetState = sheetState,
       )
@@ -254,7 +270,7 @@ object FoldersPreferencesScreen : Screen {
         confirmButton = {
           TextButton(
             onClick = {
-              preferences.blacklistedFolders.set(emptySet())
+              updateHidden(emptySet(), R.plurals.selection_folders_unhidden, blacklistedFolders.size, Icons.Rounded.Visibility)
               showClearAllDialog = false
             },
           ) {

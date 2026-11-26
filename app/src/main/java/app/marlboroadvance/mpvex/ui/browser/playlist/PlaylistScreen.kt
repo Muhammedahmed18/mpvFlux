@@ -51,6 +51,8 @@ import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbar
 import app.marlboroadvance.mpvex.ui.browser.components.SelectionToolbarDefaults
 import app.marlboroadvance.mpvex.ui.browser.components.BrowserTopBar
 import app.marlboroadvance.mpvex.ui.browser.dialogs.DeleteConfirmationDialog
+import app.marlboroadvance.mpvex.ui.browser.components.ActionFeedbackHost
+import app.marlboroadvance.mpvex.ui.browser.components.rememberActionFeedbackState
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.PlaylistActionSheet
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
@@ -74,6 +76,8 @@ object PlaylistScreen : Screen {
     )
 
     val playlistsWithCount by viewModel.playlistsWithCount.collectAsStateWithLifecycle()
+    val feedback = rememberActionFeedbackState()
+
     val selectionManager = rememberSelectionManager(
       items = playlistsWithCount,
       getId = { it.playlist.id },
@@ -84,7 +88,9 @@ object PlaylistScreen : Screen {
       onRenameItem = { _, _ -> 
         Result.success(Unit)
       },
-      onOperationComplete = { viewModel.refresh() }
+      onOperationComplete = { viewModel.refresh() },
+      feedback = feedback,
+      deletedMessage = R.plurals.delete_result_playlists,
     )
 
     val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
@@ -115,6 +121,8 @@ object PlaylistScreen : Screen {
     }
 
     BackHandler(enabled = selectionManager.isInSelectionMode) { selectionManager.clear() }
+
+    ActionFeedbackHost(feedback)
 
     Scaffold(
       topBar = {

@@ -37,8 +37,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -89,6 +87,8 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.FolderPickerDialog
 import app.marlboroadvance.mpvex.ui.browser.dialogs.RenameDialog
 import app.marlboroadvance.mpvex.ui.browser.sheets.SortBottomSheet
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
+import app.marlboroadvance.mpvex.ui.browser.components.ActionFeedbackHost
+import app.marlboroadvance.mpvex.ui.browser.components.rememberActionFeedbackState
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
 import app.marlboroadvance.mpvex.ui.browser.sheets.MarkAsHost
@@ -221,7 +221,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
   val sortDialogOpen = rememberSaveable { mutableStateOf(false) }
   val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
   val markAsOpen = rememberSaveable { mutableStateOf(false) }
-  val snackbarHostState = remember { SnackbarHostState() }
+  val feedback = rememberActionFeedbackState()
   val renameDialogOpen = rememberSaveable { mutableStateOf(false) }
   val addToPlaylistDialogOpen = rememberSaveable { mutableStateOf(false) }
 
@@ -254,6 +254,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
       viewModel.renameFolder(folder, newName)
     },
     onOperationComplete = { viewModel.refresh() },
+    feedback = feedback,
     deletedMessage = R.plurals.delete_result_folders,
   )
 
@@ -267,6 +268,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
       viewModel.renameVideo(video, newName)
     },
     onOperationComplete = { viewModel.refresh() },
+    feedback = feedback,
     deletedMessage = R.plurals.delete_result_videos,
   )
 
@@ -435,7 +437,6 @@ fun FileSystemBrowserScreen(path: String? = null) {
     app.marlboroadvance.mpvex.ui.browser.sheets.ExtractAudioHost(extractAudio)
 
     Scaffold(
-      snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
         // Folder totals come from the scan; nothing is measured here.
         val selectionSummary =
@@ -673,12 +674,14 @@ fun FileSystemBrowserScreen(path: String? = null) {
       },
     )
 
+    ActionFeedbackHost(feedback)
+
     // "Mark as" sheet for the selected videos, with Undo.
     MarkAsHost(
       open = markAsOpen,
       selectedVideos = { toolbarVideos },
       allFinished = false,
-      snackbarHostState = snackbarHostState,
+      feedback = feedback,
       onApplied = { clearSelection() },
     )
 

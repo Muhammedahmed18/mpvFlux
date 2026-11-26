@@ -30,8 +30,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -91,6 +89,8 @@ import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
 import app.marlboroadvance.mpvex.ui.browser.fab.FabScrollHelper
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
+import app.marlboroadvance.mpvex.ui.browser.components.ActionFeedbackHost
+import app.marlboroadvance.mpvex.ui.browser.components.rememberActionFeedbackState
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.sheets.MarkAsHost
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
@@ -208,6 +208,8 @@ data class VideoListScreen(
       else -> videoCountLabel
     }
 
+    val feedback = rememberActionFeedbackState()
+
     // Selection manager
     val sortedVideos = remember(sortedVideosWithInfo) { sortedVideosWithInfo.map { it.video } }
     val selectionManager =
@@ -216,6 +218,7 @@ data class VideoListScreen(
         getId = { it.id },
         onDeleteItems = { items, _ -> viewModel.deleteVideosWithProgress(items) },
         onRenameItem = { video, newName -> viewModel.renameVideo(video, newName) },
+        feedback = feedback,
         deletedMessage = R.plurals.delete_result_videos,
       )
     val deleteProgress by viewModel.deleteProgress.collectAsStateWithLifecycle()
@@ -225,7 +228,6 @@ data class VideoListScreen(
     val sortDialogOpen = rememberSaveable { mutableStateOf(false) }
     val deleteDialogOpen = rememberSaveable { mutableStateOf(false) }
     val markAsOpen = rememberSaveable { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
     val renameDialogOpen = rememberSaveable { mutableStateOf(false) }
     val addToPlaylistDialogOpen = rememberSaveable { mutableStateOf(false) }
     val copyOrMoveOpen = rememberSaveable { mutableStateOf(false) }
@@ -306,7 +308,6 @@ data class VideoListScreen(
     val extractAudio = app.marlboroadvance.mpvex.ui.browser.sheets.rememberExtractAudioController()
 
     Scaffold(
-      snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
         val selectionSummary =
           if (selectionManager.isInSelectionMode) {
@@ -480,6 +481,8 @@ data class VideoListScreen(
         privateSpaceMovedCount = privateSpaceMovedCount,
       )
 
+      ActionFeedbackHost(feedback)
+
       // "Mark as" sheet (New / Last played / Finished / Unwatched) with Undo.
       MarkAsHost(
         open = markAsOpen,
@@ -491,7 +494,7 @@ data class VideoListScreen(
         } else {
           false
         },
-        snackbarHostState = snackbarHostState,
+        feedback = feedback,
         onApplied = { selectionManager.clear() },
       )
     }

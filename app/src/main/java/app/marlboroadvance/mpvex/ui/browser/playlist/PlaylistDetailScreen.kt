@@ -7,7 +7,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.*
@@ -15,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
@@ -54,6 +54,8 @@ import androidx.compose.material.icons.rounded.Share
 import androidx.compose.ui.unit.Dp
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionManager
 import app.marlboroadvance.mpvex.ui.browser.selection.SelectionSummary
+import app.marlboroadvance.mpvex.ui.browser.components.ActionFeedbackHost
+import app.marlboroadvance.mpvex.ui.browser.components.rememberActionFeedbackState
 import app.marlboroadvance.mpvex.ui.browser.selection.rememberSelectionManager
 import app.marlboroadvance.mpvex.ui.browser.states.EmptyState
 import app.marlboroadvance.mpvex.ui.player.PlayerActivity
@@ -122,6 +124,8 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
       )
     }
 
+    val feedback = rememberActionFeedbackState()
+
     val selectionManager = rememberSelectionManager(
       items = videoItems,
       getId = { it.playlistItem.id },
@@ -130,6 +134,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
         Pair(itemsToDelete.size, 0)
       },
       onOperationComplete = { viewModel.refresh() },
+      feedback = feedback,
     )
 
     val listState = rememberLazyListState()
@@ -154,6 +159,8 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
 
     val extractAudio = app.marlboroadvance.mpvex.ui.browser.sheets.rememberExtractAudioController()
     app.marlboroadvance.mpvex.ui.browser.sheets.ExtractAudioHost(extractAudio)
+
+    ActionFeedbackHost(feedback)
 
     Scaffold(
       topBar = {
@@ -386,7 +393,7 @@ data class PlaylistDetailScreen(val playlistId: Int) : Screen {
         onCopy = {
           val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
           cm.setPrimaryClip(ClipData.newPlainText("URL", urlDialogContent))
-          Toast.makeText(context, urlCopiedText, Toast.LENGTH_SHORT).show()
+          feedback.show(urlCopiedText, Icons.Rounded.Link)
         }
       )
     }
