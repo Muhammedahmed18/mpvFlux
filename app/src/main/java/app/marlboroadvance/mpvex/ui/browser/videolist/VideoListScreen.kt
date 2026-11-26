@@ -58,6 +58,7 @@ import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
+import app.marlboroadvance.mpvex.preferences.DecoderPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.SortOrder
 import app.marlboroadvance.mpvex.preferences.VideoSortType
@@ -123,6 +124,7 @@ data class VideoListScreen(
     val safeBack = LocalSafeBack.current
     val browserPreferences = koinInject<BrowserPreferences>()
     val appearancePreferences = koinInject<AppearancePreferences>()
+    val decoderPreferences = koinInject<DecoderPreferences>()
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
     // ViewModel
@@ -146,13 +148,15 @@ data class VideoListScreen(
     val showFramerateInResolution by browserPreferences.showFramerateInResolution.collectAsState()
     val showProgressBar by browserPreferences.showProgressBar.collectAsState()
     val showDateChip by browserPreferences.showDateChip.collectAsState()
+    val showDecoderChip by browserPreferences.showDecoderChip.collectAsState()
+    val tryHwDecoding by decoderPreferences.tryHWDecoding.collectAsState()
     val showUnplayedOldVideoLabel by appearancePreferences.showUnplayedOldVideoLabel.collectAsState()
     val unplayedOldVideoDays by appearancePreferences.unplayedOldVideoDays.collectAsState()
 
     val videoCardSettings = remember(
       unlimitedNameLines, showThumbnails, showVideoExtension, showSizeChip,
       showResolutionChip, showFramerateInResolution, showProgressBar,
-      showDateChip, showUnplayedOldVideoLabel, unplayedOldVideoDays
+      showDateChip, showDecoderChip, tryHwDecoding, showUnplayedOldVideoLabel, unplayedOldVideoDays
     ) {
       app.marlboroadvance.mpvex.ui.browser.cards.VideoCardSettings(
         unlimitedNameLines = unlimitedNameLines,
@@ -163,6 +167,8 @@ data class VideoListScreen(
         showFramerateInResolution = showFramerateInResolution,
         showProgressBar = showProgressBar,
         showDateChip = showDateChip,
+        showDecoderChip = showDecoderChip,
+        tryHwDecoding = tryHwDecoding,
         showUnplayedOldVideoLabel = showUnplayedOldVideoLabel,
         unplayedOldVideoDays = unplayedOldVideoDays
       )
@@ -854,6 +860,7 @@ private fun VideoSortBottomSheet(
   val showResolutionChip by browserPreferences.showResolutionChip.collectAsState()
   val showFramerateInResolution by browserPreferences.showFramerateInResolution.collectAsState()
   val showDateChip by browserPreferences.showDateChip.collectAsState()
+  val showDecoderChip by browserPreferences.showDecoderChip.collectAsState()
   val showSubtitleIndicator by browserPreferences.showSubtitleIndicator.collectAsState()
   val unlimitedNameLines by appearancePreferences.unlimitedNameLines.collectAsState()
 
@@ -877,6 +884,7 @@ private fun VideoSortBottomSheet(
       browserPreferences.showResolutionChip.set(true)
       browserPreferences.showFramerateInResolution.set(false)
       browserPreferences.showDateChip.set(true)
+      browserPreferences.showDecoderChip.set(false)
     },
     types = listOf(VideoSortType.Title.displayName, VideoSortType.Duration.displayName, VideoSortType.Date.displayName, VideoSortType.Size.displayName),
     icons = listOf(ImageVector.vectorResource(id = R.drawable.sort_by_alpha_24px), Icons.Filled.AccessTime, Icons.Filled.CalendarToday, Icons.Filled.SwapVert),
@@ -898,6 +906,7 @@ private fun VideoSortBottomSheet(
       VisibilityToggle(label = stringResource(R.string.media_info_resolution), checked = showResolutionChip, onCheckedChange = { browserPreferences.showResolutionChip.set(it) }),
       VisibilityToggle(label = stringResource(R.string.view_toggle_framerate), checked = showFramerateInResolution, onCheckedChange = { browserPreferences.showFramerateInResolution.set(it) }),
       VisibilityToggle(label = stringResource(R.string.view_toggle_date), checked = showDateChip, onCheckedChange = { browserPreferences.showDateChip.set(it) }),
+      VisibilityToggle(label = stringResource(R.string.view_toggle_decoder), checked = showDecoderChip, onCheckedChange = { browserPreferences.showDecoderChip.set(it) }),
     ),
   )
 }

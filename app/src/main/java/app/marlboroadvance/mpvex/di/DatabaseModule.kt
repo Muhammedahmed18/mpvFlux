@@ -526,6 +526,21 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
   }
 }
 
+/**
+ * Migration from version 11 to version 12
+ *
+ * Changes:
+ * - Adds videoCodec and videoProfile columns to video_metadata_cache (decoder chip on video cards)
+ * - Clears the cache so entries are rescanned lazily with the new fields (derived data only)
+ */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+  override fun migrate(db: SupportSQLiteDatabase) {
+    db.execSQL("ALTER TABLE video_metadata_cache ADD COLUMN videoCodec TEXT NOT NULL DEFAULT ''")
+    db.execSQL("ALTER TABLE video_metadata_cache ADD COLUMN videoProfile TEXT NOT NULL DEFAULT ''")
+    db.execSQL("DELETE FROM video_metadata_cache")
+  }
+}
+
 val DatabaseModule =
   module {
     single<Json> {
@@ -540,7 +555,7 @@ val DatabaseModule =
       Room
         .databaseBuilder(context, MpvExDatabase::class.java, "mpvex.db")
         .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
         .fallbackToDestructiveMigration(true) // Fallback if migration fails (last resort)
         .build()
     }

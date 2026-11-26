@@ -28,17 +28,20 @@ fun UnifiedChip(
   // Filled with the theme's tertiary colour (used for the subtitles chip).
   isTertiary: Boolean = false,
   bold: Boolean = false,
+  // Optional explicit colours; they replace the ones picked by the flags above.
+  containerOverride: Color? = null,
+  contentOverride: Color? = null,
   size: UnifiedChipSize = if (compact) UnifiedChipSize.Compact else UnifiedChipSize.Large,
 ) {
   val colors = MaterialTheme.colorScheme
-  val containerColor = when {
+  val containerColor = containerOverride ?: when {
     isOutlined -> Color.Transparent
     isTertiary -> colors.tertiary
     isPrimary -> colors.primaryContainer
     isAccent -> colors.secondaryContainer
     else -> colors.surfaceContainerHighest
   }
-  val labelColor = when {
+  val labelColor = contentOverride ?: when {
     isTertiary && !isOutlined -> colors.onTertiary
     isPrimary -> colors.onPrimaryContainer
     isAccent -> colors.onSecondaryContainer

@@ -28,6 +28,8 @@ class BrowserPreferences(
   val showResolutionChip = preferenceStore.getBoolean("show_resolution_chip", false)
   val showFramerateInResolution = preferenceStore.getBoolean("show_framerate_in_resolution", false)
   val showSubtitleIndicator = preferenceStore.getBoolean("show_subtitle_indicator", false)
+  // Metadata-dependent chip: HW+/SW decoder badge (disabled by default for better performance)
+  val showDecoderChip = preferenceStore.getBoolean("show_decoder_chip", false)
   val showProgressBar = preferenceStore.getBoolean("show_progress_bar", true)
   val mediaLayoutMode = preferenceStore.getEnum("media_layout_mode", MediaLayoutMode.LIST)
 

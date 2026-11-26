@@ -987,6 +987,7 @@
   <string name="view_toggle_video_thumbnails">Video Thumbnails</string>
   <string name="view_toggle_show_extension">Show extension</string>
   <string name="view_toggle_framerate">Framerate</string>
+  <string name="view_toggle_decoder">Decoder</string>
   <string name="view_toggle_progress_bar">Progress Bar</string>
   <string name="track_header_embedded">EMBEDDED</string>
   <string name="track_header_external">EXTERNAL</string>

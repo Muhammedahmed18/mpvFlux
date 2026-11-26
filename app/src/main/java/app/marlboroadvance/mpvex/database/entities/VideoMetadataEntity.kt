@@ -19,5 +19,7 @@ data class VideoMetadataEntity(
   val fps: Float, // Framerate in frames per second
   val hasEmbeddedSubtitles: Boolean = false,
   val subtitleCodec: String = "",
+  val videoCodec: String = "", // mpv codec name of the first video stream, e.g. "h264", "hevc"
+  val videoProfile: String = "", // Codec profile without level, e.g. "High 10", "Main 10"
   val lastScanned: Long, // When this metadata was extracted (timestamp)
 )

@@ -46,6 +46,7 @@ object MetadataRetrieval {
         return browserPreferences.showResolutionChip.get() ||
                 browserPreferences.showFramerateInResolution.get() ||
                 browserPreferences.showSubtitleIndicator.get() ||
+                browserPreferences.showDecoderChip.get() ||
                 browserPreferences.showVideoThumbnails.get()
     }
 
@@ -72,7 +73,8 @@ object MetadataRetrieval {
         }
 
         // If video already has metadata (including FPS and subtitle info), return as-is
-        if (video.width > 0 && video.height > 0 && video.duration > 0 && video.fps > 0f && video.subtitleCodec.isNotEmpty()) {
+        if (video.width > 0 && video.height > 0 && video.duration > 0 && video.fps > 0f && video.subtitleCodec.isNotEmpty() &&
+            (video.videoCodec.isNotEmpty() || !browserPreferences.showDecoderChip.get())) {
             return@withContext video
         }
 
@@ -93,7 +95,9 @@ object MetadataRetrieval {
                     fps = metadata.fps,
                     resolution = formatResolutionWithFps(metadata.width, metadata.height, metadata.fps),
                     hasEmbeddedSubtitles = metadata.hasEmbeddedSubtitles,
-                    subtitleCodec = metadata.subtitleCodec
+                    subtitleCodec = metadata.subtitleCodec,
+                    videoCodec = metadata.videoCodec,
+                    videoProfile = metadata.videoProfile
                 )
             } else {
                 video
@@ -124,7 +128,8 @@ object MetadataRetrieval {
         // So we need to extract metadata if FPS or subtitle info is missing
         val videosNeedingMetadata = videos.filter { video ->
             video.width == 0 || video.height == 0 || video.duration == 0L || 
-            video.fps == 0f || video.subtitleCodec.isEmpty()
+            video.fps == 0f || video.subtitleCodec.isEmpty() ||
+            (video.videoCodec.isEmpty() && browserPreferences.showDecoderChip.get())
         }
 
         if (videosNeedingMetadata.isEmpty()) {
@@ -158,7 +163,9 @@ object MetadataRetrieval {
                     fps = metadata.fps,
                     resolution = formatResolutionWithFps(metadata.width, metadata.height, metadata.fps),
                     hasEmbeddedSubtitles = metadata.hasEmbeddedSubtitles,
-                    subtitleCodec = metadata.subtitleCodec
+                    subtitleCodec = metadata.subtitleCodec,
+                    videoCodec = metadata.videoCodec,
+                    videoProfile = metadata.videoProfile
                 )
             } else {
                 video
@@ -186,7 +193,8 @@ object MetadataRetrieval {
         for (video in videos) {
             // If video already has metadata (including FPS and subtitle info), emit as-is
             if (video.width > 0 && video.height > 0 && video.duration > 0 && 
-                video.fps > 0f && video.subtitleCodec.isNotEmpty()) {
+                video.fps > 0f && video.subtitleCodec.isNotEmpty() &&
+                (video.videoCodec.isNotEmpty() || !browserPreferences.showDecoderChip.get())) {
                 emit(video)
                 continue
             }
@@ -210,7 +218,9 @@ object MetadataRetrieval {
                             fps = metadata.fps,
                             resolution = formatResolutionWithFps(metadata.width, metadata.height, metadata.fps),
                             hasEmbeddedSubtitles = metadata.hasEmbeddedSubtitles,
-                            subtitleCodec = metadata.subtitleCodec
+                            subtitleCodec = metadata.subtitleCodec,
+                            videoCodec = metadata.videoCodec,
+                            videoProfile = metadata.videoProfile
                         )
                     )
                 } else {

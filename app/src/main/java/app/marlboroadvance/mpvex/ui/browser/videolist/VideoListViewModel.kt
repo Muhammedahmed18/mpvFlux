@@ -113,16 +113,18 @@ class VideoListViewModel(
         browserPreferences.showResolutionChip.changes(),
         browserPreferences.showFramerateInResolution.changes(),
         browserPreferences.showSubtitleIndicator.changes(),
-        browserPreferences.showVideoThumbnails.changes()
-      ) { showResolution, showFps, showSub, showThumb ->
-        listOf(showResolution, showFps, showSub, showThumb)
+        browserPreferences.showVideoThumbnails.changes(),
+        browserPreferences.showDecoderChip.changes()
+      ) { showResolution, showFps, showSub, showThumb, showDecoder ->
+        listOf(showResolution, showFps, showSub, showThumb, showDecoder)
       }
       .distinctUntilChanged()
       .drop(1)
       .collectLatest {
         if (MetadataRetrieval.isVideoMetadataNeeded(browserPreferences) && _videos.value.isNotEmpty()) {
           val videosNeedEnrichment = _videos.value.any { video ->
-            video.fps == 0f || video.subtitleCodec.isEmpty()
+            video.fps == 0f || video.subtitleCodec.isEmpty() ||
+              (video.videoCodec.isEmpty() && browserPreferences.showDecoderChip.get())
           }
           if (videosNeedEnrichment) {
             Log.d(tag, "Metadata preferences changed and videos need enrichment, reloading")
@@ -221,6 +223,8 @@ class VideoListViewModel(
               resolution = existing.resolution,
               hasEmbeddedSubtitles = existing.hasEmbeddedSubtitles,
               subtitleCodec = existing.subtitleCodec,
+              videoCodec = existing.videoCodec,
+              videoProfile = existing.videoProfile,
             )
           } else {
             freshVideo

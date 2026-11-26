@@ -33,7 +33,7 @@ import app.marlboroadvance.mpvex.domain.network.NetworkConnection
     FolderIndexEntity::class,
     FolderVideoEntity::class,
   ],
-  version = 11,
+  version = 12,
   exportSchema = true,
 )
 @TypeConverters(NetworkProtocolConverter::class)

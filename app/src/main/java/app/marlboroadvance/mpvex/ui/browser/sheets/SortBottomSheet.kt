@@ -328,9 +328,6 @@ private fun ViewOptionsCard(
               )
             }
           }
-          if (rowToggles.size == 1) {
-            Spacer(modifier = Modifier.weight(1f))
-          }
         }
       }
     }

@@ -95,6 +95,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import app.marlboroadvance.mpvex.ui.utils.videoFileTitle
 import app.marlboroadvance.mpvex.utils.media.ExternalSubtitleIndex
+import app.marlboroadvance.mpvex.utils.media.HardwareDecoderSupport
 import org.koin.compose.koinInject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -113,6 +114,9 @@ data class VideoCardSettings(
   val showFramerateInResolution: Boolean = false,
   val showProgressBar: Boolean = true,
   val showDateChip: Boolean = true,
+  // Decoder badge (HW+/SW). tryHwDecoding mirrors the player's "Try hardware decoding" setting.
+  val showDecoderChip: Boolean = false,
+  val tryHwDecoding: Boolean = true,
   val showUnplayedOldVideoLabel: Boolean = true,
   val unplayedOldVideoDays: Int = 7
 )
@@ -202,6 +206,28 @@ fun VideoCard(
     null
   }
   val is4K = video.width >= 3840 || video.height >= 2160
+  // Predicted decoder: "SW" when hardware decoding is off or the phone can't decode this codec,
+  // otherwise "HW+" (first in the player's mediacodec -> mediacodec-copy -> no fallback chain).
+  val decoderLabel by produceState<String?>(
+    initialValue = null,
+    settings.showDecoderChip, settings.tryHwDecoding, video.videoCodec, video.videoProfile, video.width, video.height,
+  ) {
+    value = if (settings.showDecoderChip && video.videoCodec.isNotEmpty()) {
+      withContext(Dispatchers.Default) {
+        if (!settings.tryHwDecoding) {
+          "SW"
+        } else {
+          when (HardwareDecoderSupport.check(video.videoCodec, video.videoProfile, video.width, video.height)) {
+            is HardwareDecoderSupport.Result.Available -> "HW+"
+            is HardwareDecoderSupport.Result.Unavailable -> "SW"
+            HardwareDecoderSupport.Result.Unknown -> null
+          }
+        }
+      }
+    } else {
+      null
+    }
+  }
   // Embedded subtitle names as reported by the file ("SRT · ASS").
   val subtitleNames = if (showSubtitleIndicator && video.hasEmbeddedSubtitles) {
     remember(video.subtitleCodec) {
@@ -267,6 +293,17 @@ fun VideoCard(
           horizontalArrangement = Arrangement.spacedBy(dimens.chipSpacing),
           verticalArrangement = Arrangement.spacedBy(dimens.chipSpacing),
         ) {
+          // Decoder badge first: solid primary for HW+, muted error container for software decoding.
+          decoderLabel?.let {
+            val isHardware = it != "SW"
+            UnifiedChip(
+              text = it,
+              bold = true,
+              containerOverride = if (isHardware) colors.primary else colors.errorContainer,
+              contentOverride = if (isHardware) colors.onPrimary else colors.onErrorContainer,
+              size = dimens.chipSize,
+            )
+          }
           subtitleNames?.let {
             UnifiedChip(text = it, isTertiary = true, bold = true, size = dimens.chipSize)
           }
@@ -375,7 +412,7 @@ private fun SelectionCircle(
   }
 }
 
-/** Quality tag text: "4K", "1080p", with the frame rate appended when enabled ("1080p60"). */
+/** Quality tag text: "4K", "1080p", with the frame rate appended when enabled ("1080p@60"). */
 private fun qualityLabel(video: Video, showFramerate: Boolean): String? {
   if (video.height <= 0 && video.width <= 0) return null
   val base = when {
@@ -386,7 +423,7 @@ private fun qualityLabel(video: Video, showFramerate: Boolean): String? {
     video.width >= 854 || video.height >= 480 -> "480p"
     else -> "${video.height}p"
   }
-  return if (showFramerate && video.fps > 0) "$base${video.fps.roundToInt()}" else base
+  return if (showFramerate && video.fps > 0) "$base@${video.fps.roundToInt()}" else base
 }
 
 @Deprecated("Video rows now use UnifiedChip; kept only so old references still compile.")

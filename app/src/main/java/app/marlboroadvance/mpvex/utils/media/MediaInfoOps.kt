@@ -410,7 +410,11 @@ object MediaInfoOps {
             codecs.joinToString(" ")
           } else ""
 
-          VideoMetadata(fileSize, duration, width, height, fps, hasEmbeddedSubtitles, subtitleCodec)
+          // Video codec (mapped to mpv names) and profile, used for the decoder chip
+          val videoCodec = mpvCodecName(mi.getInfo(MediaInfo.Stream.Video, 0, "Format"))
+          val videoProfile = mi.getInfo(MediaInfo.Stream.Video, 0, "Format_Profile").substringBefore('@').trim()
+
+          VideoMetadata(fileSize, duration, width, height, fps, hasEmbeddedSubtitles, subtitleCodec, videoCodec, videoProfile)
         } finally {
           mi.Close()
           pfd.close()
@@ -429,7 +433,23 @@ object MediaInfoOps {
     val fps: Float,
     val hasEmbeddedSubtitles: Boolean,
     val subtitleCodec: String = "",
+    val videoCodec: String = "",
+    val videoProfile: String = "",
   )
+
+  /** Maps a MediaInfo video "Format" to the mpv codec name used by HardwareDecoderSupport. */
+  private fun mpvCodecName(format: String): String =
+    when (format.trim().uppercase()) {
+      "AVC" -> "h264"
+      "HEVC" -> "hevc"
+      "AV1" -> "av1"
+      "VP9" -> "vp9"
+      "VP8" -> "vp8"
+      "MPEG VIDEO" -> "mpeg2video"
+      "MPEG-4 VISUAL" -> "mpeg4"
+      "H.263" -> "h263"
+      else -> ""
+    }
 
   /**
    * Extract rotation (in degrees) from the video stream. Returns 0 if not specified or on error.
