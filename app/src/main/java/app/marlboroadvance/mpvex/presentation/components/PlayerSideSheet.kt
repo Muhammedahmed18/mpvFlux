@@ -32,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
@@ -87,6 +88,9 @@ fun PlayerSideSheet(
   modifier: Modifier = Modifier,
   tonalElevation: Dp = 1.dp,
   surfaceColor: Color? = null,
+  // False when the overlay was already on screen (e.g. orientation change): the sheet
+  // then starts open instead of replaying the slide-in and scrim fade.
+  animateEntrance: Boolean = true,
   content: @Composable (requestDismiss: () -> Unit) -> Unit,
 ) {
   val scope = rememberCoroutineScope()
@@ -95,7 +99,12 @@ fun PlayerSideSheet(
 
   val sheetWidthPx = with(density) { sheetWidth.toPx() }
 
-  var backgroundAlpha by remember { mutableFloatStateOf(0f) }
+  // Survives sheetWidthPx changes (which rebuild the drag state) so a resize after the
+  // entrance never re-closes the sheet.
+  var entered by remember { mutableStateOf(!animateEntrance) }
+  var dismissing by remember { mutableStateOf(false) }
+
+  var backgroundAlpha by remember { mutableFloatStateOf(if (entered) 0.5f else 0f) }
   val alpha by animateFloatAsState(
     backgroundAlpha,
     animationSpec = sideSheetAnimationSpec,
@@ -106,7 +115,7 @@ fun PlayerSideSheet(
   // 0 = Open (sheet fully visible), 1 = Closed (sheet pushed off-screen to the right).
   val anchoredDraggableState = remember(sheetWidthPx) {
     AnchoredDraggableState(
-      initialValue        = 1,
+      initialValue        = if (entered) 0 else 1,
       snapAnimationSpec   = sideSheetAnimationSpec,
       decayAnimationSpec  = decayAnimationSpec,
       positionalThreshold = { with(density) { 56.dp.toPx() } },
@@ -122,7 +131,9 @@ fun PlayerSideSheet(
   }
 
   val internalOnDismissRequest = {
-    if (anchoredDraggableState.currentValue == 0) {
+    // Ignore repeat taps/back while the close animation is already running.
+    if (!dismissing && anchoredDraggableState.currentValue == 0) {
+      dismissing = true
       scope.launch {
         backgroundAlpha = 0f
         anchoredDraggableState.animateTo(1)
@@ -180,11 +191,16 @@ fun PlayerSideSheet(
     )
 
     LaunchedEffect(Unit) {
-      backgroundAlpha = 0.5f
+      if (!dismissing) backgroundAlpha = 0.5f
     }
 
     LaunchedEffect(anchoredDraggableState) {
-      scope.launch { anchoredDraggableState.animateTo(0) }
+      if (!entered) {
+        scope.launch {
+          anchoredDraggableState.animateTo(0)
+          entered = true
+        }
+      }
       snapshotFlow { anchoredDraggableState.currentValue }
         .drop(1)
         .filter { it == 1 }

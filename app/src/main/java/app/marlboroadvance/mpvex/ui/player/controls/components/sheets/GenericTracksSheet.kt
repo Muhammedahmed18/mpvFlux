@@ -231,6 +231,11 @@ fun getTrackTitle(track: TrackNode): String {
  */
 internal val LocalOverlayDismiss = staticCompositionLocalOf<() -> Unit> { {} }
 
+/** Plain holder (not snapshot state) recording the orientation the overlay opened in. */
+private class OrientationTracker(val opened: Boolean) {
+  var rotated: Boolean = false
+}
+
 /**
  * Single orientation-aware host for every sheet and panel the player shows in a
  * sheet-style overlay — one source of truth for anchoring, shape, scrim, insets,
@@ -253,11 +258,18 @@ internal fun PlayerOverlayHost(
   val useSideSheet =
     LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
+  // Remembered at host level, so it survives the portrait <-> landscape branch switch.
+  // Once the orientation differs from the one the overlay opened in, the overlay was
+  // already on screen: the side sheet then starts open instead of replaying its entrance.
+  val orientationTracker = remember { OrientationTracker(useSideSheet) }
+  if (orientationTracker.opened != useSideSheet) orientationTracker.rotated = true
+
   if (useSideSheet) {
     PlayerSideSheet(
       onDismissRequest = onDismissRequest,
       sheetWidth       = rememberSideSheetWidth(),
       surfaceColor     = MaterialTheme.colorScheme.surfaceContainerLow,
+      animateEntrance  = !orientationTracker.rotated,
     ) { dismiss ->
       CompositionLocalProvider(LocalOverlayDismiss provides dismiss) { content(dismiss) }
     }
@@ -270,8 +282,13 @@ internal fun PlayerOverlayHost(
     // Even fully expanded the sheet stops short of the screen height, so it never
     // reads as a full-screen takeover of the player.
     val maxSheetHeight = LocalConfiguration.current.screenHeightDp.dp * SheetDimens.SheetMaxHeightFraction
+    // One-shot: a second tap/drag while hide() is running must not start another hide
+    // or call onDismissRequest twice.
+    val dismissing = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     val dismiss: () -> Unit = {
-      scope.launch { sheetState.hide() }.invokeOnCompletion { onDismissRequest() }
+      if (dismissing.compareAndSet(false, true)) {
+        scope.launch { sheetState.hide() }.invokeOnCompletion { onDismissRequest() }
+      }
     }
     ModalBottomSheet(
       onDismissRequest = onDismissRequest,

@@ -5,6 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -14,6 +16,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.unit.IntSize
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieEpisode
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieSeason
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieSubtitle
@@ -378,11 +381,20 @@ fun PlayerSheets(
         label = "player_overlay_content",
         transitionSpec = {
           // Fade-through: old content leaves first, then the new one arrives, while
-          // the size settles on the player's spring so the host never jumps.
+          // the size settles on a non-bouncy spring (no overshoot, no mid-transition
+          // clipping; the host surface already clips to its own shape).
           (
             fadeIn(tween(durationMillis = 210, delayMillis = 90)) togetherWith
               fadeOut(tween(durationMillis = 90))
-          ).using(SizeTransform(clip = true) { _, _ -> playerControlsEnterAnimationSpec() })
+          ).using(
+            SizeTransform(clip = false) { _, _ ->
+              spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMediumLow,
+                visibilityThreshold = IntSize.VisibilityThreshold,
+              )
+            },
+          )
         },
       ) { key ->
         if (key is Panels) {
