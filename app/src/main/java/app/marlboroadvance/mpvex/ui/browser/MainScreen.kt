@@ -4,6 +4,7 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -85,9 +86,6 @@ object MainScreen : Screen {
     )
     val scope = rememberCoroutineScope()
 
-    val hideNavigationBarState = NavigationBarState.shouldHideNavigationBar
-    val isPermissionDeniedState = NavigationBarState.isPermissionDenied
-
     LaunchedEffect(pagerState.currentPage) {
       persistentSelectedTab = pagerState.currentPage
     }
@@ -113,7 +111,9 @@ object MainScreen : Screen {
     // rail on wider windows (landscape phones, tablets, foldables, split screen) so the
     // bar doesn't eat vertical space and content isn't stretched under it.
     val useRail = currentWindowWidthClass() != WindowWidthClass.Compact
-    val showNavigation = !hideNavigationBarState && !isPermissionDeniedState
+    // False until the storage permission has been checked, so the bar never flashes up and
+    // then disappears on the permission-denied screen.
+    val showNavigation = NavigationBarState.isNavigationBarVisible
 
     Scaffold(
       modifier = Modifier.fillMaxSize(),
@@ -121,7 +121,7 @@ object MainScreen : Screen {
       bottomBar = {
         AnimatedVisibility(
           visible = !useRail && showNavigation,
-          enter = slideInVertically(
+          enter = fadeIn() + slideInVertically(
             animationSpec = spring(
               dampingRatio = Spring.DampingRatioNoBouncy,
               stiffness = Spring.StiffnessMedium
@@ -200,7 +200,7 @@ object MainScreen : Screen {
         Row(modifier = Modifier.fillMaxSize()) {
           AnimatedVisibility(
             visible = useRail && showNavigation,
-            enter = slideInHorizontally(
+            enter = fadeIn() + slideInHorizontally(
               animationSpec = spring(
                 dampingRatio = Spring.DampingRatioNoBouncy,
                 stiffness = Spring.StiffnessMedium

@@ -1,35 +1,39 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.R
 import dev.vivvvek.seeker.Segment
 import `is`.xyz.mpv.Utils
 import kotlinx.collections.immutable.ImmutableList
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+/** Short pause between the tap and the animated dismiss, so the selection change is visible. */
+private const val CHAPTER_DISMISS_DELAY_MS = 220L
 
 @Composable
 fun ChaptersSheet(
@@ -40,6 +44,11 @@ fun ChaptersSheet(
 ) {
   val listState = rememberLazyListState()
   val dismiss = LocalOverlayDismiss.current
+  val scope = rememberCoroutineScope()
+
+  // The tapped chapter is highlighted immediately (before mpv reports the new chapter),
+  // then the sheet is dismissed through the host's animated dismiss.
+  var pendingChapter by remember { mutableStateOf<Segment?>(null) }
 
   LaunchedEffect(currentChapter, chapters) {
     val index = chapters.indexOf(currentChapter)
@@ -54,19 +63,29 @@ fun ChaptersSheet(
     header = {
       SheetHeader(
         title = stringResource(R.string.player_sheets_chapters_title),
-        trailing = { ChapterCountPill(count = chapters.size) },
+        trailing = { ChapterCountBadge(count = chapters.size) },
       )
     },
-    track = {
-      ChapterRow(
-        it,
-        index = chapters.indexOf(it),
-        selected = currentChapter == it,
-        // Seek first, then close the sheet with the host's animated dismiss.
+    track = { chapter ->
+      val startTime = remember(chapter) { Utils.prettyTime(chapter.start.toInt()) }
+      val metadata = remember(chapter) { listOf(TrackMetadata(startTime)) }
+
+      TrackSelectableBar(
+        id = chapters.indexOf(chapter) + 1,
+        title = chapter.name,
+        isSelected = (pendingChapter ?: currentChapter) == chapter,
         onClick = {
-          onClick(it)
-          dismiss()
+          if (pendingChapter == null) {
+            pendingChapter = chapter
+            // Seek first, then let the selection settle before the animated dismiss.
+            onClick(chapter)
+            scope.launch {
+              delay(CHAPTER_DISMISS_DELAY_MS)
+              dismiss()
+            }
+          }
         },
+        metadata = metadata,
       )
     },
     modifier = modifier,
@@ -74,87 +93,34 @@ fun ChaptersSheet(
 }
 
 /**
- * Count chip in the header — same look as [TrackCountPill], with chapter wording.
+ * Chapter count status pill: same look as the audio sheet's AudioChannelBadge —
+ * primaryContainer fill, 14dp rounded, leading 6dp dot, ExtraBold tabular-figures
+ * label — but not tappable, so there is no chevron or press scale.
  */
 @Composable
-private fun ChapterCountPill(count: Int) {
+private fun ChapterCountBadge(count: Int) {
   Surface(
-    shape = MaterialTheme.shapes.small,
-    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-  ) {
-    Text(
-      text     = pluralStringResource(R.plurals.player_chapter_count, count, count),
-      modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-      style    = MaterialTheme.typography.labelSmall.copy(
-        letterSpacing       = 0.5.sp,
-        fontFeatureSettings = "tnum",
-      ),
-      color    = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-  }
-}
-
-/**
- * One chapter: `01  Title  ✓`. The index is primary-colored; the current chapter sits
- * in a tonal container and carries the check. Start time reads as secondary text.
- */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun ChapterRow(
-  chapter: Segment,
-  index: Int,
-  selected: Boolean,
-  onClick: () -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  Surface(
-    onClick = onClick,
-    modifier = modifier
-      .fillMaxWidth()
-      .semantics { this.selected = selected },
-    shape = MaterialTheme.shapes.large,
-    color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+    shape = RoundedCornerShape(14.dp),
+    color = MaterialTheme.colorScheme.primaryContainer,
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+      modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(16.dp),
+      horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-      Text(
-        text = (index + 1).toString().padStart(2, '0'),
-        style = MaterialTheme.typography.titleMediumEmphasized.copy(fontFeatureSettings = "tnum"),
-        color = MaterialTheme.colorScheme.primary,
+      Box(
+        modifier = Modifier
+          .size(6.dp)
+          .background(MaterialTheme.colorScheme.primary, CircleShape),
       )
-      Column(modifier = Modifier.weight(1f)) {
-        Text(
-          text = chapter.name,
-          style = MaterialTheme.typography.titleMediumEmphasized,
-          color = if (selected) {
-            MaterialTheme.colorScheme.onPrimaryContainer
-          } else {
-            MaterialTheme.colorScheme.onSurface
-          },
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-          text = Utils.prettyTime(chapter.start.toInt()),
-          style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"),
-          color = if (selected) {
-            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-          } else {
-            MaterialTheme.colorScheme.onSurfaceVariant
-          },
-        )
-      }
-      if (selected) {
-        Icon(
-          imageVector = Icons.Default.Check,
-          contentDescription = null,
-          tint = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.size(24.dp),
-        )
-      }
+      Text(
+        text = pluralStringResource(R.plurals.player_chapter_count, count, count).uppercase(),
+        style = MaterialTheme.typography.labelMedium.copy(
+          fontWeight = FontWeight.ExtraBold,
+          fontFeatureSettings = "tnum",
+        ),
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+      )
     }
   }
 }

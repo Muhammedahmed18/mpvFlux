@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package app.marlboroadvance.mpvex.ui.browser.states
 
 import android.annotation.SuppressLint
@@ -18,10 +16,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderSpecial
@@ -31,10 +27,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,18 +40,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.R
 
+// ExperimentalMaterial3ExpressiveApi is already opted in project-wide via build.gradle.kts.
 @SuppressLint("UseKtx")
 @Composable
 fun PermissionDeniedState(
@@ -65,16 +63,12 @@ fun PermissionDeniedState(
   val context = LocalContext.current
   var showExplanationDialog by remember { mutableStateOf(false) }
 
-
   // Theme roles, so the first screen a new user sees matches their chosen theme,
-  // light/dark mode and dynamic color (it used to be a fixed dark palette).
+  // light/dark mode and dynamic color.
   val colors = MaterialTheme.colorScheme
-  val backgroundColor = colors.surface
-  val outerCircleColor = colors.surfaceContainerHigh
-  val innerCircleColor = colors.primaryContainer
 
   Box(
-    modifier = modifier.fillMaxSize().background(backgroundColor)
+    modifier = modifier.fillMaxSize().background(colors.surface)
   ) {
     Column(
       modifier =
@@ -85,35 +79,23 @@ fun PermissionDeniedState(
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.Center,
     ) {
-      // Custom Multi-layered Icon
-      Box(
-        contentAlignment = Alignment.Center,
-        // Static icon: the old endless pulse was decorative motion with no meaning.
-      ) {
-        // Outer Circle
+      // Hero: expressive cookie shape with a large icon (static, no decorative motion)
+      Box(contentAlignment = Alignment.Center) {
         Box(
           modifier = Modifier
-            .size(180.dp)
-            .clip(CircleShape)
-            .background(outerCircleColor)
+            .size(200.dp)
+            .clip(MaterialShapes.Cookie9Sided.toShape())
+            .background(colors.primaryContainer)
         )
-        // Inner Circle
-        Box(
-          modifier = Modifier
-            .size(130.dp)
-            .clip(CircleShape)
-            .background(innerCircleColor)
-        )
-        // Icon
         Icon(
           imageVector = Icons.Filled.FolderSpecial,
           contentDescription = null,
-          modifier = Modifier.size(64.dp),
+          modifier = Modifier.size(88.dp),
           tint = colors.onPrimaryContainer,
         )
       }
 
-      Spacer(modifier = Modifier.height(48.dp))
+      Spacer(modifier = Modifier.height(40.dp))
 
       // Title
       Text(
@@ -124,7 +106,7 @@ fun PermissionDeniedState(
         lineHeight = 40.sp
       )
 
-      Spacer(modifier = Modifier.height(24.dp))
+      Spacer(modifier = Modifier.height(16.dp))
 
       // Description
       Text(
@@ -135,9 +117,9 @@ fun PermissionDeniedState(
         lineHeight = 24.sp
       )
 
-      Spacer(modifier = Modifier.height(64.dp))
+      Spacer(modifier = Modifier.height(48.dp))
 
-      // Grant Access Button
+      // Grant Access Button (large, shape morphs on press)
       Button(
         onClick = {
           if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -156,38 +138,37 @@ fun PermissionDeniedState(
         modifier =
           Modifier
             .fillMaxWidth()
-            .height(56.dp),
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = ButtonDefaults.buttonColors(
-          containerColor = colors.primary,
-          contentColor = colors.onPrimary,
-        )
+            .heightIn(min = ButtonDefaults.LargeContainerHeight),
+        shapes = ButtonDefaults.shapes(),
+        contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.LargeContainerHeight),
       ) {
         Text(
           text = stringResource(R.string.grant_access),
-          style = MaterialTheme.typography.titleMediumEmphasized,
+          style = MaterialTheme.typography.titleLargeEmphasized,
         )
       }
 
-      Spacer(modifier = Modifier.height(16.dp))
+      Spacer(modifier = Modifier.height(12.dp))
 
       // Why is this needed?
-      TextButton(
+      FilledTonalButton(
         onClick = { showExplanationDialog = true },
-        modifier = Modifier.padding(vertical = 8.dp),
+        modifier =
+          Modifier
+            .fillMaxWidth()
+            .heightIn(min = ButtonDefaults.MediumContainerHeight),
+        shapes = ButtonDefaults.shapes(),
+        contentPadding = ButtonDefaults.contentPaddingFor(ButtonDefaults.MediumContainerHeight),
       ) {
         Icon(
           imageVector = Icons.Outlined.Info,
           contentDescription = null,
-          modifier = Modifier.size(18.dp),
-          tint = colors.onSurfaceVariant,
+          modifier = Modifier.size(ButtonDefaults.iconSizeFor(ButtonDefaults.MediumContainerHeight)),
         )
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.size(ButtonDefaults.iconSpacingFor(ButtonDefaults.MediumContainerHeight)))
         Text(
           text = stringResource(R.string.why_is_this_needed),
-          style = MaterialTheme.typography.bodyMedium,
-          color = colors.onSurfaceVariant,
-          fontWeight = FontWeight.Normal,
+          style = MaterialTheme.typography.titleMediumEmphasized,
         )
       }
 
@@ -197,23 +178,30 @@ fun PermissionDeniedState(
 
   // Explanation Dialog
   if (showExplanationDialog) {
-    val uriHandler = LocalUriHandler.current
     val githubUrl = "https://github.com/MpvFlux/mpvFlux"
 
     AlertDialog(
       onDismissRequest = { showExplanationDialog = false },
       icon = {
-        Icon(
-          imageVector = Icons.Outlined.Info,
-          contentDescription = null,
-          modifier = Modifier.size(24.dp),
-          tint = MaterialTheme.colorScheme.primary,
-        )
+        Box(
+          modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.secondaryContainer),
+          contentAlignment = Alignment.Center,
+        ) {
+          Icon(
+            imageVector = Icons.Outlined.Info,
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+          )
+        }
       },
       title = {
-        Text(text = stringResource(R.string.perm_why_title),
+        Text(
+          text = stringResource(R.string.perm_why_title),
           style = MaterialTheme.typography.headlineSmall,
-          fontWeight = FontWeight.Medium,
         )
       },
       text = {
@@ -222,66 +210,59 @@ fun PermissionDeniedState(
             Modifier
               .heightIn(max = 400.dp)
               .verticalScroll(rememberScrollState()),
-          verticalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-          // Standard build explanation
-          Text(text = stringResource(R.string.perm_why_history),
+          Text(
+            text = stringResource(R.string.perm_why_history),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
 
-          Text(text = stringResource(R.string.perm_why_policy),
+          Text(
+            text = stringResource(R.string.perm_why_policy),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
 
-          Text(text = stringResource(R.string.perm_why_scope),
+          Text(
+            text = stringResource(R.string.perm_why_scope),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
 
-          Text(text = stringResource(R.string.perm_why_open_source),
+          Text(
+            text = stringResource(R.string.perm_why_open_source),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
           )
 
-          // Clickable GitHub link
-          val annotatedString =
-            buildAnnotatedString {
-              pushStringAnnotation(
-                tag = "URL",
-                annotation = githubUrl,
-              )
-              withStyle(
-                style =
-                  SpanStyle(
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium,
-                    textDecoration = TextDecoration.Underline,
+          // Clickable GitHub link (LinkAnnotation opens via the default UriHandler)
+          val linkColor = MaterialTheme.colorScheme.primary
+          Text(
+            text =
+              buildAnnotatedString {
+                withLink(
+                  LinkAnnotation.Url(
+                    url = githubUrl,
+                    styles =
+                      TextLinkStyles(
+                        style =
+                          SpanStyle(
+                            color = linkColor,
+                            fontWeight = FontWeight.Medium,
+                            textDecoration = TextDecoration.Underline,
+                          ),
+                      ),
                   ),
-              ) {
-                append(githubUrl)
-              }
-              pop()
-            }
-
-          ClickableText(
-            text = annotatedString,
-            style = MaterialTheme.typography.bodyMedium,
-            onClick = { offset ->
-              annotatedString
-                .getStringAnnotations(
-                  tag = "URL",
-                  start = offset,
-                  end = offset,
-                ).firstOrNull()
-                ?.let {
-                  uriHandler.openUri(it.item)
+                ) {
+                  append(githubUrl)
                 }
-            },
+              },
+            style = MaterialTheme.typography.bodyMedium,
           )
 
-          Text(text = stringResource(R.string.perm_why_privacy),
+          Text(
+            text = stringResource(R.string.perm_why_privacy),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.Medium,
@@ -291,13 +272,12 @@ fun PermissionDeniedState(
       confirmButton = {
         FilledTonalButton(
           onClick = { showExplanationDialog = false },
-          shape = MaterialTheme.shapes.medium,
-          modifier = Modifier.height(40.dp),
+          shapes = ButtonDefaults.shapes(),
         ) {
           Text(stringResource(R.string.got_it))
         }
       },
-      shape = MaterialTheme.shapes.large,
+      shape = MaterialTheme.shapes.extraLarge,
     )
   }
 }

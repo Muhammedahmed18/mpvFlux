@@ -15,6 +15,13 @@ object NavigationBarState {
   var shouldHideNavigationBar: Boolean by mutableStateOf(false)
     private set
 
+  /**
+   * True once the storage permission has actually been checked. Until then the bar stays
+   * hidden, so it never flashes up on the first frame and then disappears.
+   */
+  var isPermissionKnown: Boolean by mutableStateOf(false)
+    private set
+
   var isPermissionDenied: Boolean by mutableStateOf(false)
     private set
 
@@ -23,6 +30,13 @@ object NavigationBarState {
 
   var onlyVideosSelected: Boolean by mutableStateOf(false)
     private set
+
+  /**
+   * Single source of truth for showing the navigation bar: permission checked and granted,
+   * and not hidden by selection mode or the floating bottom bar.
+   */
+  val isNavigationBarVisible: Boolean
+    get() = isPermissionKnown && !isPermissionDenied && !shouldHideNavigationBar
 
   /**
    * Update selection state and navigation bar visibility.
@@ -39,9 +53,11 @@ object NavigationBarState {
 
   /**
    * Update permission state to control navigation bar visibility.
+   * Also marks the permission as checked.
    */
   fun updatePermissionState(denied: Boolean) {
     isPermissionDenied = denied
+    isPermissionKnown = true
   }
 
   /**
