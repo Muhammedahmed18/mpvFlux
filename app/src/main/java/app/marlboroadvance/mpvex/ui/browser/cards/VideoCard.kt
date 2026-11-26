@@ -59,8 +59,10 @@ import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -92,6 +94,7 @@ import app.marlboroadvance.mpvex.domain.thumbnail.ThumbnailRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import app.marlboroadvance.mpvex.ui.utils.videoFileTitle
+import app.marlboroadvance.mpvex.utils.media.ExternalSubtitleIndex
 import org.koin.compose.koinInject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -207,6 +210,8 @@ fun VideoCard(
   } else {
     null
   }
+  // Formats of subtitle files stored next to the video ("SRT · VTT"), shown in a second colour.
+  val externalSubtitleNames = rememberExternalSubtitleNames(video.path, showSubtitleIndicator)
 
   Surface(
     modifier = modifier
@@ -264,6 +269,9 @@ fun VideoCard(
         ) {
           subtitleNames?.let {
             UnifiedChip(text = it, isTertiary = true, bold = true, size = dimens.chipSize)
+          }
+          externalSubtitleNames?.let {
+            UnifiedChip(text = it, isAccent = true, bold = true, size = dimens.chipSize)
           }
           quality?.let {
             UnifiedChip(text = it, isPrimary = is4K, bold = is4K, size = dimens.chipSize)
@@ -768,8 +776,10 @@ fun VideoMetadataChips(
   } else {
     emptyList()
   }
+  val externalSubtitleNames = rememberExternalSubtitleNames(video.path, showSubtitleIndicator)
 
   if (resolutionLabel == null && qualityLabel == null && subtitleCodecs.isEmpty() &&
+    externalSubtitleNames == null &&
     !(showSizeChip && video.size > 0) && !(showDateChip && video.dateModified > 0)
   ) return
 
@@ -786,7 +796,27 @@ fun VideoMetadataChips(
       UnifiedChip(text = remember(video.dateModified) { formatDate(video.dateModified) }, compact = true)
     }
     if (subtitleCodecs.isNotEmpty()) UnifiedChip(text = subtitleCodecs.joinToString(" · "), compact = true)
+    externalSubtitleNames?.let { UnifiedChip(text = it, isAccent = true, compact = true) }
   }
+}
+
+/**
+ * Formats of the external subtitle files next to [videoPath] ("SRT · VTT"), or null when there are
+ * none or [enabled] is false. Reads from [ExternalSubtitleIndex]'s per-folder cache, so a card never
+ * rescans the folder itself; the lookup re-runs when the library changes.
+ */
+@Composable
+private fun rememberExternalSubtitleNames(videoPath: String, enabled: Boolean): String? {
+  if (!enabled || LocalInspectionMode.current) return null
+  val version by ExternalSubtitleIndex.version.collectAsState()
+  val formats by produceState(
+    initialValue = ExternalSubtitleIndex.peek(videoPath),
+    videoPath,
+    version,
+  ) {
+    value = ExternalSubtitleIndex.formatsFor(videoPath)
+  }
+  return if (formats.isEmpty()) null else formats.joinToString(" · ")
 }
 
 private fun formatDate(timestampSeconds: Long): String {
