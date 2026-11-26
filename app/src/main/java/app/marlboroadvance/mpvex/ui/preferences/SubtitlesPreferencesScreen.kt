@@ -70,7 +70,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.Preference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
-import me.zhanghai.compose.preference.SwitchPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.SwitchPreference
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.TextButton
@@ -174,14 +174,13 @@ object SubtitlesPreferencesScreen : Screen {
               .padding(padding)
               .readableContentWidth(),
         ) {
-          // === GENERAL SECTION ===
+          // === LANGUAGE & LOADING ===
           item {
-            PreferenceSectionHeader(title = stringResource(R.string.general))
+            PreferenceSectionHeader(title = stringResource(R.string.pref_subtitles_section_language_loading))
           }
 
           item {
             PreferenceCard {
-
               val preferredLanguages by preferences.preferredLanguages.collectAsState()
               LanguagePickerPreference(
                 title = stringResource(R.string.pref_preferred_language),
@@ -211,9 +210,16 @@ object SubtitlesPreferencesScreen : Screen {
                   )
                 },
               )
+            }
+          }
 
-              PreferenceDivider()
+          // === RENDERING & FONTS ===
+          item {
+            PreferenceSectionHeader(title = stringResource(R.string.pref_subtitles_section_rendering_fonts))
+          }
 
+          item {
+            PreferenceCard {
               val usePhoneFont by preferences.usePhoneFontForTextSubs.collectAsState()
               SwitchPreference(
                 value = usePhoneFont,
@@ -289,44 +295,13 @@ object SubtitlesPreferencesScreen : Screen {
             }
           }
 
-          // === ONLINE SUBTITLE SECTION ===
+          // === SUBTITLE SEARCH ===
           item {
-            PreferenceSectionHeader(title = stringResource(R.string.pref_subtitles_search_section))
+            PreferenceSectionHeader(title = stringResource(R.string.pref_subtitles_section_search))
           }
 
           item {
             PreferenceCard {
-              // Location display
-              Box(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .clickable { saveLocationPicker.launch(null) }
-                  .padding(vertical = 16.dp, horizontal = 16.dp),
-              ) {
-                Column {
-                  Text(
-                    stringResource(R.string.pref_subtitles_save_location),
-                    style = MaterialTheme.typography.titleMediumEmphasized,
-                  )
-                  val folderPath = if (subtitleSaveFolder.isBlank()) {
-                    stringResource(R.string.not_set_video_default)
-                  } else {
-                    val raw = Uri.parse(subtitleSaveFolder).path ?: subtitleSaveFolder
-                    if (raw.contains(":")) raw.substringAfterLast(":") else raw
-                  }
-                  Text(
-                    text = folderPath,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                  )
-                }
-              }
-
-              PreferenceDivider()
-
-              var showClearDialog by remember { mutableStateOf(false) }
-              val scope = androidx.compose.runtime.rememberCoroutineScope()
-
               // Wyzie Sources
               MultiChoicePreference(
                 title = { Text(stringResource(R.string.pref_subtitles_sources), style = MaterialTheme.typography.titleMediumEmphasized) },
@@ -442,6 +417,71 @@ object SubtitlesPreferencesScreen : Screen {
 
               PreferenceDivider()
 
+              // Wyzie Tag
+              Row(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Text(
+                  text = stringResource(R.string.subtitle_search_provided_by),
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                  text = "sub.wyzie.io",
+                  style = MaterialTheme.typography.bodySmall,
+                  color = MaterialTheme.colorScheme.primary,
+                  fontWeight = FontWeight.Bold,
+                  modifier = Modifier.clickable {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://sub.wyzie.io"))
+                    context.startActivity(intent)
+                  }
+                )
+              }
+            }
+          }
+
+          // === DOWNLOADS ===
+          item {
+            PreferenceSectionHeader(title = stringResource(R.string.pref_subtitles_section_downloads))
+          }
+
+          item {
+            PreferenceCard {
+              var showClearDialog by remember { mutableStateOf(false) }
+              val scope = androidx.compose.runtime.rememberCoroutineScope()
+
+              // Location display
+              Box(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .clickable { saveLocationPicker.launch(null) }
+                  .padding(vertical = 16.dp, horizontal = 16.dp),
+              ) {
+                Column {
+                  Text(
+                    stringResource(R.string.pref_subtitles_save_location),
+                    style = MaterialTheme.typography.titleMediumEmphasized,
+                  )
+                  val folderPath = if (subtitleSaveFolder.isBlank()) {
+                    stringResource(R.string.not_set_video_default)
+                  } else {
+                    val raw = Uri.parse(subtitleSaveFolder).path ?: subtitleSaveFolder
+                    if (raw.contains(":")) raw.substringAfterLast(":") else raw
+                  }
+                  Text(
+                    text = folderPath,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  )
+                }
+              }
+
+              PreferenceDivider()
+
               Preference(
                 title = { Text(stringResource(R.string.pref_subtitles_clear_downloads), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMediumEmphasized) },
                 summary = { Text(stringResource(R.string.pref_subtitles_clear_downloads_summary)) },
@@ -481,33 +521,6 @@ object SubtitlesPreferencesScreen : Screen {
                     TextButton(onClick = { showClearDialog = false }) {
                       Text(stringResource(android.R.string.cancel))
                     }
-                  }
-                )
-              }
-
-              PreferenceDivider()
-
-              // Wyzie Tag
-              Row(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                Text(
-                  text = stringResource(R.string.subtitle_search_provided_by),
-                  style = MaterialTheme.typography.bodySmall,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                  text = "sub.wyzie.io",
-                  style = MaterialTheme.typography.bodySmall,
-                  color = MaterialTheme.colorScheme.primary,
-                  fontWeight = FontWeight.Bold,
-                  modifier = Modifier.clickable {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://sub.wyzie.io"))
-                    context.startActivity(intent)
                   }
                 )
               }

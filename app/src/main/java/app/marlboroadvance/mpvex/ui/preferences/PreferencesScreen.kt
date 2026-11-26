@@ -13,6 +13,7 @@ import androidx.compose.material.icons.automirrored.rounded.ViewQuilt
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -25,7 +26,10 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
+import app.marlboroadvance.mpvex.update.UpdateManager
+import app.marlboroadvance.mpvex.update.UpdateState
 import kotlinx.serialization.Serializable
+import org.koin.compose.koinInject
 
 @Serializable
 object PreferencesScreen : Screen {
@@ -35,6 +39,19 @@ object PreferencesScreen : Screen {
         val backstack = LocalBackStack.current
 
         val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
+        val updateManager = koinInject<UpdateManager>()
+        val updateState by updateManager.state.collectAsState()
+        val availableUpdate = (updateState as? UpdateState.Available)?.takeIf { updateManager.isSupported }
+        val updateAvailable = availableUpdate != null
+        val updateSummary = when {
+            !updateManager.isSupported -> stringResource(R.string.update_not_supported_title)
+            availableUpdate != null -> stringResource(
+                R.string.update_available_title,
+                availableUpdate.release.version.toString(),
+            )
+            else -> stringResource(R.string.update_card_up_to_date, updateManager.currentVersion)
+        }
 
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -72,12 +89,6 @@ object PreferencesScreen : Screen {
                 )
             ) {
                 item {
-                    app.marlboroadvance.mpvex.ui.update.UpdateSettingsCard(
-                        onClick = { backstack.add(UpdatesScreen) },
-                    )
-                }
-
-                item {
                     SearchPill(onClick = { backstack.add(SettingsSearchScreen) })
                 }
 
@@ -88,12 +99,14 @@ object PreferencesScreen : Screen {
                             title = stringResource(R.string.pref_appearance_title),
                             summary = stringResource(R.string.pref_appearance_summary),
                             icon = { PreferenceIcon(Icons.Rounded.Palette, containerColor = MaterialTheme.colorScheme.primaryContainer) },
+                            showChevron = true,
                             onClick = { backstack.add(AppearancePreferencesScreen) }
                         )
                         PreferenceItem(
                             title = stringResource(R.string.pref_layout_title),
                             summary = stringResource(R.string.pref_layout_summary),
                             icon = { PreferenceIcon(Icons.AutoMirrored.Rounded.ViewQuilt, containerColor = MaterialTheme.colorScheme.primaryContainer) },
+                            showChevron = true,
                             onClick = { backstack.add(PlayerControlsPreferencesScreen) }
                         )
                     }
@@ -106,13 +119,22 @@ object PreferencesScreen : Screen {
                             title = stringResource(R.string.pref_player),
                             summary = stringResource(R.string.pref_player_summary),
                             icon = { PreferenceIcon(Icons.Rounded.PlayCircle, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
+                            showChevron = true,
                             onClick = { backstack.add(PlayerPreferencesScreen) }
                         )
                         PreferenceItem(
                             title = stringResource(R.string.pref_gesture),
                             summary = stringResource(R.string.pref_gesture_summary),
                             icon = { PreferenceIcon(Icons.Rounded.Gesture, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
+                            showChevron = true,
                             onClick = { backstack.add(GesturePreferencesScreen) }
+                        )
+                        PreferenceItem(
+                            title = stringResource(R.string.pref_decoder),
+                            summary = stringResource(R.string.pref_decoder_summary),
+                            icon = { PreferenceIcon(Icons.Rounded.Memory, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
+                            showChevron = true,
+                            onClick = { backstack.add(DecoderPreferencesScreen) }
                         )
                     }
                 }
@@ -124,13 +146,8 @@ object PreferencesScreen : Screen {
                             title = stringResource(R.string.pref_folders_title),
                             summary = stringResource(R.string.pref_folders_summary),
                             icon = { PreferenceIcon(Icons.Rounded.Folder) },
+                            showChevron = true,
                             onClick = { backstack.add(FoldersPreferencesScreen) }
-                        )
-                        PreferenceItem(
-                            title = stringResource(R.string.pref_decoder),
-                            summary = stringResource(R.string.pref_decoder_summary),
-                            icon = { PreferenceIcon(Icons.Rounded.Memory) },
-                            onClick = { backstack.add(DecoderPreferencesScreen) }
                         )
                     }
                 }
@@ -142,12 +159,14 @@ object PreferencesScreen : Screen {
                             title = stringResource(R.string.pref_subtitles),
                             summary = stringResource(R.string.pref_subtitles_summary),
                             icon = { PreferenceIcon(Icons.Rounded.Subtitles) },
+                            showChevron = true,
                             onClick = { backstack.add(SubtitlesPreferencesScreen) }
                         )
                         PreferenceItem(
                             title = stringResource(R.string.pref_audio),
                             summary = stringResource(R.string.pref_audio_summary),
                             icon = { PreferenceIcon(Icons.Rounded.Audiotrack) },
+                            showChevron = true,
                             onClick = { backstack.add(AudioPreferencesScreen) }
                         )
                     }
@@ -160,18 +179,42 @@ object PreferencesScreen : Screen {
                             title = stringResource(R.string.pref_storage_title),
                             summary = stringResource(R.string.pref_storage_summary),
                             icon = { PreferenceIcon(Icons.Rounded.Storage, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) },
+                            showChevron = true,
                             onClick = { backstack.add(StorageScreen) }
                         )
                         PreferenceItem(
                             title = stringResource(R.string.pref_advanced),
                             summary = stringResource(R.string.pref_advanced_summary),
                             icon = { PreferenceIcon(Icons.Rounded.Code, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) },
+                            showChevron = true,
                             onClick = { backstack.add(AdvancedPreferencesScreen) }
+                        )
+                        PreferenceItem(
+                            title = stringResource(R.string.update_title),
+                            summary = updateSummary,
+                            icon = {
+                                PreferenceIcon(
+                                    Icons.Rounded.SystemUpdate,
+                                    containerColor = if (updateAvailable) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceContainerHighest
+                                    },
+                                    iconColor = if (updateAvailable) {
+                                        MaterialTheme.colorScheme.onPrimaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    },
+                                )
+                            },
+                            showChevron = true,
+                            onClick = { backstack.add(UpdatesScreen) }
                         )
                         PreferenceItem(
                             title = stringResource(R.string.pref_about_title),
                             summary = stringResource(R.string.pref_about_summary),
                             icon = { PreferenceIcon(Icons.Rounded.Info, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) },
+                            showChevron = true,
                             onClick = { backstack.add(AboutScreen) }
                         )
                     }
@@ -196,7 +239,7 @@ fun SearchPill(onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 4.dp)
             .scale(scale),
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,

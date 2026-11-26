@@ -46,7 +46,7 @@ import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.FooterPreference
-import me.zhanghai.compose.preference.ListPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.ListPreference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import org.koin.compose.koinInject
 

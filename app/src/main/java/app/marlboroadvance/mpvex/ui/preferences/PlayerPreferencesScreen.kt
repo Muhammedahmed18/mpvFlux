@@ -32,10 +32,10 @@ import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.serialization.Serializable
-import me.zhanghai.compose.preference.ListPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.ListPreference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import me.zhanghai.compose.preference.SliderPreference
-import me.zhanghai.compose.preference.SwitchPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.SwitchPreference
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
@@ -93,7 +93,88 @@ object PlayerPreferencesScreen : Screen {
             )
           ) {
             item {
-              PreferenceSectionHeader(title = stringResource(R.string.pref_section_playback))
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_orientation_display))
+            }
+
+            item {
+              PreferenceCard {
+                val orientation by preferences.orientation.collectAsState()
+                ListPreference(
+                  value = orientation,
+                  onValueChange = preferences.orientation::set,
+                  values = PlayerOrientation.entries,
+                  valueToText = { AnnotatedString(orientationNames[it] ?: "") },
+                  title = {
+                    Text(
+                      text = stringResource(id = R.string.pref_player_orientation),
+                      style = MaterialTheme.typography.titleMediumEmphasized
+                    )
+                  },
+                  summary = {
+                    Text(
+                      text = orientationNames[orientation] ?: "",
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                  },
+                )
+
+                PreferenceDivider()
+
+                val rememberBrightness by preferences.rememberBrightness.collectAsState()
+                SwitchPreference(
+                  value = rememberBrightness,
+                  onValueChange = preferences.rememberBrightness::set,
+                  title = {
+                    Text(
+                      text = stringResource(R.string.pref_player_remember_brightness),
+                      style = MaterialTheme.typography.titleMediumEmphasized
+                    )
+                  },
+                )
+
+                PreferenceDivider()
+
+                val keepScreenOnWhenPaused by preferences.keepScreenOnWhenPaused.collectAsState()
+                SwitchPreference(
+                  value = keepScreenOnWhenPaused,
+                  onValueChange = preferences.keepScreenOnWhenPaused::set,
+                  title = {
+                    Text(
+                      text = stringResource(R.string.pref_player_keep_screen_on_paused_title),
+                      style = MaterialTheme.typography.titleMediumEmphasized
+                    )
+                  },
+                  summary = {
+                    Text(
+                      text = if (keepScreenOnWhenPaused)
+                        stringResource(R.string.pref_player_keep_screen_on_paused_summary_on)
+                      else
+                        stringResource(R.string.pref_player_keep_screen_on_paused_summary_off),
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                  },
+                )
+
+                PreferenceDivider()
+
+                val reduceMotion by preferences.reduceMotion.collectAsState()
+                SwitchPreference(
+                  value = reduceMotion,
+                  onValueChange = preferences.reduceMotion::set,
+                  title = {
+                    Text(
+                      text = stringResource(R.string.pref_player_display_reduce_player_animation),
+                      style = MaterialTheme.typography.titleMediumEmphasized
+                    )
+                  },
+                )
+              }
+            }
+
+            item {
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_playback_resume))
             }
 
             item {
@@ -181,100 +262,6 @@ object PlayerPreferencesScreen : Screen {
             }
 
             item {
-              PreferenceSectionHeader(title = stringResource(R.string.pref_section_display_screen))
-            }
-
-            item {
-              PreferenceCard {
-                val orientation by preferences.orientation.collectAsState()
-                ListPreference(
-                  value = orientation,
-                  onValueChange = preferences.orientation::set,
-                  values = PlayerOrientation.entries,
-                  valueToText = { AnnotatedString(orientationNames[it] ?: "") },
-                  title = {
-                    Text(
-                      text = stringResource(id = R.string.pref_player_orientation),
-                      style = MaterialTheme.typography.titleMediumEmphasized
-                    )
-                  },
-                  summary = {
-                    Text(
-                      text = orientationNames[orientation] ?: "",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                  },
-                )
-
-                PreferenceDivider()
-
-                val rememberBrightness by preferences.rememberBrightness.collectAsState()
-                SwitchPreference(
-                  value = rememberBrightness,
-                  onValueChange = preferences.rememberBrightness::set,
-                  title = {
-                    Text(
-                      text = stringResource(R.string.pref_player_remember_brightness),
-                      style = MaterialTheme.typography.titleMediumEmphasized
-                    )
-                  },
-                )
-
-                PreferenceDivider()
-
-                val keepScreenOnWhenPaused by preferences.keepScreenOnWhenPaused.collectAsState()
-                SwitchPreference(
-                  value = keepScreenOnWhenPaused,
-                  onValueChange = preferences.keepScreenOnWhenPaused::set,
-                  title = {
-                    Text(
-                      text = stringResource(R.string.pref_player_keep_screen_on_paused_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
-                    )
-                  },
-                  summary = {
-                    Text(
-                      text = if (keepScreenOnWhenPaused)
-                        stringResource(R.string.pref_player_keep_screen_on_paused_summary_on)
-                      else
-                        stringResource(R.string.pref_player_keep_screen_on_paused_summary_off),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                  },
-                )
-              }
-            }
-
-            item {
-              PreferenceSectionHeader(title = stringResource(R.string.pref_section_pip))
-            }
-
-            item {
-              PreferenceCard {
-                val autoPiPOnNavigation by preferences.autoPiPOnNavigation.collectAsState()
-                SwitchPreference(
-                  value = autoPiPOnNavigation,
-                  onValueChange = preferences.autoPiPOnNavigation::set,
-                  title = {
-                    Text(
-                      text = stringResource(R.string.pref_auto_pip_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
-                    )
-                  },
-                  summary = {
-                    Text(
-                      text = stringResource(R.string.pref_auto_pip_summary),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                  },
-                )
-              }
-            }
-
-            item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_player_seeking_title))
             }
             
@@ -348,9 +335,9 @@ object PlayerPreferencesScreen : Screen {
             }
 
             item {
-              PreferenceSectionHeader(title = stringResource(R.string.pref_player_gestures))
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_touch_gestures))
             }
-            
+
             item {
               PreferenceCard {
                 val brightnessGesture by preferences.brightnessGesture.collectAsState()
@@ -406,9 +393,15 @@ object PlayerPreferencesScreen : Screen {
                     ) 
                   },
                 )
-                
-                PreferenceDivider()
-                
+              }
+            }
+
+            item {
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_seek_speed_gestures))
+            }
+
+            item {
+              PreferenceCard {
                 val horizontalSwipeToSeek by preferences.horizontalSwipeToSeek.collectAsState()
                 SwitchPreference(
                   value = horizontalSwipeToSeek,
@@ -503,6 +496,33 @@ object PlayerPreferencesScreen : Screen {
                       color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   }
+                )
+              }
+            }
+
+            item {
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_pip))
+            }
+
+            item {
+              PreferenceCard {
+                val autoPiPOnNavigation by preferences.autoPiPOnNavigation.collectAsState()
+                SwitchPreference(
+                  value = autoPiPOnNavigation,
+                  onValueChange = preferences.autoPiPOnNavigation::set,
+                  title = {
+                    Text(
+                      text = stringResource(R.string.pref_auto_pip_title),
+                      style = MaterialTheme.typography.titleMediumEmphasized
+                    )
+                  },
+                  summary = {
+                    Text(
+                      text = stringResource(R.string.pref_auto_pip_summary),
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                  },
                 )
               }
             }

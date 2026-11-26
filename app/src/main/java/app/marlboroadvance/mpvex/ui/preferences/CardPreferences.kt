@@ -3,6 +3,8 @@ package app.marlboroadvance.mpvex.ui.preferences
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -53,14 +55,14 @@ fun PreferenceCard(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 4.dp),
         shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp)
+                .padding(vertical = 4.dp)
         ) {
             content()
         }
@@ -101,6 +103,7 @@ fun PreferenceItem(
     enabled: Boolean = true,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    showChevron: Boolean = false,
 ) {
     Preference(
         title = { 
@@ -121,7 +124,18 @@ fun PreferenceItem(
         icon = icon,
         enabled = enabled,
         onClick = onClick,
-        modifier = modifier
+        modifier = modifier,
+        trailingContent = if (showChevron) {
+            {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            null
+        },
     )
 }
 
@@ -146,7 +160,7 @@ fun PreferenceSectionHeader(
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(start = 28.dp, top = 24.dp, bottom = 8.dp),
+        modifier = modifier.padding(start = 28.dp, top = 20.dp, bottom = 6.dp),
     )
 }
 

@@ -313,7 +313,7 @@ private fun SearchResultItem(
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(40.dp)
                     .scale(if (isPressed) 0.9f else 1f)
                     .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.medium),
                 contentAlignment = Alignment.Center
@@ -322,7 +322,7 @@ private fun SearchResultItem(
                     imageVector = Icons.Rounded.Settings,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(20.dp),
                 )
             }
 

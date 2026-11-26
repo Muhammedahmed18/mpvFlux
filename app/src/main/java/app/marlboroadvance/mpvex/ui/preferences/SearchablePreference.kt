@@ -623,6 +623,22 @@ object SearchablePreferences {
                 screen = AdvancedPreferencesScreen,
             ))
 
+            // Updates
+            add(SearchablePreference(
+                titleRes = R.string.update_title,
+                summaryRes = R.string.update_auto_check_summary,
+                keywords = listOf("update", "updates", "version", "release", "github", "check", "upgrade"),
+                category = "Updates",
+                screen = UpdatesScreen,
+            ))
+            add(SearchablePreference(
+                titleRes = R.string.update_auto_check,
+                summaryRes = R.string.update_auto_check_summary,
+                keywords = listOf("update", "automatic", "auto", "check", "startup"),
+                category = "Updates",
+                screen = UpdatesScreen,
+            ))
+
             // About
             add(SearchablePreference(
                 titleRes = R.string.pref_about_title,
@@ -673,5 +689,6 @@ fun searchCategoryTitleRes(category: String): Int? = when (category) {
     "Player" -> R.string.pref_player
     "Storage" -> R.string.pref_storage_title
     "Subtitles" -> R.string.pref_subtitles
+    "Updates" -> R.string.update_title
     else -> null
 }

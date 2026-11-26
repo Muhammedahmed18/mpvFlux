@@ -44,9 +44,9 @@ import app.marlboroadvance.mpvex.ui.player.MPVProfile
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.serialization.Serializable
-import me.zhanghai.compose.preference.ListPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.ListPreference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
-import me.zhanghai.compose.preference.SwitchPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.SwitchPreference
 import org.koin.compose.koinInject
 
 @Serializable

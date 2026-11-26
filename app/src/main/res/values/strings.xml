@@ -25,6 +25,9 @@
   <string name="pref_appearance_hide_player_buttons_background_title">Hide player buttons background</string>
   <string name="pref_appearance_hide_player_buttons_background_summary">Hide the background of all player control buttons</string>
   <string name="pref_appearance_category_file_browser">File Browser</string>
+  <string name="pref_appearance_section_video_list">Video List</string>
+  <string name="pref_appearance_section_watch_status">Watch Status</string>
+  <string name="pref_appearance_section_thumbnails">Thumbnails</string>
   <string name="pref_appearance_show_unplayed_old_video_label_title">Show label for new unplayed videos</string>
   <string name="pref_appearance_show_unplayed_old_video_label_summary">Display a \"New\" label on videos added within specified days that have never been played</string>
   <string name="pref_appearance_unplayed_old_video_days_title">Days threshold for new video label</string>
@@ -895,6 +898,14 @@
   <string name="pref_section_playlist_autoplay">Playlist &amp; Autoplay</string>
   <string name="pref_section_display_screen">Display &amp; Screen</string>
   <string name="pref_section_pip">Picture-in-Picture</string>
+  <string name="pref_subtitles_section_language_loading">Language &amp; Loading</string>
+  <string name="pref_subtitles_section_rendering_fonts">Rendering &amp; Fonts</string>
+  <string name="pref_subtitles_section_search">Subtitle Search</string>
+  <string name="pref_subtitles_section_downloads">Downloads</string>
+  <string name="pref_section_orientation_display">Orientation &amp; Display</string>
+  <string name="pref_section_playback_resume">Playback &amp; Resume</string>
+  <string name="pref_section_touch_gestures">Touch Gestures</string>
+  <string name="pref_section_seek_speed_gestures">Seek &amp; Speed Gestures</string>
   <string name="pref_section_landscape_controls">Landscape Controls</string>
   <string name="pref_section_portrait_controls">Portrait Controls</string>
   <string name="pref_section_seekbar_style">Seekbar Style</string>

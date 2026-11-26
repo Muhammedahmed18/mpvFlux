@@ -3,15 +3,8 @@ package app.marlboroadvance.mpvex.ui.preferences
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.TextButton
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.semantics.Role
 import app.marlboroadvance.mpvex.preferences.ThumbnailPosition
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -61,7 +54,9 @@ import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.Preference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import me.zhanghai.compose.preference.SliderPreference
-import me.zhanghai.compose.preference.SwitchPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.ListPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.SwitchPreference
+import androidx.compose.ui.text.AnnotatedString
 import org.koin.compose.koinInject
 import kotlin.math.roundToInt
 
@@ -133,7 +128,7 @@ object AppearancePreferencesScreen : Screen {
 
                         item {
                             PreferenceCard {
-                                Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)) {
+                                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                                     MultiChoiceSegmentedButton(
                                         choices = DarkMode.entries.map { stringResource(it.titleRes) }.toImmutableList(),
                                         selectedIndices = persistentListOf(DarkMode.entries.indexOf(darkMode)),
@@ -149,7 +144,7 @@ object AppearancePreferencesScreen : Screen {
                                     currentTheme = appTheme,
                                     isDarkMode = isDarkMode,
                                     onThemeSelected = { preferences.appTheme.set(it) },
-                                    modifier = Modifier.padding(vertical = 8.dp),
+                                    modifier = Modifier.padding(bottom = 8.dp),
                                 )
 
                                 PreferenceDivider()
@@ -178,7 +173,7 @@ object AppearancePreferencesScreen : Screen {
                         }
 
                         item {
-                            PreferenceSectionHeader(title = stringResource(id = R.string.pref_appearance_category_file_browser))
+                            PreferenceSectionHeader(title = stringResource(id = R.string.pref_appearance_section_video_list))
                         }
 
                         item {
@@ -204,6 +199,54 @@ object AppearancePreferencesScreen : Screen {
 
                                 PreferenceDivider()
 
+                                val autoScrollToLastPlayed by browserPreferences.autoScrollToLastPlayed.collectAsState()
+                                SwitchPreference(
+                                    value = autoScrollToLastPlayed,
+                                    onValueChange = { browserPreferences.autoScrollToLastPlayed.set(it) },
+                                    title = {
+                                        Text(
+                                            text = stringResource(R.string.pref_appearance_auto_scroll_title),
+                                            style = MaterialTheme.typography.titleMediumEmphasized
+                                        )
+                                    },
+                                    summary = {
+                                        Text(
+                                            text = stringResource(R.string.pref_appearance_auto_scroll_summary),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                )
+
+                                PreferenceDivider()
+
+                                val tapThumbnailToSelect by gesturePreferences.tapThumbnailToSelect.collectAsState()
+                                SwitchPreference(
+                                    value = tapThumbnailToSelect,
+                                    onValueChange = { gesturePreferences.tapThumbnailToSelect.set(it) },
+                                    title = {
+                                        Text(
+                                            text = stringResource(id = R.string.pref_gesture_tap_thumbnail_to_select_title),
+                                            style = MaterialTheme.typography.titleMediumEmphasized
+                                        )
+                                    },
+                                    summary = {
+                                        Text(
+                                            text = stringResource(id = R.string.pref_gesture_tap_thumbnail_to_select_summary),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        item {
+                            PreferenceSectionHeader(title = stringResource(id = R.string.pref_appearance_section_watch_status))
+                        }
+
+                        item {
+                            PreferenceCard {
                                 val showUnplayedOldVideoLabel by preferences.showUnplayedOldVideoLabel.collectAsState()
                                 SwitchPreference(
                                     value = showUnplayedOldVideoLabel,
@@ -253,27 +296,6 @@ object AppearancePreferencesScreen : Screen {
 
                                 PreferenceDivider()
 
-                                val autoScrollToLastPlayed by browserPreferences.autoScrollToLastPlayed.collectAsState()
-                                SwitchPreference(
-                                    value = autoScrollToLastPlayed,
-                                    onValueChange = { browserPreferences.autoScrollToLastPlayed.set(it) },
-                                    title = {
-                                        Text(
-                                            text = stringResource(R.string.pref_appearance_auto_scroll_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
-                                        )
-                                    },
-                                    summary = {
-                                        Text(
-                                            text = stringResource(R.string.pref_appearance_auto_scroll_summary),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                )
-
-                                PreferenceDivider()
-
                                 val watchedThreshold by browserPreferences.watchedThreshold.collectAsState()
                                 SliderPreference(
                                     value = watchedThreshold.toFloat(),
@@ -299,30 +321,15 @@ object AppearancePreferencesScreen : Screen {
                                         )
                                     },
                                 )
+                            }
+                        }
 
-                                PreferenceDivider()
+                        item {
+                            PreferenceSectionHeader(title = stringResource(id = R.string.pref_appearance_section_thumbnails))
+                        }
 
-                                val tapThumbnailToSelect by gesturePreferences.tapThumbnailToSelect.collectAsState()
-                                SwitchPreference(
-                                    value = tapThumbnailToSelect,
-                                    onValueChange = { gesturePreferences.tapThumbnailToSelect.set(it) },
-                                    title = {
-                                        Text(
-                                            text = stringResource(id = R.string.pref_gesture_tap_thumbnail_to_select_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
-                                        )
-                                    },
-                                    summary = {
-                                        Text(
-                                            text = stringResource(id = R.string.pref_gesture_tap_thumbnail_to_select_summary),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                )
-
-                                PreferenceDivider()
-
+                        item {
+                            PreferenceCard {
                                 val showNetworkThumbnails by preferences.showNetworkThumbnails.collectAsState()
                                 SwitchPreference(
                                     value = showNetworkThumbnails,
@@ -345,8 +352,12 @@ object AppearancePreferencesScreen : Screen {
                                 PreferenceDivider()
 
                                 val thumbnailPosition by preferences.thumbnailPosition.collectAsState()
-                                var showThumbnailPositionDialog by remember { mutableStateOf(false) }
-                                Preference(
+                                val thumbnailPositionNames = ThumbnailPosition.entries.associateWith { stringResource(it.titleRes) }
+                                ListPreference(
+                                    value = thumbnailPosition,
+                                    onValueChange = { preferences.thumbnailPosition.set(it) },
+                                    values = ThumbnailPosition.entries,
+                                    valueToText = { AnnotatedString(thumbnailPositionNames[it] ?: "") },
                                     title = {
                                         Text(
                                             text = stringResource(R.string.pref_appearance_thumbnail_position_title),
@@ -363,55 +374,7 @@ object AppearancePreferencesScreen : Screen {
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
-                                    onClick = { showThumbnailPositionDialog = true },
                                 )
-
-                                if (showThumbnailPositionDialog) {
-                                    AlertDialog(
-                                        onDismissRequest = { showThumbnailPositionDialog = false },
-                                        title = {
-                                            Text(stringResource(R.string.pref_appearance_thumbnail_position_title))
-                                        },
-                                        text = {
-                                            Column {
-                                                Text(
-                                                    text = stringResource(R.string.pref_appearance_thumbnail_position_dialog_summary),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.padding(bottom = 8.dp),
-                                                )
-                                                ThumbnailPosition.entries.forEach { option ->
-                                                    Row(
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .selectable(
-                                                                selected = option == thumbnailPosition,
-                                                                onClick = {
-                                                                    preferences.thumbnailPosition.set(option)
-                                                                    showThumbnailPositionDialog = false
-                                                                },
-                                                                role = Role.RadioButton,
-                                                            )
-                                                            .padding(vertical = 8.dp),
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                    ) {
-                                                        RadioButton(selected = option == thumbnailPosition, onClick = null)
-                                                        Text(
-                                                            text = stringResource(option.titleRes),
-                                                            style = MaterialTheme.typography.bodyLarge,
-                                                            modifier = Modifier.padding(start = 16.dp),
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        },
-                                        confirmButton = {
-                                            TextButton(onClick = { showThumbnailPositionDialog = false }) {
-                                                Text(stringResource(R.string.generic_cancel))
-                                            }
-                                        },
-                                    )
-                                }
                             }
                         }
 

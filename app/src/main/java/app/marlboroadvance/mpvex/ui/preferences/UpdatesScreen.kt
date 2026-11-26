@@ -28,7 +28,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import app.marlboroadvance.mpvex.ui.preferences.components.PreferenceSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -302,6 +302,6 @@ private fun SwitchRow(
       Text(title, style = MaterialTheme.typography.titleMediumEmphasized)
       Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-    Switch(checked = checked, onCheckedChange = null)
+    PreferenceSwitch(checked = checked, onCheckedChange = null)
   }
 }

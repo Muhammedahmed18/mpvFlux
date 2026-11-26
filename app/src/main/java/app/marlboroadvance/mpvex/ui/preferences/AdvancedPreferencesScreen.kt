@@ -52,7 +52,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
-import me.zhanghai.compose.preference.SwitchPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.SwitchPreference
 import me.zhanghai.compose.preference.TwoTargetIconButtonPreference
 import org.koin.compose.koinInject
 
