@@ -1,17 +1,6 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,12 +8,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import dev.vivvvek.seeker.Segment
 import `is`.xyz.mpv.Utils
@@ -63,7 +49,12 @@ fun ChaptersSheet(
     header = {
       SheetHeader(
         title = stringResource(R.string.player_sheets_chapters_title),
-        trailing = { ChapterCountBadge(count = chapters.size) },
+        // Same look as the audio sheet's channel badge, but not tappable.
+        trailing = {
+          SheetStatusBadge(
+            text = pluralStringResource(R.plurals.player_chapter_count, chapters.size, chapters.size).uppercase(),
+          )
+        },
       )
     },
     track = { chapter ->
@@ -90,37 +81,4 @@ fun ChaptersSheet(
     },
     modifier = modifier,
   )
-}
-
-/**
- * Chapter count status pill: same look as the audio sheet's AudioChannelBadge —
- * primaryContainer fill, 14dp rounded, leading 6dp dot, ExtraBold tabular-figures
- * label — but not tappable, so there is no chevron or press scale.
- */
-@Composable
-private fun ChapterCountBadge(count: Int) {
-  Surface(
-    shape = RoundedCornerShape(14.dp),
-    color = MaterialTheme.colorScheme.primaryContainer,
-  ) {
-    Row(
-      modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-      Box(
-        modifier = Modifier
-          .size(6.dp)
-          .background(MaterialTheme.colorScheme.primary, CircleShape),
-      )
-      Text(
-        text = pluralStringResource(R.plurals.player_chapter_count, count, count).uppercase(),
-        style = MaterialTheme.typography.labelMedium.copy(
-          fontWeight = FontWeight.ExtraBold,
-          fontFeatureSettings = "tnum",
-        ),
-        color = MaterialTheme.colorScheme.onPrimaryContainer,
-      )
-    }
-  }
 }

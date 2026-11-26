@@ -1,19 +1,12 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -27,8 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -39,8 +30,6 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -48,10 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AudioChannels
 import app.marlboroadvance.mpvex.preferences.AudioPreferences
@@ -135,36 +121,33 @@ private fun AudioTracksSheetContent(
           .fillMaxWidth()
           .padding(bottom = navBarPadding.coerceAtLeast(MaterialTheme.spacing.medium))
       ) {
-        // Back arrow + title — same typography as SheetHeader's title line for visual continuity.
+        // Back arrow + title — same title style as SheetHeader for visual continuity.
         Row(
           modifier = Modifier
             .fillMaxWidth()
             .padding(MaterialTheme.spacing.medium),
           verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(12.dp)
+          horizontalArrangement = Arrangement.spacedBy(SheetDimens.HeaderBackGap)
         ) {
           FilledTonalIconButton(
             onClick  = { isChannelSelectionMode = false },
             shapes   = IconButtonDefaults.shapes(),
             colors   = glassIconButtonColors(hideBackground = false),
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(SheetDimens.ActionButtonSize),
           ) {
             Icon(
               imageVector        = Icons.AutoMirrored.Filled.ArrowBack,
               contentDescription = stringResource(R.string.back),
+              modifier           = Modifier.size(SheetDimens.ActionIconSize),
             )
           }
-          Text(
-            text  = stringResource(R.string.audio_channels),
-            style = MaterialTheme.typography.headlineSmallEmphasized,
-            color = MaterialTheme.colorScheme.onSurface,
-          )
+          SheetTitleText(text = stringResource(R.string.audio_channels))
         }
 
         LazyColumn(
           modifier = Modifier.weight(1f),
           contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.medium),
-          verticalArrangement = Arrangement.spacedBy(8.dp)
+          verticalArrangement = Arrangement.spacedBy(SheetDimens.ListItemSpacing)
         ) {
           items(AudioChannels.entries.toTypedArray()) { channel ->
             val isSelected = audioChannels == channel
@@ -197,9 +180,10 @@ private fun AudioTracksSheetContent(
           SheetHeader(
             title = stringResource(R.string.pref_audio),
             trailing = {
-              AudioChannelBadge(
-                channelName = stringResource(audioChannels.title),
-                onClick     = { isChannelSelectionMode = true },
+              SheetStatusBadge(
+                text         = stringResource(audioChannels.title).uppercase(),
+                onClick      = { isChannelSelectionMode = true },
+                trailingIcon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
               )
             },
           )
@@ -249,7 +233,7 @@ private fun AudioTracksSheetContent(
             horizontal = MaterialTheme.spacing.medium,
             vertical = MaterialTheme.spacing.small
           ),
-          verticalArrangement = Arrangement.spacedBy(8.dp)
+          verticalArrangement = Arrangement.spacedBy(SheetDimens.ListItemSpacing)
         ) {
           items(audioItems) { item ->
             when (item) {
@@ -282,74 +266,12 @@ private fun AudioTracksSheetContent(
                 )
               }
               is AudioItem.Header -> {
-                TrackHeaderPill(
-                  title = item.title,
-                  modifier = Modifier.padding(horizontal = 16.dp)
-                )
+                TrackHeaderPill(title = item.title)
               }
             }
           }
         }
       }
-    }
-  }
-}
-
-/**
- * Audio channel status pill: matches the player's value-chip language —
- * primaryContainer fill, 14dp rounded, leading 6dp dot, ExtraBold tabular-figures
- * label, trailing chevron. Spring-scales 0.97× on press (OxygenOS "soft squish").
- */
-@Composable
-private fun AudioChannelBadge(
-  channelName: String,
-  onClick: () -> Unit,
-) {
-  val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
-  val pressScale by animateFloatAsState(
-    targetValue   = if (isPressed) 0.97f else 1f,
-    animationSpec = spring(
-      dampingRatio = Spring.DampingRatioMediumBouncy,
-      stiffness    = Spring.StiffnessLow,
-    ),
-    label = "audio_channel_badge_press_scale",
-  )
-
-  Surface(
-    onClick           = onClick,
-    interactionSource = interactionSource,
-    shape             = RoundedCornerShape(14.dp),
-    color             = MaterialTheme.colorScheme.primaryContainer,
-    modifier          = Modifier.graphicsLayer {
-      scaleX = pressScale
-      scaleY = pressScale
-    },
-  ) {
-    Row(
-      modifier              = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-      verticalAlignment     = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-      Box(
-        modifier = Modifier
-          .size(6.dp)
-          .background(MaterialTheme.colorScheme.primary, CircleShape),
-      )
-      Text(
-        text  = channelName.uppercase(),
-        style = MaterialTheme.typography.labelMedium.copy(
-          fontWeight          = FontWeight.ExtraBold,
-          fontFeatureSettings = "tnum",
-        ),
-        color = MaterialTheme.colorScheme.onPrimaryContainer,
-      )
-      Icon(
-        imageVector        = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-        contentDescription = null,
-        modifier           = Modifier.size(14.dp),
-        tint               = MaterialTheme.colorScheme.onPrimaryContainer,
-      )
     }
   }
 }

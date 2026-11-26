@@ -10,12 +10,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -75,8 +77,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -92,14 +94,105 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.launch
 
 /**
+ * Single source of truth for every size, alpha and motion value used by the player sheets
+ * (Chapters, Audio, Subtitles, Decoders, ...). Tweak a value here and every sheet follows.
+ */
+internal object SheetDimens {
+  // --- Overlay host -------------------------------------------------------
+  const val SheetMaxHeightFraction = 0.75f
+  const val SheetContainerAlpha = 0.85f
+
+  // --- Glass edge ---------------------------------------------------------
+  const val GlassEdgeTopAlpha = 0.25f
+  const val GlassEdgeBottomAlpha = 0.05f
+
+  // --- List ---------------------------------------------------------------
+  val ListItemSpacing = 6.dp
+
+  // --- Header -------------------------------------------------------------
+  val HeaderLabelGap = 2.dp
+  val HeaderBackGap = 10.dp
+  const val HeaderLabelAlpha = 0.6f
+  const val HeaderLabelLetterSpacing = 1f // sp
+
+  // --- Section divider ("EMBEDDED" / "EXTERNAL") --------------------------
+  val SectionPaddingTop = 12.dp
+  val SectionPaddingBottom = 2.dp
+  val SectionPaddingHorizontal = 12.dp
+  val SectionRuleWidth = 24.dp
+  val SectionRuleThickness = 1.dp
+  val SectionRuleGap = 10.dp
+  const val SectionRuleAlpha = 0.3f
+  const val SectionLabelAlpha = 0.6f
+
+  // --- Track row ----------------------------------------------------------
+  val RowPaddingHorizontal = 12.dp
+  val RowPaddingVertical = 9.dp
+  val RowMinHeight = 48.dp
+  val RowContentGap = 10.dp
+  val RowCornerRadius = 16.dp
+  val RowCornerRadiusPressed = 22.dp
+  val RowBorderWidth = 1.dp
+  val RowBorderWidthSelected = 1.5.dp
+  const val RowPressScale = 0.98f
+  const val RowDisabledAlpha = 0.5f
+  const val RowSelectedContainerAlpha = 0.35f
+  const val RowIdleContainerAlpha = 0.4f
+  const val RowSelectedBorderAlpha = 0.3f
+  const val RowSpringDamping = 0.7f
+  const val IndicatorSpringDamping = 0.6f
+  val RowTitleMetadataGap = 4.dp
+  val RowMetadataGap = 4.dp
+
+  // --- Round badges / selection indicator ---------------------------------
+  val BadgeSize = 20.dp
+  val BadgeIconSize = 12.dp
+  val CheckIconSize = 14.dp
+  val RingStroke = 1.5.dp
+  const val BadgeIdleAlpha = 0.12f
+  const val RingAlpha = 0.4f
+
+  // --- Metadata tag -------------------------------------------------------
+  val TagPaddingHorizontal = 6.dp
+  val TagPaddingVertical = 1.dp
+  const val TagFontSize = 9f // sp
+  const val TagLetterSpacing = 0.5f // sp
+
+  // --- Count pill ---------------------------------------------------------
+  val CountPillPaddingHorizontal = 6.dp
+  val CountPillPaddingVertical = 2.dp
+  const val CountPillLetterSpacing = 0.5f // sp
+
+  // --- Status badge (chapter count, audio channels) -----------------------
+  val StatusBadgeCorner = 10.dp
+  val StatusBadgePaddingHorizontal = 8.dp
+  val StatusBadgePaddingVertical = 4.dp
+  val StatusBadgeGap = 4.dp
+  val StatusBadgeDotSize = 5.dp
+  val StatusBadgeChevronSize = 12.dp
+  const val StatusBadgePressScale = 0.97f
+
+  // --- Action buttons -----------------------------------------------------
+  val ActionButtonSize = 36.dp
+  val ActionIconSize = 18.dp
+  val AddButtonPaddingVertical = 10.dp
+  val AddButtonIconSize = 18.dp
+
+  // --- Trailing action inside a row (e.g. remove subtitle) ----------------
+  val TrailingActionSize = 28.dp
+  val TrailingIconSize = 18.dp
+  const val TrailingIconAlpha = 0.8f
+}
+
+/**
  * Single source of truth for the soft top-light gradient that traces every glass
  * surface in the sheets — the sheet itself, track rows in idle state, etc.
  * Centralised so a tweak to the highlight feel propagates everywhere.
  */
 internal val SheetGlassEdgeBrush: Brush = Brush.verticalGradient(
   listOf(
-    Color.White.copy(alpha = 0.25f),
-    Color.White.copy(alpha = 0.05f),
+    Color.White.copy(alpha = SheetDimens.GlassEdgeTopAlpha),
+    Color.White.copy(alpha = SheetDimens.GlassEdgeBottomAlpha),
   ),
 )
 
@@ -119,7 +212,7 @@ fun getTrackTitle(track: TrackNode): String {
   } else {
     track.title
   }
-  
+
   return if (!title.isNullOrBlank()) {
     title
   } else {
@@ -174,9 +267,9 @@ internal fun PlayerOverlayHost(
     // reveals the rest of the list at the capped full height.
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
-    // Even fully expanded the sheet stops at ~75% of the screen, so it never
+    // Even fully expanded the sheet stops short of the screen height, so it never
     // reads as a full-screen takeover of the player.
-    val maxSheetHeight = LocalConfiguration.current.screenHeightDp.dp * 0.75f
+    val maxSheetHeight = LocalConfiguration.current.screenHeightDp.dp * SheetDimens.SheetMaxHeightFraction
     val dismiss: () -> Unit = {
       scope.launch { sheetState.hide() }.invokeOnCompletion { onDismissRequest() }
     }
@@ -186,7 +279,7 @@ internal fun PlayerOverlayHost(
       // Translucent "glass" container — MPV's SurfaceView can't be backdrop-blurred,
       // so glass is approximated by letting the video glow through a high-alpha
       // surface tint, matching the translucent track rows it hosts.
-      containerColor   = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.85f),
+      containerColor   = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = SheetDimens.SheetContainerAlpha),
       dragHandle       = { BottomSheetDefaults.DragHandle() },
     ) {
       Box(modifier = Modifier.heightIn(max = maxSheetHeight)) {
@@ -246,7 +339,7 @@ private fun <T> GenericTracksSheetContent(
         horizontal = MaterialTheme.spacing.medium,
         vertical = MaterialTheme.spacing.small
       ),
-      verticalArrangement = Arrangement.spacedBy(8.dp)
+      verticalArrangement = Arrangement.spacedBy(SheetDimens.ListItemSpacing)
     ) {
       items(tracks) {
         track(it)
@@ -263,12 +356,26 @@ private fun <T> GenericTracksSheetContent(
   }
 }
 
+/** Sheet title line. Shared by [SheetHeader] and sub-views that need the same look. */
+@Composable
+internal fun SheetTitleText(
+  text: String,
+  modifier: Modifier = Modifier,
+) {
+  Text(
+    text     = text,
+    modifier = modifier,
+    style    = MaterialTheme.typography.titleLargeEmphasized,
+    color    = MaterialTheme.colorScheme.onSurface,
+  )
+}
+
 /**
- * Sheet header. Renders the title (`headlineSmall ExtraBold`) plus an optional
- * dim eyebrow line and an optional trailing slot.
+ * Sheet header. Renders the title plus an optional dim eyebrow line and an optional
+ * trailing slot.
  *
- *   label  → small `labelSmall` `1.sp`-tracking eyebrow line above the title.
- *            Omit (or pass `null`) when the eyebrow would just repeat the title.
+ *   label  → small `labelSmall` eyebrow line above the title. Omit (or pass `null`)
+ *            when the eyebrow would just repeat the title.
  *   trailing → composable slot at the end of the title row (e.g. the Audio
  *              sheet's channel-status badge).
  */
@@ -294,16 +401,12 @@ fun SheetHeader(
       if (label != null) {
         Text(
           text  = label,
-          style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
-          color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+          style = MaterialTheme.typography.labelSmall.copy(letterSpacing = SheetDimens.HeaderLabelLetterSpacing.sp),
+          color = MaterialTheme.colorScheme.onSurface.copy(alpha = SheetDimens.HeaderLabelAlpha),
         )
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(SheetDimens.HeaderLabelGap))
       }
-      Text(
-        text  = title,
-        style = MaterialTheme.typography.headlineSmallEmphasized,
-        color = MaterialTheme.colorScheme.onSurface,
-      )
+      SheetTitleText(text = title)
     }
     trailing?.invoke()
   }
@@ -311,7 +414,7 @@ fun SheetHeader(
 
 /**
  * Compact count chip — "4 TRACKS" — sits in `SheetHeader`'s trailing slot.
- * Same 8dp rounded mini-tag visual language as `TrackMetadataTag`, so the
+ * Same rounded mini-tag visual language as `TrackMetadataTag`, so the
  * counter reads as a piece of metadata about the list rather than another control.
  */
 @Composable
@@ -322,10 +425,13 @@ fun TrackCountPill(count: Int) {
   ) {
     Text(
       text     = pluralStringResource(R.plurals.player_track_count, count, count),
-      modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+      modifier = Modifier.padding(
+        horizontal = SheetDimens.CountPillPaddingHorizontal,
+        vertical   = SheetDimens.CountPillPaddingVertical,
+      ),
       style    = MaterialTheme.typography.labelSmall.copy(
         fontWeight          = FontWeight.Medium,
-        letterSpacing       = 0.5.sp,
+        letterSpacing       = SheetDimens.CountPillLetterSpacing.sp,
         fontFeatureSettings = "tnum",
       ),
       color    = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -334,46 +440,163 @@ fun TrackCountPill(count: Int) {
 }
 
 /**
+ * Status badge used in sheet headers: primaryContainer fill, leading dot, ExtraBold
+ * tabular-figures label. Pass [onClick] (and optionally [trailingIcon]) to make it
+ * tappable — it then spring-scales on press; without [onClick] it is a static pill.
+ *
+ * Used by the Chapters sheet (chapter count) and the Audio sheet (channel layout).
+ */
+@Composable
+fun SheetStatusBadge(
+  text: String,
+  modifier: Modifier = Modifier,
+  onClick: (() -> Unit)? = null,
+  trailingIcon: ImageVector? = null,
+) {
+  val interactionSource = remember { MutableInteractionSource() }
+  val isPressed by interactionSource.collectIsPressedAsState()
+  val pressScale by animateFloatAsState(
+    targetValue   = if (isPressed && onClick != null) SheetDimens.StatusBadgePressScale else 1f,
+    animationSpec = spring(
+      dampingRatio = Spring.DampingRatioMediumBouncy,
+      stiffness    = Spring.StiffnessLow,
+    ),
+    label = "sheet_status_badge_press_scale",
+  )
+
+  val shape = RoundedCornerShape(SheetDimens.StatusBadgeCorner)
+  val color = MaterialTheme.colorScheme.primaryContainer
+  val scaledModifier = modifier.graphicsLayer {
+    scaleX = pressScale
+    scaleY = pressScale
+  }
+  val badgeContent: @Composable () -> Unit = {
+    Row(
+      modifier = Modifier.padding(
+        horizontal = SheetDimens.StatusBadgePaddingHorizontal,
+        vertical   = SheetDimens.StatusBadgePaddingVertical,
+      ),
+      verticalAlignment     = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(SheetDimens.StatusBadgeGap),
+    ) {
+      Box(
+        modifier = Modifier
+          .size(SheetDimens.StatusBadgeDotSize)
+          .background(MaterialTheme.colorScheme.primary, CircleShape),
+      )
+      Text(
+        text  = text,
+        style = MaterialTheme.typography.labelSmall.copy(
+          fontWeight          = FontWeight.ExtraBold,
+          fontFeatureSettings = "tnum",
+        ),
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+      )
+      if (trailingIcon != null) {
+        Icon(
+          imageVector        = trailingIcon,
+          contentDescription = null,
+          modifier           = Modifier.size(SheetDimens.StatusBadgeChevronSize),
+          tint               = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+      }
+    }
+  }
+
+  if (onClick != null) {
+    Surface(
+      onClick           = onClick,
+      interactionSource = interactionSource,
+      shape             = shape,
+      color             = color,
+      modifier          = scaledModifier,
+      content           = badgeContent,
+    )
+  } else {
+    Surface(
+      shape    = shape,
+      color    = color,
+      modifier = scaledModifier,
+      content  = badgeContent,
+    )
+  }
+}
+
+/**
  * Section header divider — One UI–style label flanked by two short rules.
  * Replaces the previous Surface pill so groups read as clean breaks rather
  * than another tappable-looking container.
- *
- * `[─── 24dp ───]  LABEL  [─── 24dp ───]`
  */
 @Composable
 fun TrackHeaderPill(
-    title: String,
-    modifier: Modifier = Modifier,
+  title: String,
+  modifier: Modifier = Modifier,
 ) {
-    val ruleColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 16.dp, bottom = 4.dp, start = 16.dp, end = 16.dp),
-        verticalAlignment     = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .width(24.dp)
-                .height(1.dp)
-                .background(ruleColor),
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text  = title.uppercase(),
-            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.sp),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Box(
-            modifier = Modifier
-                .width(24.dp)
-                .height(1.dp)
-                .background(ruleColor),
-        )
-    }
+  val ruleColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = SheetDimens.SectionRuleAlpha)
+  Row(
+    modifier = modifier
+      .fillMaxWidth()
+      .padding(
+        top        = SheetDimens.SectionPaddingTop,
+        bottom     = SheetDimens.SectionPaddingBottom,
+        start      = SheetDimens.SectionPaddingHorizontal,
+        end        = SheetDimens.SectionPaddingHorizontal,
+      ),
+    verticalAlignment     = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.Center,
+  ) {
+    SectionRule(ruleColor)
+    Spacer(modifier = Modifier.width(SheetDimens.SectionRuleGap))
+    Text(
+      text  = title.uppercase(),
+      style = MaterialTheme.typography.labelSmall.copy(letterSpacing = SheetDimens.HeaderLabelLetterSpacing.sp),
+      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = SheetDimens.SectionLabelAlpha),
+    )
+    Spacer(modifier = Modifier.width(SheetDimens.SectionRuleGap))
+    SectionRule(ruleColor)
+  }
 }
+
+@Composable
+private fun SectionRule(color: Color) {
+  Box(
+    modifier = Modifier
+      .width(SheetDimens.SectionRuleWidth)
+      .height(SheetDimens.SectionRuleThickness)
+      .background(color),
+  )
+}
+
+/**
+ * Circular badge slot used at the start of a track row. Filled with the primary colour
+ * when selected, a faint tint otherwise. Callers supply the content (an id number, an icon…)
+ * and can read the matching content colour from [trackBadgeContentColor].
+ */
+@Composable
+fun TrackBadge(
+  isSelected: Boolean,
+  modifier: Modifier = Modifier,
+  content: @Composable BoxScope.() -> Unit,
+) {
+  Box(
+    modifier = modifier
+      .size(SheetDimens.BadgeSize)
+      .clip(CircleShape)
+      .background(
+        if (isSelected) {
+          MaterialTheme.colorScheme.primary
+        } else {
+          MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = SheetDimens.BadgeIdleAlpha)
+        },
+      ),
+    contentAlignment = Alignment.Center,
+    content          = content,
+  )
+}
+
+@Composable
+fun trackBadgeContentColor(isSelected: Boolean): Color =
+  if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -392,29 +615,29 @@ fun TrackSelectableBar(
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
 
-  // E1: shape morph 20dp → 28dp on press, scale 1.0 → 0.98 on press — OxygenOS "settle"
+  // Shape morph on press + subtle scale — OxygenOS "settle"
   val cornerRadius by animateDpAsState(
-    targetValue   = if (isPressed) 28.dp else 20.dp,
-    animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+    targetValue   = if (isPressed) SheetDimens.RowCornerRadiusPressed else SheetDimens.RowCornerRadius,
+    animationSpec = spring(dampingRatio = SheetDimens.RowSpringDamping, stiffness = Spring.StiffnessMediumLow),
     label         = "track_row_corner_radius",
   )
   val pressScale by animateFloatAsState(
-    targetValue   = if (isPressed) 0.98f else 1f,
-    animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+    targetValue   = if (isPressed) SheetDimens.RowPressScale else 1f,
+    animationSpec = spring(dampingRatio = SheetDimens.RowSpringDamping, stiffness = Spring.StiffnessMediumLow),
     label         = "track_row_press_scale",
   )
 
   val shape = RoundedCornerShape(cornerRadius)
 
-  // E1: glass idle / primaryContainer selected
+  // Glass idle / primaryContainer selected
   val containerColor = if (isSelected) {
-    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+    MaterialTheme.colorScheme.primaryContainer.copy(alpha = SheetDimens.RowSelectedContainerAlpha)
   } else {
-    MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.4f)
+    MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = SheetDimens.RowIdleContainerAlpha)
   }
-  val borderWidth = if (isSelected) 1.5.dp else 1.dp
+  val borderWidth = if (isSelected) SheetDimens.RowBorderWidthSelected else SheetDimens.RowBorderWidth
   val borderBrush = if (isSelected) {
-    SolidColor(MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+    SolidColor(MaterialTheme.colorScheme.primary.copy(alpha = SheetDimens.RowSelectedBorderAlpha))
   } else {
     SheetGlassEdgeBrush
   }
@@ -434,58 +657,47 @@ fun TrackSelectableBar(
       .graphicsLayer {
         scaleX = pressScale
         scaleY = pressScale
-        alpha = if (enabled) 1f else 0.5f
-      }
-      .border(borderWidth, borderBrush, shape),
+        alpha = if (enabled) 1f else SheetDimens.RowDisabledAlpha
+      },
     shape             = shape,
     color             = containerColor,
+    // Border drawn by the Surface itself so it always shares the fill's bounds and shape.
+    border            = BorderStroke(borderWidth, borderBrush),
   ) {
     Row(
       modifier              = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = 14.dp),
+        // Fill the 48dp touch-target height so the container covers the whole area inside the border.
+        .heightIn(min = SheetDimens.RowMinHeight)
+        .padding(
+          horizontal = SheetDimens.RowPaddingHorizontal,
+          vertical   = SheetDimens.RowPaddingVertical,
+        ),
       verticalAlignment     = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      horizontalArrangement = Arrangement.spacedBy(SheetDimens.RowContentGap),
     ) {
-      // E2: Circular badge slot — overridden by `badge` lambda when callers need a
-      // custom icon (e.g. SubtitlesOff / channel mode). Default is a 24dp circular
-      // ID chip with tabular figures.
+      // Badge slot — overridden by `badge` lambda when callers need a custom icon
+      // (e.g. SubtitlesOff). Default is a circular ID chip with tabular figures.
       if (badge != null) {
         badge()
       } else {
-        Box(
-          modifier = Modifier
-            .size(24.dp)
-            .clip(CircleShape)
-            .background(
-              if (isSelected) {
-                MaterialTheme.colorScheme.primary
-              } else {
-                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
-              },
-            ),
-          contentAlignment = Alignment.Center,
-        ) {
+        TrackBadge(isSelected = isSelected) {
           Text(
             text  = id.toString().padStart(2, '0'),
             style = MaterialTheme.typography.labelSmall.copy(
               fontWeight          = FontWeight.Bold,
               fontFeatureSettings = "tnum",
             ),
-            color = if (isSelected) {
-              MaterialTheme.colorScheme.onPrimary
-            } else {
-              MaterialTheme.colorScheme.onSurfaceVariant
-            },
+            color = trackBadgeContentColor(isSelected),
           )
         }
       }
 
-      // E3: Title + metadata column
+      // Title + metadata column
       Column(modifier = Modifier.weight(1f)) {
         Text(
           text       = title,
-          style      = MaterialTheme.typography.titleMedium.copy(
+          style      = MaterialTheme.typography.titleSmall.copy(
             fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
           ),
           color      = if (isSelected) {
@@ -498,10 +710,10 @@ fun TrackSelectableBar(
         )
 
         if (metadata.isNotEmpty()) {
-          Spacer(modifier = Modifier.height(6.dp))
+          Spacer(modifier = Modifier.height(SheetDimens.RowTitleMetadataGap))
           FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement   = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(SheetDimens.RowMetadataGap),
+            verticalArrangement   = Arrangement.spacedBy(SheetDimens.RowMetadataGap),
           ) {
             metadata.forEach { data ->
               TrackMetadataTag(data, isSelected)
@@ -510,20 +722,20 @@ fun TrackSelectableBar(
         }
       }
 
-      // E4: Selection indicator — AnimatedContent morph between ring and filled-check disc
+      // Selection indicator — AnimatedContent morph between ring and filled-check disc
       if (isSelected || trailingContent == null) {
         AnimatedContent(
           targetState = isSelected,
           transitionSpec = {
-            (scaleIn(spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium)) + fadeIn()) togetherWith
-              (scaleOut(spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium)) + fadeOut())
+            (scaleIn(spring(dampingRatio = SheetDimens.IndicatorSpringDamping, stiffness = Spring.StiffnessMedium)) + fadeIn()) togetherWith
+              (scaleOut(spring(dampingRatio = SheetDimens.IndicatorSpringDamping, stiffness = Spring.StiffnessMedium)) + fadeOut())
           },
           label = "track_row_selection_indicator",
         ) { selected ->
           if (selected) {
             Box(
               modifier = Modifier
-                .size(24.dp)
+                .size(SheetDimens.BadgeSize)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.primary),
               contentAlignment = Alignment.Center,
@@ -532,14 +744,18 @@ fun TrackSelectableBar(
                 imageVector        = Icons.Default.Check,
                 contentDescription = null,
                 tint               = MaterialTheme.colorScheme.onPrimary,
-                modifier           = Modifier.size(16.dp),
+                modifier           = Modifier.size(SheetDimens.CheckIconSize),
               )
             }
           } else {
             Box(
               modifier = Modifier
-                .size(24.dp)
-                .border(2.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), CircleShape),
+                .size(SheetDimens.BadgeSize)
+                .border(
+                  SheetDimens.RingStroke,
+                  MaterialTheme.colorScheme.outlineVariant.copy(alpha = SheetDimens.RingAlpha),
+                  CircleShape,
+                ),
             )
           }
         }
@@ -557,24 +773,27 @@ fun TrackMetadataTag(
   metadata: TrackMetadata,
   isSelected: Boolean,
 ) {
-  // Map to the player's container/onContainer token pairs — drops opacity literals
+  // Map to the player's container/onContainer token pairs
   val (backgroundColor, contentColor) = when (metadata.type) {
     MetadataType.PRIMARY -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
     MetadataType.WARNING -> MaterialTheme.colorScheme.errorContainer  to MaterialTheme.colorScheme.onErrorContainer
     MetadataType.DEFAULT -> MaterialTheme.colorScheme.surfaceContainerHigh to MaterialTheme.colorScheme.onSurfaceVariant
   }
 
-  // Mini-tag: 8dp rounded, no border, compact padding, Medium weight (drops the old Black)
+  // Mini-tag: rounded, no border, compact padding, Medium weight
   Surface(
     color = backgroundColor,
     shape = MaterialTheme.shapes.small,
   ) {
     Text(
       text       = metadata.text.uppercase(),
-      modifier   = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+      modifier   = Modifier.padding(
+        horizontal = SheetDimens.TagPaddingHorizontal,
+        vertical   = SheetDimens.TagPaddingVertical,
+      ),
       style      = MaterialTheme.typography.labelSmall.copy(
-        fontSize      = 10.sp,
-        letterSpacing = 0.5.sp,
+        fontSize      = SheetDimens.TagFontSize.sp,
+        letterSpacing = SheetDimens.TagLetterSpacing.sp,
         fontWeight    = FontWeight.Medium,
       ),
       color      = if (isSelected && metadata.type == MetadataType.DEFAULT) {
@@ -594,9 +813,9 @@ data class TrackAction(
 
 /**
  * Action toolbar with two slots — leading actions pinned to the start, trailing
- * pinned to the end, separated by a flexible spacer. Each button is a 40dp icon-only
+ * pinned to the end, separated by a flexible spacer. Each button is an icon-only
  * `FilledTonalIconButton` carrying its **own** tonal background; there is no
- * unifying glass wrapper. The button morphs from a 12dp-rounded square at rest
+ * unifying glass wrapper. The button morphs from a rounded square at rest
  * to a full circle on press. Labels are revealed via `TooltipBox` on long-press.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -640,13 +859,13 @@ private fun ActionChip(action: TrackAction) {
         haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
         action.onClick()
       },
-      modifier = Modifier.size(40.dp),
+      modifier = Modifier.size(SheetDimens.ActionButtonSize),
       shapes   = chipShapes,
     ) {
       Icon(
         imageVector        = action.icon,
         contentDescription = action.label,
-        modifier           = Modifier.size(20.dp),
+        modifier           = Modifier.size(SheetDimens.ActionIconSize),
       )
     }
   }
@@ -671,12 +890,15 @@ fun AddTrackRow(
       onClick = onClick,
       modifier = Modifier.weight(1f),
       shape = MaterialTheme.shapes.extraLarge,
-      contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.medium, vertical = 12.dp)
+      contentPadding = PaddingValues(
+        horizontal = MaterialTheme.spacing.medium,
+        vertical = SheetDimens.AddButtonPaddingVertical,
+      )
     ) {
       Icon(
         Icons.Default.Add,
         contentDescription = null,
-        modifier = Modifier.size(20.dp),
+        modifier = Modifier.size(SheetDimens.AddButtonIconSize),
       )
       Spacer(modifier = Modifier.size(MaterialTheme.spacing.small))
       Text(

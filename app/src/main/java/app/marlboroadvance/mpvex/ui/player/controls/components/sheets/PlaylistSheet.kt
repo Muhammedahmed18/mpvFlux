@@ -63,10 +63,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
@@ -85,6 +85,85 @@ import org.koin.compose.koinInject
 import java.io.File
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+
+/**
+ * Every size, alpha and timing used by the playlist sheet, in one place.
+ * Tweak a value here and the whole sheet follows.
+ */
+private object PlaylistDimens {
+  // --- Sheet frame --------------------------------------------------------
+  val SheetMaxWidth = 560.dp
+  const val SheetMaxHeightFraction = 0.75f
+  val SideSheetMaxWidth = 400.dp
+  const val SideSheetWidthFraction = 0.45f
+  val SideSheetCorner = 24.dp
+  val SideSheetTopPadding = 8.dp
+  const val SideSheetScrimAlpha = 0.4f
+  const val SideSheetExitMillis = 200
+
+  // --- Drag handle --------------------------------------------------------
+  val HandlePaddingTop = 8.dp
+  val HandlePaddingBottom = 2.dp
+  val HandleWidth = 32.dp
+  val HandleHeight = 4.dp
+  const val HandleAlpha = 0.4f
+
+  // --- Header -------------------------------------------------------------
+  val HeaderPaddingHorizontal = 16.dp
+  val HeaderPaddingTop = 4.dp
+  val HeaderGap = 8.dp
+  val CountPillPaddingHorizontal = 8.dp
+  val CountPillPaddingVertical = 1.dp
+
+  // --- Filter row ---------------------------------------------------------
+  val FilterPaddingHorizontal = 12.dp
+  val FilterPaddingVertical = 6.dp
+
+  // --- Now playing card ---------------------------------------------------
+  val CardPaddingHorizontal = 12.dp
+  val CardPaddingVertical = 2.dp
+  val CardContentPadding = 8.dp
+  val CardContentGap = 10.dp
+  val CardThumbnailWidth = 104.dp
+  val TextGap = 2.dp
+  const val CardDetailsAlpha = 0.75f
+
+  // --- List ---------------------------------------------------------------
+  val ListPaddingHorizontal = 12.dp
+  val ListPaddingTop = 2.dp
+  val ListPaddingBottom = 12.dp
+  val ListItemSpacing = 2.dp
+
+  // --- Episode row --------------------------------------------------------
+  val RowPaddingHorizontal = 4.dp
+  val RowPaddingVertical = 4.dp
+  val RowContentGap = 10.dp
+  val RowThumbnailWidth = 96.dp
+  val RowStatusIconSize = 18.dp
+  val RowLoadingSize = 20.dp
+
+  // --- Thumbnail ----------------------------------------------------------
+  const val ThumbnailAspectRatio = 16f / 9f
+  val ThumbnailPlaceholderIconSize = 20.dp
+  const val ThumbnailDimmedAlpha = 0.6f
+  val DurationPillInset = 4.dp
+  val DurationPillLift = 12.dp
+  val DurationPillPaddingHorizontal = 5.dp
+  val DurationPillPaddingVertical = 1.dp
+  const val DurationPillAlpha = 0.72f
+  val ProgressInset = 4.dp
+  val ProgressHeight = 3.dp
+  const val ProgressTrackAlpha = 0.4f
+  const val ProgressPercentMax = 100f
+
+  // --- Thumbnail request size (kept above display size so it stays sharp) --
+  val ThumbnailRequestWidth = 160.dp
+  val ThumbnailRequestHeight = 90.dp
+
+  // --- Empty state --------------------------------------------------------
+  val EmptyPaddingVertical = 28.dp
+  val EmptyPaddingHorizontal = 20.dp
+}
 
 // ---------------------------------------------------------------------------
 // Data
@@ -146,8 +225,8 @@ fun PlaylistSheet(
     PlayerSheet(
       onDismissRequest = onDismissRequest,
       modifier = Modifier.fillMaxWidth(),
-      customMaxWidth = 560.dp,
-      customMaxHeight = screenHeight * 0.75f,
+      customMaxWidth = PlaylistDimens.SheetMaxWidth,
+      customMaxHeight = screenHeight * PlaylistDimens.SheetMaxHeightFraction,
     ) {
       Column(modifier = modifier) {
         DragHandle()
@@ -157,9 +236,12 @@ fun PlaylistSheet(
   } else {
     PlaylistSideSheet(
       onDismissRequest = onDismissRequest,
-      width = minOf(400.dp, screenWidth * 0.45f),
+      width = minOf(PlaylistDimens.SideSheetMaxWidth, screenWidth * PlaylistDimens.SideSheetWidthFraction),
     ) {
-      PlaylistContent(playlist, onItemClick, isM3UPlaylist, loadingItemIndex, Modifier.padding(top = 12.dp))
+      PlaylistContent(
+        playlist, onItemClick, isM3UPlaylist, loadingItemIndex,
+        Modifier.padding(top = PlaylistDimens.SideSheetTopPadding),
+      )
     }
   }
 }
@@ -203,7 +285,10 @@ private fun PlaylistContent(
     SingleChoiceSegmentedButtonRow(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = 8.dp),
+        .padding(
+          horizontal = PlaylistDimens.FilterPaddingHorizontal,
+          vertical = PlaylistDimens.FilterPaddingVertical,
+        ),
     ) {
       PlaylistFilter.entries.forEachIndexed { i, option ->
         SegmentedButton(
@@ -230,8 +315,13 @@ private fun PlaylistContent(
       LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        contentPadding = PaddingValues(
+          start = PlaylistDimens.ListPaddingHorizontal,
+          end = PlaylistDimens.ListPaddingHorizontal,
+          top = PlaylistDimens.ListPaddingTop,
+          bottom = PlaylistDimens.ListPaddingBottom,
+        ),
+        verticalArrangement = Arrangement.spacedBy(PlaylistDimens.ListItemSpacing),
       ) {
         items(visible, key = { it.index }) { item ->
           PlaylistRow(
@@ -254,15 +344,17 @@ private fun PlaylistContent(
 @Composable
 private fun DragHandle() {
   Box(
-    modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(top = PlaylistDimens.HandlePaddingTop, bottom = PlaylistDimens.HandlePaddingBottom),
     contentAlignment = Alignment.Center,
   ) {
     Box(
       modifier = Modifier
-        .width(32.dp)
-        .height(4.dp)
+        .width(PlaylistDimens.HandleWidth)
+        .height(PlaylistDimens.HandleHeight)
         .clip(CircleShape)
-        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
+        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = PlaylistDimens.HandleAlpha)),
     )
   }
 }
@@ -270,21 +362,26 @@ private fun DragHandle() {
 @Composable
 private fun PlaylistHeader(count: Int) {
   Row(
-    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(
+        start = PlaylistDimens.HeaderPaddingHorizontal,
+        end = PlaylistDimens.HeaderPaddingHorizontal,
+        top = PlaylistDimens.HeaderPaddingTop,
+      ),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(10.dp),
+    horizontalArrangement = Arrangement.spacedBy(PlaylistDimens.HeaderGap),
   ) {
-    Text(
-      text = stringResource(R.string.playlist_title),
-      style = MaterialTheme.typography.titleLargeEmphasized,
-      color = MaterialTheme.colorScheme.onSurface,
-    )
+    SheetTitleText(text = stringResource(R.string.playlist_title))
     Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
       Text(
         text = count.toString(),
-        style = MaterialTheme.typography.labelLarge,
+        style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp),
+        modifier = Modifier.padding(
+          horizontal = PlaylistDimens.CountPillPaddingHorizontal,
+          vertical = PlaylistDimens.CountPillPaddingVertical,
+        ),
       )
     }
   }
@@ -305,23 +402,28 @@ private fun NowPlayingCard(
       haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
       onClick()
     },
-    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(
+        horizontal = PlaylistDimens.CardPaddingHorizontal,
+        vertical = PlaylistDimens.CardPaddingVertical,
+      ),
     shape = MaterialTheme.shapes.extraLarge,
     color = MaterialTheme.colorScheme.primaryContainer,
     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
   ) {
     Row(
-      modifier = Modifier.padding(10.dp),
+      modifier = Modifier.padding(PlaylistDimens.CardContentPadding),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      horizontalArrangement = Arrangement.spacedBy(PlaylistDimens.CardContentGap),
     ) {
       Thumbnail(
         bitmap = thumbnail,
         duration = item.duration,
         progressPercent = item.progressPercent,
-        modifier = Modifier.width(128.dp),
+        modifier = Modifier.width(PlaylistDimens.CardThumbnailWidth),
       )
-      Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+      Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(PlaylistDimens.TextGap)) {
         Text(
           text = stringResource(R.string.playlist_now_playing).uppercase(),
           style = MaterialTheme.typography.labelSmall,
@@ -333,7 +435,10 @@ private fun NowPlayingCard(
           maxLines = 2,
           overflow = TextOverflow.Ellipsis,
         )
-        DetailsLine(item, MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f))
+        DetailsLine(
+          item,
+          MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = PlaylistDimens.CardDetailsAlpha),
+        )
       }
     }
   }
@@ -360,21 +465,24 @@ private fun PlaylistRow(
     color = Color.Transparent,
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
+      modifier = Modifier.padding(
+        horizontal = PlaylistDimens.RowPaddingHorizontal,
+        vertical = PlaylistDimens.RowPaddingVertical,
+      ),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(12.dp),
+      horizontalArrangement = Arrangement.spacedBy(PlaylistDimens.RowContentGap),
     ) {
       Thumbnail(
         bitmap = thumbnail,
         duration = item.duration,
         progressPercent = item.progressPercent,
-        modifier = Modifier.width(120.dp),
+        modifier = Modifier.width(PlaylistDimens.RowThumbnailWidth),
         dimmed = item.isWatched,
       )
-      Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+      Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(PlaylistDimens.TextGap)) {
         Text(
           text = item.title,
-          style = MaterialTheme.typography.bodyLarge,
+          style = MaterialTheme.typography.bodyMedium,
           color = if (item.isWatched) {
             MaterialTheme.colorScheme.onSurfaceVariant
           } else {
@@ -386,25 +494,25 @@ private fun PlaylistRow(
         DetailsLine(item, MaterialTheme.colorScheme.onSurfaceVariant)
       }
       when {
-        isLoading -> LoadingIndicator(modifier = Modifier.size(24.dp))
+        isLoading -> LoadingIndicator(modifier = Modifier.size(PlaylistDimens.RowLoadingSize))
         item.isWatched -> Icon(
           imageVector = ImageVector.vectorResource(R.drawable.ic_sym_check_circle_fill),
           contentDescription = stringResource(R.string.playlist_filter_watched),
           tint = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.size(22.dp),
+          modifier = Modifier.size(PlaylistDimens.RowStatusIconSize),
         )
       }
     }
   }
 }
 
-/** "1080p · 23:40" under a title; leaves out parts that are unknown. */
+/** The resolution under a title; left out when unknown. */
 @Composable
 private fun DetailsLine(item: PlaylistItem, color: Color) {
   // The length is shown on the thumbnail, so only the resolution goes here.
   val text = item.resolution
   if (text.isNotEmpty()) {
-    Text(text = text, style = MaterialTheme.typography.labelMedium, color = color, maxLines = 1)
+    Text(text = text, style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1)
   }
 }
 
@@ -419,7 +527,7 @@ private fun Thumbnail(
 ) {
   Box(
     modifier = modifier
-      .aspectRatio(16f / 9f)
+      .aspectRatio(PlaylistDimens.ThumbnailAspectRatio)
       .clip(MaterialTheme.shapes.medium)
       .background(MaterialTheme.colorScheme.surfaceContainerHighest),
     contentAlignment = Alignment.Center,
@@ -430,7 +538,7 @@ private fun Thumbnail(
         contentDescription = null,
         modifier = Modifier
           .fillMaxSize()
-          .graphicsLayer { alpha = if (dimmed) 0.6f else 1f },
+          .graphicsLayer { alpha = if (dimmed) PlaylistDimens.ThumbnailDimmedAlpha else 1f },
         contentScale = ContentScale.Crop,
       )
     } else {
@@ -438,42 +546,48 @@ private fun Thumbnail(
         imageVector = ImageVector.vectorResource(R.drawable.ic_sym_movie),
         contentDescription = null,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.size(24.dp),
+        modifier = Modifier.size(PlaylistDimens.ThumbnailPlaceholderIconSize),
       )
     }
 
-    // Same overlay as the video cards: length pill bottom-right, lifted above a thick
-    // rounded progress bar inset from the edges.
+    // Same overlay as the video cards: length pill bottom-right, lifted above a rounded
+    // progress bar inset from the edges.
     val showProgress = progressPercent > 0f
     if (duration.isNotEmpty()) {
       Surface(
         modifier = Modifier
           .align(Alignment.BottomEnd)
-          .padding(end = 5.dp, bottom = if (showProgress) 14.dp else 5.dp),
+          .padding(
+            end = PlaylistDimens.DurationPillInset,
+            bottom = if (showProgress) PlaylistDimens.DurationPillLift else PlaylistDimens.DurationPillInset,
+          ),
         shape = CircleShape,
-        color = Color.Black.copy(alpha = 0.72f),
+        color = Color.Black.copy(alpha = PlaylistDimens.DurationPillAlpha),
         contentColor = Color.White,
       ) {
         Text(
           text = duration,
           style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"),
           fontWeight = FontWeight.SemiBold,
-          modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+          modifier = Modifier.padding(
+            horizontal = PlaylistDimens.DurationPillPaddingHorizontal,
+            vertical = PlaylistDimens.DurationPillPaddingVertical,
+          ),
         )
       }
     }
 
     if (showProgress) {
       LinearProgressIndicator(
-        progress = { (progressPercent / 100f).coerceIn(0f, 1f) },
+        progress = { (progressPercent / PlaylistDimens.ProgressPercentMax).coerceIn(0f, 1f) },
         modifier = Modifier
           .align(Alignment.BottomCenter)
-          .padding(5.dp)
+          .padding(PlaylistDimens.ProgressInset)
           .fillMaxWidth()
-          .height(4.dp)
+          .height(PlaylistDimens.ProgressHeight)
           .clip(CircleShape),
         color = MaterialTheme.colorScheme.primary,
-        trackColor = Color.White.copy(alpha = 0.4f),
+        trackColor = Color.White.copy(alpha = PlaylistDimens.ProgressTrackAlpha),
         strokeCap = StrokeCap.Round,
         gapSize = 0.dp,
         drawStopIndicator = {},
@@ -485,7 +599,12 @@ private fun Thumbnail(
 @Composable
 private fun EmptyState(filter: PlaylistFilter) {
   Box(
-    modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp, horizontal = 24.dp),
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(
+        vertical = PlaylistDimens.EmptyPaddingVertical,
+        horizontal = PlaylistDimens.EmptyPaddingHorizontal,
+      ),
     contentAlignment = Alignment.Center,
   ) {
     Text(
@@ -526,7 +645,7 @@ private fun PlaylistSideSheet(
     if (!closing) {
       closing = true
       scope.launch {
-        hidden.animateTo(1f, tween(200))
+        hidden.animateTo(1f, tween(PlaylistDimens.SideSheetExitMillis))
         onDismissRequest()
       }
     }
@@ -536,7 +655,7 @@ private fun PlaylistSideSheet(
   Box(
     modifier = Modifier
       .fillMaxSize()
-      .background(Color.Black.copy(alpha = 0.4f * (1f - hidden.value)))
+      .background(Color.Black.copy(alpha = PlaylistDimens.SideSheetScrimAlpha * (1f - hidden.value)))
       .clickable(
         interactionSource = remember { MutableInteractionSource() },
         indication = null,
@@ -554,7 +673,10 @@ private fun PlaylistSideSheet(
           indication = null,
           onClick = {},
         ),
-      shape = RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp),
+      shape = RoundedCornerShape(
+        topStart = PlaylistDimens.SideSheetCorner,
+        bottomStart = PlaylistDimens.SideSheetCorner,
+      ),
       color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
       Column(
@@ -583,8 +705,8 @@ private fun rememberPlaylistThumbnail(
 ): Bitmap? {
   val video = rememberPlaylistVideo(item)
   val density = LocalDensity.current
-  val widthPx = with(density) { 160.dp.roundToPx() }
-  val heightPx = with(density) { 90.dp.roundToPx() }
+  val widthPx = with(density) { PlaylistDimens.ThumbnailRequestWidth.roundToPx() }
+  val heightPx = with(density) { PlaylistDimens.ThumbnailRequestHeight.roundToPx() }
   val key = remember(video.id, video.path) { thumbnailRepository.thumbnailKey(video) }
   var thumbnail by remember(key) { mutableStateOf(thumbnailRepository.getThumbnailFromMemory(video)) }
 

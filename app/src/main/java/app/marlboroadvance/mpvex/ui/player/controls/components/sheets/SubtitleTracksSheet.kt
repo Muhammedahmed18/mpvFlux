@@ -1,11 +1,7 @@
 package app.marlboroadvance.mpvex.ui.player.controls.components.sheets
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -18,11 +14,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.ui.player.TrackNode
 import kotlinx.collections.immutable.ImmutableList
@@ -119,28 +112,12 @@ fun SubtitlesSheet(
               }
             },
             badge      = {
-              Box(
-                modifier = Modifier
-                  .size(24.dp)
-                  .clip(CircleShape)
-                  .background(
-                    if (isOffSelected) {
-                      MaterialTheme.colorScheme.primary
-                    } else {
-                      MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.12f)
-                    },
-                  ),
-                contentAlignment = Alignment.Center,
-              ) {
+              TrackBadge(isSelected = isOffSelected) {
                 Icon(
                   imageVector        = Icons.Outlined.SubtitlesOff,
                   contentDescription = null,
-                  tint               = if (isOffSelected) {
-                    MaterialTheme.colorScheme.onPrimary
-                  } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                  },
-                  modifier           = Modifier.size(14.dp),
+                  tint               = trackBadgeContentColor(isOffSelected),
+                  modifier           = Modifier.size(SheetDimens.BadgeIconSize),
                 )
               }
             },
@@ -150,7 +127,7 @@ fun SubtitlesSheet(
           val track = item.node
           val isSelected = isSubtitleSelected(track.id)
           val externalLabel = stringResource(R.string.generic_external)
-          
+
           val metadata = remember(track) {
             mutableListOf<TrackMetadata>().apply {
               if (!track.codec.isNullOrBlank()) {
@@ -175,13 +152,13 @@ fun SubtitlesSheet(
               {
                 IconButton(
                   onClick = { onRemoveSubtitle(track.id) },
-                  modifier = Modifier.size(32.dp)
+                  modifier = Modifier.size(SheetDimens.TrailingActionSize)
                 ) {
                   Icon(
                     Icons.Default.Delete,
                     contentDescription = stringResource(R.string.cd_remove_subtitle),
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
+                    modifier = Modifier.size(SheetDimens.TrailingIconSize),
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = SheetDimens.TrailingIconAlpha)
                   )
                 }
               }
@@ -189,10 +166,7 @@ fun SubtitlesSheet(
           )
         }
         is SubtitleItem.Header -> {
-          TrackHeaderPill(
-            title = item.title,
-            modifier = Modifier.padding(horizontal = 16.dp)
-          )
+          TrackHeaderPill(title = item.title)
         }
       }
     },
