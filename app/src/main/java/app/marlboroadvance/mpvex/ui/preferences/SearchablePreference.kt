@@ -40,6 +40,13 @@ object SearchablePreferences {
                 screen = AppearancePreferencesScreen,
             ))
             add(SearchablePreference(
+                titleRes = R.string.pref_appearance_system_font_title,
+                summaryRes = R.string.pref_appearance_system_font_summary,
+                keywords = listOf("font", "system font", "roboto", "typeface", "text"),
+                category = "Appearance",
+                screen = AppearancePreferencesScreen,
+            ))
+            add(SearchablePreference(
                 titleRes = R.string.pref_appearance_unlimited_name_lines_title,
                 summaryRes = R.string.pref_appearance_unlimited_name_lines_summary,
                 keywords = listOf("name", "full", "truncate", "lines", "display"),

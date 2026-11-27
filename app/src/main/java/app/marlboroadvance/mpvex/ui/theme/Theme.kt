@@ -14,6 +14,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
@@ -31,6 +32,7 @@ fun MpvexTheme(content: @Composable () -> Unit) {
     val darkMode by preferences.darkMode.collectAsState()
     val amoledMode by preferences.amoledMode.collectAsState()
     val appTheme by preferences.appTheme.collectAsState()
+    val useSystemFont by preferences.useSystemFont.collectAsState()
     val darkTheme = isSystemInDarkTheme()
     val context = LocalContext.current
 
@@ -70,7 +72,7 @@ fun MpvexTheme(content: @Composable () -> Unit) {
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = AppTypography,
+            typography = remember(useSystemFont) { appTypography(useSystemFont) },
             shapes = AppShapes, // Apply M3 Expressive Shapes
             motionScheme = MotionScheme.expressive(), // Already using expressive motion
             content = content,

@@ -169,6 +169,29 @@ object AppearancePreferencesScreen : Screen {
                                     },
                                     enabled = darkMode != DarkMode.Light
                                 )
+
+                                PreferenceDivider()
+
+                                val useSystemFont by preferences.useSystemFont.collectAsState()
+                                SwitchPreference(
+                                    value = useSystemFont,
+                                    onValueChange = { newValue ->
+                                        preferences.useSystemFont.set(newValue)
+                                    },
+                                    title = {
+                                        Text(
+                                            text = stringResource(id = R.string.pref_appearance_system_font_title),
+                                            style = MaterialTheme.typography.titleMediumEmphasized
+                                        )
+                                    },
+                                    summary = {
+                                        Text(
+                                            text = stringResource(id = R.string.pref_appearance_system_font_summary),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                )
                             }
                         }
 
