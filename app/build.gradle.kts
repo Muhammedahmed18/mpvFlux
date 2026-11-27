@@ -24,8 +24,8 @@ android {
     applicationId = "app.marlboroadvance.mpvflux"
     minSdk = 26
     targetSdk = 36
-    versionCode = 168
-    versionName = "1.6.7"
+    versionCode = 169
+    versionName = "1.6.8"
 
     vectorDrawables {
       useSupportLibrary = true
