@@ -32,7 +32,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object CopyPasteOps {
   private const val TAG = "CopyPasteOps"
-  private const val BUFFER_SIZE = 8 * 1024 // 8KB buffer for file operations
+  private const val BUFFER_SIZE = 256 * 1024 // 256KB buffer for file operations
+
+  // Progress is published at most this often (plus once when a file finishes), instead of
+  // after every buffer, so a big copy doesn't build a new progress object per chunk.
+  private const val PROGRESS_INTERVAL_NS = 100_000_000L
   private const val MAX_FILENAME_ATTEMPTS = 1000
 
   // ============================================================================
@@ -418,19 +422,24 @@ object CopyPasteOps {
             val buffer = ByteArray(BUFFER_SIZE)
             var copiedForFile = 0L
             var read: Int
+            var lastPublishNs = 0L
             while (input.read(buffer).also { read = it } != -1) {
               checkCancellation()
               output.write(buffer, 0, read)
               copiedForFile += read
-              val progress = if (video.size > 0) copiedForFile.toFloat() / video.size else 0f
-              updateProgress(
-                currentFile = video.displayName,
-                currentFileIndex = index + 1,
-                totalFiles = videos.size,
-                currentFileProgress = progress.coerceIn(0f, 1f),
-                bytesProcessed = processedBytes + copiedForFile,
-                totalBytes = totalBytes,
-              )
+              val now = System.nanoTime()
+              if (now - lastPublishNs >= PROGRESS_INTERVAL_NS || (video.size > 0 && copiedForFile >= video.size)) {
+                lastPublishNs = now
+                val progress = if (video.size > 0) copiedForFile.toFloat() / video.size else 0f
+                updateProgress(
+                  currentFile = video.displayName,
+                  currentFileIndex = index + 1,
+                  totalFiles = videos.size,
+                  currentFileProgress = progress.coerceIn(0f, 1f),
+                  bytesProcessed = processedBytes + copiedForFile,
+                  totalBytes = totalBytes,
+                )
+              }
             }
             output.flush()
           }
@@ -583,19 +592,24 @@ object CopyPasteOps {
             val buffer = ByteArray(BUFFER_SIZE)
             var copiedForFile = 0L
             var read: Int
+            var lastPublishNs = 0L
             while (input.read(buffer).also { read = it } != -1) {
               checkCancellation()
               output.write(buffer, 0, read)
               copiedForFile += read
-              val progress = if (video.size > 0) copiedForFile.toFloat() / video.size else 0f
-              updateProgress(
-                currentFile = video.displayName,
-                currentFileIndex = index + 1,
-                totalFiles = validVideos.size,
-                currentFileProgress = progress.coerceIn(0f, 1f),
-                bytesProcessed = processedBytes + copiedForFile,
-                totalBytes = totalBytes,
-              )
+              val now = System.nanoTime()
+              if (now - lastPublishNs >= PROGRESS_INTERVAL_NS || (video.size > 0 && copiedForFile >= video.size)) {
+                lastPublishNs = now
+                val progress = if (video.size > 0) copiedForFile.toFloat() / video.size else 0f
+                updateProgress(
+                  currentFile = video.displayName,
+                  currentFileIndex = index + 1,
+                  totalFiles = validVideos.size,
+                  currentFileProgress = progress.coerceIn(0f, 1f),
+                  bytesProcessed = processedBytes + copiedForFile,
+                  totalBytes = totalBytes,
+                )
+              }
             }
             output.flush()
           }
@@ -945,6 +959,7 @@ object CopyPasteOps {
           val buffer = ByteArray(BUFFER_SIZE)
           var bytesCopied = 0L
           var bytesRead: Int
+          var lastPublishNs = 0L
 
           while (input.read(buffer).also { bytesRead = it } != -1) {
             checkCancellation()
@@ -952,10 +967,16 @@ object CopyPasteOps {
             output.write(buffer, 0, bytesRead)
             bytesCopied += bytesRead
 
-            val progress = if (fileSize > 0) bytesCopied.toFloat() / fileSize else 1f
-            onProgress(progress.coerceIn(0f, 1f))
+            val now = System.nanoTime()
+            if (now - lastPublishNs >= PROGRESS_INTERVAL_NS) {
+              lastPublishNs = now
+              val progress = if (fileSize > 0) bytesCopied.toFloat() / fileSize else 1f
+              onProgress(progress.coerceIn(0f, 1f))
+            }
           }
 
+          // Always end at 100%, whichever chunk the throttle last skipped.
+          onProgress(1f)
           output.flush()
         }
       }

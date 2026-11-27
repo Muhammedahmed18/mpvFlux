@@ -852,6 +852,9 @@ private fun VideoSortBottomSheet(
   onSortTypeChange: (VideoSortType) -> Unit,
   onSortOrderChange: (SortOrder) -> Unit,
 ) {
+  // SortBottomSheet draws nothing while closed, so skip collecting the toggle preferences too.
+  if (!isOpen) return
+
   val browserPreferences = koinInject<BrowserPreferences>()
   val appearancePreferences = koinInject<AppearancePreferences>()
   val showThumbnails by browserPreferences.showVideoThumbnails.collectAsState()

@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -112,11 +113,14 @@ internal fun SmartSkipOverlay(
   val mediaKey by MPVLib.propString["path"].collectAsState()
   val rawPosition by MPVLib.propInt["time-pos"].collectAsState()
   val rawDuration by MPVLib.propInt["duration"].collectAsState()
-  val position = rawPosition ?: -1
   val duration = rawDuration ?: 0
 
   val ranges = remember(chapters, duration) { SmartSkipDetector.ranges(chapters, duration) }
-  val range = remember(ranges, position) { SmartSkipDetector.active(ranges, position) }
+  // The position is read inside derived states, so the 1 Hz time-pos ticks only recompose this
+  // overlay when the active range (or the latch release below) actually changes.
+  val range by remember(ranges) {
+    derivedStateOf { SmartSkipDetector.active(ranges, rawPosition ?: -1) }
+  }
 
   // Keyed on mediaKey so the latch resets synchronously when the media changes.
   var skipped by remember(mediaKey) { mutableStateOf<SmartSkipRange?>(null) }
@@ -130,8 +134,13 @@ internal fun SmartSkipOverlay(
   // Release the latch only once playback has stayed outside the skipped range.
   // An unknown position (-1) or a single out-of-range report proves nothing.
   val latched = skipped
-  val outside = latched != null && position >= 0 &&
-    (position < latched.start || position >= latched.end)
+  val outside by remember(latched) {
+    derivedStateOf {
+      val position = rawPosition ?: -1
+      latched != null && position >= 0 &&
+        (position < latched.start || position >= latched.end)
+    }
+  }
   LaunchedEffect(latched, outside) {
     if (latched != null && outside) {
       delay(SETTLE_MS)
@@ -140,11 +149,11 @@ internal fun SmartSkipOverlay(
   }
 
   // Failed seek: still deep inside the range after a while, so offer the chip again.
-  val latestPosition by rememberUpdatedState(position)
   LaunchedEffect(latched) {
     if (latched == null) return@LaunchedEffect
     delay(RETRY_MS)
-    val p = latestPosition.toFloat()
+    // Read after the delay, so this is the current position, not the one at launch.
+    val p = (rawPosition ?: -1).toFloat()
     if (p >= latched.start && latched.end - p > KEYFRAME_SLACK_SECONDS) skipped = null
   }
 
@@ -189,7 +198,7 @@ internal fun SmartSkipOverlay(
             val selected = visibleRange
             if (selected != null && skipped != selected) {
               val target = SmartSkipDetector.seekTarget(selected, duration)
-              if (target > position) {
+              if (target > (rawPosition ?: -1)) {
                 skipped = selected
                 haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
                 // Let the exit animation draw its first frames before mpv starts the

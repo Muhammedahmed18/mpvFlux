@@ -241,8 +241,8 @@ fun FileSystemBrowserScreen(path: String? = null) {
   var toolbarExpanded by rememberSaveable { mutableStateOf(true) }
 
   // Selection managers - separate for folders and videos
-  val folders = items.filterIsInstance<FileSystemItem.Folder>()
-  val videos = items.filterIsInstance<FileSystemItem.VideoFile>().map { it.video }
+  val folders = remember(items) { items.filterIsInstance<FileSystemItem.Folder>() }
+  val videos = remember(items) { items.filterIsInstance<FileSystemItem.VideoFile>().map { it.video } }
 
   val folderSelectionManager = rememberSelectionManager(
     items = folders,
@@ -907,8 +907,8 @@ private fun FileSystemBrowserContent(
   val thumbWidthPx = with(density) { thumbWidthDp.roundToPx() }
   val thumbHeightPx = ((thumbWidthPx.toFloat() / aspect).toInt())
 
-  val folders = items.filterIsInstance<FileSystemItem.Folder>()
-  val videos = items.filterIsInstance<FileSystemItem.VideoFile>().map { it.video }
+  val folders = remember(items) { items.filterIsInstance<FileSystemItem.Folder>() }
+  val videos = remember(items) { items.filterIsInstance<FileSystemItem.VideoFile>().map { it.video } }
 
   // Create a unique folderId based on the current directories
   val folderId = remember(folders, isAtRoot, breadcrumbs) {

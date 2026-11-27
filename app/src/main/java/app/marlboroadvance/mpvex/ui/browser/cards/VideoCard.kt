@@ -60,6 +60,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -75,6 +76,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -556,6 +558,10 @@ fun VideoThumbnail(
         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
         label = "thumbnail_fade"
       )
+      // imageAlpha changes every frame of the fade. Composition only needs to know whether the
+      // fade is still running (it flips once at the start and once at the end); the alpha
+      // itself is applied in the draw phase below.
+      val isFadingIn by remember { derivedStateOf { imageAlpha < 1f } }
 
       // Single effect replaces two competing ones. It also re-runs when the thumbnail
       // gets noticeably bigger, so a cached small bitmap isn't stretched and blurry.
@@ -597,17 +603,19 @@ fun VideoThumbnail(
         // Step 3.3 — Ensure shimmer exits cleanly
         // Shimmer stays as long as we're loading OR the fade is in progress.
         // We also check !loadFailed and thumbnail != null to avoid indefinite shimmer if loading never starts or fails.
-        if ((isLoading || (thumbnail != null && imageAlpha < 1f)) && !loadFailed) {
+        if ((isLoading || (thumbnail != null && isFadingIn)) && !loadFailed) {
           ThumbnailShimmer(modifier = Modifier.matchParentSize())
         }
 
-        if (thumbnail != null) {
+        val currentThumbnail = thumbnail
+        if (currentThumbnail != null) {
+          val thumbnailImage = remember(currentThumbnail) { currentThumbnail.asImageBitmap() }
           Image(
-            bitmap = thumbnail!!.asImageBitmap(),
+            bitmap = thumbnailImage,
             contentDescription = null,
             modifier = Modifier
               .matchParentSize()
-              .alpha(imageAlpha * (if (isWatched) 0.6f else 1f)),
+              .graphicsLayer { alpha = imageAlpha * (if (isWatched) 0.6f else 1f) },
             contentScale = if (isPortrait) ContentScale.Fit else ContentScale.Crop,
           )
         } else if (!isLoading || loadFailed) {
