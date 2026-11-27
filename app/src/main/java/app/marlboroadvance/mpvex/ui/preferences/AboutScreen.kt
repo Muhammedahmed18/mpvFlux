@@ -395,7 +395,7 @@ object AboutScreen : Screen {
         HighlightCard(
           modifier = Modifier.weight(1f),
           icon = Icons.Outlined.Bolt,
-          title = "High-Performance",
+          title = stringResource(R.string.about_highlight_high_performance),
           subtitle = stringResource(R.string.about_highlight_libmpv),
           containerColor = colors.primaryContainer,
           contentColor = colors.onPrimaryContainer,

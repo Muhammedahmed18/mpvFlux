@@ -45,7 +45,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.ui.preferences.PreferenceCard
-import app.marlboroadvance.mpvex.ui.preferences.PreferenceDivider
 import app.marlboroadvance.mpvex.utils.media.DeviceCodecReport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -115,7 +114,6 @@ fun DeviceCodecSummaryCard(entries: List<DeviceCodecReport.Entry>) {
         )
       }
     }
-    PreferenceDivider()
     Column(
       modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
       verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -138,8 +136,7 @@ fun DeviceCodecSummaryCard(entries: List<DeviceCodecReport.Entry>) {
 @Composable
 fun CodecGroupCard(entries: List<DeviceCodecReport.Entry>) {
   PreferenceCard {
-    entries.forEachIndexed { index, entry ->
-      if (index > 0) PreferenceDivider()
+    entries.forEach { entry ->
       CodecRow(entry)
     }
   }

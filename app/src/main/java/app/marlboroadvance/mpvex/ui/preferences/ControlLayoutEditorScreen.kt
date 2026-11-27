@@ -216,7 +216,7 @@ data class ControlLayoutEditorScreen(
             ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                   Text(
-                          text = "Long press to reorder items. Tap the '-' icon to remove them.",
+                          text = stringResource(R.string.control_layout_reorder_hint),
                           style = MaterialTheme.typography.bodyMedium,
                           color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                           modifier = Modifier.padding(bottom = 16.dp, start = 4.dp)

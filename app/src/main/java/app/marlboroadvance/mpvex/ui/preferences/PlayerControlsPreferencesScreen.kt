@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -17,7 +18,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.NorthEast
+import androidx.compose.material.icons.rounded.Smartphone
+import androidx.compose.material.icons.rounded.SouthEast
+import androidx.compose.material.icons.rounded.SouthWest
+import androidx.compose.material.icons.rounded.VerticalAlignBottom
+import androidx.compose.material.icons.rounded.VerticalAlignTop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -39,7 +46,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -62,6 +71,9 @@ import app.marlboroadvance.mpvex.ui.preferences.components.ListPreference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
 import app.marlboroadvance.mpvex.ui.preferences.components.SwitchPreference
 import app.marlboroadvance.mpvex.ui.preferences.components.PlayerButtonChip
+import app.marlboroadvance.mpvex.ui.preferences.components.PreferenceChoice
+import app.marlboroadvance.mpvex.ui.preferences.components.PreferenceSlider
+import app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarStylePreview
 import org.koin.compose.koinInject
 
 @Serializable
@@ -133,50 +145,42 @@ object PlayerControlsPreferencesScreen : Screen {
             
             item {
               PreferenceCard {
-                PreferenceCategoryWithEditButton(
-                  title = stringResource(id = R.string.pref_layout_top_right_controls),
-                  onClick = {
-                    backstack.add(ControlLayoutEditorScreen(ControlRegion.TOP_RIGHT))
-                  },
+                LayoutRegionPreference(
+                  title = stringResource(R.string.pref_layout_top_right_controls),
+                  icon = Icons.Rounded.NorthEast,
+                  buttons = topRightButtons,
+                  onClick = { backstack.add(ControlLayoutEditorScreen(ControlRegion.TOP_RIGHT)) },
                 )
-                PreferenceIconSummary(buttons = topRightButtons)
-                
-                
-                PreferenceCategoryWithEditButton(
-                  title = stringResource(id = R.string.pref_layout_bottom_right_controls),
-                  onClick = {
-                    backstack.add(ControlLayoutEditorScreen(ControlRegion.BOTTOM_RIGHT))
-                  },
+                LayoutRegionPreference(
+                  title = stringResource(R.string.pref_layout_bottom_right_controls),
+                  icon = Icons.Rounded.SouthEast,
+                  buttons = bottomRightButtons,
+                  onClick = { backstack.add(ControlLayoutEditorScreen(ControlRegion.BOTTOM_RIGHT)) },
                 )
-                PreferenceIconSummary(buttons = bottomRightButtons)
-                
-                
-                PreferenceCategoryWithEditButton(
-                  title = stringResource(id = R.string.pref_layout_bottom_left_controls),
-                  onClick = {
-                    backstack.add(ControlLayoutEditorScreen(ControlRegion.BOTTOM_LEFT))
-                  },
+                LayoutRegionPreference(
+                  title = stringResource(R.string.pref_layout_bottom_left_controls),
+                  icon = Icons.Rounded.SouthWest,
+                  buttons = bottomLeftButtons,
+                  onClick = { backstack.add(ControlLayoutEditorScreen(ControlRegion.BOTTOM_LEFT)) },
                 )
-                PreferenceIconSummary(buttons = bottomLeftButtons)
               }
             }
-            
+
             item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_section_portrait_controls))
             }
 
             item {
               PreferenceCard {
-                PreferenceCategoryWithEditButton(
-                  title = stringResource(id = R.string.pref_layout_portrait_bottom_controls),
-                  onClick = {
-                    backstack.add(ControlLayoutEditorScreen(ControlRegion.PORTRAIT_BOTTOM))
-                  },
+                LayoutRegionPreference(
+                  title = stringResource(R.string.pref_layout_portrait_bottom_controls),
+                  icon = Icons.Rounded.Smartphone,
+                  buttons = portraitBottomButtons,
+                  onClick = { backstack.add(ControlLayoutEditorScreen(ControlRegion.PORTRAIT_BOTTOM)) },
                 )
-                PreferenceIconSummary(buttons = portraitBottomButtons)
               }
             }
-            
+
             item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_section_seekbar_style))
             }
@@ -185,31 +189,28 @@ object PlayerControlsPreferencesScreen : Screen {
               val seekbarStyle by appearancePrefs.seekbarStyle.collectAsState()
               
               PreferenceCard {
-                SeekbarStyle.entries.forEachIndexed { index, style ->
-                  ListItem(
-                    headlineContent = {
-                      Text(text = style.name, style = MaterialTheme.typography.titleMediumEmphasized)
-                    },
-                    // Small live drawing of the style, with sample chapter gaps.
-                    supportingContent = {
-                      app.marlboroadvance.mpvex.ui.player.controls.components.SeekbarStylePreview(
-                        style = style,
-                        modifier = Modifier.padding(top = 6.dp),
-                      )
-                    },
-                    trailingContent = {
-                      RadioButton(
-                        selected = seekbarStyle == style,
-                        onClick = null
-                      )
-                    },
-                    colors = ListItemDefaults.colors(
-                      containerColor = Color.Transparent,
-                    ),
-                    modifier = Modifier
-                      .clickable { appearancePrefs.seekbarStyle.set(style) }
-                  )
-                }
+                // One row: the three styles as connected buttons, with a live preview of the
+                // selected one that crossfades when the style changes.
+                PreferenceChoice(
+                  options = SeekbarStyle.entries.toList(),
+                  selected = seekbarStyle,
+                  onSelect = { appearancePrefs.seekbarStyle.set(it) },
+                  label = { seekbarStyleLabel(it) },
+                  footer = {
+                    Crossfade(
+                      targetState = seekbarStyle,
+                      modifier = Modifier.fillMaxWidth(),
+                      label = "seekbar_style_preview",
+                    ) { style ->
+                      Box(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+                        contentAlignment = Alignment.Center,
+                      ) {
+                        SeekbarStylePreview(style = style, modifier = Modifier.scale(1.5f))
+                      }
+                    }
+                  },
+                )
               }
             }
 
@@ -238,21 +239,15 @@ object PlayerControlsPreferencesScreen : Screen {
               val aboveText = stringResource(R.string.pref_controls_position_above)
               val belowText = stringResource(R.string.pref_controls_position_below)
               PreferenceCard {
-                ListPreference(
-                  value = controlsPosition,
-                  onValueChange = { appearancePrefs.controlsPosition.set(it) },
-                  values = ControlsPosition.entries.toList(),
-                  valueToText = { AnnotatedString(if (it == ControlsPosition.Below) belowText else aboveText) },
-                  title = {
-                    Text(
-                      text = stringResource(R.string.pref_controls_position_title),
-                    )
+                PreferenceChoice(
+                  options = ControlsPosition.entries.toList(),
+                  selected = controlsPosition,
+                  onSelect = { appearancePrefs.controlsPosition.set(it) },
+                  label = { if (it == ControlsPosition.Below) belowText else aboveText },
+                  icon = {
+                    if (it == ControlsPosition.Below) Icons.Rounded.VerticalAlignBottom else Icons.Rounded.VerticalAlignTop
                   },
-                  summary = {
-                    Text(
-                      text = if (controlsPosition == ControlsPosition.Below) belowText else aboveText,
-                    )
-                  },
+                  title = { Text(text = stringResource(R.string.pref_controls_position_title)) },
                 )
               }
             }
@@ -263,8 +258,6 @@ object PlayerControlsPreferencesScreen : Screen {
             
             item {
               val hidePlayerButtonsBackground by appearancePrefs.hidePlayerButtonsBackground.collectAsState()
-              val context = LocalContext.current
-              val customLabel = stringResource(R.string.pref_gesture_double_tap_custom)
               val playerTimeToDisappear by playerPrefs.playerTimeToDisappear.collectAsState()
               val predefinedTimeValues = listOf(500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000)
               val isCustomTimeValue = !predefinedTimeValues.contains(playerTimeToDisappear)
@@ -290,29 +283,33 @@ object PlayerControlsPreferencesScreen : Screen {
                 )
 
                 
-                ListPreference(
-                  value = if (isCustomTimeValue) -1 else playerTimeToDisappear,
-                  onValueChange = { newValue ->
-                    if (newValue == -1) {
-                      customTimeValue = playerTimeToDisappear.toString()
-                      showCustomTimeDialog = true
+                PreferenceSlider(
+                  value = playerTimeToDisappear,
+                  onValueChangeFinished = { playerPrefs.playerTimeToDisappear.set(it) },
+                  min = 500,
+                  max = 5000,
+                  step = 500,
+                  title = { Text(text = stringResource(R.string.pref_player_display_hide_player_control_time)) },
+                  valueLabel = {
+                    if (isCustomTimeValue && it == playerTimeToDisappear) {
+                      stringResource(R.string.custom_ms_value, it)
                     } else {
-                      playerPrefs.playerTimeToDisappear.set(newValue)
+                      stringResource(R.string.value_ms, it)
                     }
                   },
-                  values = predefinedTimeValues + listOf(-1),
-                  valueToText = { value ->
-                    if (value == -1) AnnotatedString(customLabel) else AnnotatedString(context.getString(R.string.value_ms, value))
-                  },
-                  title = { Text(text = stringResource(R.string.pref_player_display_hide_player_control_time)) },
-                  summary = {
-                    Text(
-                      text = if (isCustomTimeValue) stringResource(R.string.custom_ms_value, playerTimeToDisappear) else stringResource(R.string.value_ms, playerTimeToDisappear),
-                    )
+                  trailing = {
+                    TextButton(
+                      onClick = {
+                        customTimeValue = playerTimeToDisappear.toString()
+                        showCustomTimeDialog = true
+                      },
+                    ) {
+                      Text(text = stringResource(R.string.pref_exact_value))
+                    }
                   },
                 )
               }
-              
+
               if (showCustomTimeDialog) {
                 AlertDialog(
                   onDismissRequest = { showCustomTimeDialog = false },
@@ -320,10 +317,17 @@ object PlayerControlsPreferencesScreen : Screen {
                   text = {
                     Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
                       Text(text = stringResource(R.string.dialog_custom_hide_time), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 16.dp))
+                      val customTimeInvalid = (customTimeValue.toIntOrNull() ?: 0) < 100
                       OutlinedTextField(
                         value = customTimeValue,
                         onValueChange = { customTimeValue = it },
                         label = { Text(stringResource(R.string.milliseconds)) },
+                        isError = customTimeInvalid,
+                        supportingText = if (customTimeInvalid) {
+                          { Text(stringResource(R.string.pref_hide_time_error)) }
+                        } else {
+                          null
+                        },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -333,6 +337,7 @@ object PlayerControlsPreferencesScreen : Screen {
                   },
                   confirmButton = {
                     TextButton(
+                      enabled = (customTimeValue.toIntOrNull() ?: 0) >= 100,
                       onClick = {
                         val value = customTimeValue.toIntOrNull()
                         if (value != null && value >= 100) {
@@ -359,55 +364,56 @@ object PlayerControlsPreferencesScreen : Screen {
     }
   }
 
-  @Composable
-  private fun PreferenceCategoryWithEditButton(
-    title: String,
-    onClick: () -> Unit,
-  ) {
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-      verticalAlignment = Alignment.CenterVertically,
-    ) {
-      Text(
-        text = title,
-        style = MaterialTheme.typography.titleMediumEmphasized,
-        modifier = Modifier.weight(1f),
-      )
-      IconButton(onClick = onClick) {
-        Icon(
-          imageVector = Icons.Rounded.Edit,
-          contentDescription = stringResource(R.string.edit_item, title),
-          tint = MaterialTheme.colorScheme.primary,
-        )
-      }
-    }
-  }
-
+  /** One tappable row per control region: icon, name, the buttons placed there, and a chevron. */
   @OptIn(ExperimentalLayoutApi::class)
   @Composable
-  private fun PreferenceIconSummary(buttons: List<PlayerButton>) {
-    FlowRow(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-      horizontalArrangement = Arrangement.spacedBy(10.dp),
-      verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
-    ) {
-      if (buttons.isEmpty()) {
-        Text(
-          stringResource(R.string.pref_gesture_double_tap_none),
-          style = MaterialTheme.typography.bodyMedium,
-          color = MaterialTheme.colorScheme.outline,
-        )
-      } else {
-        buttons.forEach { button ->
-          PlayerButtonChip(
-            button = button,
-            enabled = true,
-            onClick = null, 
-            badgeIcon = null,
-            badgeColor = null
-          )
+  private fun LayoutRegionPreference(
+    title: String,
+    icon: ImageVector,
+    buttons: List<PlayerButton>,
+    onClick: () -> Unit,
+  ) {
+    Preference(
+      title = { Text(text = title) },
+      icon = { PreferenceIcon(icon) },
+      summary = {
+        if (buttons.isEmpty()) {
+          Text(text = stringResource(R.string.pref_layout_region_empty))
+        } else {
+          FlowRow(
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+          ) {
+            buttons.forEach { button ->
+              PlayerButtonChip(
+                button = button,
+                enabled = true,
+                onClick = null,
+                badgeIcon = null,
+                badgeColor = null,
+              )
+            }
+          }
         }
-      }
-    }
+      },
+      trailingContent = {
+        Icon(
+          imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+          contentDescription = null,
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+      },
+      onClick = onClick,
+    )
   }
+
+  @Composable
+  private fun seekbarStyleLabel(style: SeekbarStyle): String = stringResource(
+    when (style) {
+      SeekbarStyle.Standard -> R.string.seekbar_style_standard
+      SeekbarStyle.Thick -> R.string.seekbar_style_thick
+      SeekbarStyle.Expressive -> R.string.seekbar_style_expressive
+    },
+  )
 }

@@ -21,6 +21,10 @@ import androidx.compose.animation.slideOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
+import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavBackStack
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -40,6 +45,7 @@ import androidx.navigation3.ui.NavDisplay
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
+import app.marlboroadvance.mpvex.ui.preferences.settingsPaneMetadata
 import app.marlboroadvance.mpvex.ui.browser.MainScreen
 import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.theme.MpvexTheme
@@ -155,6 +161,7 @@ class MainActivity : ComponentActivity() {
   /**
    * Navigator that handles screen transitions and provides shared states
    */
+  @OptIn(ExperimentalMaterial3AdaptiveApi::class)
   @Composable
   fun Navigator() {
     val backstack = rememberNavBackStack(MainScreen)
@@ -235,6 +242,15 @@ class MainActivity : ComponentActivity() {
       }
     }
 
+    // Two-pane settings: on wide windows the settings list and the open screen sit side by side.
+    // Phones stay single-pane. Only screens that carry pane metadata (see settingsPaneMetadata)
+    // take part; everything else keeps the normal single-pane behavior.
+    val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
+    val paneDirective = remember(windowAdaptiveInfo) {
+      calculatePaneScaffoldDirective(windowAdaptiveInfo).copy(horizontalPartitionSpacerSize = 0.dp)
+    }
+    val listDetailStrategy = rememberListDetailSceneStrategy<Screen>(directive = paneDirective)
+
     // Provide LocalBackStack to all screens
     CompositionLocalProvider(
       LocalBackStack provides typedBackstack,
@@ -243,7 +259,10 @@ class MainActivity : ComponentActivity() {
       NavDisplay(
         backStack = typedBackstack,
         onBack = { safeBack() },
-        entryProvider = { route -> NavEntry(route) { route.Content() } },
+        sceneStrategy = listDetailStrategy,
+        entryProvider = { route ->
+          NavEntry(route, metadata = settingsPaneMetadata(route)) { route.Content() }
+        },
         popTransitionSpec = popTransitionSpec,
         transitionSpec = transitionSpec,
         predictivePopTransitionSpec = predictivePopTransitionSpec,

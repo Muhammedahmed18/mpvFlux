@@ -1251,4 +1251,13 @@
   <string name="toast_screenshot_failed">Failed to create screenshot</string>
   <string name="toast_snapshot_failed">Failed to save snapshot: %1$s</string>
   <string name="player_button_chapter_preview" translatable="false">1:06 • Chapter 1</string>
+  <string name="settings_detail_placeholder">Select a setting</string>
+  <string name="about_highlight_high_performance">High-Performance</string>
+  <string name="control_layout_reorder_hint">Long press to reorder items. Tap the \'-\' icon to remove them.</string>
+  <string name="pref_layout_region_empty">No buttons yet. Tap to add.</string>
+  <string name="seekbar_style_standard">Standard</string>
+  <string name="seekbar_style_thick">Thick</string>
+  <string name="seekbar_style_expressive">Expressive</string>
+  <string name="pref_exact_value">Exact value</string>
+  <string name="pref_hide_time_error">Enter at least 100 ms</string>
 </resources>

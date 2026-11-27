@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -138,8 +139,8 @@ object PreferencesScreen : Screen {
                 contentPadding = PaddingValues(
                     top = padding.calculateTopPadding(),
                     bottom = padding.calculateBottomPadding() + 24.dp,
-                    start = 0.dp,
-                    end = 0.dp
+                    start = 8.dp,
+                    end = 8.dp
                 )
             ) {
                 item {
@@ -159,14 +160,14 @@ object PreferencesScreen : Screen {
                                 summary = stringResource(R.string.pref_appearance_summary),
                                 icon = { PreferenceIcon(Icons.Rounded.Palette) },
                                 showChevron = true,
-                                onClick = { backstack.add(AppearancePreferencesScreen) }
+                                onClick = { backstack.openSetting(AppearancePreferencesScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_layout_title),
                                 summary = stringResource(R.string.pref_layout_summary),
                                 icon = { PreferenceIcon(Icons.AutoMirrored.Rounded.ViewQuilt) },
                                 showChevron = true,
-                                onClick = { backstack.add(PlayerControlsPreferencesScreen) }
+                                onClick = { backstack.openSetting(PlayerControlsPreferencesScreen) }
                             )
                         }
                     }
@@ -179,35 +180,35 @@ object PreferencesScreen : Screen {
                                 summary = stringResource(R.string.pref_player_summary),
                                 icon = { PreferenceIcon(Icons.Rounded.PlayCircle) },
                                 showChevron = true,
-                                onClick = { backstack.add(PlayerPreferencesScreen) }
+                                onClick = { backstack.openSetting(PlayerPreferencesScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_gesture),
                                 summary = stringResource(R.string.pref_gesture_summary),
                                 icon = { PreferenceIcon(Icons.Rounded.Gesture) },
                                 showChevron = true,
-                                onClick = { backstack.add(GesturePreferencesScreen) }
+                                onClick = { backstack.openSetting(GesturePreferencesScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_decoder),
                                 summary = stringResource(R.string.pref_decoder_summary),
                                 icon = { PreferenceIcon(Icons.Rounded.Memory) },
                                 showChevron = true,
-                                onClick = { backstack.add(DecoderPreferencesScreen) }
+                                onClick = { backstack.openSetting(DecoderPreferencesScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_audio),
                                 summary = stringResource(R.string.pref_audio_summary),
                                 icon = { PreferenceIcon(Icons.Rounded.Audiotrack) },
                                 showChevron = true,
-                                onClick = { backstack.add(AudioPreferencesScreen) }
+                                onClick = { backstack.openSetting(AudioPreferencesScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_subtitles),
                                 summary = stringResource(R.string.pref_subtitles_summary),
                                 icon = { PreferenceIcon(Icons.Rounded.Subtitles) },
                                 showChevron = true,
-                                onClick = { backstack.add(SubtitlesPreferencesScreen) }
+                                onClick = { backstack.openSetting(SubtitlesPreferencesScreen) }
                             )
                         }
                     }
@@ -220,7 +221,7 @@ object PreferencesScreen : Screen {
                                 summary = stringResource(R.string.pref_folders_summary),
                                 icon = { PreferenceIcon(Icons.Rounded.Folder) },
                                 showChevron = true,
-                                onClick = { backstack.add(FoldersPreferencesScreen) }
+                                onClick = { backstack.openSetting(FoldersPreferencesScreen) }
                             )
                         }
                     }
@@ -233,14 +234,14 @@ object PreferencesScreen : Screen {
                                 summary = stringResource(R.string.pref_storage_summary),
                                 icon = { PreferenceIcon(Icons.Rounded.Storage) },
                                 showChevron = true,
-                                onClick = { backstack.add(StorageScreen) }
+                                onClick = { backstack.openSetting(StorageScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_advanced),
                                 summary = stringResource(R.string.pref_advanced_summary),
                                 icon = { PreferenceIcon(Icons.Rounded.Code) },
                                 showChevron = true,
-                                onClick = { backstack.add(AdvancedPreferencesScreen) }
+                                onClick = { backstack.openSetting(AdvancedPreferencesScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.update_title),
@@ -256,14 +257,14 @@ object PreferencesScreen : Screen {
                                     )
                                 },
                                 showChevron = true,
-                                onClick = { backstack.add(UpdatesScreen) }
+                                onClick = { backstack.openSetting(UpdatesScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_about_title),
                                 summary = stringResource(R.string.pref_about_summary),
                                 icon = { PreferenceIcon(Icons.Rounded.Info) },
                                 showChevron = true,
-                                onClick = { backstack.add(AboutScreen) }
+                                onClick = { backstack.openSetting(AboutScreen) }
                             )
                         }
                     }
@@ -279,7 +280,7 @@ object PreferencesScreen : Screen {
                             query = debouncedSearchQuery,
                             onClick = {
                                 keyboardController?.hide()
-                                backstack.add(preference.screen)
+                                backstack.openSetting(preference.screen)
                             },
                         )
                     }
@@ -289,6 +290,10 @@ object PreferencesScreen : Screen {
     }
 }
 
+/**
+ * M3 search bar used as the settings search field. Results are shown inline in the list below
+ * it, so the bar itself never expands into the full-screen search view.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchField(
@@ -297,52 +302,40 @@ fun SearchField(
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    TextField(
-        value = query,
-        onValueChange = onQueryChange,
+    SearchBar(
+        inputField = {
+            SearchBarDefaults.InputField(
+                query = query,
+                onQueryChange = onQueryChange,
+                onSearch = { onSearch() },
+                expanded = false,
+                onExpandedChange = {},
+                placeholder = { Text(text = stringResource(R.string.settings_search_hint)) },
+                leadingIcon = {
+                    Icon(imageVector = Icons.Rounded.Search, contentDescription = null)
+                },
+                trailingIcon = {
+                    AnimatedVisibility(
+                        visible = query.isNotEmpty(),
+                        enter = fadeIn(),
+                        exit = fadeOut(),
+                    ) {
+                        IconButton(onClick = { onQueryChange("") }) {
+                            Icon(
+                                imageVector = Icons.Rounded.Clear,
+                                contentDescription = stringResource(R.string.pref_storage_clear),
+                            )
+                        }
+                    }
+                },
+            )
+        },
+        expanded = false,
+        onExpandedChange = {},
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        placeholder = {
-            Text(
-                text = stringResource(R.string.settings_search_hint),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Rounded.Search,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        },
-        trailingIcon = {
-            AnimatedVisibility(
-                visible = query.isNotEmpty(),
-                enter = fadeIn(),
-                exit = fadeOut(),
-            ) {
-                IconButton(onClick = { onQueryChange("") }) {
-                    Icon(
-                        imageVector = Icons.Rounded.Clear,
-                        contentDescription = stringResource(R.string.pref_storage_clear),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        },
-        singleLine = true,
-        shape = CircleShape,
-        colors = TextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-        ),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-        keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-        textStyle = MaterialTheme.typography.bodyLarge,
+        content = {},
     )
 }
 
@@ -438,7 +431,7 @@ private fun SearchResultItem(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = Icons.Rounded.Settings,
+                imageVector = searchCategoryIcon(preference.category),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(24.dp),
@@ -477,4 +470,20 @@ private fun SearchResultItem(
             }
         }
     }
+}
+
+/** Same icons as the settings home rows, so a search result shows the section it lives in. */
+private fun searchCategoryIcon(category: String): ImageVector = when (category) {
+    "About" -> Icons.Rounded.Info
+    "Advanced" -> Icons.Rounded.Code
+    "Appearance" -> Icons.Rounded.Palette
+    "Audio" -> Icons.Rounded.Audiotrack
+    "Decoder" -> Icons.Rounded.Memory
+    "Folders" -> Icons.Rounded.Folder
+    "Gestures" -> Icons.Rounded.Gesture
+    "Player" -> Icons.Rounded.PlayCircle
+    "Storage" -> Icons.Rounded.Storage
+    "Subtitles" -> Icons.Rounded.Subtitles
+    "Updates" -> Icons.Rounded.SystemUpdate
+    else -> Icons.Rounded.Settings
 }

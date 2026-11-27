@@ -152,7 +152,6 @@ object StorageScreen : Screen {
               bytes = fontsBytes,
               onClick = { confirmClearFonts = true },
             )
-            PreferenceDivider()
             CacheSizeRow(
               title = stringResource(R.string.pref_storage_config_title),
               summary = stringResource(R.string.pref_storage_config_summary),
@@ -160,7 +159,6 @@ object StorageScreen : Screen {
               bytes = configBytes,
               onClick = { confirmClearConfig = true },
             )
-            PreferenceDivider()
             CacheSizeRow(
               title = stringResource(R.string.pref_storage_temp_title),
               summary = stringResource(R.string.pref_storage_temp_summary),

@@ -2,6 +2,20 @@ package app.marlboroadvance.mpvex.ui.preferences
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CornerBasedShape
+import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntRect
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.*
@@ -36,18 +50,85 @@ fun PreferenceIcon(
     )
 }
 
+/** Gap between the rows of a [PreferenceCard]; each row is its own tonal segment. */
+private val PreferenceCardGap = 2.dp
+
+/** Corner radius of the edges where two segments meet. */
+private val PreferenceCardInnerCorner = 4.dp
+
+private fun segmentShape(outer: CornerBasedShape, inner: CornerSize, index: Int, count: Int): Shape =
+    when {
+        count <= 1 -> outer
+        index == 0 -> outer.copy(bottomStart = inner, bottomEnd = inner)
+        index == count - 1 -> outer.copy(topStart = inner, topEnd = inner)
+        else -> outer.copy(all = inner)
+    }
+
 /**
- * Flat group container: rows sit directly on the screen surface, no card background.
+ * Grouped tonal container in the M3 segmented list style: every row is a `surfaceContainer`
+ * segment separated by a thin gap. The first and last segments get the large outer corners and
+ * the ones in between get small corners. Each row is clipped to its own segment, so ripples
+ * follow the shape. Position is known only at layout time, so the shapes are applied there.
  */
 @Composable
 fun PreferenceCard(
     modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.() -> Unit,
+    content: @Composable () -> Unit,
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth(),
+    val containerColor = MaterialTheme.colorScheme.surfaceContainer
+    val outer = MaterialTheme.shapes.large
+    val inner = CornerSize(PreferenceCardInnerCorner)
+    var bounds by remember { mutableStateOf<List<IntRect>>(emptyList()) }
+
+    Layout(
         content = content,
-    )
+        modifier = modifier
+            .fillMaxWidth()
+            .drawBehind {
+                bounds.forEachIndexed { index, rect ->
+                    val shape = segmentShape(outer, inner, index, bounds.size)
+                    translate(rect.left.toFloat(), rect.top.toFloat()) {
+                        drawOutline(
+                            outline = shape.createOutline(
+                                Size(rect.width.toFloat(), rect.height.toFloat()),
+                                layoutDirection,
+                                this,
+                            ),
+                            color = containerColor,
+                        )
+                    }
+                }
+            },
+    ) { measurables, constraints ->
+        val width = constraints.maxWidth
+        val childConstraints = Constraints(
+            minWidth = width,
+            maxWidth = width,
+            minHeight = 0,
+            maxHeight = constraints.maxHeight,
+        )
+        val placeables = measurables.map { it.measure(childConstraints) }
+        val gap = PreferenceCardGap.roundToPx()
+        val tops = IntArray(placeables.size)
+        val rects = ArrayList<IntRect>(placeables.size)
+        var y = 0
+        placeables.forEachIndexed { index, placeable ->
+            tops[index] = y
+            rects.add(IntRect(0, y, width, y + placeable.height))
+            y += placeable.height + gap
+        }
+        val totalHeight = if (placeables.isEmpty()) 0 else y - gap
+        layout(width, totalHeight.coerceIn(constraints.minHeight, constraints.maxHeight)) {
+            placeables.forEachIndexed { index, placeable ->
+                val segment = segmentShape(outer, inner, index, placeables.size)
+                placeable.placeWithLayer(0, tops[index]) {
+                    shape = segment
+                    clip = true
+                }
+            }
+            if (bounds != rects) bounds = rects
+        }
+    }
 }
 
 /**
@@ -118,13 +199,6 @@ fun PreferenceItem(
         },
     )
 }
-
-/** Flat list style has no dividers; kept so existing call sites compile. */
-@Composable
-@Suppress("UNUSED_PARAMETER")
-fun PreferenceDivider(
-    modifier: Modifier = Modifier,
-) = Unit
 
 @Composable
 fun PreferenceSectionHeader(

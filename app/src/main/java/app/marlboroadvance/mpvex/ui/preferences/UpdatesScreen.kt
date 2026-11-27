@@ -140,7 +140,6 @@ object UpdatesScreen : Screen {
               checked = autoCheck,
               onCheckedChange = { preferences.autoCheck.set(it) },
             )
-            PreferenceDivider()
             Row(
               modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
               verticalAlignment = Alignment.CenterVertically,
