@@ -5,50 +5,66 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.text.format.DateUtils
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import app.marlboroadvance.mpvex.ui.preferences.components.PreferenceSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.UpdatePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
+import app.marlboroadvance.mpvex.ui.preferences.components.PreferenceSwitch
 import app.marlboroadvance.mpvex.ui.update.CollapsibleReleaseNotes
 import app.marlboroadvance.mpvex.ui.update.updateErrorText
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
@@ -66,6 +82,9 @@ private const val RELEASES_URL = "https://github.com/${GitHubReleases.OWNER}/${G
  * Settings → Updates: whether a newer stable version exists, its release notes, a link to the
  * release page on GitHub, and the auto-check setting. Nothing is downloaded or installed here;
  * updating happens from GitHub in the browser.
+ *
+ * The status card changes color, badge shape and content with the update state, and the screen
+ * supports pull-to-refresh as an alternative to the "Check now" button.
  */
 @Serializable
 object UpdatesScreen : Screen {
@@ -76,6 +95,7 @@ object UpdatesScreen : Screen {
     val manager = koinInject<UpdateManager>()
     val preferences = koinInject<UpdatePreferences>()
     val state by manager.state.collectAsState()
+    val lastCheck by preferences.lastCheckTime.collectAsState()
 
     val backgroundColor = rememberPreferenceBackgroundColor()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -106,61 +126,44 @@ object UpdatesScreen : Screen {
         )
       },
     ) { padding ->
-      LazyColumn(
-        modifier = Modifier.fillMaxSize().readableContentWidth(),
-        contentPadding = PaddingValues(
-          top = padding.calculateTopPadding(),
-          bottom = padding.calculateBottomPadding() + 24.dp,
-          start = 8.dp,
-          end = 8.dp,
-        ),
+      PullToRefreshBox(
+        isRefreshing = state is UpdateState.Checking,
+        onRefresh = { if (manager.isSupported) manager.check() },
+        modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
       ) {
-        item { StatusCard(state = state, manager = manager) }
+        LazyColumn(
+          modifier = Modifier.fillMaxSize().readableContentWidth(),
+          contentPadding = PaddingValues(
+            bottom = padding.calculateBottomPadding() + 24.dp,
+            start = 8.dp,
+            end = 8.dp,
+          ),
+        ) {
+          item { StatusCard(state = state, manager = manager, lastCheck = lastCheck) }
 
-        (state as? UpdateState.Available)?.release?.let { release ->
-          item { PreferenceSectionHeader(title = stringResource(R.string.update_whats_new_in, release.version.toString())) }
-          item {
-            PreferenceCard {
-              CollapsibleReleaseNotes(
-                markdown = release.notes.ifBlank { stringResource(R.string.update_no_notes) },
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-              )
+          (state as? UpdateState.Available)?.release?.let { release ->
+            item { PreferenceSectionHeader(title = stringResource(R.string.update_whats_new_in, release.version.toString())) }
+            item {
+              PreferenceCard {
+                CollapsibleReleaseNotes(
+                  markdown = release.notes.ifBlank { stringResource(R.string.update_no_notes) },
+                  modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+                )
+              }
             }
           }
-        }
 
-        item { PreferenceSectionHeader(title = stringResource(R.string.update_settings_header)) }
-        item {
-          val autoCheck by preferences.autoCheck.collectAsState()
-          val lastCheck by preferences.lastCheckTime.collectAsState()
-          PreferenceCard {
-            SwitchRow(
-              title = stringResource(R.string.update_auto_check),
-              summary = stringResource(R.string.update_auto_check_summary),
-              checked = autoCheck,
-              onCheckedChange = { preferences.autoCheck.set(it) },
-            )
-            Row(
-              modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
-              verticalAlignment = Alignment.CenterVertically,
-            ) {
-              Text(
-                text = if (lastCheck > 0) {
-                  stringResource(
-                    R.string.update_last_checked,
-                    DateUtils.getRelativeTimeSpanString(lastCheck, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),
-                  )
-                } else {
-                  stringResource(R.string.update_never_checked)
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
+          item { PreferenceSectionHeader(title = stringResource(R.string.update_settings_header)) }
+          item {
+            val autoCheck by preferences.autoCheck.collectAsState()
+            PreferenceCard {
+              SwitchRow(
+                icon = R.drawable.ic_sym_sync,
+                title = stringResource(R.string.update_auto_check),
+                summary = stringResource(R.string.update_auto_check_summary),
+                checked = autoCheck,
+                onCheckedChange = { preferences.autoCheck.set(it) },
               )
-              TextButton(
-                onClick = { manager.check() },
-                enabled = manager.isSupported && state !is UpdateState.Checking,
-              ) { Text(stringResource(R.string.update_check_now)) }
             }
           }
         }
@@ -173,70 +176,208 @@ object UpdatesScreen : Screen {
 // Status card
 // ---------------------------------------------------------------------------
 
+private enum class StatusKind { Unsupported, UpToDate, Checking, Available, Failed }
+
+private fun statusKindOf(state: UpdateState, supported: Boolean): StatusKind = when {
+  !supported -> StatusKind.Unsupported
+  state is UpdateState.Checking -> StatusKind.Checking
+  state is UpdateState.Available -> StatusKind.Available
+  state is UpdateState.Failed -> StatusKind.Failed
+  else -> StatusKind.UpToDate
+}
+
+private data class StatusColors(
+  val container: Color,
+  val content: Color,
+  val badge: Color,
+  val onBadge: Color,
+)
+
+/** One color role per state, so the state reads before any text does. */
+@Composable
+private fun statusColors(kind: StatusKind): StatusColors {
+  val c = MaterialTheme.colorScheme
+  return when (kind) {
+    StatusKind.Available -> StatusColors(c.primaryContainer, c.onPrimaryContainer, c.primary, c.onPrimary)
+    StatusKind.Failed -> StatusColors(c.errorContainer, c.onErrorContainer, c.error, c.onError)
+    StatusKind.UpToDate -> StatusColors(c.tertiaryContainer, c.onTertiaryContainer, c.tertiary, c.onTertiary)
+    StatusKind.Checking -> StatusColors(c.surfaceContainerHigh, c.onSurface, c.secondaryContainer, c.onSecondaryContainer)
+    StatusKind.Unsupported -> StatusColors(c.surfaceContainerLow, c.onSurface, c.surfaceContainerHighest, c.onSurfaceVariant)
+  }
+}
+
+@DrawableRes
+private fun statusIcon(kind: StatusKind): Int = when (kind) {
+  StatusKind.Available, StatusKind.Unsupported, StatusKind.Checking -> R.drawable.ic_sym_system_update
+  StatusKind.UpToDate -> R.drawable.ic_sym_check_circle_fill
+  StatusKind.Failed -> R.drawable.ic_sym_error
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun StatusCard(state: UpdateState, manager: UpdateManager) {
-  val context = LocalContext.current
-  val highlighted = manager.isSupported && state is UpdateState.Available
-  Surface(
-    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-    shape = MaterialTheme.shapes.extraLarge,
-    color = if (highlighted) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLow,
-    contentColor = if (highlighted) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
-  ) {
-    Column(
-      modifier = Modifier.fillMaxWidth().padding(24.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-      when {
-        !manager.isSupported -> {
-          StatusIcon(R.drawable.ic_sym_system_update)
-          StatusTitle(stringResource(R.string.update_not_supported_title))
-          StatusText(stringResource(R.string.update_not_supported_text))
-        }
+private fun statusShape(kind: StatusKind): Shape {
+  val polygon = when (kind) {
+    StatusKind.Available -> MaterialShapes.SoftBurst
+    StatusKind.UpToDate -> MaterialShapes.Cookie9Sided
+    StatusKind.Failed -> MaterialShapes.Pentagon
+    StatusKind.Checking, StatusKind.Unsupported -> MaterialShapes.Cookie6Sided
+  }
+  // toShape() is itself @Composable (it remembers the shape), so it must not be called inside remember { }.
+  return polygon.toShape()
+}
 
-        else -> when (state) {
-          UpdateState.Idle, UpdateState.UpToDate -> {
-            StatusIcon(R.drawable.ic_sym_check_circle_fill)
-            StatusTitle(stringResource(R.string.update_up_to_date))
-            StatusText(stringResource(R.string.update_installed_version, manager.currentVersion))
-            Spacer(Modifier.height(4.dp))
-            FilledTonalButton(onClick = { manager.check() }) {
-              Icon(ImageVector.vectorResource(R.drawable.ic_sym_sync), null, Modifier.size(18.dp))
-              Spacer(Modifier.width(8.dp))
-              Text(stringResource(R.string.update_check_now))
-            }
+@Composable
+private fun StatusCard(state: UpdateState, manager: UpdateManager, lastCheck: Long) {
+  val kind = statusKindOf(state, manager.isSupported)
+  val target = statusColors(kind)
+  val containerColor by animateColorAsState(target.container, label = "statusContainer")
+  val contentColor by animateColorAsState(target.content, label = "statusContent")
+  val badgeColor by animateColorAsState(target.badge, label = "statusBadge")
+  val onBadgeColor by animateColorAsState(target.onBadge, label = "statusOnBadge")
+
+  Surface(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(horizontal = 12.dp, vertical = 8.dp)
+      // Screen readers announce the new state when it changes.
+      .semantics { liveRegion = LiveRegionMode.Polite },
+    shape = MaterialTheme.shapes.extraLarge,
+    color = containerColor,
+    contentColor = contentColor,
+  ) {
+    AnimatedContent(
+      targetState = state,
+      contentKey = { statusKindOf(it, manager.isSupported) },
+      label = "statusBody",
+    ) { current ->
+      StatusBody(
+        state = current,
+        manager = manager,
+        lastCheck = lastCheck,
+        badgeColor = badgeColor,
+        onBadgeColor = onBadgeColor,
+      )
+    }
+  }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
+@Composable
+private fun StatusBody(
+  state: UpdateState,
+  manager: UpdateManager,
+  lastCheck: Long,
+  badgeColor: Color,
+  onBadgeColor: Color,
+) {
+  val context = LocalContext.current
+  val kind = statusKindOf(state, manager.isSupported)
+  val actionColors = ButtonDefaults.buttonColors(containerColor = badgeColor, contentColor = onBadgeColor)
+
+  Column(
+    modifier = Modifier.fillMaxWidth().padding(24.dp),
+    verticalArrangement = Arrangement.spacedBy(16.dp),
+  ) {
+    // Badge (or spinner) next to the title and supporting text, left-aligned.
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+      if (kind == StatusKind.Checking) {
+        Box(modifier = Modifier.size(56.dp), contentAlignment = Alignment.Center) {
+          LoadingIndicator(modifier = Modifier.size(48.dp))
+        }
+      } else {
+        TonalBadge(
+          icon = statusIcon(kind),
+          containerColor = badgeColor,
+          contentColor = onBadgeColor,
+          shape = statusShape(kind),
+          size = 56.dp,
+          iconSize = 28.dp,
+        )
+      }
+
+      Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+      ) {
+        when {
+          !manager.isSupported -> {
+            StatusTitle(stringResource(R.string.update_not_supported_title))
+            StatusText(stringResource(R.string.update_not_supported_text))
           }
 
-          UpdateState.Checking -> {
-            LoadingIndicator(modifier = Modifier.size(48.dp))
+          state is UpdateState.Available -> {
+            StatusTitle(stringResource(R.string.update_available_title, state.release.version.toString()))
+            StatusText(stringResource(R.string.update_you_have, manager.currentVersion))
+          }
+
+          state is UpdateState.Failed -> {
+            StatusTitle(stringResource(R.string.update_failed_title))
+            StatusText(updateErrorText(state.error))
+          }
+
+          state is UpdateState.Checking -> {
             StatusTitle(stringResource(R.string.update_checking))
           }
 
-          is UpdateState.Available -> {
-            StatusIcon(R.drawable.ic_sym_system_update)
-            StatusTitle(stringResource(R.string.update_available_title, state.release.version.toString()))
-            StatusText(stringResource(R.string.update_you_have, manager.currentVersion))
-            Spacer(Modifier.height(4.dp))
-            Button(onClick = { openInBrowser(context, releasePageUrl(state.release)) }) {
-              Text(stringResource(R.string.update_view_on_github))
-              Spacer(Modifier.width(8.dp))
-              Icon(ImageVector.vectorResource(R.drawable.ic_sym_open_in_new), null, Modifier.size(18.dp))
-            }
-          }
-
-          is UpdateState.Failed -> {
-            StatusIcon(R.drawable.ic_sym_error)
-            StatusTitle(stringResource(R.string.update_failed_title))
-            StatusText(updateErrorText(state.error))
-            Spacer(Modifier.height(4.dp))
-            FilledTonalButton(onClick = { manager.check() }) {
-              Text(stringResource(R.string.update_check_now))
-            }
+          else -> {
+            StatusTitle(stringResource(R.string.update_up_to_date))
+            StatusText(stringResource(R.string.update_installed_version, manager.currentVersion))
           }
         }
       }
+    }
+
+    // Actions. "Check now" lives only here; the settings section no longer repeats it.
+    when {
+      !manager.isSupported || state is UpdateState.Checking -> Unit
+
+      state is UpdateState.Available -> {
+        FlowRow(
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+          verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+          Button(
+            onClick = { openInBrowser(context, releasePageUrl(state.release)) },
+            colors = actionColors,
+          ) {
+            Text(stringResource(R.string.update_view_on_github))
+            Spacer(Modifier.width(8.dp))
+            Icon(ImageVector.vectorResource(R.drawable.ic_sym_open_in_new), null, Modifier.size(18.dp))
+          }
+          TextButton(onClick = { manager.check() }) {
+            Text(stringResource(R.string.update_check_now))
+          }
+        }
+      }
+
+      else -> {
+        Button(onClick = { manager.check() }, colors = actionColors) {
+          Icon(ImageVector.vectorResource(R.drawable.ic_sym_sync), null, Modifier.size(18.dp))
+          Spacer(Modifier.width(8.dp))
+          Text(stringResource(R.string.update_check_now))
+        }
+      }
+    }
+
+    // Last checked, folded into the card.
+    if (manager.isSupported && state !is UpdateState.Checking) {
+      val lastCheckedText = if (lastCheck > 0) {
+        stringResource(
+          R.string.update_last_checked,
+          DateUtils.getRelativeTimeSpanString(lastCheck, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS),
+        )
+      } else {
+        stringResource(R.string.update_never_checked)
+      }
+      Text(
+        text = lastCheckedText,
+        style = MaterialTheme.typography.labelMedium,
+        color = LocalContentColor.current.copy(alpha = 0.7f),
+      )
     }
   }
 }
@@ -254,18 +395,30 @@ private fun openInBrowser(context: Context, url: String) {
 }
 
 @Composable
-private fun StatusIcon(icon: Int) {
-  Icon(
-    imageVector = ImageVector.vectorResource(icon),
-    contentDescription = null,
-    modifier = Modifier.size(48.dp),
-    tint = MaterialTheme.colorScheme.primary,
-  )
+private fun TonalBadge(
+  @DrawableRes icon: Int,
+  containerColor: Color,
+  contentColor: Color,
+  shape: Shape,
+  size: Dp,
+  iconSize: Dp,
+) {
+  Box(
+    modifier = Modifier.size(size).background(containerColor, shape),
+    contentAlignment = Alignment.Center,
+  ) {
+    Icon(
+      imageVector = ImageVector.vectorResource(icon),
+      contentDescription = null,
+      modifier = Modifier.size(iconSize),
+      tint = contentColor,
+    )
+  }
 }
 
 @Composable
 private fun StatusTitle(text: String) {
-  Text(text = text, style = MaterialTheme.typography.titleLargeEmphasized, textAlign = TextAlign.Center)
+  Text(text = text, style = MaterialTheme.typography.titleLargeEmphasized)
 }
 
 @Composable
@@ -273,8 +426,7 @@ private fun StatusText(text: String) {
   Text(
     text = text,
     style = MaterialTheme.typography.bodyMedium,
-    textAlign = TextAlign.Center,
-    color = androidx.compose.material3.LocalContentColor.current.copy(alpha = 0.8f),
+    color = LocalContentColor.current.copy(alpha = 0.8f),
   )
 }
 
@@ -284,6 +436,7 @@ private fun StatusText(text: String) {
 
 @Composable
 private fun SwitchRow(
+  @DrawableRes icon: Int,
   title: String,
   summary: String,
   checked: Boolean,
@@ -294,9 +447,18 @@ private fun SwitchRow(
     modifier = Modifier
       .fillMaxWidth()
       .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
-      .padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
+      .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
+    TonalBadge(
+      icon = icon,
+      containerColor = MaterialTheme.colorScheme.secondaryContainer,
+      contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+      shape = CircleShape,
+      size = 40.dp,
+      iconSize = 22.dp,
+    )
+    Spacer(Modifier.width(16.dp))
     Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
       Text(title, style = MaterialTheme.typography.titleMediumEmphasized)
       Text(summary, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
