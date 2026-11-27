@@ -706,10 +706,10 @@ fun FileSystemBrowserScreen(path: String? = null) {
             videoSelectionManager.deleteSelected()
           }
         },
-        itemType = when {
-          folderSelectionManager.isInSelectionMode && videoSelectionManager.isInSelectionMode -> "item"
-          folderSelectionManager.isInSelectionMode -> "folder"
-          else -> "video"
+        titleRes = when {
+          folderSelectionManager.isInSelectionMode && videoSelectionManager.isInSelectionMode -> R.plurals.delete_title_item
+          folderSelectionManager.isInSelectionMode -> R.plurals.delete_title_folder
+          else -> R.plurals.delete_title_video
         },
         itemCount = selectedCount,
         itemNames = selectedNames,
@@ -733,7 +733,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
             onDismiss = { renameDialogOpen.value = false },
             onConfirm = { newName -> videoSelectionManager.renameSelected(newName) },
             currentName = baseName,
-            itemType = "file",
+            titleRes = R.string.rename_title_file,
             extension = if (extension != ".") extension else null,
           )
         }
@@ -747,7 +747,7 @@ fun FileSystemBrowserScreen(path: String? = null) {
               folderSelectionManager.renameSelected(newName)
             },
             currentName = folder.name,
-            itemType = "folder",
+            titleRes = R.string.rename_title_folder,
           )
         }
       }

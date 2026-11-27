@@ -220,7 +220,7 @@ object PlaylistScreen : Screen {
           isOpen = true,
           onDismiss = { deleteDialogOpen.value = false },
           onConfirm = { selectionManager.deleteSelected() },
-          itemType = "playlist",
+          titleRes = R.plurals.delete_title_playlist,
           itemCount = selectedForDelete.size,
           itemNames = selectedForDelete.map { it.playlist.name }
         )

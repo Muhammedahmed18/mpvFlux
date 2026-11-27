@@ -69,8 +69,8 @@ fun FileOperationProgressDialog(
   )
 
   val operationName = when (operationType) {
-    is CopyPasteOps.OperationType.Copy -> stringResource(R.string.copy_op_copying)
-    is CopyPasteOps.OperationType.Move -> stringResource(R.string.copy_op_moving)
+    is CopyPasteOps.OperationType.Copy -> stringResource(R.string.copy_op_copying_files)
+    is CopyPasteOps.OperationType.Move -> stringResource(R.string.copy_op_moving_files)
   }
 
   ModalBottomSheet(
@@ -94,7 +94,7 @@ fun FileOperationProgressDialog(
       ) {
         Column(modifier = Modifier.weight(1f)) {
           Text(
-            text = "$operationName files",
+            text = operationName,
             style = MaterialTheme.typography.headlineSmallEmphasized,
           )
           if (!isOperationComplete) {

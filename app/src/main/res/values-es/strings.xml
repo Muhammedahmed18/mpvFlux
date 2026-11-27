@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
   <string name="generic_reset">Restablecer</string>
   <string name="generic_share">Compartir</string>
@@ -27,6 +27,9 @@
   <string name="pref_appearance_hide_player_buttons_background_title">Ocultar fondo de los botones del reproductor</string>
   <string name="pref_appearance_hide_player_buttons_background_summary">Ocultar el fondo de todos los botones de control del reproductor</string>
   <string name="pref_appearance_category_file_browser">Explorador de archivos</string>
+  <string name="pref_appearance_section_video_list">Lista de videos</string>
+  <string name="pref_appearance_section_watch_status">Estado de reproducción</string>
+  <string name="pref_appearance_section_thumbnails">Miniaturas</string>
   <string name="pref_appearance_show_unplayed_old_video_label_title">Mostrar etiqueta en videos nuevos sin reproducir</string>
   <string name="pref_appearance_show_unplayed_old_video_label_summary">Mostrar la etiqueta \"Nuevo\" en los videos agregados dentro del plazo indicado que nunca se han reproducido</string>
   <string name="pref_appearance_unplayed_old_video_days_title">Plazo en días para la etiqueta de video nuevo</string>
@@ -336,6 +339,7 @@
   <string name="player_sheets_sub_delay_subtitle_text_seen">Texto visto</string>
   <string name="player_sheets_delay_set_as_default">Establecer como predeterminado</string>
   <string name="player_sheets_audio_delay_card_title">Retraso de audio</string>
+  <string name="player_sheets_delay_measure_title">Medir por sincronización</string>
   <string name="player_sheets_sub_delay_audio_sound_heard">Sonido escuchado</string>
   <string name="player_sheets_sub_delay_sound_sound_spotted">Sonido detectado</string>
   <string name="player_sheets_sub_select_font">Fuente de subtítulos</string>
@@ -480,6 +484,12 @@
   <string name="search_videos">Buscar videos…</string>
   <string name="search_folders_and_videos">Buscar carpetas y videos…</string>
   <string name="search_playlists">Buscar listas de reproducción…</string>
+  <string name="search_folders">Buscar carpetas…</string>
+  <string name="search">Buscar</string>
+  <string name="search_clear">Borrar búsqueda</string>
+  <string name="search_close">Cerrar búsqueda</string>
+  <string name="no_results_found">No se encontraron resultados</string>
+  <string name="no_results_found_message">Prueba con otro término de búsqueda.</string>
   <string name="play_recently_played_or_first">Reproducir el último video reproducido o el primero</string>
   <string name="toggle_menu">Mostrar u ocultar menú</string>
   <string name="close">Cerrar</string>
@@ -576,11 +586,26 @@
     <item quantity="one">%1$d video eliminado</item>
     <item quantity="other">%1$d videos eliminados</item>
   </plurals>
+  <plurals name="delete_result_playlists">
+    <item quantity="one">%1$d lista de reproducción eliminada</item>
+    <item quantity="other">%1$d listas de reproducción eliminadas</item>
+  </plurals>
   <plurals name="delete_result_folders">
     <item quantity="one">%1$d carpeta eliminada</item>
     <item quantity="other">%1$d carpetas eliminadas</item>
   </plurals>
   <string name="delete_result_with_failures">%1$s · %2$d fallidos</string>
+  <plurals name="playlist_items_removed">
+    <item quantity="one">%1$d elemento eliminado de la lista de reproducción</item>
+    <item quantity="other">%1$d elementos eliminados de la lista de reproducción</item>
+  </plurals>
+  <string name="rename_success">Nombre cambiado</string>
+  <string name="rename_failed">No se pudo cambiar el nombre</string>
+  <plurals name="selection_folders_unhidden">
+    <item quantity="one">%1$d carpeta visible de nuevo</item>
+    <item quantity="other">%1$d carpetas visibles de nuevo</item>
+  </plurals>
+  <string name="selection_hide_failed">No se pudieron actualizar las carpetas ocultas</string>
   <string name="delete_result_failed">No se pudo eliminar</string>
   <string name="dialog_create_folder_title">Crear nueva carpeta</string>
   <string name="dialog_folder_name">Nombre de la carpeta</string>
@@ -610,6 +635,8 @@
   <string name="decoder_reason_profile">Tu teléfono no puede decodificar %1$s %2$s por hardware</string>
   <string name="decoder_reason_resolution">Tu teléfono no puede decodificar %1$s a %2$d×%3$d por hardware</string>
   <string name="decoder_sheet_sw_note">%1$s, por lo que este video se reproduce con decodificación por software (SW) y consume más batería.</string>
+  <string name="decoder_chip_hardware">HW+</string>
+  <string name="decoder_chip_software">SW</string>
   <string name="player_hold_to_unlock">Mantén presionado para desbloquear</string>
   <!-- Browser cards -->
   <plurals name="card_video_count">
@@ -620,6 +647,9 @@
   <string name="card_cd_selected">Seleccionado</string>
   <string name="card_storage_internal">Interno</string>
   <string name="card_storage_sd_card">Tarjeta SD</string>
+  <string name="card_duration_hours_minutes">%1$dh %2$dm</string>
+  <string name="card_duration_minutes">%1$dm</string>
+  <string name="card_duration_less_than_minute">&lt;1m</string>
   <!-- Preferred language picker (audio + subtitles) -->
   <string name="pref_preferred_language">Idioma preferido</string>
   <string name="lang_off">Desactivados</string>
@@ -648,7 +678,6 @@
   <string name="pref_subtitles_formats">Formatos preferidos</string>
   <string name="pref_subtitles_encodings">Codificaciones preferidas</string>
   <string name="dialog_export_success">¡Se exportaron %1$d elementos correctamente!</string>
-
   <!-- Media info screen -->
   <string name="media_info_back">Volver</string>
   <string name="media_info_tab_overview">Resumen</string>
@@ -661,6 +690,10 @@
   <string name="media_info_share_report">Compartir informe completo</string>
   <string name="media_info_share_chooser">Compartir información multimedia</string>
   <string name="media_info_share_failed">No se pudo compartir: %1$s</string>
+  <string name="media_info_share_failed_generic">No se pudo compartir. Inténtalo de nuevo.</string>
+  <string name="media_info_share_no_app">No hay ninguna aplicación disponible para compartir</string>
+  <string name="media_info_more_options">Más opciones</string>
+  <string name="media_info_title_fallback">Información multimedia</string>
   <string name="media_info_copied">Se copió %1$s</string>
   <string name="media_info_copied_summary">Resumen copiado</string>
   <string name="media_info_copied_report">Informe completo copiado</string>
@@ -763,7 +796,6 @@
   <string name="update_show_less">Mostrar menos</string>
   <string name="update_view_update">Ver actualización</string>
   <string name="update_whats_new_in">Novedades de %1$s</string>
-
   <!-- Accessibility labels (Material 3 audit, phase 1) -->
   <string name="cd_play">Reproducir</string>
   <string name="cd_pause">Pausar</string>
@@ -782,7 +814,6 @@
   <string name="cd_use_video_title">Usar título del video</string>
   <string name="cd_remove_subtitle">Quitar subtítulo</string>
   <string name="cd_reset_delay">Restablecer retraso</string>
-
   <!-- Moved from hard-coded UI text (Material 3 audit, phase 3) -->
   <string name="playlist_type_local">Local</string>
   <string name="move">Mover</string>
@@ -845,6 +876,10 @@
   <string name="history_disabled_message">Actívalo en los ajustes avanzados para guardar tu historial de reproducción</string>
   <string name="no_recent_items">No hay elementos recientes</string>
   <string name="no_recent_items_message">Los videos y las listas de reproducción que reproduzcas aparecerán aquí</string>
+  <string name="pref_settings_title">Ajustes</string>
+  <string name="pref_section_interface">Interfaz</string>
+  <string name="pref_section_library">Biblioteca</string>
+  <string name="pref_section_system">Sistema</string>
   <string name="pref_section_ui_appearance">Interfaz y apariencia</string>
   <string name="pref_section_playback_controls">Reproducción y controles</string>
   <string name="pref_section_media_files">Contenido multimedia y archivos</string>
@@ -880,6 +915,14 @@
   <string name="pref_section_playlist_autoplay">Lista de reproducción y reproducción automática</string>
   <string name="pref_section_display_screen">Visualización y pantalla</string>
   <string name="pref_section_pip">Imagen en imagen</string>
+  <string name="pref_subtitles_section_language_loading">Idioma y carga</string>
+  <string name="pref_subtitles_section_rendering_fonts">Renderizado y fuentes</string>
+  <string name="pref_subtitles_section_search">Búsqueda de subtítulos</string>
+  <string name="pref_subtitles_section_downloads">Descargas</string>
+  <string name="pref_section_orientation_display">Orientación y pantalla</string>
+  <string name="pref_section_playback_resume">Reproducción y reanudación</string>
+  <string name="pref_section_touch_gestures">Gestos táctiles</string>
+  <string name="pref_section_seek_speed_gestures">Gestos de avance, retroceso y velocidad</string>
   <string name="pref_section_landscape_controls">Controles en horizontal</string>
   <string name="pref_section_portrait_controls">Controles en vertical</string>
   <string name="pref_section_seekbar_style">Estilo de la barra de progreso</string>
@@ -927,6 +970,7 @@
   <string name="about_metric_android">Android</string>
   <string name="about_metric_device">Dispositivo</string>
   <string name="about_metric_hardware">Hardware</string>
+  <string name="about_metric_copied">%1$s copiado</string>
   <string name="sort_oldest">Más antiguos</string>
   <string name="sort_newest">Más recientes</string>
   <string name="sort_smallest">Más pequeños</string>
@@ -945,6 +989,7 @@
   <string name="view_toggle_video_thumbnails">Miniaturas de video</string>
   <string name="view_toggle_show_extension">Mostrar extensión</string>
   <string name="view_toggle_framerate">Frecuencia de fotogramas</string>
+  <string name="view_toggle_decoder">Decodificador</string>
   <string name="view_toggle_progress_bar">Barra de progreso</string>
   <string name="track_header_embedded">INTEGRADAS</string>
   <string name="track_header_external">EXTERNAS</string>
@@ -1040,6 +1085,9 @@
   <string name="codec_support_group_older">Formatos antiguos</string>
   <string name="pref_seekbar_show_chapters_title">Mostrar capítulos en la barra de progreso</string>
   <string name="pref_seekbar_show_chapters_summary">Dividir la barra de progreso donde comienzan los capítulos, como la apertura y el cierre</string>
+  <string name="pref_controls_position_title">Posición de los botones de control</string>
+  <string name="pref_controls_position_above">Encima de la barra de progreso</string>
+  <string name="pref_controls_position_below">Debajo de la barra de progreso</string>
   <!-- Extract audio (1.5.2) -->
   <string name="extract_audio">Extraer audio</string>
   <string name="extract_audio_action">Extraer</string>
@@ -1109,7 +1157,83 @@
     <item quantity="one">%1$d PISTA</item>
     <item quantity="other">%1$d PISTAS</item>
   </plurals>
+  <plurals name="player_chapter_count">
+    <item quantity="one">%1$d CAPÍTULO</item>
+    <item quantity="other">%1$d CAPÍTULOS</item>
+  </plurals>
+  <string name="player_sheets_chapters_title">Capítulos</string>
   <!-- Smart Skip -->
   <string name="smart_skip_intro">Saltar introducción</string>
   <string name="smart_skip_outro">Saltar créditos finales</string>
+  <!-- Video filter presets (player > video settings). Names and descriptions are shown in the preset chips. -->
+  <string name="filter_preset_none_name">Ninguno</string>
+  <string name="filter_preset_none_desc">Ajustes predeterminados sin modificaciones</string>
+  <string name="filter_preset_vivid_name">Vívido</string>
+  <string name="filter_preset_vivid_desc">Colores intensificados con detalles nítidos</string>
+  <string name="filter_preset_warm_tone_name">Tono cálido</string>
+  <string name="filter_preset_warm_tone_desc">Colores más cálidos con un matiz dorado</string>
+  <string name="filter_preset_cool_tone_name">Tono frío</string>
+  <string name="filter_preset_cool_tone_desc">Colores más fríos con un matiz azul</string>
+  <string name="filter_preset_soft_pastel_name">Pastel suave</string>
+  <string name="filter_preset_soft_pastel_desc">Colores suaves y apagados con un aspecto delicado</string>
+  <string name="filter_preset_cinematic_name">Cinematográfico</string>
+  <string name="filter_preset_cinematic_desc">Tratamiento de color cinematográfico con profundidad</string>
+  <string name="filter_preset_dramatic_name">Dramático</string>
+  <string name="filter_preset_dramatic_desc">Aspecto dramático de alto contraste</string>
+  <string name="filter_preset_night_mode_name">Modo nocturno</string>
+  <string name="filter_preset_night_mode_desc">Brillo reducido para entornos oscuros</string>
+  <string name="filter_preset_nostalgic_name">Nostálgico</string>
+  <string name="filter_preset_nostalgic_desc">Aspecto de película antigua con enfoque suave</string>
+  <string name="filter_preset_ghibli_style_name">Estilo Ghibli</string>
+  <string name="filter_preset_ghibli_style_desc">Colores suaves y evocadores de anime</string>
+  <string name="filter_preset_neon_pop_name">Neón vibrante</string>
+  <string name="filter_preset_neon_pop_desc">Colores vibrantes de neón con un estilo atrevido</string>
+  <string name="filter_preset_deep_black_name">Negro profundo</string>
+  <string name="filter_preset_deep_black_desc">Negros intensificados para pantallas OLED</string>
+  <!-- Delete confirmation sheet title. %1$d is the number of items about to be deleted. -->
+  <plurals name="delete_title_video">
+    <item quantity="one">¿Eliminar %1$d video?</item>
+    <item quantity="other">¿Eliminar %1$d videos?</item>
+  </plurals>
+  <plurals name="delete_title_file">
+    <item quantity="one">¿Eliminar %1$d archivo?</item>
+    <item quantity="other">¿Eliminar %1$d archivos?</item>
+  </plurals>
+  <plurals name="delete_title_folder">
+    <item quantity="one">¿Eliminar %1$d carpeta?</item>
+    <item quantity="other">¿Eliminar %1$d carpetas?</item>
+  </plurals>
+  <plurals name="delete_title_item">
+    <item quantity="one">¿Eliminar %1$d elemento?</item>
+    <item quantity="other">¿Eliminar %1$d elementos?</item>
+  </plurals>
+  <plurals name="delete_title_playlist">
+    <item quantity="one">¿Eliminar %1$d lista de reproducción?</item>
+    <item quantity="other">¿Eliminar %1$d listas de reproducción?</item>
+  </plurals>
+  <!-- Rename sheet titles -->
+  <string name="rename_title_file">Cambiar nombre del archivo</string>
+  <string name="rename_title_folder">Cambiar nombre de la carpeta</string>
+  <!-- Toast after adding videos to a playlist. %1$d is the video count, %2$s the playlist name. -->
+  <plurals name="playlist_videos_added">
+    <item quantity="one">Video agregado a \"%2$s\"</item>
+    <item quantity="other">%1$d videos agregados a \"%2$s\"</item>
+  </plurals>
+  <!-- Copy/move progress sheet titles -->
+  <string name="copy_op_copying_files">Copiando archivos</string>
+  <string name="copy_op_moving_files">Moviendo archivos</string>
+  <!-- Folder picker title. %1$s is the action, e.g. "Move to". -->
+  <string name="folder_picker_title_format">%1$s:</string>
+  <!-- Playlist row subtitle. %1$s is the video count label, %2$s the last-updated date. -->
+  <string name="playlist_row_subtitle">%1$s • %2$s</string>
+  <!-- Player toasts. %1$s is a file name or an error message. -->
+  <string name="toast_audio_invalid_uri">No se pudo cargar el archivo de audio: URI no válido</string>
+  <string name="toast_audio_added">Pista de audio agregada</string>
+  <string name="toast_audio_failed">No se pudo cargar el audio: %1$s</string>
+  <string name="toast_subtitle_invalid_format">Formato de archivo de subtítulos no válido</string>
+  <string name="toast_subtitle_added">%1$s agregado</string>
+  <string name="toast_subtitle_failed">No se pudo cargar el subtítulo</string>
+  <string name="toast_subtitle_deleted">Subtítulo eliminado</string>
+  <string name="toast_screenshot_failed">No se pudo crear la captura de pantalla</string>
+  <string name="toast_snapshot_failed">No se pudo guardar la captura: %1$s</string>
 </resources>

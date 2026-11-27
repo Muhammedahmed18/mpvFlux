@@ -142,7 +142,7 @@ fun FolderPickerDialog(
       ) {
         Column(modifier = Modifier.weight(1f)) {
           Text(
-            text = "$titlePrefix:",
+            text = stringResource(R.string.folder_picker_title_format, titlePrefix),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold,

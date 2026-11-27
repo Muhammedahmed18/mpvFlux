@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex.ui.browser.dialogs
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -49,7 +50,7 @@ fun RenameDialog(
   onDismiss: () -> Unit,
   onConfirm: (String) -> Unit,
   currentName: String,
-  itemType: String,
+  @StringRes titleRes: Int,
   extension: String? = null,
 ) {
   if (!isOpen) return
@@ -128,7 +129,7 @@ fun RenameDialog(
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Text(
-          text = "Rename $itemType",
+          text = stringResource(titleRes),
           style = MaterialTheme.typography.headlineSmallEmphasized,
           modifier = Modifier.weight(1f)
         )

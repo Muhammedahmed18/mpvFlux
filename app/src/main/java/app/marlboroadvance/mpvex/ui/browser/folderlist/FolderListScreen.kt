@@ -453,7 +453,7 @@ object FolderListScreen : Screen {
           isOpen = true,
           onDismiss = { deleteDialogOpen.value = false },
           onConfirm = { selectionManager.deleteSelected() },
-          itemType = "folder",
+          titleRes = R.plurals.delete_title_folder,
           itemCount = selectedForDelete.size,
           itemNames = selectedForDelete.map { it.name },
         )
@@ -470,7 +470,7 @@ object FolderListScreen : Screen {
           onDismiss = { renameDialogOpen.value = false },
           currentName = selectionManager.getSelectedItems().firstOrNull()?.name ?: "",
           onConfirm = { selectionManager.renameSelected(it) },
-          itemType = "folder",
+          titleRes = R.string.rename_title_folder,
         )
       }
     }

@@ -102,7 +102,7 @@ fun VideoSettingsFilterPresetsCard(modifier: Modifier = Modifier) {
               MPVLib.setPropertyInt("hue", preset.hue)
               MPVLib.setPropertyInt("sharpen", preset.sharpness)
             },
-            label = { Text(preset.displayName) },
+            label = { Text(stringResource(preset.displayNameRes)) },
             leadingIcon = null,
           )
         }
@@ -110,9 +110,10 @@ fun VideoSettingsFilterPresetsCard(modifier: Modifier = Modifier) {
 
       // Show description for selected preset
       currentPreset?.let { preset ->
-        if (preset.description.isNotEmpty()) {
+        val presetDescription = stringResource(preset.descriptionRes)
+        if (presetDescription.isNotEmpty()) {
           Text(
-            text = preset.description,
+            text = presetDescription,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),

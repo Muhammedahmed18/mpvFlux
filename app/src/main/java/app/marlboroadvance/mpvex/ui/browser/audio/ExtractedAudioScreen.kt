@@ -168,7 +168,7 @@ object ExtractedAudioScreen {
           renameTarget = null
         },
         currentName = file.baseName,
-        itemType = "file",
+        titleRes = R.string.rename_title_file,
         extension = file.extension.takeIf { it.isNotEmpty() }?.let { ".$it" },
       )
     }
@@ -181,7 +181,7 @@ object ExtractedAudioScreen {
           viewModel.delete(file)
           deleteTarget = null
         },
-        itemType = "file",
+        titleRes = R.plurals.delete_title_file,
         itemCount = 1,
         itemNames = listOf(file.name),
       )

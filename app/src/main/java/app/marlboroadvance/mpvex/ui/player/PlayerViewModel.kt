@@ -550,16 +550,16 @@ class PlayerViewModel(
         val path =
           uri.resolveUri(host.context)
             ?: return@launch withContext(Dispatchers.Main) {
-              showToast("Failed to load audio file: Invalid URI")
+              showToast(host.context.getString(R.string.toast_audio_invalid_uri))
             }
 
         MPVLib.command("audio-add", path, "cached")
         withContext(Dispatchers.Main) {
-          showToast("Audio track added")
+          showToast(host.context.getString(R.string.toast_audio_added))
         }
       }.onFailure { e ->
         withContext(Dispatchers.Main) {
-          showToast("Failed to load audio: ${e.message}")
+          showToast(host.context.getString(R.string.toast_audio_failed, e.message))
         }
         android.util.Log.e("PlayerViewModel", "Error adding audio", e)
       }
@@ -579,7 +579,7 @@ class PlayerViewModel(
 
         if (!isValidSubtitleFile(fileName)) {
           return@launch withContext(Dispatchers.Main) {
-            showToast("Invalid subtitle file format")
+            showToast(host.context.getString(R.string.toast_subtitle_invalid_format))
           }
         }
 
@@ -613,13 +613,13 @@ class PlayerViewModel(
         val displayName = fileName.take(30).let { if (fileName.length > 30) "$it..." else it }
         if (!silent) {
           withContext(Dispatchers.Main) {
-            showToast("$displayName added")
+            showToast(host.context.getString(R.string.toast_subtitle_added, displayName))
           }
         }
       }.onFailure {
         if (!silent) {
           withContext(Dispatchers.Main) {
-            showToast("Failed to load subtitle")
+            showToast(host.context.getString(R.string.toast_subtitle_failed))
           }
         }
       }
@@ -756,7 +756,7 @@ class PlayerViewModel(
           _externalSubtitles.remove(originalUriString)
           mpvPathToUriMap.remove(mpvPath)
           withContext(Dispatchers.Main) {
-            showToast("Subtitle deleted")
+            showToast(host.context.getString(R.string.toast_subtitle_deleted))
           }
         }
       }
@@ -1501,7 +1501,7 @@ class PlayerViewModel(
         // Check if file was created
         if (!tempFile.exists() || tempFile.length() == 0L) {
           withContext(Dispatchers.Main) {
-            Toast.makeText(context, "Failed to create screenshot", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_screenshot_failed), Toast.LENGTH_SHORT).show()
           }
           return@launch
         }
@@ -1594,7 +1594,7 @@ class PlayerViewModel(
         }
       } catch (e: Exception) {
         withContext(Dispatchers.Main) {
-          Toast.makeText(context, "Failed to save snapshot: ${e.message}", Toast.LENGTH_LONG).show()
+          Toast.makeText(context, context.getString(R.string.toast_snapshot_failed, e.message), Toast.LENGTH_LONG).show()
         }
       } finally {
         _isSnapshotLoading.value = false

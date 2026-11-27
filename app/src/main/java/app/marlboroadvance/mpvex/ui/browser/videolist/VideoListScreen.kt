@@ -547,7 +547,7 @@ private fun VideoListDialogs(
       isOpen = true,
       onDismiss = { deleteDialogOpen.value = false },
       onConfirm = { selectionManager.deleteSelected() },
-      itemType = "video",
+      titleRes = R.plurals.delete_title_video,
       itemCount = selectedForDelete.size,
       itemNames = selectedForDelete.map { it.displayName },
     )
@@ -564,7 +564,7 @@ private fun VideoListDialogs(
         onDismiss = { renameDialogOpen.value = false },
         onConfirm = { newName -> selectionManager.renameSelected(newName) },
         currentName = baseName,
-        itemType = "file",
+        titleRes = R.string.rename_title_file,
         extension = if (extension != ".") extension else null,
       )
     }

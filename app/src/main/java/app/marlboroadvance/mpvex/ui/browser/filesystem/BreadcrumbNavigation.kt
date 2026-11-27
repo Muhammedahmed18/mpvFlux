@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,8 +45,8 @@ fun BreadcrumbNavigation(
     breadcrumbs.forEachIndexed { index, component ->
       if (index > 0) {
         Icon(
-          imageVector = Icons.Filled.ChevronRight,
-          contentDescription = null, // decorative chevron
+          imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+          contentDescription = null, // decorative chevron, mirrors in RTL
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
           modifier = Modifier.padding(horizontal = 4.dp),
         )

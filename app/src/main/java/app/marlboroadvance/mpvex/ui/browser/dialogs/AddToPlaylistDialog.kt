@@ -95,11 +95,7 @@ fun AddToPlaylistDialog(
             video.path to video.displayName
           }
           repository.addItemsToPlaylist(playlistId.toInt(), items)
-          val message = if (videos.size == 1) {
-            "Video added to \"$name\""
-          } else {
-            "${videos.size} videos added to \"$name\""
-          }
+          val message = context.resources.getQuantityString(R.plurals.playlist_videos_added, videos.size, videos.size, name)
           Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
           showCreateDialog = false
           onSuccess()
@@ -183,11 +179,7 @@ fun AddToPlaylistDialog(
                     video.path to video.displayName
                   }
                   repository.addItemsToPlaylist(playlist.id, items)
-                  val message = if (videos.size == 1) {
-                    "Video added to \"${playlist.name}\""
-                  } else {
-                    "${videos.size} videos added to \"${playlist.name}\""
-                  }
+                  val message = context.resources.getQuantityString(R.plurals.playlist_videos_added, videos.size, videos.size, playlist.name)
                   Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                   onSuccess()
                   onDismiss()
@@ -244,7 +236,11 @@ private fun PlaylistItemCard(
         )
         Spacer(modifier = Modifier.height(2.dp))
         Text(
-          text = "$itemCount videos • ${formatDate(playlist.updatedAt)}",
+          text = stringResource(
+            R.string.playlist_row_subtitle,
+            pluralStringResource(R.plurals.card_video_count, itemCount, itemCount),
+            formatDate(playlist.updatedAt),
+          ),
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex.ui.browser.dialogs
 
+import androidx.annotation.PluralsRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,7 +35,7 @@ fun DeleteConfirmationDialog(
   isOpen: Boolean,
   onDismiss: () -> Unit,
   onConfirm: () -> Unit,
-  itemType: String,
+  @PluralsRes titleRes: Int,
   itemCount: Int,
   itemNames: List<String> = emptyList(),
 ) {
@@ -47,8 +48,6 @@ fun DeleteConfirmationDialog(
     sheetState = sheetState,
     dragHandle = { BottomSheetDefaults.DragHandle() },
   ) {
-    val itemText = if (itemCount == 1) itemType else "${itemType}s"
-
     Column(
       modifier = Modifier
         .fillMaxWidth()
@@ -59,7 +58,7 @@ fun DeleteConfirmationDialog(
       // Title. The confirm action now lives in a labelled button row at the bottom
       // (a corner icon read as "close" and made permanent delete easy to mis-tap).
       Text(
-        text = "Delete $itemCount $itemText?",
+        text = pluralStringResource(titleRes, itemCount, itemCount),
         style = MaterialTheme.typography.headlineSmallEmphasized,
       )
 
