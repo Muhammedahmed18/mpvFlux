@@ -144,7 +144,7 @@ object DeviceCodecReport {
 
   private fun maxPixels(info: MediaCodecInfo, mime: String): Long =
     runCatching {
-      val v = info.getCapabilitiesForType(mime).videoCapabilities
+      val v = info.getCapabilitiesForType(mime).videoCapabilities ?: return@runCatching 0L
       v.supportedWidths.upper.toLong() * v.supportedHeights.upper.toLong()
     }.getOrDefault(0L)
 
