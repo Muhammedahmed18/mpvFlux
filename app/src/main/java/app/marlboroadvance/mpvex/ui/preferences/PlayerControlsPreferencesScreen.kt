@@ -41,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -140,7 +141,6 @@ object PlayerControlsPreferencesScreen : Screen {
                 )
                 PreferenceIconSummary(buttons = topRightButtons)
                 
-                PreferenceDivider()
                 
                 PreferenceCategoryWithEditButton(
                   title = stringResource(id = R.string.pref_layout_bottom_right_controls),
@@ -150,7 +150,6 @@ object PlayerControlsPreferencesScreen : Screen {
                 )
                 PreferenceIconSummary(buttons = bottomRightButtons)
                 
-                PreferenceDivider()
                 
                 PreferenceCategoryWithEditButton(
                   title = stringResource(id = R.string.pref_layout_bottom_left_controls),
@@ -210,9 +209,6 @@ object PlayerControlsPreferencesScreen : Screen {
                     modifier = Modifier
                       .clickable { appearancePrefs.seekbarStyle.set(style) }
                   )
-                  if (index < SeekbarStyle.entries.size - 1) {
-                    PreferenceDivider()
-                  }
                 }
               }
             }
@@ -226,14 +222,11 @@ object PlayerControlsPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_seekbar_show_chapters_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized,
                     )
                   },
                   summary = {
                     Text(
                       text = stringResource(R.string.pref_seekbar_show_chapters_summary),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                   },
                 )
@@ -253,14 +246,11 @@ object PlayerControlsPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_controls_position_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized,
                     )
                   },
                   summary = {
                     Text(
                       text = if (controlsPosition == ControlsPosition.Below) belowText else aboveText,
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                   },
                 )
@@ -273,6 +263,8 @@ object PlayerControlsPreferencesScreen : Screen {
             
             item {
               val hidePlayerButtonsBackground by appearancePrefs.hidePlayerButtonsBackground.collectAsState()
+              val context = LocalContext.current
+              val customLabel = stringResource(R.string.pref_gesture_double_tap_custom)
               val playerTimeToDisappear by playerPrefs.playerTimeToDisappear.collectAsState()
               val predefinedTimeValues = listOf(500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000)
               val isCustomTimeValue = !predefinedTimeValues.contains(playerTimeToDisappear)
@@ -284,21 +276,19 @@ object PlayerControlsPreferencesScreen : Screen {
                 SwitchPreference(
                   value = hidePlayerButtonsBackground,
                   onValueChange = { appearancePrefs.hidePlayerButtonsBackground.set(it) },
-                  title = { Text(text = stringResource(id = R.string.pref_appearance_hide_player_buttons_background_title), style = MaterialTheme.typography.titleMediumEmphasized) },
-                  summary = { Text(text = stringResource(id = R.string.pref_appearance_hide_player_buttons_background_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                  title = { Text(text = stringResource(id = R.string.pref_appearance_hide_player_buttons_background_title)) },
+                  summary = { Text(text = stringResource(id = R.string.pref_appearance_hide_player_buttons_background_summary)) },
                 )
                 
-                PreferenceDivider()
                 
                 val showFileExtension by playerPrefs.showFileExtension.collectAsState()
                 SwitchPreference(
                   value = showFileExtension,
                   onValueChange = playerPrefs.showFileExtension::set,
-                  title = { Text(stringResource(R.string.pref_player_show_file_extension_title), style = MaterialTheme.typography.titleMediumEmphasized) },
-                  summary = { Text(stringResource(R.string.pref_player_show_file_extension_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                  title = { Text(stringResource(R.string.pref_player_show_file_extension_title)) },
+                  summary = { Text(stringResource(R.string.pref_player_show_file_extension_summary)) },
                 )
 
-                PreferenceDivider()
                 
                 ListPreference(
                   value = if (isCustomTimeValue) -1 else playerTimeToDisappear,
@@ -312,14 +302,12 @@ object PlayerControlsPreferencesScreen : Screen {
                   },
                   values = predefinedTimeValues + listOf(-1),
                   valueToText = { value ->
-                    if (value == -1) AnnotatedString("Custom") else AnnotatedString("$value ms")
+                    if (value == -1) AnnotatedString(customLabel) else AnnotatedString(context.getString(R.string.value_ms, value))
                   },
-                  title = { Text(text = stringResource(R.string.pref_player_display_hide_player_control_time), style = MaterialTheme.typography.titleMediumEmphasized) },
+                  title = { Text(text = stringResource(R.string.pref_player_display_hide_player_control_time)) },
                   summary = {
                     Text(
                       text = if (isCustomTimeValue) stringResource(R.string.custom_ms_value, playerTimeToDisappear) else stringResource(R.string.value_ms, playerTimeToDisappear),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )

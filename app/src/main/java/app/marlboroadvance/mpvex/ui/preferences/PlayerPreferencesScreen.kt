@@ -107,19 +107,15 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(id = R.string.pref_player_orientation),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
                     Text(
                       text = orientationNames[orientation] ?: "",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
 
-                PreferenceDivider()
 
                 val rememberBrightness by preferences.rememberBrightness.collectAsState()
                 SwitchPreference(
@@ -128,12 +124,10 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_player_remember_brightness),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                 )
 
-                PreferenceDivider()
 
                 val keepScreenOnWhenPaused by preferences.keepScreenOnWhenPaused.collectAsState()
                 SwitchPreference(
@@ -142,7 +136,6 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_player_keep_screen_on_paused_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
@@ -151,13 +144,10 @@ object PlayerPreferencesScreen : Screen {
                         stringResource(R.string.pref_player_keep_screen_on_paused_summary_on)
                       else
                         stringResource(R.string.pref_player_keep_screen_on_paused_summary_off),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
 
-                PreferenceDivider()
 
                 val reduceMotion by preferences.reduceMotion.collectAsState()
                 SwitchPreference(
@@ -166,7 +156,6 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_player_display_reduce_player_animation),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                 )
@@ -186,12 +175,10 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_player_save_position_on_quit),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                 )
 
-                PreferenceDivider()
 
                 val closeAfterEndOfVideo by preferences.closeAfterReachingEndOfVideo.collectAsState()
                 SwitchPreference(
@@ -200,7 +187,6 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(id = R.string.pref_player_close_after_eof),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                 )
@@ -220,7 +206,6 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_autoplay_next_video_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
@@ -229,13 +214,10 @@ object PlayerPreferencesScreen : Screen {
                         stringResource(R.string.pref_autoplay_next_video_summary)
                       else
                         stringResource(R.string.pref_autoplay_next_video_summary_off),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
 
-                PreferenceDivider()
 
                 val playlistMode by preferences.playlistMode.collectAsState()
                 SwitchPreference(
@@ -244,7 +226,6 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_autoplay_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
@@ -253,8 +234,6 @@ object PlayerPreferencesScreen : Screen {
                         stringResource(R.string.pref_autoplay_summary)
                       else
                         stringResource(R.string.pref_autoplay_summary_off),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
@@ -274,12 +253,10 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.show_splash_ovals_on_double_tap_to_seek),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
                 
                 val showSeekTimeWhileSeeking by preferences.showSeekTimeWhileSeeking.collectAsState()
                 SwitchPreference(
@@ -288,12 +265,10 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.show_time_on_double_tap_to_seek),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
                 
                 val usePreciseSeeking by preferences.usePreciseSeeking.collectAsState()
                 SwitchPreference(
@@ -302,12 +277,10 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_use_precise_seeking),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
                 
                 val customSkipDuration by preferences.customSkipDuration.collectAsState()
                 SliderPreference(
@@ -347,12 +320,10 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_gestures_brightness),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
                 
                 val volumeGesture by preferences.volumeGesture.collectAsState()
                 SwitchPreference(
@@ -361,12 +332,10 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_gestures_volume),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
 
                 val swapVolumeAndBrightness by preferences.swapVolumeAndBrightness.collectAsState()
                 SwitchPreference(
@@ -375,12 +344,10 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.swap_the_volume_and_brightness_slider),
-                      style = MaterialTheme.typography.titleMediumEmphasized,
                     )
                   },
                 )
 
-                PreferenceDivider()
 
                 val pinchToZoomGesture by preferences.pinchToZoomGesture.collectAsState()
                 SwitchPreference(
@@ -389,7 +356,6 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_player_gestures_pinch_to_zoom),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
@@ -409,12 +375,10 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_player_gestures_horizontal_swipe_to_seek),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
                 
                 val horizontalSwipeSensitivity by preferences.horizontalSwipeSensitivity.collectAsState()
                 SliderPreference(
@@ -449,7 +413,6 @@ object PlayerPreferencesScreen : Screen {
                   sliderValue = horizontalSwipeSensitivity,
                 )
                 
-                PreferenceDivider()
                 
                 val holdForMultipleSpeed by preferences.holdForMultipleSpeed.collectAsState()
                 SliderPreference(
@@ -477,7 +440,6 @@ object PlayerPreferencesScreen : Screen {
                   sliderValue = holdForMultipleSpeed,
                 )
                 
-                PreferenceDivider()
                 
                 val showDynamicSpeedOverlay by preferences.showDynamicSpeedOverlay.collectAsState()
                 SwitchPreference(
@@ -486,14 +448,11 @@ object PlayerPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_dynamic_speed_overlay_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
                     Text(
                       text = stringResource(R.string.pref_dynamic_speed_overlay_summary),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   }
                 )
@@ -513,14 +472,11 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_auto_pip_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
                     Text(
                       text = stringResource(R.string.pref_auto_pip_summary),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )

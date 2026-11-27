@@ -147,7 +147,6 @@ object AppearancePreferencesScreen : Screen {
                                     modifier = Modifier.padding(bottom = 8.dp),
                                 )
 
-                                PreferenceDivider()
 
                                 SwitchPreference(
                                     value = amoledMode,
@@ -157,20 +156,16 @@ object AppearancePreferencesScreen : Screen {
                                     title = { 
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_amoled_mode_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         ) 
                                     },
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_amoled_mode_summary),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                     enabled = darkMode != DarkMode.Light
                                 )
 
-                                PreferenceDivider()
 
                                 val useSystemFont by preferences.useSystemFont.collectAsState()
                                 SwitchPreference(
@@ -181,14 +176,11 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_system_font_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_system_font_summary),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                 )
@@ -208,19 +200,15 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_unlimited_name_lines_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_unlimited_name_lines_summary),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
 
-                                PreferenceDivider()
 
                                 val autoScrollToLastPlayed by browserPreferences.autoScrollToLastPlayed.collectAsState()
                                 SwitchPreference(
@@ -229,19 +217,15 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(R.string.pref_appearance_auto_scroll_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
                                         Text(
                                             text = stringResource(R.string.pref_appearance_auto_scroll_summary),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
 
-                                PreferenceDivider()
 
                                 val tapThumbnailToSelect by gesturePreferences.tapThumbnailToSelect.collectAsState()
                                 SwitchPreference(
@@ -250,14 +234,11 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_gesture_tap_thumbnail_to_select_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_gesture_tap_thumbnail_to_select_summary),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
@@ -277,19 +258,15 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_show_unplayed_old_video_label_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_show_unplayed_old_video_label_summary),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
 
-                                PreferenceDivider()
 
                                 val unplayedOldVideoDays by preferences.unplayedOldVideoDays.collectAsState()
                                 SliderPreference(
@@ -317,7 +294,6 @@ object AppearancePreferencesScreen : Screen {
                                     enabled = showUnplayedOldVideoLabel
                                 )
 
-                                PreferenceDivider()
 
                                 val watchedThreshold by browserPreferences.watchedThreshold.collectAsState()
                                 SliderPreference(
@@ -360,19 +336,15 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_show_network_thumbnails_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_show_network_thumbnails_summary),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )
 
-                                PreferenceDivider()
 
                                 val thumbnailPosition by preferences.thumbnailPosition.collectAsState()
                                 val thumbnailPositionNames = ThumbnailPosition.entries.associateWith { stringResource(it.titleRes) }
@@ -384,7 +356,6 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(R.string.pref_appearance_thumbnail_position_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
@@ -393,8 +364,6 @@ object AppearancePreferencesScreen : Screen {
                                                 R.string.pref_appearance_thumbnail_position_summary,
                                                 stringResource(thumbnailPosition.titleRes),
                                             ),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
                                 )
@@ -438,7 +407,6 @@ object AppearancePreferencesScreen : Screen {
                                     onClick = pickAudioFolder,
                                 )
 
-                                PreferenceDivider()
 
                                 val showAudioTab by browserPreferences.showAudioTab.collectAsState()
                                 SwitchPreference(
@@ -447,14 +415,11 @@ object AppearancePreferencesScreen : Screen {
                                     title = {
                                         Text(
                                             text = stringResource(R.string.pref_audio_show_tab_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
                                         )
                                     },
                                     summary = {
                                         Text(
                                             text = stringResource(R.string.pref_audio_show_tab_summary),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 )

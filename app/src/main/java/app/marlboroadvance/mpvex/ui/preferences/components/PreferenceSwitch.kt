@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import app.marlboroadvance.mpvex.ui.preferences.PreferenceTitle
 
 /**
  * Material 3 switch that shows a check when on and a cross when off.
@@ -66,7 +67,7 @@ fun SwitchPreference(
 ) {
     // The whole row toggles, and TalkBack reads title + summary + on/off as one switch.
     ListItem(
-        headlineContent = title,
+        headlineContent = { PreferenceTitle(title) },
         supportingContent = summary,
         leadingContent = icon,
         trailingContent = { PreferenceSwitch(checked = value, onCheckedChange = null) },

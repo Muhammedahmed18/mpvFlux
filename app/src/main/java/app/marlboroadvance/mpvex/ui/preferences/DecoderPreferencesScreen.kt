@@ -118,19 +118,15 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_profile_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
                     Text(
                       text = currentProfile.displayName,
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
 
-                PreferenceDivider()
 
                 val tryHWDecoding by preferences.tryHWDecoding.collectAsState()
                 SwitchPreference(
@@ -141,12 +137,10 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_try_hw_dec_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
 
-                PreferenceDivider()
 
                 val gpuNext by preferences.gpuNext.collectAsState()
                 val useVulkan by preferences.useVulkan.collectAsState()
@@ -162,14 +156,11 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_gpu_next_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
                     Text(
                       text = stringResource(R.string.pref_decoder_gpu_next_summary),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
@@ -201,7 +192,6 @@ object DecoderPreferencesScreen : Screen {
                   )
                 }
 
-                PreferenceDivider()
 
                 SwitchPreference(
                   value = useVulkan,
@@ -212,7 +202,6 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_vulkan_title) + " (Experimental)",
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
@@ -221,14 +210,12 @@ object DecoderPreferencesScreen : Screen {
                         if (isVulkanSupported) R.string.pref_decoder_vulkan_summary
                         else R.string.pref_decoder_vulkan_not_supported
                       ),
-                      style = MaterialTheme.typography.bodyMedium,
                       color = if (isVulkanSupported) MaterialTheme.colorScheme.onSurfaceVariant
                              else MaterialTheme.colorScheme.error,
                     )
                   },
                 )
 
-                PreferenceDivider()
 
                 val debanding by preferences.debanding.collectAsState()
                 ListPreference(
@@ -238,19 +225,15 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_debanding_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
                     Text(
                       text = debanding.name,
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
 
-                PreferenceDivider()
 
                 val useYUV420p by preferences.useYUV420P.collectAsState()
                 SwitchPreference(
@@ -261,14 +244,11 @@ object DecoderPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_decoder_yuv420p_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
                     Text(
                       text = stringResource(R.string.pref_decoder_yuv420p_summary),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )

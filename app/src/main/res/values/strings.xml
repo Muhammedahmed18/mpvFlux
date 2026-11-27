@@ -1250,4 +1250,5 @@
   <string name="toast_subtitle_deleted">Subtitle deleted</string>
   <string name="toast_screenshot_failed">Failed to create screenshot</string>
   <string name="toast_snapshot_failed">Failed to save snapshot: %1$s</string>
+  <string name="player_button_chapter_preview" translatable="false">1:06 • Chapter 1</string>
 </resources>

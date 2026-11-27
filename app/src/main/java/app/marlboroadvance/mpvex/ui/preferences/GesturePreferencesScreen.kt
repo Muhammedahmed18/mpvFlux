@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.ui.preferences.components.SwitchPreference
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
@@ -113,6 +114,7 @@ object GesturePreferencesScreen : Screen {
             
             item {
               PreferenceCard {
+                val customLabel = stringResource(R.string.pref_gesture_double_tap_custom)
                 val doubleTapSeekDuration by preferences.doubleTapToSeekDuration.collectAsState()
                 val predefinedValues = listOf(3, 5, 10, 15, 20, 25, 30)
                 val isCustomValue = !predefinedValues.contains(doubleTapSeekDuration)
@@ -130,7 +132,7 @@ object GesturePreferencesScreen : Screen {
                   values = predefinedValues + listOf(-1),
                   valueToText = { value ->
                     if (value == -1) {
-                      AnnotatedString("Custom")
+                      AnnotatedString(customLabel)
                     } else {
                       AnnotatedString("${value}s")
                     }
@@ -138,19 +140,15 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(id = R.string.pref_player_double_tap_seek_duration),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
                     Text(
                       text = if (isCustomValue) stringResource(R.string.custom_seconds_value, doubleTapSeekDuration) else "${doubleTapSeekDuration}s",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
                 
-                PreferenceDivider()
 
                 val doubleTapSeekAreaWidth by preferences.doubleTapSeekAreaWidth.collectAsState()
                 val seekAreaValues = listOf(20, 25, 30, 35, 40, 45)
@@ -163,19 +161,15 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_double_tap_seek_area_width_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = {
                     Text(
-                      text = "Current: ${doubleTapSeekAreaWidth}%",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                      text = stringResource(R.string.pref_double_tap_seek_area_width_summary, doubleTapSeekAreaWidth),
                     )
                   },
                 )
                 
-                PreferenceDivider()
 
                 val leftDoubleTap by preferences.leftSingleActionGesture.collectAsState()
                 ListPreference(
@@ -186,19 +180,15 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_gesture_double_tap_left_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
                     Text(
                       text = gestureNames[leftDoubleTap] ?: "",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
 
                 val centerDoubleTap by preferences.centerSingleActionGesture.collectAsState()
                 val centerValues = listOf(
@@ -216,19 +206,15 @@ object GesturePreferencesScreen : Screen {
                       text = stringResource(
                         if (useSingleTapForCenter) R.string.pref_gesture_single_tap_center_title else R.string.pref_gesture_double_tap_center_title,
                       ),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = { 
                     Text(
                       text = gestureNames[centerDoubleTap] ?: "",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
 
                 val rightDoubleTap by preferences.rightSingleActionGesture.collectAsState()
                 ListPreference(
@@ -239,35 +225,28 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_gesture_double_tap_right_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
                     Text(
                       text = gestureNames[rightDoubleTap] ?: "",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
 
                 val useSingleTapForCenterVal by preferences.useSingleTapForCenter.collectAsState()
-                me.zhanghai.compose.preference.SwitchPreference(
+                SwitchPreference(
                   value = useSingleTapForCenterVal,
                   onValueChange = { preferences.useSingleTapForCenter.set(it) },
                   title = {
                     Text(
                       text = stringResource(id = R.string.pref_gesture_use_single_tap_for_center_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
                     Text(
                       text = stringResource(id = R.string.pref_gesture_use_single_tap_for_center_summary),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
@@ -317,13 +296,12 @@ object GesturePreferencesScreen : Screen {
             item {
               PreferenceCard {
                 val mediaButtonsEnabled by preferences.mediaButtonsEnabled.collectAsState()
-                me.zhanghai.compose.preference.SwitchPreference(
+                SwitchPreference(
                   value = mediaButtonsEnabled,
                   onValueChange = { preferences.mediaButtonsEnabled.set(it) },
                   title = {
                     Text(
                       text = stringResource(R.string.pref_gesture_media_buttons_enabled_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     )
                   },
                   summary = {
@@ -335,13 +313,10 @@ object GesturePreferencesScreen : Screen {
                           R.string.pref_gesture_media_buttons_enabled_summary_off
                         },
                       ),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )
 
-                PreferenceDivider()
 
                 val mediaPrevious by preferences.mediaPreviousGesture.collectAsState()
                 ListPreference(
@@ -353,19 +328,15 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_gesture_media_previous),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
                     Text(
                       text = gestureNames[mediaPrevious] ?: "",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
 
-                PreferenceDivider()
 
                 val mediaPlay by preferences.mediaPlayGesture.collectAsState()
                 ListPreference(
@@ -377,19 +348,15 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_gesture_media_play),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
                     Text(
                       text = gestureNames[mediaPlay] ?: "",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
 
-                PreferenceDivider()
 
                 val mediaNext by preferences.mediaNextGesture.collectAsState()
                 ListPreference(
@@ -401,14 +368,11 @@ object GesturePreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_gesture_media_next),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
                     Text(
                       text = gestureNames[mediaNext] ?: "",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
                 )

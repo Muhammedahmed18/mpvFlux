@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.DpOffset
+import app.marlboroadvance.mpvex.ui.preferences.PreferenceTitle
 
 /**
  * Drop-in replacement for me.zhanghai's `ListPreference` (same parameters used by the settings
@@ -59,7 +60,7 @@ fun <T> ListPreference(
 
     Box(modifier = modifier) {
         ListItem(
-            headlineContent = title,
+            headlineContent = { PreferenceTitle(title) },
             supportingContent = summary,
             leadingContent = icon,
             trailingContent = {

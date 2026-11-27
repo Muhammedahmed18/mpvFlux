@@ -111,7 +111,7 @@ fun PlayerButtonChip(
                 modifier = Modifier.size(24.dp), 
               )
               Text(
-                text = "1:06 • Chapter 1", // TODO: strings
+                text = stringResource(R.string.player_button_chapter_preview),
                 fontSize = 15.sp, 
                 textAlign = TextAlign.Center,
                 lineHeight = 14.sp,

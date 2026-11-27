@@ -6,9 +6,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -52,8 +51,17 @@ fun PreferenceCard(
 }
 
 /**
- * Flat preference row. Icon, text and trailing content share one vertical center line,
- * with equal top and bottom padding, whether the summary takes one line or several.
+ * Title slot style shared by every preference row, so call sites can pass a plain `Text`.
+ * An explicit `style` on the Text still wins.
+ */
+@Composable
+internal fun PreferenceTitle(content: @Composable () -> Unit) {
+    ProvideTextStyle(MaterialTheme.typography.titleMediumEmphasized, content)
+}
+
+/**
+ * Flat preference row built on the same M3 [ListItem] as the switch and dropdown rows, so every
+ * row shares one geometry. The summary uses the ListItem default (bodyMedium, onSurfaceVariant).
  */
 @Composable
 fun Preference(
@@ -65,33 +73,16 @@ fun Preference(
     trailingContent: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
 ) {
-    Row(
+    ListItem(
+        headlineContent = { PreferenceTitle(title) },
+        supportingContent = summary,
+        leadingContent = icon,
+        trailingContent = trailingContent,
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         modifier = modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .heightIn(min = 80.dp)
-            .padding(start = 16.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            // Icon is centered in a fixed slot so the text starts at the same x on every row.
-            Box(modifier = Modifier.width(68.dp), contentAlignment = Alignment.Center) { icon() }
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            ProvideTextStyle(MaterialTheme.typography.bodyLarge) { title() }
-            if (summary != null) {
-                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
-                    ProvideTextStyle(MaterialTheme.typography.bodyMedium) { summary() }
-                }
-            }
-        }
-        if (trailingContent != null) {
-            Box(
-                modifier = Modifier.padding(start = 8.dp).widthIn(min = 48.dp),
-                contentAlignment = Alignment.Center,
-            ) { trailingContent() }
-        }
-    }
+            .alpha(if (enabled) 1f else 0.38f)
+            .clickable(enabled = enabled, onClick = onClick),
+    )
 }
 
 /**
@@ -108,21 +99,8 @@ fun PreferenceItem(
     showChevron: Boolean = false,
 ) {
     Preference(
-        title = { 
-            Text(
-                text = title, 
-                style = MaterialTheme.typography.titleMediumEmphasized 
-            ) 
-        },
-        summary = summary?.let { 
-            { 
-                Text(
-                    text = it, 
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
-                ) 
-            } 
-        },
+        title = { Text(text = title) },
+        summary = summary?.let { { Text(text = it) } },
         icon = icon,
         enabled = enabled,
         onClick = onClick,

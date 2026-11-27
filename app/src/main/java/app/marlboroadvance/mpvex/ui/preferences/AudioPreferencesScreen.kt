@@ -103,7 +103,6 @@ object AudioPreferencesScreen : Screen {
                   onValueChange = { preferences.preferredLanguages.set(it) },
                 )
 
-                PreferenceDivider()
 
                 val audioPitchCorrection by preferences.audioPitchCorrection.collectAsState()
                 SwitchPreference(
@@ -112,19 +111,15 @@ object AudioPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_audio_pitch_correction_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
                     Text(
                       text = stringResource(R.string.pref_audio_pitch_correction_summary),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
 
                 val volumeNormalization by preferences.volumeNormalization.collectAsState()
                 SwitchPreference(
@@ -133,19 +128,15 @@ object AudioPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.pref_audio_volume_normalization_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
                     Text(
                       text = stringResource(R.string.pref_audio_volume_normalization_summary),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
 
                 val automaticBackgroundPlayback by preferences.automaticBackgroundPlayback.collectAsState()
                 SwitchPreference(
@@ -154,12 +145,10 @@ object AudioPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(R.string.background_playback_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
 
                 val audioChannel by preferences.audioChannels.collectAsState()
                 ListPreference(
@@ -170,19 +159,15 @@ object AudioPreferencesScreen : Screen {
                   title = { 
                     Text(
                       text = stringResource(id = R.string.pref_audio_channels),
-                      style = MaterialTheme.typography.titleMediumEmphasized
                     ) 
                   },
                   summary = { 
                     Text(
                       text = channelNames[audioChannel] ?: "",
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     ) 
                   },
                 )
                 
-                PreferenceDivider()
 
                 val volumeBoostCap by preferences.volumeBoostCap.collectAsState()
                 SliderPreference(

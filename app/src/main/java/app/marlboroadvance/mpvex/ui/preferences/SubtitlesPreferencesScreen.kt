@@ -203,13 +203,12 @@ object SubtitlesPreferencesScreen : Screen {
                 showOffOption = true,
               )
 
-              PreferenceDivider()
 
               val autoload by preferences.autoloadMatchingSubtitles.collectAsState()
               SwitchPreference(
                 value = autoload,
                 onValueChange = { preferences.autoloadMatchingSubtitles.set(it) },
-                title = { Text(stringResource(R.string.pref_subtitles_autoload_title), style = MaterialTheme.typography.titleMediumEmphasized) },
+                title = { Text(stringResource(R.string.pref_subtitles_autoload_title)) },
                 summary = {
                   Text(
                     stringResource(R.string.pref_subtitles_autoload_summary),
@@ -231,7 +230,7 @@ object SubtitlesPreferencesScreen : Screen {
               SwitchPreference(
                 value = usePhoneFont,
                 onValueChange = { preferences.usePhoneFontForTextSubs.set(it) },
-                title = { Text(stringResource(R.string.pref_sub_phone_font_title), style = MaterialTheme.typography.titleMediumEmphasized) },
+                title = { Text(stringResource(R.string.pref_sub_phone_font_title)) },
                 summary = {
                   Text(
                     stringResource(R.string.pref_sub_phone_font_summary),
@@ -240,13 +239,12 @@ object SubtitlesPreferencesScreen : Screen {
                 },
               )
 
-              PreferenceDivider()
 
               val overrideAss by preferences.overrideAssSubs.collectAsState()
               SwitchPreference(
                 value = overrideAss,
                 onValueChange = { preferences.overrideAssSubs.set(it) },
-                title = { Text(stringResource(R.string.player_sheets_sub_override_ass), style = MaterialTheme.typography.titleMediumEmphasized) },
+                title = { Text(stringResource(R.string.player_sheets_sub_override_ass)) },
                 summary = {
                   Text(
                     stringResource(R.string.player_sheets_sub_override_ass_subtitle),
@@ -255,13 +253,12 @@ object SubtitlesPreferencesScreen : Screen {
                 },
               )
 
-              PreferenceDivider()
 
               val scaleByWindow by preferences.scaleByWindow.collectAsState()
               SwitchPreference(
                 value = scaleByWindow,
                 onValueChange = { preferences.scaleByWindow.set(it) },
-                title = { Text(stringResource(R.string.player_sheets_sub_scale_by_window), style = MaterialTheme.typography.titleMediumEmphasized) },
+                title = { Text(stringResource(R.string.player_sheets_sub_scale_by_window)) },
                 summary = {
                   Text(
                     stringResource(R.string.player_sheets_sub_scale_by_window_summary),
@@ -270,7 +267,6 @@ object SubtitlesPreferencesScreen : Screen {
                 },
               )
 
-              PreferenceDivider()
 
               Box(
                 modifier =
@@ -326,7 +322,6 @@ object SubtitlesPreferencesScreen : Screen {
                 hasAllOption = true
               )
 
-              PreferenceDivider()
 
               // Languages
               val subdlLanguages by preferences.subdlLanguages.collectAsState()
@@ -346,7 +341,6 @@ object SubtitlesPreferencesScreen : Screen {
                 hasAllOption = true
               )
 
-              PreferenceDivider()
 
               // Advanced Filters (Toggleable)
               var showAdvanced by remember { mutableStateOf(false) }
@@ -377,11 +371,10 @@ object SubtitlesPreferencesScreen : Screen {
                     SwitchPreference(
                       value = wyzieHearingImpaired,
                       onValueChange = { preferences.wyzieHearingImpaired.set(it) },
-                      title = { Text(stringResource(R.string.pref_subtitles_hearing_impaired), style = MaterialTheme.typography.titleMediumEmphasized) },
+                      title = { Text(stringResource(R.string.pref_subtitles_hearing_impaired)) },
                       summary = { Text(stringResource(R.string.pref_subtitles_hearing_impaired_summary)) }
                     )
 
-                    PreferenceDivider()
 
                     MultiChoicePreference(
                       title = { Text(stringResource(R.string.pref_subtitles_formats), style = MaterialTheme.typography.titleMediumEmphasized) },
@@ -399,7 +392,6 @@ object SubtitlesPreferencesScreen : Screen {
                       hasAllOption = true
                     )
 
-                    PreferenceDivider()
 
                     MultiChoicePreference(
                       title = { Text(stringResource(R.string.pref_subtitles_encodings), style = MaterialTheme.typography.titleMediumEmphasized) },
@@ -422,7 +414,6 @@ object SubtitlesPreferencesScreen : Screen {
                 }
               }
 
-              PreferenceDivider()
 
               // Wyzie Tag
               Row(
@@ -487,7 +478,6 @@ object SubtitlesPreferencesScreen : Screen {
                 }
               }
 
-              PreferenceDivider()
 
               Preference(
                 title = { Text(stringResource(R.string.pref_subtitles_clear_downloads), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMediumEmphasized) },

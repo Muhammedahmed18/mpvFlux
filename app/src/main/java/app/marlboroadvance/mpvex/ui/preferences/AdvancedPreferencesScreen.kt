@@ -206,7 +206,6 @@ object AdvancedPreferencesScreen : Screen {
                   icon = { PreferenceIcon(Icons.Rounded.FileUpload, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
                   onClick = { exportLauncher.launch(settingsManager.getDefaultExportFilename()) },
                 )
-                PreferenceDivider()
                 PreferenceItem(
                   title = stringResource(R.string.pref_import_settings_title),
                   summary = stringResource(R.string.pref_import_settings_summary),
@@ -235,7 +234,6 @@ object AdvancedPreferencesScreen : Screen {
                   iconButtonEnabled = mpvConfStorageLocation.isNotBlank(),
                 )
                 
-                PreferenceDivider()
                 
                 PreferenceItem(
                   title = stringResource(R.string.pref_advanced_mpv_conf),
@@ -243,7 +241,6 @@ object AdvancedPreferencesScreen : Screen {
                   onClick = { backStack.add(ConfigEditorScreen(ConfigEditorScreen.ConfigType.MPV_CONF)) },
                 )
                 
-                PreferenceDivider()
                 
                 PreferenceItem(
                   title = stringResource(R.string.pref_advanced_input_conf),
@@ -263,11 +260,10 @@ object AdvancedPreferencesScreen : Screen {
                 SwitchPreference(
                   value = enableRecentlyPlayed,
                   onValueChange = preferences.enableRecentlyPlayed::set,
-                  title = { Text(text = stringResource(R.string.pref_advanced_enable_recently_played_title), style = MaterialTheme.typography.titleMediumEmphasized) },
-                  summary = { Text(text = stringResource(R.string.pref_advanced_enable_recently_played_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                  title = { Text(text = stringResource(R.string.pref_advanced_enable_recently_played_title)) },
+                  summary = { Text(text = stringResource(R.string.pref_advanced_enable_recently_played_summary)) },
                 )
                 
-                PreferenceDivider()
                 
                 PreferenceItem(
                   title = stringResource(R.string.pref_advanced_clear_playback_history),
@@ -308,11 +304,10 @@ object AdvancedPreferencesScreen : Screen {
                 SwitchPreference(
                   value = verboseLogging,
                   onValueChange = preferences.verboseLogging::set,
-                  title = { Text(text = stringResource(R.string.pref_advanced_verbose_logging_title), style = MaterialTheme.typography.titleMediumEmphasized) },
-                  summary = { Text(text = stringResource(R.string.pref_advanced_verbose_logging_summary), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                  title = { Text(text = stringResource(R.string.pref_advanced_verbose_logging_title)) },
+                  summary = { Text(text = stringResource(R.string.pref_advanced_verbose_logging_summary)) },
                 )
                 
-                PreferenceDivider()
                 
                 PreferenceItem(
                   title = stringResource(R.string.pref_advanced_dump_logs_title),
