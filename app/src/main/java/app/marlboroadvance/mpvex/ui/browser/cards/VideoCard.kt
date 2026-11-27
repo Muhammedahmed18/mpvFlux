@@ -173,7 +173,7 @@ fun VideoCard(
   // Selection adds a soft accent highlight behind the row; nothing changes size.
   val colors = MaterialTheme.colorScheme
   val containerColor by animateColorAsState(
-    targetValue = if (isSelected) colors.primary.copy(alpha = 0.12f) else Color.Transparent,
+    targetValue = if (isSelected) colors.primary.copy(alpha = 0.18f) else Color.Transparent,
     animationSpec = tween(durationMillis = 150),
     label = "video_row_selection",
   )
@@ -185,7 +185,7 @@ fun VideoCard(
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
   val cardScale by animateFloatAsState(
-    targetValue = if (isPressed) 0.96f else 1f,
+    targetValue = if (isPressed) 0.98f else 1f,
     animationSpec = spring(
       dampingRatio = Spring.DampingRatioLowBouncy,
       stiffness = Spring.StiffnessMediumLow,
@@ -206,20 +206,20 @@ fun VideoCard(
     null
   }
   val is4K = video.width >= 3840 || video.height >= 2160
-  // Predicted decoder: "SW" when hardware decoding is off or the phone can't decode this codec,
-  // otherwise "HW+" (first in the player's mediacodec -> mediacodec-copy -> no fallback chain).
-  val decoderLabel by produceState<String?>(
+  // Predicted decoder: false (software) when hardware decoding is off or the phone can't decode
+  // this codec, otherwise true (first in the player's mediacodec -> mediacodec-copy -> no fallback chain).
+  val decoderIsHardware by produceState<Boolean?>(
     initialValue = null,
     settings.showDecoderChip, settings.tryHwDecoding, video.videoCodec, video.videoProfile, video.width, video.height,
   ) {
     value = if (settings.showDecoderChip && video.videoCodec.isNotEmpty()) {
       withContext(Dispatchers.Default) {
         if (!settings.tryHwDecoding) {
-          "SW"
+          false
         } else {
           when (HardwareDecoderSupport.check(video.videoCodec, video.videoProfile, video.width, video.height)) {
-            is HardwareDecoderSupport.Result.Available -> "HW+"
-            is HardwareDecoderSupport.Result.Unavailable -> "SW"
+            is HardwareDecoderSupport.Result.Available -> true
+            is HardwareDecoderSupport.Result.Unavailable -> false
             HardwareDecoderSupport.Result.Unknown -> null
           }
         }
@@ -294,10 +294,11 @@ fun VideoCard(
           verticalArrangement = Arrangement.spacedBy(dimens.chipSpacing),
         ) {
           // Decoder badge first: solid primary for HW+, muted error container for software decoding.
-          decoderLabel?.let {
-            val isHardware = it != "SW"
+          decoderIsHardware?.let { isHardware ->
             UnifiedChip(
-              text = it,
+              text = stringResource(
+                if (isHardware) R.string.decoder_chip_hardware else R.string.decoder_chip_software,
+              ),
               bold = true,
               containerOverride = if (isHardware) colors.primary else colors.errorContainer,
               contentOverride = if (isHardware) colors.onPrimary else colors.onErrorContainer,

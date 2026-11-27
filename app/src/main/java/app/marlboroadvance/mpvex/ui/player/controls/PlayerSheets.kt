@@ -5,11 +5,14 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -369,6 +372,7 @@ fun PlayerSheets(
   // the content swaps, so tracks -> delay/settings never shows two overlays,
   // duplicate scrims or a jump. Other sheets keep their own PlayerSheet layout.
   val hosted = panelShown != Panels.None || sheetShown.usesOverlayHost()
+  val panelReturnSheet by viewModel.panelReturnSheet.collectAsState()
   if (hosted) {
     val overlayKey: Any = if (panelShown != Panels.None) panelShown else sheetShown
     PlayerOverlayHost(onDismissRequest = onDismissRequest) { dismiss ->
@@ -376,12 +380,31 @@ fun PlayerSheets(
         targetState = overlayKey,
         label = "player_overlay_content",
         transitionSpec = {
-          // Fade-through: old content leaves first, then the new one arrives, while
-          // the size settles on a non-bouncy spring (no overshoot, no mid-transition
-          // clipping; the host surface already clips to its own shape).
+          // Sheet -> panel slides forward, panel -> sheet slides back (shared-axis).
+          // Any other swap keeps the fade-through: old content leaves first, then the
+          // new one arrives. Size settles on a non-bouncy spring (no overshoot, no
+          // mid-transition clipping; the host surface already clips to its own shape).
+          val direction =
+            when {
+              targetState is Panels && initialState !is Panels -> 1
+              targetState !is Panels && initialState is Panels -> -1
+              else -> 0
+            }
           (
-            fadeIn(tween(durationMillis = 210, delayMillis = 90)) togetherWith
-              fadeOut(tween(durationMillis = 90))
+            if (direction == 0) {
+              fadeIn(tween(durationMillis = 210, delayMillis = 90)) togetherWith
+                fadeOut(tween(durationMillis = 90))
+            } else {
+              (
+                slideInHorizontally(tween(durationMillis = 280, easing = FastOutSlowInEasing)) { width ->
+                  width * direction
+                } + fadeIn(tween(durationMillis = 200))
+              ) togetherWith (
+                slideOutHorizontally(tween(durationMillis = 280, easing = FastOutSlowInEasing)) { width ->
+                  (-width * PANEL_SLIDE_FRACTION * direction).toInt()
+                } + fadeOut(tween(durationMillis = 120))
+              )
+            }
           ).using(
             SizeTransform(clip = false) { _, _ ->
               spring(
@@ -394,7 +417,15 @@ fun PlayerSheets(
         },
       ) { key ->
         if (key is Panels) {
-          PlayerPanels(panelShown = key, onDismissRequest = dismiss, viewModel = viewModel)
+          // Captured once per panel so the header keeps its back arrow while this
+          // panel animates out after Back has already cleared the origin.
+          val hasOrigin = remember { panelReturnSheet != Sheets.None }
+          PlayerPanels(
+            panelShown = key,
+            onDismissRequest = dismiss,
+            viewModel = viewModel,
+            onBack = if (hasOrigin) viewModel::closePanelToSheet else null,
+          )
         } else {
           sheetBody(key as Sheets)
         }
@@ -404,6 +435,9 @@ fun PlayerSheets(
     sheetBody(sheetShown)
   }
 }
+
+/** Share of the content width the outgoing content travels during a sheet <-> panel slide. */
+private const val PANEL_SLIDE_FRACTION = 0.3f
 
 private fun Sheets.usesOverlayHost(): Boolean =
   when (this) {

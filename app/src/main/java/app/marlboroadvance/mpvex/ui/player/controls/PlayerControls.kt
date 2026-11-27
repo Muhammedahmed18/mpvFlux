@@ -622,7 +622,7 @@ fun PlayerControls(
                 Box(
                   modifier = Modifier
                     .graphicsLayer { scaleX = prevScale; scaleY = prevScale }
-                    .size(54.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .playerGlass(CircleShape, hideBackground, GlassWeight.Strong)
                     // Only a real disabled state fades (M3 0.38). Buffering is shown on the
@@ -653,19 +653,19 @@ fun PlayerControls(
                     imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_skip_previous_fill),
                     contentDescription = null,
                     tint               = transportContentColor,
-                    modifier           = Modifier.size(26.dp),
+                    modifier           = Modifier.size(24.dp),
                   )
                 }
               }
 
               // ── Play / Pause — M3 Expressive shape-morph hero ───────────
               // The container shape itself is the toggle animation: a full circle
-              // (corner = half the 88dp box) when paused relaxes into a squircle
+              // (corner = half the 64dp box) when paused relaxes into a squircle
               // (~30% corner) when playing, on the shared soft spring. A press
               // softens the corner further (expressive squeeze) and `heroScale`
               // shrinks the whole button. reduceMotion holds the press squeeze flat
               // but the shape still settles via the spring.
-              val baseCorner = if (isPlaying) 17.dp else 28.dp
+              val baseCorner = if (isPlaying) 19.dp else 32.dp
               val targetCorner = if (playPressed && !reduceMotion) baseCorner - 5.dp else baseCorner
               val heroCorner by animateDpAsState(
                 targetValue   = targetCorner,
@@ -675,19 +675,18 @@ fun PlayerControls(
               val heroShape = RoundedCornerShape(heroCorner)
 
               if (isBuffering) {
-                // Buffering reuses the hero's solid `primary` disc (same 88dp, same
+                // Buffering reuses the hero's solid `primary` disc (same 64dp, same
                 // fill) with an `onPrimary` LoadingIndicator at its center, so it reads
                 // as the same button thinking — not a different component swapping in.
                 Box(
                   modifier = Modifier
-                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-                    .size(56.dp)
+                    .size(64.dp)
                     .clip(CircleShape)
                     .then(if (!hideBackground) Modifier.background(primaryColor) else Modifier),
                   contentAlignment = Alignment.Center,
                 ) {
                   LoadingIndicator(
-                    modifier = Modifier.size(34.dp),
+                    modifier = Modifier.size(38.dp),
                     color    = if (hideBackground) primaryColor else onPrimaryColor,
                   )
                 }
@@ -705,8 +704,7 @@ fun PlayerControls(
                       scaleX = beatScale
                       scaleY = beatScale
                     }
-                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
-                    .size(56.dp)
+                    .size(64.dp)
                     .clip(heroShape)
                     .then(if (!hideBackground) Modifier.background(primaryColor) else Modifier)
                     .semantics { contentDescription = playPauseLabel }
@@ -741,7 +739,7 @@ fun PlayerControls(
                       imageVector        = if (playing) ImageVector.vectorResource(R.drawable.ic_sym_pause_fill) else ImageVector.vectorResource(R.drawable.ic_sym_play_arrow_fill),
                       contentDescription = null,
                       tint               = if (hideBackground) primaryColor else onPrimaryColor,
-                      modifier           = Modifier.size(28.dp),
+                      modifier           = Modifier.size(30.dp),
                     )
                   }
                 }
@@ -754,7 +752,7 @@ fun PlayerControls(
                 Box(
                   modifier = Modifier
                     .graphicsLayer { scaleX = nextScale; scaleY = nextScale }
-                    .size(54.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .playerGlass(CircleShape, hideBackground, GlassWeight.Strong)
                     // Only a real disabled state fades (M3 0.38). Buffering is shown on the
@@ -786,7 +784,7 @@ fun PlayerControls(
                     imageVector        = ImageVector.vectorResource(R.drawable.ic_sym_skip_next_fill),
                     contentDescription = null,
                     tint               = transportContentColor,
-                    modifier           = Modifier.size(26.dp),
+                    modifier           = Modifier.size(24.dp),
                   )
                 }
               }

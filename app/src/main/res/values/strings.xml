@@ -345,6 +345,7 @@
   <string name="player_sheets_sub_delay_subtitle_text_seen">Text seen</string>
   <string name="player_sheets_delay_set_as_default">Set as default</string>
   <string name="player_sheets_audio_delay_card_title">Audio delay</string>
+  <string name="player_sheets_delay_measure_title">Measure by timing</string>
   <string name="player_sheets_sub_delay_audio_sound_heard">Sound heard</string>
   <string name="player_sheets_sub_delay_sound_sound_spotted">Sound spotted</string>
   <string name="player_sheets_sub_select_font">Subtitle font</string>
@@ -643,6 +644,8 @@
   <string name="decoder_reason_profile">Your phone can\'t decode %1$s %2$s in hardware</string>
   <string name="decoder_reason_resolution">Your phone can\'t decode %1$s at %2$d×%3$d in hardware</string>
   <string name="decoder_sheet_sw_note">%1$s, so this video plays with software decoding (SW) and uses more battery.</string>
+  <string name="decoder_chip_hardware">HW+</string>
+  <string name="decoder_chip_software">SW</string>
   <string name="player_hold_to_unlock">Hold to unlock</string>
   <!-- Browser cards -->
   <plurals name="card_video_count">
@@ -653,6 +656,9 @@
   <string name="card_cd_selected">Selected</string>
   <string name="card_storage_internal">Internal</string>
   <string name="card_storage_sd_card">SD card</string>
+  <string name="card_duration_hours_minutes">%1$dh %2$dm</string>
+  <string name="card_duration_minutes">%1$dm</string>
+  <string name="card_duration_less_than_minute">&lt;1m</string>
   <!-- Preferred language picker (audio + subtitles) -->
   <string name="pref_preferred_language">Preferred language</string>
   <string name="lang_off">Off</string>
@@ -694,6 +700,10 @@
   <string name="media_info_share_report">Share full report</string>
   <string name="media_info_share_chooser">Share media info</string>
   <string name="media_info_share_failed">Couldn\'t share: %1$s</string>
+  <string name="media_info_share_failed_generic">Couldn\'t share. Please try again.</string>
+  <string name="media_info_share_no_app">No app available to share with</string>
+  <string name="media_info_more_options">More options</string>
+  <string name="media_info_title_fallback">Media info</string>
   <string name="media_info_copied">Copied %1$s</string>
   <string name="media_info_copied_summary">Summary copied</string>
   <string name="media_info_copied_report">Full report copied</string>

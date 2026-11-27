@@ -27,11 +27,9 @@ import androidx.compose.ui.res.stringResource
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.SubtitlesPreferences
 import app.marlboroadvance.mpvex.preferences.preference.deleteAndGet
-import app.marlboroadvance.mpvex.presentation.components.ExpandableCard
 import app.marlboroadvance.mpvex.presentation.components.SliderItem
-import app.marlboroadvance.mpvex.ui.player.controls.CARDS_MAX_WIDTH
 import app.marlboroadvance.mpvex.ui.player.controls.components.sheets.toFixed
-import app.marlboroadvance.mpvex.ui.player.controls.panelCardsColors
+import app.marlboroadvance.mpvex.ui.player.controls.components.panels.components.PanelSection
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import `is`.xyz.mpv.MPVLib
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
@@ -41,18 +39,10 @@ import org.koin.compose.koinInject
 @Composable
 fun SubtitlesMiscellaneousCard(modifier: Modifier = Modifier) {
   val preferences = koinInject<SubtitlesPreferences>()
-  var isExpanded by remember { mutableStateOf(true) }
-  ExpandableCard(
-    isExpanded,
-    title = {
-      Row(horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium)) {
-        Icon(Icons.Default.Tune, null)
-        Text(stringResource(R.string.player_sheets_sub_misc_card_title))
-      }
-    },
-    onExpand = { isExpanded = !isExpanded },
-    modifier.widthIn(max = CARDS_MAX_WIDTH),
-    colors = panelCardsColors(),
+  PanelSection(
+    modifier = modifier,
+    title = stringResource(R.string.player_sheets_sub_misc_card_title),
+    icon = Icons.Default.Tune,
   ) {
     ProvidePreferenceLocals {
       Column {

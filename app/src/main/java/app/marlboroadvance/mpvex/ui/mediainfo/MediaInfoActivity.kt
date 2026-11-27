@@ -2,6 +2,7 @@ package app.marlboroadvance.mpvex.ui.mediainfo
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -52,28 +53,20 @@ class MediaInfoActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
+    // Set the system bars before the first frame so they never flash the wrong style.
+    val systemDark =
+      (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    applyEdgeToEdge(isDark(appearancePreferences.darkMode.get(), systemDark))
+
     // Ignored after rotation: the ViewModel already has (or is loading) this file.
     viewModel.load(mediaUri(intent), intent?.getStringExtra(EXTRA_FILE_PATH))
 
     setContent {
       val dark by appearancePreferences.darkMode.collectAsState()
-      val isSystemInDarkTheme = isSystemInDarkTheme()
-      val isDarkMode = dark == DarkMode.Dark || (dark == DarkMode.System && isSystemInDarkTheme)
+      val isDarkMode = isDark(dark, isSystemInDarkTheme())
 
-      LaunchedEffect(isDarkMode) {
-        enableEdgeToEdge(
-          statusBarStyle =
-            SystemBarStyle.auto(
-              lightScrim = Color.White.toArgb(),
-              darkScrim = Color.Transparent.toArgb(),
-            ) { isDarkMode },
-          navigationBarStyle =
-            SystemBarStyle.auto(
-              lightScrim = Color.Transparent.toArgb(),
-              darkScrim = Color.Transparent.toArgb(),
-            ) { isDarkMode },
-        )
-      }
+      // Keeps the bars in step if the theme changes while the screen is open.
+      LaunchedEffect(isDarkMode) { applyEdgeToEdge(isDarkMode) }
 
       MpvexTheme {
         Surface(color = MaterialTheme.colorScheme.surface) {
@@ -87,6 +80,24 @@ class MediaInfoActivity : ComponentActivity() {
     super.onNewIntent(intent)
     setIntent(intent)
     viewModel.load(mediaUri(intent), intent.getStringExtra(EXTRA_FILE_PATH))
+  }
+
+  private fun isDark(mode: DarkMode, systemDark: Boolean): Boolean =
+    mode == DarkMode.Dark || (mode == DarkMode.System && systemDark)
+
+  private fun applyEdgeToEdge(isDarkMode: Boolean) {
+    enableEdgeToEdge(
+      statusBarStyle =
+        SystemBarStyle.auto(
+          lightScrim = Color.White.toArgb(),
+          darkScrim = Color.Transparent.toArgb(),
+        ) { isDarkMode },
+      navigationBarStyle =
+        SystemBarStyle.auto(
+          lightScrim = Color.Transparent.toArgb(),
+          darkScrim = Color.Transparent.toArgb(),
+        ) { isDarkMode },
+    )
   }
 
   private fun mediaUri(intent: Intent?): Uri? =

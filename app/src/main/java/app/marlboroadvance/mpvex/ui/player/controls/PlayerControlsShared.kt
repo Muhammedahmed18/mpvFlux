@@ -754,6 +754,10 @@ internal fun PlayerIconButton(
           haptic.performHapticFeedback(HapticFeedbackType.LongPress)
           clickEvent()
           currentOnLongClick()
+        } else if (interaction is PressInteraction.Cancel) {
+          // Finger dragged off after the long-press fired: no click will follow to
+          // consume the flag, so clear it or the next normal tap would be swallowed.
+          longPressHandled = false
         }
       }
     }

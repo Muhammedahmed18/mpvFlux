@@ -1,5 +1,6 @@
 package app.marlboroadvance.mpvex.ui.player.controls
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -21,15 +22,21 @@ fun PlayerPanels(
   panelShown: Panels,
   onDismissRequest: () -> Unit,
   viewModel: PlayerViewModel,
+  onBack: (() -> Unit)? = null,
 ) {
+  // Registered inside the overlay's own composition so it outranks the sheet's
+  // default back handling (which would dismiss everything).
+  if (onBack != null) BackHandler(onBack = onBack)
+
   when (panelShown) {
     Panels.None -> {}
     Panels.SubtitleSettings -> {
-      SubtitleSettingsPanel(onDismissRequest)
+      SubtitleSettingsPanel(onDismissRequest = onDismissRequest, onBack = onBack)
     }
     Panels.SubtitleDelay -> {
       SubtitleDelayPanel(
         onDismissRequest = onDismissRequest,
+        onBack = onBack,
         subDelay = viewModel.subDelay,
         subSpeed = viewModel.subSpeed,
       )
@@ -37,11 +44,12 @@ fun PlayerPanels(
     Panels.AudioDelay -> {
       AudioDelayPanel(
         onDismissRequest = onDismissRequest,
+        onBack = onBack,
         audioDelay = viewModel.audioDelay,
       )
     }
     Panels.VideoFilters -> {
-      VideoSettingsPanel(onDismissRequest)
+      VideoSettingsPanel(onDismissRequest = onDismissRequest, onBack = onBack)
     }
   }
 }

@@ -302,21 +302,35 @@ class PlayerViewModel(
 
   val panelShown = MutableStateFlow(Panels.None)
 
+  /** Sheet the currently shown panel was opened from, or [Sheets.None] when it has no origin. */
+  val panelReturnSheet = MutableStateFlow(Sheets.None)
+
   // Single transition path for sheets and panels: opening one always clears the
   // other, so the two flows are never both non-None.
   fun openSheet(sheet: Sheets) {
+    panelReturnSheet.value = Sheets.None
     panelShown.value = Panels.None
     setSheetShown(sheet)
   }
 
   fun openPanel(panel: Panels) {
+    // Remember the originating sheet so Back can return to it. A panel opened while
+    // another panel is showing (no sheet) keeps the existing origin.
+    if (sheetShown.value != Sheets.None) panelReturnSheet.value = sheetShown.value
     sheetShown.value = Sheets.None
     panelShown.value = panel
   }
 
   fun dismissOverlay() {
+    panelReturnSheet.value = Sheets.None
     sheetShown.value = Sheets.None
     panelShown.value = Panels.None
+  }
+
+  /** Back from a panel: return to its originating sheet, or dismiss when there is none. */
+  fun closePanelToSheet() {
+    val origin = panelReturnSheet.value
+    if (origin == Sheets.None) dismissOverlay() else openSheet(origin)
   }
 
   // Seek state

@@ -41,31 +41,26 @@ import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.SubtitlesPreferences
 import app.marlboroadvance.mpvex.preferences.preference.Preference
 import app.marlboroadvance.mpvex.preferences.preference.deleteAndGet
-import app.marlboroadvance.mpvex.presentation.components.ExpandableCard
 import app.marlboroadvance.mpvex.presentation.components.TintedSliderItem
-import app.marlboroadvance.mpvex.ui.player.controls.CARDS_MAX_WIDTH
-import app.marlboroadvance.mpvex.ui.player.controls.panelCardsColors
+import app.marlboroadvance.mpvex.ui.player.controls.components.panels.components.PanelSection
 import app.marlboroadvance.mpvex.ui.theme.spacing
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.ui.text.style.TextOverflow
 import `is`.xyz.mpv.MPVLib
 import org.koin.compose.koinInject
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubtitleSettingsColorsCard(modifier: Modifier = Modifier) {
   val preferences = koinInject<SubtitlesPreferences>()
-  var isExpanded by remember { mutableStateOf(true) }
-  ExpandableCard(
-    isExpanded = isExpanded,
-    onExpand = { isExpanded = !isExpanded },
-    title = {
-      Row(
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
-      ) {
-        Icon(Icons.Default.Palette, null)
-        Text(stringResource(R.string.player_sheets_sub_colors_card_title))
-      }
-    },
-    modifier = modifier.widthIn(max = CARDS_MAX_WIDTH),
-    colors = panelCardsColors(),
+  PanelSection(
+    modifier = modifier,
+    title = stringResource(R.string.player_sheets_sub_colors_card_title),
+    icon = Icons.Default.Palette,
   ) {
     Column {
       var currentColorType by remember { mutableStateOf(SubColorType.Text) }
@@ -74,44 +69,37 @@ fun SubtitleSettingsColorsCard(modifier: Modifier = Modifier) {
         currentColor = getCurrentMPVColor(currentColorType)
       }
       Row(
-        horizontalArrangement = Arrangement.Center,
+        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.smaller),
         verticalAlignment = Alignment.CenterVertically,
         modifier =
           Modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(start = MaterialTheme.spacing.extraSmall, end = MaterialTheme.spacing.medium),
+            .padding(horizontal = MaterialTheme.spacing.small),
       ) {
-        SubColorType.entries.forEach { type ->
-          IconToggleButton(
-            checked = currentColorType == type,
-            onCheckedChange = { currentColorType = type },
-          ) {
-            Icon(
-              when (type) {
-                SubColorType.Text -> Icons.Default.FormatColorText
-                SubColorType.Border -> Icons.Default.BorderColor
-                SubColorType.Background -> Icons.Default.FormatColorFill
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.weight(1f)) {
+          SubColorType.entries.forEachIndexed { index, type ->
+            SegmentedButton(
+              selected = currentColorType == type,
+              onClick = { currentColorType = type },
+              shape = SegmentedButtonDefaults.itemShape(index = index, count = SubColorType.entries.size),
+              icon = {},
+              label = {
+                Text(
+                  stringResource(type.titleRes),
+                  maxLines = 1,
+                  overflow = TextOverflow.Ellipsis,
+                )
               },
-              null,
             )
           }
         }
-        Text(stringResource(currentColorType.titleRes))
-        Spacer(Modifier.weight(1f))
-        TextButton(
+        IconButton(
           onClick = {
             resetColors(preferences, currentColorType)
             currentColor = getCurrentMPVColor(currentColorType)
           },
         ) {
-          Row(
-            horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.extraSmall),
-            verticalAlignment = Alignment.CenterVertically,
-          ) {
-            Icon(Icons.Default.FormatColorReset, null)
-            Text(stringResource(R.string.generic_reset))
-          }
+          Icon(Icons.Default.FormatColorReset, stringResource(R.string.generic_reset))
         }
       }
       SubtitlesColorPicker(

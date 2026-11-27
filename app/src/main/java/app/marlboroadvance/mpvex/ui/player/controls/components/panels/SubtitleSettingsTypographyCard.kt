@@ -55,10 +55,8 @@ import app.marlboroadvance.mpvex.preferences.SubtitleJustification
 import app.marlboroadvance.mpvex.preferences.SubtitlesPreferences
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.preferences.preference.deleteAndGet
-import app.marlboroadvance.mpvex.presentation.components.ExpandableCard
 import app.marlboroadvance.mpvex.presentation.components.SliderItem
-import app.marlboroadvance.mpvex.ui.player.controls.CARDS_MAX_WIDTH
-import app.marlboroadvance.mpvex.ui.player.controls.panelCardsColors
+import app.marlboroadvance.mpvex.ui.player.controls.components.panels.components.PanelSection
 import app.marlboroadvance.mpvex.ui.theme.spacing
 import `is`.xyz.mpv.MPVLib
 import me.zhanghai.compose.preference.ListPreference
@@ -71,21 +69,10 @@ import org.koin.compose.koinInject
 fun SubtitleSettingsTypographyCard(modifier: Modifier = Modifier) {
   val context = LocalContext.current
   val preferences = koinInject<SubtitlesPreferences>()
-  var isExpanded by remember { mutableStateOf(true) }
-
-  ExpandableCard(
-    isExpanded = isExpanded,
-    onExpand = { isExpanded = !isExpanded },
-    title = {
-      Row(
-        horizontalArrangement = Arrangement.spacedBy(MaterialTheme.spacing.medium),
-      ) {
-        Icon(Icons.Default.FormatColorText, null)
-        Text(stringResource(R.string.player_sheets_sub_typography_card_title))
-      }
-    },
-    modifier = modifier.widthIn(max = CARDS_MAX_WIDTH),
-    colors = panelCardsColors(),
+  PanelSection(
+    modifier = modifier,
+    title = stringResource(R.string.player_sheets_sub_typography_card_title),
+    icon = Icons.Default.FormatColorText,
   ) {
     Column {
       val isBold by MPVLib.propBoolean["sub-bold"].collectAsState()

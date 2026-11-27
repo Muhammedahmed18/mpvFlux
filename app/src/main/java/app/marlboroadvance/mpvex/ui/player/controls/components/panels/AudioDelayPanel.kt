@@ -38,14 +38,15 @@ fun AudioDelayPanel(
   onDismissRequest: () -> Unit,
   audioDelay: StateFlow<Float>,
   modifier: Modifier = Modifier,
+  onBack: (() -> Unit)? = null,
 ) {
   val preferences = koinInject<AudioPreferences>()
 
   OverlayPanelContent(
     modifier = modifier,
-    header = {
-      AudioDelayCardTitle(onClose = onDismissRequest)
-    }
+    title = stringResource(R.string.player_sheets_audio_delay_card_title),
+    onClose = onDismissRequest,
+    onBack = onBack,
   ) {
     val delayFloat by audioDelay.collectAsState()
 
@@ -75,28 +76,4 @@ fun DelayCard(
         onReset = onReset,
         delayType = delayType
     )
-}
-
-@Composable
-fun AudioDelayCardTitle(
-  onClose: () -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.SpaceBetween,
-    modifier = modifier
-      .fillMaxWidth()
-      .padding(horizontal = MaterialTheme.spacing.medium)
-      .padding(top = MaterialTheme.spacing.small),
-  ) {
-    Text(
-      stringResource(R.string.player_sheets_audio_delay_card_title),
-      style = MaterialTheme.typography.titleLarge,
-    )
-    Spacer(Modifier.weight(1f))
-    IconButton(onClick = onClose) {
-      Icon(Icons.Default.Close, stringResource(R.string.close), modifier = Modifier.size(32.dp))
-    }
-  }
 }

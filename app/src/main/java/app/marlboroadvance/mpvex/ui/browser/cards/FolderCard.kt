@@ -1,20 +1,22 @@
 package app.marlboroadvance.mpvex.ui.browser.cards
 
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.semantics
-import app.marlboroadvance.mpvex.R
-import androidx.compose.ui.res.stringResource
+import android.content.Context
+import android.text.format.DateUtils
+import android.text.format.Formatter
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColor
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.Transition
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -38,25 +40,25 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import kotlin.math.log10
-import kotlin.math.pow
 
 @Immutable
 data class FolderCardSettings(
@@ -83,41 +85,46 @@ fun FolderCard(
   dimens: BrowserCardDimens = rememberBrowserCardDimens(),
 ) {
   val internalLabel = stringResource(R.string.card_storage_internal)
-  val sdCardLabel = stringResource(R.string.card_storage_sd_card)
-  val displayPath = remember(folder.path, folder.name, internalLabel, sdCardLabel) {
-    shortenPath(folder.path, folder.name, internalLabel, sdCardLabel)
+  val externalLabel = stringResource(R.string.generic_external)
+  val displayPath = remember(folder.path, folder.name, internalLabel, externalLabel) {
+    shortenPath(folder.path, folder.name, internalLabel, externalLabel)
   }
 
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
-
   val cardScale by animateFloatAsState(
-    targetValue = when {
-      isPressed -> 0.96f
-      else -> 1f
-    },
+    targetValue = if (isPressed) 0.98f else 1f,
     animationSpec = spring(
       dampingRatio = Spring.DampingRatioLowBouncy,
-      stiffness = Spring.StiffnessMediumLow
+      stiffness = Spring.StiffnessMediumLow,
     ),
-    label = "folder_card_scale"
+    label = "folder_card_scale",
   )
 
+  // One transition drives every selection colour (row tint, tile, icon tint).
+  val selectionTransition = updateTransition(targetState = isSelected, label = "folder_selection")
 
   // No container, same as the video rows: folders sit directly on the screen.
-  // Selection adds a soft accent highlight behind the row (plus the check badge).
-  val containerColor by animateColorAsState(
-    targetValue = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f) else Color.Transparent,
-    animationSpec = tween(durationMillis = 150),
-    label = "folder_row_selection",
-  )
+  // Selection adds a soft tonal highlight behind the row (plus the tile turning into a check).
+  // Only the alpha is animated (never colour from Transparent, which blends through black and
+  // flickers on light themes). It is read while drawing, so the row doesn't recompose.
+  val rowTintAlpha by selectionTransition.animateFloat(
+    transitionSpec = { tween(durationMillis = 150) },
+    label = "folder_row_tint",
+  ) { selected -> if (selected) 0.5f else 0f }
+  val rowTintColor = MaterialTheme.colorScheme.primaryContainer
   val shape = MaterialTheme.shapes.large
 
   Surface(
     modifier = modifier
       .fillMaxWidth()
-      .scale(cardScale)
+      // Read in the graphics layer, so the press animation doesn't recompose the row.
+      .graphicsLayer {
+        scaleX = cardScale
+        scaleY = cardScale
+      }
       .clip(shape)
+      .drawBehind { drawRect(rowTintColor, alpha = rowTintAlpha) }
       .semantics { selected = isSelected }
       .combinedClickable(
         interactionSource = interactionSource,
@@ -126,7 +133,7 @@ fun FolderCard(
         onLongClick = onLongClick,
       ),
     shape = shape,
-    color = containerColor,
+    color = Color.Transparent,
   ) {
     Row(
       modifier = Modifier
@@ -136,8 +143,10 @@ fun FolderCard(
     ) {
       FolderIconContainer(
         isSelected = isSelected,
+        selectionTransition = selectionTransition,
         customIcon = customIcon,
         onThumbClick = onThumbClick,
+        onLongClick = onLongClick,
         dimens = dimens,
       )
 
@@ -150,7 +159,7 @@ fun FolderCard(
         Text(
           text = folder.name,
           style = MaterialTheme.typography.titleMediumEmphasized,
-          color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+          color = MaterialTheme.colorScheme.onSurface,
           maxLines = if (settings.unlimitedNameLines) Int.MAX_VALUE else 2,
           overflow = TextOverflow.Ellipsis,
         )
@@ -174,32 +183,41 @@ fun FolderCard(
 @Composable
 private fun FolderIconContainer(
   isSelected: Boolean,
+  selectionTransition: Transition<Boolean>,
   customIcon: ImageVector?,
   onThumbClick: () -> Unit,
+  onLongClick: (() -> Unit)?,
   dimens: BrowserCardDimens,
 ) {
   // When selected, the whole tile becomes the tick: it fills with the accent
   // colour and the folder icon swaps to a check, instead of a badge on top.
-  val tileColor by animateColorAsState(
-    targetValue = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
-    animationSpec = tween(durationMillis = 150),
+  val tileColor by selectionTransition.animateColor(
+    transitionSpec = { tween(durationMillis = 150) },
     label = "folder_tile_color",
-  )
-  val iconTint by animateColorAsState(
-    targetValue = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer,
-    animationSpec = tween(durationMillis = 150),
+  ) { selected ->
+    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
+  }
+  val iconTint by selectionTransition.animateColor(
+    transitionSpec = { tween(durationMillis = 150) },
     label = "folder_tile_icon_tint",
-  )
+  ) { selected ->
+    if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+  }
+  val selectLabel = stringResource(R.string.select)
 
   Box(
     modifier = Modifier
       .size(dimens.folderTileSize)
       .clip(MaterialTheme.shapes.large)
-      .background(tileColor)
+      .drawBehind { drawRect(tileColor) }
       .combinedClickable(
         onClick = onThumbClick,
+        onClickLabel = selectLabel,
+        role = Role.Button,
+        // Long press on the tile behaves like long press on the row.
+        onLongClick = onLongClick,
         indication = ripple(bounded = true),
-        interactionSource = remember { MutableInteractionSource() }
+        interactionSource = remember { MutableInteractionSource() },
       ),
     contentAlignment = Alignment.Center,
   ) {
@@ -241,6 +259,31 @@ private fun FolderMetadataChips(
   customChipContent: (@Composable () -> Unit)?,
   dimens: BrowserCardDimens,
 ) {
+  val context = LocalContext.current
+
+  // Formatted once per value instead of on every recomposition.
+  val sizeText = remember(folder.totalSize, settings.showTotalSizeChip) {
+    if (settings.showTotalSizeChip && folder.totalSize > 0) {
+      Formatter.formatShortFileSize(context, folder.totalSize)
+    } else {
+      null
+    }
+  }
+  val durationText = remember(folder.totalDuration, settings.showTotalDurationChip) {
+    if (settings.showTotalDurationChip && folder.totalDuration > 0) {
+      formatDuration(context, folder.totalDuration)
+    } else {
+      null
+    }
+  }
+  val dateText = remember(folder.lastModified, settings.showDateChip) {
+    if (settings.showDateChip && folder.lastModified > 0) {
+      formatDate(context, folder.lastModified)
+    } else {
+      null
+    }
+  }
+
   FlowRow(
     horizontalArrangement = Arrangement.spacedBy(dimens.chipSpacing),
     verticalArrangement = Arrangement.spacedBy(dimens.chipSpacing),
@@ -255,65 +298,67 @@ private fun FolderMetadataChips(
 
     customChipContent?.invoke()
 
-    if (settings.showTotalSizeChip && folder.totalSize > 0) {
-      UnifiedChip(text = formatFileSize(folder.totalSize), size = dimens.chipSize)
+    if (sizeText != null) {
+      UnifiedChip(text = sizeText, size = dimens.chipSize)
     }
 
-    if (settings.showTotalDurationChip && folder.totalDuration > 0) {
-      UnifiedChip(text = formatDuration(folder.totalDuration), size = dimens.chipSize)
+    if (durationText != null) {
+      UnifiedChip(text = durationText, size = dimens.chipSize)
     }
 
-    if (settings.showDateChip && folder.lastModified > 0) {
-      UnifiedChip(text = formatDate(folder.lastModified), size = dimens.chipSize)
+    if (dateText != null) {
+      UnifiedChip(text = dateText, size = dimens.chipSize)
     }
   }
 }
 
 /**
  * Turns "/storage/emulated/0/Anime/Frieren" (folder "Frieren") into "Internal › Anime".
+ * Any other volume under /storage (SD card, USB drive) is shown as [externalLabel].
  * Paths that aren't under /storage are shown as-is, minus the folder name.
  */
 private fun shortenPath(
   path: String,
   name: String,
   internalLabel: String,
-  sdCardLabel: String,
+  externalLabel: String,
 ): String {
   val parent = path.removeSuffix("/").removeSuffix(name).removeSuffix("/")
   if (parent.isEmpty()) return ""
+  if (!parent.startsWith("/storage/")) return parent
 
-  val internalRoot = "/storage/emulated/0"
-  val (rootLabel, rest) = when {
-    parent == internalRoot || parent.startsWith("$internalRoot/") ->
-      internalLabel to parent.removePrefix(internalRoot)
-    parent.startsWith("/storage/") -> {
-      val afterStorage = parent.removePrefix("/storage/")
-      sdCardLabel to afterStorage.substringAfter('/', "")
-    }
-    else -> return parent
+  // "emulated/0/Anime" -> volume "emulated", rest "0/Anime".
+  val afterStorage = parent.removePrefix("/storage/")
+  val volume = afterStorage.substringBefore('/')
+  val rest = afterStorage.substringAfter('/', "")
+
+  val (rootLabel, folders) = if (volume == "emulated") {
+    // Internal storage of any user (/storage/emulated/0, /storage/emulated/10, ...):
+    // the first segment is the user id, not a folder.
+    internalLabel to rest.substringAfter('/', "")
+  } else {
+    externalLabel to rest
   }
 
-  return (listOf(rootLabel) + rest.split('/'))
+  return (listOf(rootLabel) + folders.split('/'))
     .filter { it.isNotBlank() }
     .joinToString(" › ")
 }
 
-
-private fun formatFileSize(size: Long): String {
-  if (size <= 0) return "0 B"
-  val units = arrayOf("B", "KB", "MB", "GB", "TB")
-  val digitGroups = (log10(size.toDouble()) / log10(1024.0)).toInt()
-  return String.format(Locale.US, "%.1f %s", size / 1024.0.pow(digitGroups.toDouble()), units[digitGroups])
+private fun formatDuration(context: Context, duration: Long): String {
+  val hours = duration / 3_600_000
+  val minutes = (duration % 3_600_000) / 60_000
+  return when {
+    hours > 0 -> context.getString(R.string.card_duration_hours_minutes, hours, minutes)
+    minutes > 0 -> context.getString(R.string.card_duration_minutes, minutes)
+    else -> context.getString(R.string.card_duration_less_than_minute)
+  }
 }
 
-private fun formatDuration(duration: Long): String {
-  val hours = duration / 3600000
-  val minutes = (duration % 3600000) / 60000
-  return if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
-}
-
-private val FOLDER_DATE_FORMATTER by lazy { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
-
-private fun formatDate(timestampSeconds: Long): String {
-  return FOLDER_DATE_FORMATTER.format(Date(timestampSeconds * 1000))
+private fun formatDate(context: Context, timestampSeconds: Long): String {
+  return DateUtils.formatDateTime(
+    context,
+    timestampSeconds * 1000,
+    DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_YEAR or DateUtils.FORMAT_ABBREV_MONTH,
+  )
 }

@@ -1,5 +1,12 @@
+@file:OptIn(
+  ExperimentalMaterial3Api::class,
+  ExperimentalMaterial3ExpressiveApi::class,
+  ExperimentalFoundationApi::class,
+)
+
 package app.marlboroadvance.mpvex.ui.browser.sheets
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,24 +19,28 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,14 +53,37 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.unit.sp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.ui.browser.dialogs.VisibilityToggle
+
+// ── Layout constants ──
+private val SheetHorizontalPadding = 24.dp
+private val CardShape = RoundedCornerShape(24.dp)
+private val CardPadding = 16.dp
+private val SectionSpacing = 16.dp
+private val ItemSpacing = 8.dp
+private val CardContentSpacing = 12.dp
+private const val SortTypeColumns = 2
+private const val ViewOptionColumns = 3
+
+/**
+ * A single sort choice. [key] is the stable identifier passed back through
+ * [SortBottomSheet]'s callbacks; [label] is the localized text shown to the user.
+ */
+@Immutable
+data class SortOption(
+  val key: String,
+  val label: String,
+  val icon: ImageVector? = null,
+)
 
 /**
  * Localized names for each sort direction. Resolved during composition so the
  * non-composable [SortBottomSheet] getLabelForType lambdas can use them.
  */
-@androidx.compose.runtime.Immutable
+@Immutable
 class SortOrderLabels(
   val oldest: String,
   val newest: String,
@@ -82,9 +116,14 @@ fun rememberSortOrderLabels(): SortOrderLabels {
 
 /**
  * SortBottomSheet — M3 Expressive
- * Pinned header, tonal section containers, wrapping ToggleButtons and switch rows.
+ *
+ * Pinned header with a quiet Reset action, one "Sort" card (type grid + connected
+ * order group) and an optional "View options" card. Labels stay on one line and
+ * shrink to fit instead of truncating or wrapping, so the sheet height is stable.
+ *
+ * [sortType] is the [SortOption.key] of the selected option. [getLabelForType]
+ * receives that key and the current direction.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SortBottomSheet(
   isOpen: Boolean,
@@ -94,8 +133,7 @@ fun SortBottomSheet(
   onSortTypeChange: (String) -> Unit,
   sortOrderAsc: Boolean,
   onSortOrderChange: (Boolean) -> Unit,
-  types: List<String>,
-  icons: List<ImageVector>,
+  options: List<SortOption>,
   getLabelForType: (String, Boolean) -> Pair<String, String>,
   modifier: Modifier = Modifier,
   visibilityToggles: List<VisibilityToggle> = emptyList(),
@@ -108,7 +146,8 @@ fun SortBottomSheet(
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
   val subtitle = if (showSortOptions) {
-    "$sortType · ${if (sortOrderAsc) ascLabel else descLabel}"
+    val selectedLabel = options.firstOrNull { it.key == sortType }?.label ?: sortType
+    "$selectedLabel · ${if (sortOrderAsc) ascLabel else descLabel}"
   } else {
     stringResource(R.string.sort_sheet_subtitle)
   }
@@ -123,7 +162,7 @@ fun SortBottomSheet(
       Row(
         modifier = Modifier
           .fillMaxWidth()
-          .padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 16.dp),
+          .padding(start = SheetHorizontalPadding, end = 16.dp, top = 8.dp, bottom = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
       ) {
@@ -143,18 +182,14 @@ fun SortBottomSheet(
         }
 
         if (onReset != null) {
-          IconButton(
-            onClick = onReset,
-            colors = IconButtonDefaults.filledIconButtonColors(
-              containerColor = MaterialTheme.colorScheme.primaryContainer,
-              contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            ),
-            modifier = Modifier.size(48.dp),
-          ) {
+          TextButton(onClick = onReset) {
             Icon(
               imageVector = Icons.Filled.RestartAlt,
-              contentDescription = stringResource(R.string.generic_reset),
+              contentDescription = null,
+              modifier = Modifier.size(ToggleButtonDefaults.IconSize),
             )
+            Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
+            Text(text = stringResource(R.string.generic_reset))
           }
         }
       }
@@ -164,18 +199,15 @@ fun SortBottomSheet(
         modifier = Modifier
           .weight(1f, fill = false)
           .verticalScroll(rememberScrollState())
-          .padding(horizontal = 24.dp)
-          .padding(bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+          .padding(horizontal = SheetHorizontalPadding)
+          .padding(bottom = SheetHorizontalPadding),
+        verticalArrangement = Arrangement.spacedBy(SectionSpacing),
       ) {
         if (showSortOptions) {
-          SortByCard(
+          SortCard(
             sortType = sortType,
             onSortTypeChange = onSortTypeChange,
-            types = types,
-            icons = icons,
-          )
-          OrderCard(
+            options = options,
             sortOrderAsc = sortOrderAsc,
             onSortOrderChange = onSortOrderChange,
             ascLabel = ascLabel,
@@ -191,6 +223,49 @@ fun SortBottomSheet(
   }
 }
 
+/**
+ * Backwards-compatible overload for call sites that still pass display strings and a
+ * parallel icon list. The string doubles as the key. Migrate callers to the
+ * [SortOption] overload.
+ */
+@Deprecated("Pass a List<SortOption> instead of parallel types/icons lists.")
+@Composable
+fun SortBottomSheet(
+  isOpen: Boolean,
+  onDismiss: () -> Unit,
+  title: String,
+  sortType: String,
+  onSortTypeChange: (String) -> Unit,
+  sortOrderAsc: Boolean,
+  onSortOrderChange: (Boolean) -> Unit,
+  types: List<String>,
+  icons: List<ImageVector>,
+  getLabelForType: (String, Boolean) -> Pair<String, String>,
+  modifier: Modifier = Modifier,
+  visibilityToggles: List<VisibilityToggle> = emptyList(),
+  showSortOptions: Boolean = true,
+  onReset: (() -> Unit)? = null,
+) {
+  val options = remember(types, icons) {
+    types.mapIndexed { index, type -> SortOption(key = type, label = type, icon = icons.getOrNull(index)) }
+  }
+  SortBottomSheet(
+    isOpen = isOpen,
+    onDismiss = onDismiss,
+    title = title,
+    sortType = sortType,
+    onSortTypeChange = onSortTypeChange,
+    sortOrderAsc = sortOrderAsc,
+    onSortOrderChange = onSortOrderChange,
+    options = options,
+    getLabelForType = getLabelForType,
+    modifier = modifier,
+    visibilityToggles = visibilityToggles,
+    showSortOptions = showSortOptions,
+    onReset = onReset,
+  )
+}
+
 @Composable
 private fun SectionContainer(
   title: String,
@@ -198,12 +273,12 @@ private fun SectionContainer(
 ) {
   Surface(
     modifier = Modifier.fillMaxWidth(),
-    shape = RoundedCornerShape(24.dp),
+    shape = CardShape,
     color = MaterialTheme.colorScheme.surfaceContainerLow,
   ) {
     Column(
-      modifier = Modifier.padding(16.dp),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
+      modifier = Modifier.padding(CardPadding),
+      verticalArrangement = Arrangement.spacedBy(CardContentSpacing),
     ) {
       Text(
         text = title,
@@ -216,80 +291,75 @@ private fun SectionContainer(
   }
 }
 
+/** Sort type grid and order group merged into one card to keep the sheet short. */
 @Composable
-private fun SortByCard(
+private fun SortCard(
   sortType: String,
   onSortTypeChange: (String) -> Unit,
-  types: List<String>,
-  icons: List<ImageVector>,
-) {
-  SectionContainer(title = stringResource(R.string.sort_by)) {
-    Column(
-      modifier = Modifier.fillMaxWidth(),
-      verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-      types.chunked(2).forEachIndexed { rowIndex, rowTypes ->
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          rowTypes.forEachIndexed { colIndex, type ->
-            val index = rowIndex * 2 + colIndex
-            ToggleButton(
-              checked = type == sortType,
-              onCheckedChange = { if (it) onSortTypeChange(type) },
-              modifier = Modifier
-                .weight(1f)
-                .minimumInteractiveComponentSize()
-                .semantics { role = Role.RadioButton },
-            ) {
-              if (index < icons.size) {
-                Icon(
-                  imageVector = icons[index],
-                  contentDescription = null,
-                  modifier = Modifier.size(ToggleButtonDefaults.IconSize),
-                )
-                Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
-              }
-              Text(
-                text = type,
-                style = MaterialTheme.typography.labelLargeEmphasized,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-              )
-            }
-          }
-          if (rowTypes.size < 2) Spacer(Modifier.weight(1f))
-        }
-      }
-    }
-  }
-}
-
-@Composable
-private fun OrderCard(
+  options: List<SortOption>,
   sortOrderAsc: Boolean,
   onSortOrderChange: (Boolean) -> Unit,
   ascLabel: String,
   descLabel: String,
 ) {
-  SectionContainer(title = stringResource(R.string.sort_order)) {
-    Row(
+  SectionContainer(title = stringResource(R.string.sort_by)) {
+    Column(
       modifier = Modifier.fillMaxWidth(),
-      horizontalArrangement = Arrangement.spacedBy(8.dp),
+      verticalArrangement = Arrangement.spacedBy(ItemSpacing),
     ) {
+      options.chunked(SortTypeColumns).forEach { rowOptions ->
+        ConnectedRow {
+          rowOptions.forEachIndexed { index, option ->
+            val checked = option.key == sortType
+            ToggleButton(
+              checked = checked,
+              onCheckedChange = { if (it) onSortTypeChange(option.key) },
+              shapes = connectedShapes(index, rowOptions.size),
+              modifier = Modifier
+                .weight(1f)
+                .minimumInteractiveComponentSize()
+                .semantics {
+                  role = Role.RadioButton
+                  selected = checked
+                },
+            ) {
+              // The selected type shows the current direction in place of its own icon.
+              val icon = when {
+                checked && sortOrderAsc -> Icons.Filled.ArrowUpward
+                checked -> Icons.Filled.ArrowDownward
+                else -> option.icon
+              }
+              ToggleContent(icon = icon, label = option.label)
+            }
+          }
+          if (rowOptions.size < SortTypeColumns) {
+            Spacer(Modifier.weight((SortTypeColumns - rowOptions.size).toFloat()))
+          }
+        }
+      }
+    }
+
+    Text(
+      text = stringResource(R.string.sort_order),
+      style = MaterialTheme.typography.labelLarge,
+      color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+
+    ConnectedRow {
       OrderToggle(
-        selected = sortOrderAsc,
+        checked = sortOrderAsc,
         onClick = { onSortOrderChange(true) },
         icon = Icons.Filled.ArrowUpward,
         label = ascLabel,
+        shapes = connectedShapes(0, 2),
         modifier = Modifier.weight(1f),
       )
       OrderToggle(
-        selected = !sortOrderAsc,
+        checked = !sortOrderAsc,
         onClick = { onSortOrderChange(false) },
         icon = Icons.Filled.ArrowDownward,
         label = descLabel,
+        shapes = connectedShapes(1, 2),
         modifier = Modifier.weight(1f),
       )
     }
@@ -298,31 +368,25 @@ private fun OrderCard(
 
 @Composable
 private fun OrderToggle(
-  selected: Boolean,
+  checked: Boolean,
   onClick: () -> Unit,
   icon: ImageVector,
   label: String,
+  shapes: ToggleButtonShapes,
   modifier: Modifier = Modifier,
 ) {
   ToggleButton(
-    checked = selected,
+    checked = checked,
     onCheckedChange = { if (it) onClick() },
+    shapes = shapes,
     modifier = modifier
       .minimumInteractiveComponentSize()
-      .semantics { role = Role.RadioButton },
+      .semantics {
+        role = Role.RadioButton
+        selected = checked
+      },
   ) {
-    Icon(
-      imageVector = icon,
-      contentDescription = null,
-      modifier = Modifier.size(ToggleButtonDefaults.IconSize),
-    )
-    Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
-    Text(
-      text = label,
-      style = MaterialTheme.typography.labelLargeEmphasized,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-    )
+    ToggleContent(icon = icon, label = label)
   }
 }
 
@@ -333,33 +397,81 @@ private fun ViewOptionsCard(
   SectionContainer(title = stringResource(R.string.view_options)) {
     Column(
       modifier = Modifier.fillMaxWidth(),
-      verticalArrangement = Arrangement.spacedBy(8.dp),
+      verticalArrangement = Arrangement.spacedBy(ItemSpacing),
     ) {
-      toggles.chunked(3).forEach { rowToggles ->
-        Row(
-          modifier = Modifier.fillMaxWidth(),
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-          rowToggles.forEach { toggle ->
+      toggles.chunked(ViewOptionColumns).forEach { rowToggles ->
+        ConnectedRow {
+          rowToggles.forEachIndexed { index, toggle ->
             ToggleButton(
               checked = toggle.checked,
               onCheckedChange = toggle.onCheckedChange,
+              shapes = connectedShapes(index, rowToggles.size),
               modifier = Modifier
                 .weight(1f)
                 .minimumInteractiveComponentSize()
-                .semantics { role = Role.Checkbox },
+                .semantics {
+                  role = Role.Checkbox
+                  selected = toggle.checked
+                },
             ) {
-              Text(
-                text = toggle.label,
-                style = MaterialTheme.typography.labelLargeEmphasized,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-              )
+              ToggleContent(icon = null, label = toggle.label)
             }
           }
-          repeat(3 - rowToggles.size) { Spacer(Modifier.weight(1f)) }
+          if (rowToggles.size < ViewOptionColumns) {
+            Spacer(Modifier.weight((ViewOptionColumns - rowToggles.size).toFloat()))
+          }
         }
       }
     }
   }
+}
+
+// ── Shared building blocks ──
+
+/** A row whose buttons sit tightly together so connected shapes read as one group. */
+@Composable
+private fun ConnectedRow(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+    content = content,
+  )
+}
+
+@Composable
+private fun connectedShapes(index: Int, count: Int): ToggleButtonShapes = when {
+  count <= 1 -> ToggleButtonDefaults.shapes()
+  index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+  index == count - 1 -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+  else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+}
+
+@Composable
+private fun ToggleContent(
+  icon: ImageVector?,
+  label: String,
+) {
+  if (icon != null) {
+    Icon(
+      imageVector = icon,
+      contentDescription = null,
+      modifier = Modifier.size(ToggleButtonDefaults.IconSize),
+    )
+    Spacer(Modifier.width(ToggleButtonDefaults.IconSpacing))
+  }
+  FitLabel(text = label)
+}
+
+/** One-line label that shrinks (down to 10sp) rather than truncating or wrapping. */
+@Composable
+private fun FitLabel(text: String) {
+  val style = MaterialTheme.typography.labelLargeEmphasized
+  val maxSize = if (style.fontSize.isSpecified) style.fontSize else 14.sp
+  Text(
+    text = text,
+    style = style,
+    maxLines = 1,
+    overflow = TextOverflow.Ellipsis,
+    autoSize = TextAutoSize.StepBased(minFontSize = 10.sp, maxFontSize = maxSize),
+  )
 }

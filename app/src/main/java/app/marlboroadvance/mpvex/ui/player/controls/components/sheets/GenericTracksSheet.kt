@@ -100,6 +100,8 @@ import kotlinx.coroutines.launch
 internal object SheetDimens {
   // --- Overlay host -------------------------------------------------------
   const val SheetMaxHeightFraction = 0.75f
+  // Must stay above 0.5 so the bottom sheet keeps its half-height stop for short content.
+  const val SheetMinHeightFraction = 0.6f
   const val SheetContainerAlpha = 0.85f
 
   // --- Glass edge ---------------------------------------------------------
@@ -282,6 +284,7 @@ internal fun PlayerOverlayHost(
     // Even fully expanded the sheet stops short of the screen height, so it never
     // reads as a full-screen takeover of the player.
     val maxSheetHeight = LocalConfiguration.current.screenHeightDp.dp * SheetDimens.SheetMaxHeightFraction
+    val minSheetHeight = LocalConfiguration.current.screenHeightDp.dp * SheetDimens.SheetMinHeightFraction
     // One-shot: a second tap/drag while hide() is running must not start another hide
     // or call onDismissRequest twice.
     val dismissing = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
@@ -299,7 +302,10 @@ internal fun PlayerOverlayHost(
       containerColor   = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = SheetDimens.SheetContainerAlpha),
       dragHandle       = { BottomSheetDefaults.DragHandle() },
     ) {
-      Box(modifier = Modifier.heightIn(max = maxSheetHeight)) {
+      // The minimum keeps the content taller than half the screen, which the sheet needs
+      // to keep its half-height stop. Without it a short panel (e.g. audio delay) drops
+      // that stop and the sheet reopens fully expanded when returning to the track list.
+      Box(modifier = Modifier.heightIn(min = minSheetHeight, max = maxSheetHeight)) {
         CompositionLocalProvider(LocalOverlayDismiss provides dismiss) { content(dismiss) }
       }
     }

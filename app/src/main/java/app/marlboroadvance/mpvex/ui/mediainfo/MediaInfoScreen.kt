@@ -5,13 +5,18 @@
 
 package app.marlboroadvance.mpvex.ui.mediainfo
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -28,21 +33,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ContainedLoadingIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -57,7 +64,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,7 +76,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -86,8 +96,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * Copies to the clipboard and confirms with a snackbar. Android 13+ shows its own
- * confirmation whenever an app copies something, so the snackbar is skipped there.
+ * Copies to the clipboard and always confirms with the app's own snackbar, so the feedback is
+ * the same on every Android version (Android 13+ also shows its system preview).
  */
 internal class CopyActions(
   private val context: Context,
@@ -100,7 +110,7 @@ internal class CopyActions(
   fun copy(clipLabel: String, text: String, message: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(clipLabel, text))
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) showMessage(message)
+    showMessage(message)
   }
 
   fun showMessage(message: String) {
@@ -123,11 +133,27 @@ internal fun MediaInfoScreen(
   val snackbarHostState = remember { SnackbarHostState() }
   val copyActions = remember(context) { CopyActions(context, scope, snackbarHostState) }
   val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+  // Lives here, above AnimatedContent, so the selected tab survives retry / reload.
+  val pagerState = rememberPagerState(pageCount = { 2 })
   val details = (state as? MediaInfoUiState.Loaded)?.details
   val subtitleText = details?.subtitle?.takeIf { it.isNotBlank() }
 
   val surface = MaterialTheme.colorScheme.surface
   val scrolledSurface = MaterialTheme.colorScheme.surfaceContainer
+
+  // Flips only when the bar crosses the halfway point, so scrolling doesn't recompose the title.
+  val titleCollapsed by remember { derivedStateOf { scrollBehavior.state.collapsedFraction > 0.5f } }
+  val titleFallback = stringResource(R.string.media_info_title_fallback)
+
+  val onShareFailure: (Throwable) -> Unit = { e ->
+    val message =
+      if (e is ActivityNotFoundException) {
+        R.string.media_info_share_no_app
+      } else {
+        R.string.media_info_share_failed_generic
+      }
+    copyActions.showMessage(context.getString(message))
+  }
 
   Scaffold(
     modifier = Modifier.fillMaxSize().nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -137,8 +163,16 @@ internal fun MediaInfoScreen(
       LargeFlexibleTopAppBar(
         title = {
           Text(
-            text = details?.title.orEmpty(),
-            maxLines = 1,
+            text = details?.title?.takeIf { it.isNotBlank() } ?: titleFallback,
+            // Emphasized M3 styles instead of the bar's oversized default: a readable
+            // two lines while expanded, one compact line once collapsed.
+            style =
+              if (titleCollapsed) {
+                MaterialTheme.typography.titleMediumEmphasized
+              } else {
+                MaterialTheme.typography.titleLargeEmphasized
+              },
+            maxLines = if (titleCollapsed) 1 else 2,
             overflow = TextOverflow.Ellipsis,
           )
         },
@@ -158,45 +192,36 @@ internal fun MediaInfoScreen(
         },
         actions = {
           if (details != null) {
-            ActionMenu(
-              icon = Icons.Filled.ContentCopy,
-              contentDescription = stringResource(R.string.media_info_copy),
-              items =
+            OverflowMenu(
+              contentDescription = stringResource(R.string.media_info_more_options),
+              groups =
                 listOf(
-                  menuItem(stringResource(R.string.media_info_copy_summary)) {
-                    copyActions.copy(
-                      details.title,
-                      details.summaryText,
-                      context.getString(R.string.media_info_copied_summary),
-                    )
-                  },
-                  menuItem(stringResource(R.string.media_info_copy_report)) {
-                    copyActions.copy(
-                      details.title,
-                      details.reportText,
-                      context.getString(R.string.media_info_copied_report),
-                    )
-                  },
-                ),
-            )
-            ActionMenu(
-              icon = Icons.Filled.Share,
-              contentDescription = stringResource(R.string.media_info_share),
-              items =
-                listOf(
-                  menuItem(stringResource(R.string.media_info_share_summary)) {
-                    shareText(context, details.title, details.summaryText)
-                  },
-                  menuItem(stringResource(R.string.media_info_share_report)) {
-                    scope.launch {
-                      shareReportFile(context, details.fileName, details.reportText)
-                        .onFailure { e ->
-                          copyActions.showMessage(
-                            context.getString(R.string.media_info_share_failed, e.message.orEmpty()),
-                          )
-                        }
-                    }
-                  },
+                  listOf(
+                    MenuEntry(stringResource(R.string.media_info_copy_summary), Icons.Filled.ContentCopy) {
+                      copyActions.copy(
+                        details.title,
+                        details.summaryText,
+                        context.getString(R.string.media_info_copied_summary),
+                      )
+                    },
+                    MenuEntry(stringResource(R.string.media_info_copy_report), Icons.Filled.ContentCopy) {
+                      copyActions.copy(
+                        details.title,
+                        details.reportText,
+                        context.getString(R.string.media_info_copied_report),
+                      )
+                    },
+                  ),
+                  listOf(
+                    MenuEntry(stringResource(R.string.media_info_share_summary), Icons.Filled.Share) {
+                      shareText(context, details.title, details.summaryText).onFailure(onShareFailure)
+                    },
+                    MenuEntry(stringResource(R.string.media_info_share_report), Icons.Filled.Share) {
+                      scope.launch {
+                        shareReportFile(context, details.fileName, details.reportText).onFailure(onShareFailure)
+                      }
+                    },
+                  ),
                 ),
             )
           }
@@ -227,6 +252,7 @@ internal fun MediaInfoScreen(
           MediaInfoTabs(
             details = current.details,
             copyActions = copyActions,
+            pagerState = pagerState,
             // Same colour the large top bar fades to when collapsed, so bar and tabs match.
             tabColor = {
               lerp(surface, scrolledSurface, FastOutLinearInEasing.transform(scrollBehavior.state.collapsedFraction))
@@ -241,9 +267,9 @@ internal fun MediaInfoScreen(
 private fun MediaInfoTabs(
   details: MediaInfoDetails,
   copyActions: CopyActions,
+  pagerState: PagerState,
   tabColor: () -> androidx.compose.ui.graphics.Color,
 ) {
-  val pagerState = rememberPagerState(pageCount = { 2 })
   val scope = rememberCoroutineScope()
   val tabs = listOf(R.string.media_info_tab_overview, R.string.media_info_tab_report)
 
@@ -268,7 +294,6 @@ private fun MediaInfoTabs(
       state = pagerState,
       modifier = Modifier.weight(1f).fillMaxWidth(),
       verticalAlignment = Alignment.Top,
-      key = { it },
     ) { page ->
       when (page) {
         0 -> MediaInfoOverview(details, copyActions)
@@ -278,29 +303,37 @@ private fun MediaInfoTabs(
   }
 }
 
-/** A menu entry; the action is typed `() -> Unit` explicitly so any body works. */
-private fun menuItem(label: String, action: () -> Unit): Pair<String, () -> Unit> = label to action
+/** One row in the overflow menu. */
+private class MenuEntry(
+  val label: String,
+  val icon: ImageVector,
+  val action: () -> Unit,
+)
 
+/** A single overflow menu; each inner list is a group, and groups are separated by a divider. */
 @Composable
-private fun ActionMenu(
-  icon: ImageVector,
+private fun OverflowMenu(
   contentDescription: String,
-  items: List<Pair<String, () -> Unit>>,
+  groups: List<List<MenuEntry>>,
 ) {
   var expanded by remember { mutableStateOf(false) }
   Box {
     IconButton(onClick = { expanded = true }) {
-      Icon(icon, contentDescription = contentDescription)
+      Icon(Icons.Filled.MoreVert, contentDescription = contentDescription)
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-      items.forEach { (label, action) ->
-        DropdownMenuItem(
-          text = { Text(label) },
-          onClick = {
-            expanded = false
-            action()
-          },
-        )
+      groups.forEachIndexed { index, group ->
+        if (index > 0) HorizontalDivider()
+        group.forEach { entry ->
+          DropdownMenuItem(
+            text = { Text(entry.label) },
+            leadingIcon = { Icon(entry.icon, contentDescription = null) },
+            onClick = {
+              expanded = false
+              entry.action()
+            },
+          )
+        }
       }
     }
   }
@@ -308,36 +341,60 @@ private fun ActionMenu(
 
 // ── Loading and error ──────────────────────────────────────────────────────
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun MediaInfoLoading() {
-  Box(Modifier.fillMaxSize()) {
-    // Placeholders shaped like the content that's coming.
-    Column(
-      modifier = Modifier.fillMaxWidth().padding(16.dp),
-      verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        repeat(4) { SkeletonBlock(Modifier.width(64.dp).height(32.dp), 12.dp) }
-      }
-      SkeletonBlock(Modifier.fillMaxWidth().height(88.dp), 28.dp)
-      SkeletonBlock(Modifier.fillMaxWidth().height(200.dp), 28.dp)
+  // One animation drives every block, so the shimmer sweeps in sync. It's only read while
+  // drawing, so it never recomposes the placeholders.
+  val progress =
+    rememberInfiniteTransition(label = "media_info_skeleton").animateFloat(
+      initialValue = 0f,
+      targetValue = 1f,
+      animationSpec = infiniteRepeatable(tween(durationMillis = 1400, easing = LinearEasing)),
+      label = "shimmer",
+    )
+
+  // Placeholders shaped like the content that's coming: chips, a summary card, then sections.
+  Column(
+    modifier = Modifier.fillMaxSize().padding(16.dp),
+    verticalArrangement = Arrangement.spacedBy(16.dp),
+  ) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      repeat(4) { SkeletonBlock(Modifier.width(72.dp).height(32.dp), 16.dp, progress) }
     }
-    ContainedLoadingIndicator(modifier = Modifier.align(Alignment.Center))
+    SkeletonBlock(Modifier.fillMaxWidth().height(96.dp), 28.dp, progress)
+    repeat(2) { SkeletonSection(progress) }
   }
 }
 
 @Composable
-private fun SkeletonBlock(modifier: Modifier, radius: Dp) {
+private fun SkeletonSection(progress: State<Float>) {
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    SkeletonBlock(Modifier.width(120.dp).height(16.dp), 8.dp, progress)
+    repeat(3) { SkeletonBlock(Modifier.fillMaxWidth().height(56.dp), 20.dp, progress) }
+  }
+}
+
+@Composable
+private fun SkeletonBlock(modifier: Modifier, radius: Dp, progress: State<Float>) {
+  val base = MaterialTheme.colorScheme.surfaceContainerHigh
+  val highlight = MaterialTheme.colorScheme.surfaceContainerHighest
   Box(
     modifier
-      .graphicsLayer { alpha = 0.7f }
       .clip(RoundedCornerShape(radius))
-      .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+      .drawBehind {
+        val width = size.width
+        val shift = (progress.value * 2f - 0.5f) * width
+        drawRect(
+          Brush.linearGradient(
+            colors = listOf(base, highlight, base),
+            start = Offset(shift - width, 0f),
+            end = Offset(shift, 0f),
+          ),
+        )
+      },
   )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun MediaInfoError(message: String?, onRetry: () -> Unit) {
   Column(
@@ -386,15 +443,17 @@ private fun MediaInfoError(message: String?, onRetry: () -> Unit) {
 
 // ── Sharing ────────────────────────────────────────────────────────────────
 
-private fun shareText(context: Context, subject: String, text: String) {
-  val intent =
-    Intent(Intent.ACTION_SEND).apply {
-      type = "text/plain"
-      putExtra(Intent.EXTRA_SUBJECT, subject)
-      putExtra(Intent.EXTRA_TEXT, text)
-    }
-  context.startActivity(Intent.createChooser(intent, context.getString(R.string.media_info_share_chooser)))
-}
+/** Fails with [ActivityNotFoundException] when no app can handle the share. */
+private fun shareText(context: Context, subject: String, text: String): Result<Unit> =
+  runCatching {
+    val intent =
+      Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_SUBJECT, subject)
+        putExtra(Intent.EXTRA_TEXT, text)
+      }
+    context.startActivity(Intent.createChooser(intent, context.getString(R.string.media_info_share_chooser)))
+  }
 
 /** The full report is shared as a .txt file: it can be long, and keeps its column layout. */
 private suspend fun shareReportFile(context: Context, fileName: String, report: String): Result<Unit> =
