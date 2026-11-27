@@ -890,6 +890,10 @@
   <string name="history_disabled_message">Enable it in Advanced Settings to track your playback history</string>
   <string name="no_recent_items">No recent items</string>
   <string name="no_recent_items_message">Videos and playlists you play will appear here</string>
+  <string name="pref_settings_title">Settings</string>
+  <string name="pref_section_interface">Interface</string>
+  <string name="pref_section_library">Library</string>
+  <string name="pref_section_system">System</string>
   <string name="pref_section_ui_appearance">UI &amp; Appearance</string>
   <string name="pref_section_playback_controls">Playback &amp; Controls</string>
   <string name="pref_section_media_files">Media &amp; Files</string>

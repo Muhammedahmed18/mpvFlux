@@ -77,7 +77,7 @@ object AdvancedPreferencesScreen : Screen {
     val clearedHistoryMsg = stringResource(R.string.pref_advanced_cleared_playback_history)
 
     val backgroundColor = rememberPreferenceBackgroundColor()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/xml")) { uri ->
         uri?.let {
@@ -144,7 +144,6 @@ object AdvancedPreferencesScreen : Screen {
             title = { 
               Text(
                 text = stringResource(R.string.pref_advanced),
-                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -158,6 +157,7 @@ object AdvancedPreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
+            large = true,
             containerColor = backgroundColor,
           )
         },

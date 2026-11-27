@@ -65,7 +65,7 @@ object GesturePreferencesScreen : Screen {
     val gestureNames = SingleActionGesture.entries.associateWith { stringResource(it.titleRes) }
 
     val backgroundColor = rememberPreferenceBackgroundColor()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Surface(
       modifier = Modifier.fillMaxSize(),
@@ -79,7 +79,6 @@ object GesturePreferencesScreen : Screen {
             title = { 
               Text(
                 text = stringResource(R.string.pref_gesture),
-                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               ) 
             },
@@ -93,6 +92,7 @@ object GesturePreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
+            large = true,
             containerColor = backgroundColor,
           )
         },

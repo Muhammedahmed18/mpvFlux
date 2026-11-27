@@ -61,7 +61,7 @@ object DecoderPreferencesScreen : Screen {
     var showGpuNextWarning by remember { mutableStateOf(false) }
 
     val backgroundColor = rememberPreferenceBackgroundColor()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Surface(
       modifier = Modifier.fillMaxSize(),
@@ -75,7 +75,6 @@ object DecoderPreferencesScreen : Screen {
             title = {
               Text(
                 text = stringResource(R.string.pref_decoder),
-                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -89,6 +88,7 @@ object DecoderPreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
+            large = true,
             containerColor = backgroundColor,
           )
         },

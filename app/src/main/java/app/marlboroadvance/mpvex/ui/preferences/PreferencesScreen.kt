@@ -7,12 +7,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
@@ -63,7 +63,7 @@ object PreferencesScreen : Screen {
     override fun Content() {
         val backstack = LocalBackStack.current
 
-        val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+        val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
         val context = LocalContext.current
         val keyboardController = LocalSoftwareKeyboardController.current
@@ -114,8 +114,7 @@ object PreferencesScreen : Screen {
                 PreferenceTopBar(
                     title = {
                         Text(
-                            text = stringResource(R.string.pref_preferences),
-                            style = MaterialTheme.typography.titleLargeEmphasized,
+                            text = stringResource(R.string.pref_settings_title),
                             color = MaterialTheme.colorScheme.primary
                         )
                     },
@@ -130,6 +129,7 @@ object PreferencesScreen : Screen {
                     },
                     scrollBehavior = scrollBehavior,
                     containerColor = MaterialTheme.colorScheme.surface,
+                    large = true,
                 )
             }
         ) { padding ->
@@ -138,8 +138,8 @@ object PreferencesScreen : Screen {
                 contentPadding = PaddingValues(
                     top = padding.calculateTopPadding(),
                     bottom = padding.calculateBottomPadding() + 24.dp,
-                    start = 8.dp,
-                    end = 8.dp
+                    start = 0.dp,
+                    end = 0.dp
                 )
             ) {
                 item {
@@ -151,54 +151,68 @@ object PreferencesScreen : Screen {
                 }
 
                 if (searchQuery.isBlank()) {
-                    item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_ui_appearance)) }
+                    item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_interface)) }
                     item {
                         PreferenceCard {
                             PreferenceItem(
                                 title = stringResource(R.string.pref_appearance_title),
                                 summary = stringResource(R.string.pref_appearance_summary),
-                                icon = { PreferenceIcon(Icons.Rounded.Palette, containerColor = MaterialTheme.colorScheme.primaryContainer) },
+                                icon = { PreferenceIcon(Icons.Rounded.Palette) },
                                 showChevron = true,
                                 onClick = { backstack.add(AppearancePreferencesScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_layout_title),
                                 summary = stringResource(R.string.pref_layout_summary),
-                                icon = { PreferenceIcon(Icons.AutoMirrored.Rounded.ViewQuilt, containerColor = MaterialTheme.colorScheme.primaryContainer) },
+                                icon = { PreferenceIcon(Icons.AutoMirrored.Rounded.ViewQuilt) },
                                 showChevron = true,
                                 onClick = { backstack.add(PlayerControlsPreferencesScreen) }
                             )
                         }
                     }
 
-                    item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_playback_controls)) }
+                    item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_playback)) }
                     item {
                         PreferenceCard {
                             PreferenceItem(
                                 title = stringResource(R.string.pref_player),
                                 summary = stringResource(R.string.pref_player_summary),
-                                icon = { PreferenceIcon(Icons.Rounded.PlayCircle, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
+                                icon = { PreferenceIcon(Icons.Rounded.PlayCircle) },
                                 showChevron = true,
                                 onClick = { backstack.add(PlayerPreferencesScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_gesture),
                                 summary = stringResource(R.string.pref_gesture_summary),
-                                icon = { PreferenceIcon(Icons.Rounded.Gesture, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
+                                icon = { PreferenceIcon(Icons.Rounded.Gesture) },
                                 showChevron = true,
                                 onClick = { backstack.add(GesturePreferencesScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_decoder),
                                 summary = stringResource(R.string.pref_decoder_summary),
-                                icon = { PreferenceIcon(Icons.Rounded.Memory, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
+                                icon = { PreferenceIcon(Icons.Rounded.Memory) },
                                 showChevron = true,
                                 onClick = { backstack.add(DecoderPreferencesScreen) }
+                            )
+                            PreferenceItem(
+                                title = stringResource(R.string.pref_audio),
+                                summary = stringResource(R.string.pref_audio_summary),
+                                icon = { PreferenceIcon(Icons.Rounded.Audiotrack) },
+                                showChevron = true,
+                                onClick = { backstack.add(AudioPreferencesScreen) }
+                            )
+                            PreferenceItem(
+                                title = stringResource(R.string.pref_subtitles),
+                                summary = stringResource(R.string.pref_subtitles_summary),
+                                icon = { PreferenceIcon(Icons.Rounded.Subtitles) },
+                                showChevron = true,
+                                onClick = { backstack.add(SubtitlesPreferencesScreen) }
                             )
                         }
                     }
 
-                    item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_media_files)) }
+                    item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_library)) }
                     item {
                         PreferenceCard {
                             PreferenceItem(
@@ -211,40 +225,20 @@ object PreferencesScreen : Screen {
                         }
                     }
 
-                    item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_audio_subtitles)) }
-                    item {
-                        PreferenceCard {
-                            PreferenceItem(
-                                title = stringResource(R.string.pref_subtitles),
-                                summary = stringResource(R.string.pref_subtitles_summary),
-                                icon = { PreferenceIcon(Icons.Rounded.Subtitles) },
-                                showChevron = true,
-                                onClick = { backstack.add(SubtitlesPreferencesScreen) }
-                            )
-                            PreferenceItem(
-                                title = stringResource(R.string.pref_audio),
-                                summary = stringResource(R.string.pref_audio_summary),
-                                icon = { PreferenceIcon(Icons.Rounded.Audiotrack) },
-                                showChevron = true,
-                                onClick = { backstack.add(AudioPreferencesScreen) }
-                            )
-                        }
-                    }
-
-                    item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_system_info)) }
+                    item { PreferenceSectionHeader(title = stringResource(R.string.pref_section_system)) }
                     item {
                         PreferenceCard {
                             PreferenceItem(
                                 title = stringResource(R.string.pref_storage_title),
                                 summary = stringResource(R.string.pref_storage_summary),
-                                icon = { PreferenceIcon(Icons.Rounded.Storage, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) },
+                                icon = { PreferenceIcon(Icons.Rounded.Storage) },
                                 showChevron = true,
                                 onClick = { backstack.add(StorageScreen) }
                             )
                             PreferenceItem(
                                 title = stringResource(R.string.pref_advanced),
                                 summary = stringResource(R.string.pref_advanced_summary),
-                                icon = { PreferenceIcon(Icons.Rounded.Code, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) },
+                                icon = { PreferenceIcon(Icons.Rounded.Code) },
                                 showChevron = true,
                                 onClick = { backstack.add(AdvancedPreferencesScreen) }
                             )
@@ -254,15 +248,10 @@ object PreferencesScreen : Screen {
                                 icon = {
                                     PreferenceIcon(
                                         Icons.Rounded.SystemUpdate,
-                                        containerColor = if (updateAvailable) {
-                                            MaterialTheme.colorScheme.primaryContainer
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceContainerHighest
-                                        },
                                         iconColor = if (updateAvailable) {
-                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                            MaterialTheme.colorScheme.primary
                                         } else {
-                                            MaterialTheme.colorScheme.onSecondaryContainer
+                                            Color.Unspecified
                                         },
                                     )
                                 },
@@ -272,7 +261,7 @@ object PreferencesScreen : Screen {
                             PreferenceItem(
                                 title = stringResource(R.string.pref_about_title),
                                 summary = stringResource(R.string.pref_about_summary),
-                                icon = { PreferenceIcon(Icons.Rounded.Info, containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) },
+                                icon = { PreferenceIcon(Icons.Rounded.Info) },
                                 showChevron = true,
                                 onClick = { backstack.add(AboutScreen) }
                             )
@@ -308,12 +297,12 @@ fun SearchField(
     onSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    OutlinedTextField(
+    TextField(
         value = query,
         onValueChange = onQueryChange,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         placeholder = {
             Text(
                 text = stringResource(R.string.settings_search_hint),
@@ -325,7 +314,7 @@ fun SearchField(
             Icon(
                 imageVector = Icons.Rounded.Search,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
         trailingIcon = {
@@ -338,18 +327,18 @@ fun SearchField(
                     Icon(
                         imageVector = Icons.Rounded.Clear,
                         contentDescription = stringResource(R.string.pref_storage_clear),
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         },
         singleLine = true,
-        shape = MaterialTheme.shapes.extraLarge,
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = Color.Transparent,
+        shape = CircleShape,
+        colors = TextFieldDefaults.colors(
             focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
         ),
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(onSearch = { onSearch() }),
@@ -448,20 +437,12 @@ private fun SearchResultItem(
                 .padding(horizontal = 16.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .scale(if (isPressed) 0.9f else 1f)
-                    .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.medium),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Settings,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
+            Icon(
+                imageVector = Icons.Rounded.Settings,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(24.dp),
+            )
 
             Spacer(modifier = Modifier.width(16.dp))
 

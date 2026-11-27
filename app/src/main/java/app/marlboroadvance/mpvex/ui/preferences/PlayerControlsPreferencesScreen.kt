@@ -84,7 +84,7 @@ object PlayerControlsPreferencesScreen : Screen {
 
     // Settings follow the theme surface; the AMOLED option already makes it pure black.
     val backgroundColor = MaterialTheme.colorScheme.surface
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Surface(
       modifier = Modifier.fillMaxSize(),
@@ -98,7 +98,6 @@ object PlayerControlsPreferencesScreen : Screen {
             title = {
               Text(
                 text = stringResource(id = R.string.pref_layout_title),
-                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -112,6 +111,7 @@ object PlayerControlsPreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
+            large = true,
             containerColor = backgroundColor,
           )
         },

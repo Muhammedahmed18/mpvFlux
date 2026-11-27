@@ -114,7 +114,7 @@ object AboutScreen : Screen {
     val snackbarHostState = remember { SnackbarHostState() }
 
     val backgroundColor = rememberPreferenceBackgroundColor()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     val noBrowserMessage = stringResource(R.string.about_no_browser)
     val debugCopiedMessage = stringResource(R.string.about_debug_info_copied)
@@ -210,7 +210,6 @@ object AboutScreen : Screen {
             title = {
               Text(
                 text = stringResource(R.string.pref_about_title),
-                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -224,6 +223,7 @@ object AboutScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
+            large = true,
             containerColor = backgroundColor,
           )
         },
@@ -487,7 +487,7 @@ object AboutScreen : Screen {
     Surface(
       modifier = Modifier.fillMaxWidth(),
       shape = CardShape,
-      color = MaterialTheme.colorScheme.surfaceContainer,
+      color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
       Column {
         links.forEachIndexed { index, link ->

@@ -50,7 +50,7 @@ object PlayerPreferencesScreen : Screen {
     val orientationNames = PlayerOrientation.entries.associateWith { stringResource(it.titleRes) }
 
     val backgroundColor = rememberPreferenceBackgroundColor()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Surface(
       modifier = Modifier.fillMaxSize(),
@@ -64,7 +64,6 @@ object PlayerPreferencesScreen : Screen {
             title = {
               Text(
                 text = stringResource(id = R.string.pref_player),
-                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -78,6 +77,7 @@ object PlayerPreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
+            large = true,
             containerColor = backgroundColor,
           )
         },

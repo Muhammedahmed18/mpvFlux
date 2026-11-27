@@ -81,7 +81,7 @@ data class ConfigEditorScreen(
     val mpvConfStorageLocation by preferences.mpvConfStorageUri.collectAsState()
 
     val backgroundColor = rememberPreferenceBackgroundColor()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     LaunchedEffect(mpvConfStorageLocation) {
       if (mpvConfStorageLocation.isBlank()) return@LaunchedEffect
@@ -147,12 +147,12 @@ data class ConfigEditorScreen(
         topBar = {
           PreferenceTopBar(
             scrollBehavior = scrollBehavior,
+            large = true,
             containerColor = backgroundColor,
             title = {
               Column {
                 Text(
                   text = screenTitle,
-                  style = MaterialTheme.typography.titleLargeEmphasized,
                   color = MaterialTheme.colorScheme.primary,
                 )
                 if (hasUnsavedChanges) {
@@ -207,7 +207,7 @@ data class ConfigEditorScreen(
               modifier = Modifier
                   .fillMaxSize()
                   .padding(12.dp),
-              shape = MaterialTheme.shapes.large,
+              shape = MaterialTheme.shapes.extraLarge,
               color = MaterialTheme.colorScheme.surfaceContainerLow,
               border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
           ) {

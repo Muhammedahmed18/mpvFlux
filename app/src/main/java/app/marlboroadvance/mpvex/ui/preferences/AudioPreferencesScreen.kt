@@ -48,7 +48,7 @@ object AudioPreferencesScreen : Screen {
     val channelNames = AudioChannels.entries.associateWith { stringResource(it.title) }
 
     val backgroundColor = rememberPreferenceBackgroundColor()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Surface(
       modifier = Modifier.fillMaxSize(),
@@ -62,7 +62,6 @@ object AudioPreferencesScreen : Screen {
             title = { 
               Text(
                 text = stringResource(R.string.pref_audio),
-                style = MaterialTheme.typography.titleLargeEmphasized,
                 color = MaterialTheme.colorScheme.primary,
               )
             },
@@ -76,6 +75,7 @@ object AudioPreferencesScreen : Screen {
               }
             },
             scrollBehavior = scrollBehavior,
+            large = true,
             containerColor = backgroundColor,
           )
         },

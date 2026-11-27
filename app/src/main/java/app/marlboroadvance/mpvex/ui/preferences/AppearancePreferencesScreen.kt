@@ -80,7 +80,7 @@ object AppearancePreferencesScreen : Screen {
             DarkMode.System -> systemDarkTheme
         }
         val backgroundColor = MaterialTheme.colorScheme.surface
-        val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+        val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -94,7 +94,6 @@ object AppearancePreferencesScreen : Screen {
                         title = {
                             Text(
                                 text = stringResource(R.string.pref_appearance_title),
-                                style = MaterialTheme.typography.titleLargeEmphasized,
                                 color = MaterialTheme.colorScheme.primary,
                             )
                         },
@@ -108,6 +107,7 @@ object AppearancePreferencesScreen : Screen {
                             }
                         },
                         scrollBehavior = scrollBehavior,
+                        large = true,
                         containerColor = backgroundColor,
                     )
                 },

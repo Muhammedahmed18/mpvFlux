@@ -1,76 +1,59 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
+import androidx.compose.ui.unit.sp
 
 /**
- * Modern Material 3 Expressive Icon Container.
- * Uses tonal palettes and updated shapes.
+ * Plain preference icon (no container). [containerColor] and [iconColor] are kept so existing
+ * call sites compile; the icon always uses the neutral on-surface-variant tint.
  */
 @Composable
 fun PreferenceIcon(
     imageVector: ImageVector,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
-    containerColor: Color = MaterialTheme.colorScheme.secondaryContainer,
-    iconColor: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+    @Suppress("UNUSED_PARAMETER") containerColor: Color = Color.Unspecified,
+    iconColor: Color = Color.Unspecified,
 ) {
-    Box(
-        modifier = modifier
-            .size(40.dp)
-            .clip(MaterialTheme.shapes.medium)
-            .background(containerColor),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = imageVector,
-            contentDescription = contentDescription,
-            tint = iconColor,
-            modifier = Modifier.size(20.dp),
-        )
-    }
+    Icon(
+        imageVector = imageVector,
+        contentDescription = contentDescription,
+        tint = if (iconColor.isSpecified) iconColor else MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier.size(24.dp),
+    )
 }
 
 /**
- * A grouped container using the M3 Expressive 'SurfaceContainer' roles.
- * Uses 'extraLarge' shape for a more modern, friendly look.
+ * Flat group container: rows sit directly on the screen surface, no card background.
  */
 @Composable
 fun PreferenceCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-        ) {
-            content()
-        }
-    }
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        content = content,
+    )
 }
 
 /**
- * Native Material 3 ListItem wrapper for Preferences.
+ * Flat preference row. Icon, text and trailing content share one vertical center line,
+ * with equal top and bottom padding, whether the summary takes one line or several.
  */
 @Composable
 fun Preference(
@@ -82,14 +65,33 @@ fun Preference(
     trailingContent: (@Composable () -> Unit)? = null,
     enabled: Boolean = true,
 ) {
-    ListItem(
-        headlineContent = title,
-        supportingContent = summary,
-        leadingContent = icon,
-        trailingContent = trailingContent,
-        modifier = modifier.clickable(enabled = enabled, onClick = onClick),
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-    )
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .heightIn(min = 80.dp)
+            .padding(start = 16.dp, end = 24.dp, top = 12.dp, bottom = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            // Icon is centered in a fixed slot so the text starts at the same x on every row.
+            Box(modifier = Modifier.width(68.dp), contentAlignment = Alignment.Center) { icon() }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            ProvideTextStyle(MaterialTheme.typography.bodyLarge) { title() }
+            if (summary != null) {
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
+                    ProvideTextStyle(MaterialTheme.typography.bodyMedium) { summary() }
+                }
+            }
+        }
+        if (trailingContent != null) {
+            Box(
+                modifier = Modifier.padding(start = 8.dp).widthIn(min = 48.dp),
+                contentAlignment = Alignment.Center,
+            ) { trailingContent() }
+        }
+    }
 }
 
 /**
@@ -139,16 +141,12 @@ fun PreferenceItem(
     )
 }
 
+/** Flat list style has no dividers; kept so existing call sites compile. */
 @Composable
+@Suppress("UNUSED_PARAMETER")
 fun PreferenceDivider(
     modifier: Modifier = Modifier,
-) {
-    HorizontalDivider(
-        modifier = modifier.padding(horizontal = 24.dp),
-        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
-        thickness = 1.dp,
-    )
-}
+) = Unit
 
 @Composable
 fun PreferenceSectionHeader(
@@ -157,10 +155,10 @@ fun PreferenceSectionHeader(
 ) {
     Text(
         text = title,
-        style = MaterialTheme.typography.titleSmall,
+        style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.Bold,
-        modifier = modifier.padding(start = 28.dp, top = 20.dp, bottom = 6.dp),
+        fontWeight = FontWeight.Medium,
+        modifier = modifier.padding(start = 16.dp, top = 20.dp, bottom = 6.dp),
     )
 }
 
@@ -189,17 +187,56 @@ fun PreferenceTopBar(
     containerColor: Color = rememberPreferenceBackgroundColor(),
     scrolledContainerColor: Color = MaterialTheme.colorScheme.surfaceContainer,
     actions: @Composable RowScope.() -> Unit = {},
+    large: Boolean = false,
 ) {
-    TopAppBar(
-        title = title,
-        modifier = modifier,
-        navigationIcon = navigationIcon,
-        actions = actions,
-        scrollBehavior = scrollBehavior,
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = containerColor,
-            scrolledContainerColor = scrolledContainerColor,
-            titleContentColor = MaterialTheme.colorScheme.primary,
-        ),
+    val colors = TopAppBarDefaults.topAppBarColors(
+        containerColor = containerColor,
+        scrolledContainerColor = scrolledContainerColor,
+        titleContentColor = MaterialTheme.colorScheme.primary,
+    )
+    if (large) {
+        LargeTopAppBar(
+            title = { ProvideLargeTitleStyle(scrollBehavior) { title() } },
+            expandedHeight = LargeTitleBarExpandedHeight,
+            modifier = modifier,
+            navigationIcon = navigationIcon,
+            actions = actions,
+            scrollBehavior = scrollBehavior,
+            colors = colors,
+        )
+    } else {
+        TopAppBar(
+            title = title,
+            modifier = modifier,
+            navigationIcon = navigationIcon,
+            actions = actions,
+            scrollBehavior = scrollBehavior,
+            colors = colors,
+        )
+    }
+}
+
+/** Expanded height of the large settings bar; shorter than the M3 default to keep the title close to the back button. */
+val LargeTitleBarExpandedHeight = 112.dp
+
+private val LargeTitleExpandedSize = 36.sp
+private val LargeTitleCollapsedSize = 22.sp
+
+/**
+ * Scales the large-bar title between its expanded and collapsed size with the scroll, so every
+ * large-title screen (settings and sub-screens) uses the same title size. The scroll fraction is
+ * read here, inside the title, so only the title recomposes while scrolling.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProvideLargeTitleStyle(
+    scrollBehavior: TopAppBarScrollBehavior?,
+    content: @Composable () -> Unit,
+) {
+    val fraction = scrollBehavior?.state?.collapsedFraction ?: 0f
+    val size = lerp(LargeTitleExpandedSize, LargeTitleCollapsedSize, fraction)
+    ProvideTextStyle(
+        value = LocalTextStyle.current.copy(fontSize = size, lineHeight = size * 1.2f),
+        content = content,
     )
 }

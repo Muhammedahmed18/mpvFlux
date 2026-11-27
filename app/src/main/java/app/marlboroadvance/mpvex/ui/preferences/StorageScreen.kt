@@ -96,16 +96,16 @@ object StorageScreen : Screen {
       if (parts.any { it == null }) null else parts.filterNotNull().sum()
     }
 
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
       modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+      containerColor = MaterialTheme.colorScheme.surface,
       topBar = {
         PreferenceTopBar(
           title = {
             Text(
               text = stringResource(R.string.pref_storage_title),
-              style = MaterialTheme.typography.titleLargeEmphasized,
               color = MaterialTheme.colorScheme.primary,
             )
           },
@@ -119,7 +119,8 @@ object StorageScreen : Screen {
             }
           },
           scrollBehavior = scrollBehavior,
-          containerColor = MaterialTheme.colorScheme.background,
+          large = true,
+          containerColor = MaterialTheme.colorScheme.surface,
         )
       },
     ) { padding ->

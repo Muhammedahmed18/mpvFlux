@@ -47,7 +47,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,6 +74,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
+import app.marlboroadvance.mpvex.ui.preferences.LargeTitleBarExpandedHeight
+import app.marlboroadvance.mpvex.ui.preferences.ProvideLargeTitleStyle
 
 /**
  * M3 Expressive Browser Top Bar
@@ -117,6 +122,9 @@ fun BrowserTopBar(
   onSearchQueryChange: (String) -> Unit = {},
   onSearchClose: () -> Unit = {},
   searchPlaceholder: String = "",
+  /** Large collapsing title for the normal (non-search, non-selection) bar; used by settings screens. */
+  largeTitle: Boolean = false,
+  scrollBehavior: TopAppBarScrollBehavior? = null,
 ) {
   if (isInSelectionMode) {
     SelectionTopBar(
@@ -161,6 +169,8 @@ fun BrowserTopBar(
       modifier = modifier,
       onTitleLongPress = onTitleLongPress,
       onSearchClick = onSearchClick,
+      largeTitle = largeTitle,
+      scrollBehavior = scrollBehavior,
     )
   }
 }
@@ -237,16 +247,22 @@ private fun NormalTopBar(
   modifier: Modifier = Modifier,
   onTitleLongPress: (() -> Unit)?,
   onSearchClick: (() -> Unit)? = null,
+  largeTitle: Boolean = false,
+  scrollBehavior: TopAppBarScrollBehavior? = null,
 ) {
+  val useLarge = largeTitle && subtitle.isNullOrBlank()
   val colors = TopAppBarDefaults.topAppBarColors(
-    containerColor = Color.Transparent,
+    containerColor = if (useLarge) MaterialTheme.colorScheme.surface else Color.Transparent,
     scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
   )
   val titleContent: @Composable () -> Unit = {
     Text(
       text = title,
       // Expressive emphasized styles replace the manual ExtraBold on the base style.
-      style = if (onBackClick == null) {
+      style = if (useLarge) {
+        // The shared large-title scaling (see ProvideLargeTitleStyle) sets the size.
+        LocalTextStyle.current
+      } else if (onBackClick == null) {
         MaterialTheme.typography.headlineMediumEmphasized
       } else {
         MaterialTheme.typography.titleLargeEmphasized
@@ -309,7 +325,17 @@ private fun NormalTopBar(
       }
     }
 
-  if (subtitle.isNullOrBlank()) {
+  if (useLarge) {
+    LargeTopAppBar(
+      title = { ProvideLargeTitleStyle(scrollBehavior) { titleContent() } },
+      expandedHeight = LargeTitleBarExpandedHeight,
+      navigationIcon = navigationIconContent,
+      actions = actionsContent,
+      colors = colors,
+      scrollBehavior = scrollBehavior,
+      modifier = modifier,
+    )
+  } else if (subtitle.isNullOrBlank()) {
     TopAppBar(
       title = titleContent,
       navigationIcon = navigationIconContent,

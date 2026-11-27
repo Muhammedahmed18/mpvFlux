@@ -50,6 +50,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -118,7 +120,11 @@ object FoldersPreferencesScreen : Screen {
 
     ActionFeedbackHost(feedback)
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+      modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+      containerColor = MaterialTheme.colorScheme.surface,
       topBar = {
         BrowserTopBar(
             title = stringResource(R.string.pref_folders_title),
@@ -136,6 +142,8 @@ object FoldersPreferencesScreen : Screen {
             onInvertSelection = { selectionState = selectionState.invertSelection(blacklistedFoldersList) },
             onDeselectAll = { selectionState = selectionState.clear() },
             useRemoveIcon = true,
+            largeTitle = true,
+            scrollBehavior = scrollBehavior,
             additionalActions = {
                 if (!selectionState.isInSelectionMode && blacklistedFolders.isNotEmpty()) {
                     IconButton(onClick = { showClearAllDialog = true }) {
@@ -391,7 +399,7 @@ private fun AddFolderBottomSheet(
     sheetState = sheetState,
     shape = MaterialTheme.shapes.extraLarge,
     dragHandle = { BottomSheetDefaults.DragHandle() },
-    containerColor = MaterialTheme.colorScheme.surfaceContainer
+    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
   ) {
     Column(
       modifier = Modifier

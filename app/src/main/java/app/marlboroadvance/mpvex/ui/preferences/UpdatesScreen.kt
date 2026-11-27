@@ -78,7 +78,7 @@ object UpdatesScreen : Screen {
     val state by manager.state.collectAsState()
 
     val backgroundColor = rememberPreferenceBackgroundColor()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
       modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -88,7 +88,6 @@ object UpdatesScreen : Screen {
           title = {
             Text(
               text = stringResource(R.string.update_title),
-              style = MaterialTheme.typography.titleLargeEmphasized,
               color = MaterialTheme.colorScheme.primary,
             )
           },
@@ -102,6 +101,7 @@ object UpdatesScreen : Screen {
             }
           },
           scrollBehavior = scrollBehavior,
+          large = true,
           containerColor = backgroundColor,
         )
       },

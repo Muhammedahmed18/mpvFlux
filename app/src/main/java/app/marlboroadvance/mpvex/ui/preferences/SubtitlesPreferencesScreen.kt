@@ -37,7 +37,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -88,13 +89,16 @@ object SubtitlesPreferencesScreen : Screen {
     val backstack = LocalBackStack.current
     val preferences = koinInject<SubtitlesPreferences>()
 
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
+      modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+      containerColor = MaterialTheme.colorScheme.surface,
       topBar = {
-        TopAppBar(
+        PreferenceTopBar(
           title = {
             Text(
               text = stringResource(R.string.pref_subtitles),
-              style = MaterialTheme.typography.headlineSmallEmphasized,
               color = MaterialTheme.colorScheme.primary,
             )
           },
@@ -109,6 +113,9 @@ object SubtitlesPreferencesScreen : Screen {
               )
             }
           },
+          scrollBehavior = scrollBehavior,
+          containerColor = MaterialTheme.colorScheme.surface,
+          large = true,
         )
       },
     ) { padding ->
@@ -538,6 +545,8 @@ object SubtitlesPreferencesScreen : Screen {
               isFontViewerLoading = false
             },
             sheetState = sheetState,
+            shape = MaterialTheme.shapes.extraLarge,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
           ) {
             Row(
               modifier = Modifier

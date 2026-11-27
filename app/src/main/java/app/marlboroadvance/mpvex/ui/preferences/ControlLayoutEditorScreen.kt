@@ -139,7 +139,7 @@ data class ControlLayoutEditorScreen(
 
     // Settings follow the theme surface; the AMOLED option already makes it pure black.
     val backgroundColor = MaterialTheme.colorScheme.surface
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     var showResetDialog by remember { mutableStateOf(false) }
 
@@ -170,7 +170,6 @@ data class ControlLayoutEditorScreen(
               title = { 
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLargeEmphasized,
                     color = MaterialTheme.colorScheme.primary
                 ) 
               },
@@ -185,6 +184,7 @@ data class ControlLayoutEditorScreen(
                 }
               },
               scrollBehavior = scrollBehavior,
+              large = true,
               containerColor = backgroundColor,
             )
           },
@@ -350,7 +350,7 @@ private fun IconsLegend() {
     Card(
         modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
         shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
         Column(

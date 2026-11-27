@@ -44,7 +44,7 @@ object DeviceCodecSupportScreen : Screen {
   override fun Content() {
     val backstack = LocalBackStack.current
     val backgroundColor = rememberPreferenceBackgroundColor()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val entries = rememberDeviceCodecReport()
 
     Scaffold(
@@ -55,7 +55,6 @@ object DeviceCodecSupportScreen : Screen {
           title = {
             Text(
               text = stringResource(R.string.codec_support_title),
-              style = MaterialTheme.typography.titleLargeEmphasized,
               color = MaterialTheme.colorScheme.primary,
             )
           },
@@ -69,6 +68,7 @@ object DeviceCodecSupportScreen : Screen {
             }
           },
           scrollBehavior = scrollBehavior,
+          large = true,
           containerColor = backgroundColor,
         )
       },
