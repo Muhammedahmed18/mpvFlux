@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.ImmutableList
+import androidx.compose.material3.ExposedDropdownMenu
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

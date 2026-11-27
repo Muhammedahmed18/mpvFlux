@@ -25,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -440,7 +441,7 @@ private fun ConnectedRow(content: @Composable androidx.compose.foundation.layout
 
 @Composable
 private fun connectedShapes(index: Int, count: Int): ToggleButtonShapes = when {
-  count <= 1 -> ToggleButtonDefaults.shapes()
+  count <= 1 -> ToggleButtonDefaults.shapesFor(ButtonDefaults.MinHeight)
   index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
   index == count - 1 -> ButtonGroupDefaults.connectedTrailingButtonShapes()
   else -> ButtonGroupDefaults.connectedMiddleButtonShapes()

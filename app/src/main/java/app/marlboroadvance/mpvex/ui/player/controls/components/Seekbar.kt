@@ -36,10 +36,12 @@ import androidx.compose.foundation.indication
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -324,11 +326,18 @@ fun StandardSeekbar(position: Float, duration: Float, chapters: ImmutableList<Se
         label = "seekThumbHeight",
     )
 
-    Slider(value = position, onValueChange = onSeek, onValueChangeFinished = onSeekFinished, valueRange = 0f..duration.coerceAtLeast(0.1f), modifier = modifier.fillMaxWidth().height(48.dp), interactionSource = interactionSource,
+    // Material3 1.5.0: a Slider with custom thumb/track takes a SliderState. The range is part of
+    // the key so the state is rebuilt when the duration becomes known; the position is pushed in
+    // on every recomposition (drags update the state themselves and report through onSeek).
+    val seekRange = 0f..duration.coerceAtLeast(0.1f)
+    val sliderState = remember(seekRange) { SliderState(value = position, trackRange = seekRange) }
+    SideEffect { if (sliderState.value != position) sliderState.value = position }
+
+    Slider(state = sliderState, onValueChange = onSeek, onValueChangeFinished = onSeekFinished, modifier = modifier.fillMaxWidth().height(48.dp), interactionSource = interactionSource,
         track = { sliderState ->
             Canvas(modifier = Modifier.fillMaxWidth().height(metrics.activeTrackHeight)) {
-                val range = (sliderState.valueRange.endInclusive - sliderState.valueRange.start).takeIf { it > 0f } ?: 1f
-                val fraction = ((sliderState.value - sliderState.valueRange.start) / range).coerceIn(0f, 1f)
+                val range = (sliderState.trackRange.endInclusive - sliderState.trackRange.start).takeIf { it > 0f } ?: 1f
+                val fraction = ((sliderState.value - sliderState.trackRange.start) / range).coerceIn(0f, 1f)
                 drawSeekTrack(
                     fraction = fraction,
                     chapterFractions = visibleChapterFractions(chapters, duration, size.width, 12.dp.toPx()),
