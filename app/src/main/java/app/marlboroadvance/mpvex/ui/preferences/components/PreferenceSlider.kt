@@ -5,10 +5,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -45,20 +43,15 @@ fun PreferenceSlider(
     val maxF = max.toFloat()
     val steps = ((max - min) / step - 1).coerceAtLeast(0)
 
-    fun snap(raw: Float): Int = min + ((raw - minF) / step).roundToInt() * step
+    fun snap(raw: Float): Int =
+        (min + ((raw - minF) / step).roundToInt() * step).coerceIn(min, max)
 
     var dragging by remember { mutableStateOf(false) }
     var draft by remember { mutableFloatStateOf(value.toFloat()) }
 
-    // Drags update the state themselves; saved changes are pushed in when not dragging.
-    val sliderState = remember(min, max, step) {
-        SliderState(value = value.toFloat().coerceIn(minF, maxF), steps = steps, trackRange = minF..maxF)
-    }
-    SideEffect {
-        val target = value.toFloat().coerceIn(minF, maxF)
-        if (!dragging && sliderState.value != target) sliderState.value = target
-    }
-
+    // While dragging the thumb follows the draft; otherwise it follows the saved value,
+    // so external changes sync automatically.
+    val sliderValue = if (dragging) draft else value.toFloat().coerceIn(minF, maxF)
     val shown = if (dragging) snap(draft) else value
 
     ListItem(
@@ -67,16 +60,18 @@ fun PreferenceSlider(
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(text = valueLabel(shown))
                 Slider(
-                    state = sliderState,
+                    value = sliderValue,
                     onValueChange = {
                         dragging = true
                         draft = it
                     },
                     onValueChangeFinished = {
-                        val snapped = snap(sliderState.value).coerceIn(min, max)
+                        val snapped = snap(draft)
                         dragging = false
                         onValueChangeFinished(snapped)
                     },
+                    valueRange = minF..maxF,
+                    steps = steps,
                     enabled = enabled,
                     modifier = Modifier.fillMaxWidth(),
                 )

@@ -559,7 +559,7 @@ internal fun DrawScope.drawSeekTrack(
  * preview mirrors its style (including Expressive's asymmetric track).
  */
 @Composable
-fun SeekbarStylePreview(style: SeekbarStyle, modifier: Modifier = Modifier) {
+fun SeekbarStylePreview(style: SeekbarStyle, modifier: Modifier = Modifier, showChapters: Boolean = true) {
     val activeColor = MaterialTheme.colorScheme.primary
     val inactiveColor = seekbarInactiveColor(activeColor)
     Canvas(modifier = modifier.width(120.dp).height(28.dp)) {
@@ -573,7 +573,7 @@ fun SeekbarStylePreview(style: SeekbarStyle, modifier: Modifier = Modifier) {
         val thumbW = 5.dp.toPx()
         drawSeekTrack(
             fraction = fraction,
-            chapterFractions = listOf(0.18f, 0.72f),
+            chapterFractions = if (showChapters) listOf(0.18f, 0.72f) else emptyList(),
             activeColor = activeColor,
             inactiveColor = inactiveColor,
             activeTrackHeightPx = activeH,

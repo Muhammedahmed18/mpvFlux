@@ -6,6 +6,7 @@
   <string name="generic_confirm">Confirm</string>
   <string name="generic_cancel">Cancel</string>
   <string name="generic_ok">OK</string>
+  <string name="generic_restart">Restart</string>
   <string name="generic_unit_ms">ms</string>
   <string name="generic_disabled">Disabled</string>
   <string name="pref_preferences">Preferences</string>
@@ -195,6 +196,7 @@
   <string name="pref_player_gestures_horizontal_swipe_sensitivity_high">High</string>
   <string name="pref_player_gestures_horizontal_swipe_sensitivity_current_summary">Current: %1$d/100 (%2$s)</string>
   <string name="pref_player_gestures_hold_for_multiple_speed">Hold for multi - x speed</string>
+  <string name="pref_player_speed_value">%1$.2fx</string>
   <string name="pref_player_controls">Controls</string>
   <string name="pref_player_controls_allow_gestures_in_panels">Allow gestures in panels</string>
   <string name="pref_player_controls_display_volume_as_percentage">Display volume as percentage</string>
@@ -243,6 +245,9 @@
   <string name="pref_decoder_vulkan_not_supported">Not supported (requires Android 13+ with Vulkan 1.3)</string>
   <string name="pref_decoder_yuv420p_title">Use YUV420P pixel format</string>
   <string name="pref_decoder_yuv420p_summary">May fix black screens on some video codecs, can also improve performance at the cost of quality</string>
+  <string name="pref_decoder_section_decoding">Decoding</string>
+  <string name="pref_decoder_section_rendering">Rendering</string>
+  <string name="pref_experimental_badge">Experimental</string>
   <string name="pref_subtitles">Subtitles</string>
   <string name="pref_subtitles_summary">Preferred languages, fonts and search</string>
   <string name="pref_subtitle_search_title">Online Subtitle Search</string>
@@ -256,10 +261,20 @@
   <string name="pref_subtitles_save_location">Subtitle Save Location</string>
   <string name="pref_subtitles_search_online">Online Subtitle Search…</string>
   <string name="pref_subtitles_subdl_languages">Subtitle Languages</string>
-  <string name="all_languages">All (Selective Filtering)</string>
+  <string name="all_languages">All languages</string>
   <string name="pref_subtitles_clear_downloads">Clear Subtitle Downloads</string>
-  <string name="pref_subtitles_clear_downloads_summary">Delete all files in the current save location</string>
-  <string name="pref_subtitles_clear_downloads_confirmation">Are you sure you want to delete all downloaded subtitles? This action cannot be undone.</string>
+  <string name="pref_subtitles_clear_downloads_summary">Delete subtitle files from the save folder. Other files are kept.</string>
+  <string name="pref_subtitles_clear_downloads_confirmation">Are you sure you want to delete the downloaded subtitle files? This action cannot be undone.</string>
+  <plurals name="pref_subtitles_clear_downloads_confirmation_count">
+    <item quantity="one">Delete %1$d subtitle file from the save folder? This action cannot be undone.</item>
+    <item quantity="other">Delete %1$d subtitle files from the save folder? This action cannot be undone.</item>
+  </plurals>
+  <string name="pref_subtitles_clear_downloads_none">There are no subtitle files in the save folder.</string>
+  <string name="pref_subtitles_clear_downloads_failed">Couldn\'t clear subtitle downloads: %1$s</string>
+  <string name="pref_subtitles_selection_summary">%1$s +%2$d</string>
+  <string name="font_removed">Font removed</string>
+  <string name="wyzie_host" translatable="false">sub.wyzie.io</string>
+  <string name="wyzie_url" translatable="false">https://sub.wyzie.io</string>
   <string name="toast_subtitles_cleared">Subtitle downloads cleared</string>
   <string name="pref_audio">Audio</string>
   <string name="pref_audio_summary">Preferred languages, audio channels, pitch correction</string>
@@ -827,6 +842,8 @@
   <string name="cd_use_video_title">Use video title</string>
   <string name="cd_remove_subtitle">Remove subtitle</string>
   <string name="cd_reset_delay">Reset delay</string>
+  <string name="cd_expanded">Expanded</string>
+  <string name="cd_collapsed">Collapsed</string>
 
   <!-- Moved from hard-coded UI text (Material 3 audit, phase 3) -->
   <string name="playlist_type_local">Local</string>
@@ -940,6 +957,7 @@
   <string name="pref_section_landscape_controls">Landscape Controls</string>
   <string name="pref_section_portrait_controls">Portrait Controls</string>
   <string name="pref_section_seekbar_style">Seekbar Style</string>
+  <string name="pref_section_behavior">Behavior</string>
   <string name="custom_ms_value">Custom (%1$d ms)</string>
   <string name="value_ms">%1$d ms</string>
   <string name="edit_item">Edit %1$s</string>
