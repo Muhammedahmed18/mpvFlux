@@ -49,13 +49,20 @@ fun PlayerButtonChip(
   badgeIcon: ImageVector? = null,
   badgeColor: Color? = null,
   elevation: Dp = 0.dp,
+  compact: Boolean = false,
 ) {
   val label = getPlayerButtonLabel(button) // Kept for accessibility
   val shape = MaterialTheme.shapes.large
+  // Compact chips are used in the layout overview, where no badge is shown.
+  val outerPadding = if (compact) 0.dp else 6.dp
+  val minSize = if (compact) 46.dp else 56.dp
+  val horizontalPadding = if (compact) 10.dp else 12.dp
+  val iconSize = if (compact) 20.dp else 24.dp
+  val textSize = if (compact) 13.sp else 15.sp
 
   Box(
     // Room around the tile so the corner badge is never cut off.
-    modifier = Modifier.padding(6.dp),
+    modifier = Modifier.padding(outerPadding),
   ) {
     Card(
       modifier = Modifier,
@@ -87,15 +94,15 @@ fun PlayerButtonChip(
       Box(
         modifier =
           Modifier
-            .defaultMinSize(minWidth = 56.dp, minHeight = 56.dp)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .defaultMinSize(minWidth = minSize, minHeight = minSize)
+            .padding(horizontal = horizontalPadding, vertical = 8.dp),
         contentAlignment = Alignment.Center,
       ) {
         when (button) {
           PlayerButton.VIDEO_TITLE -> {
             Text(
               text = stringResource(R.string.player_button_video_title),
-              fontSize = 15.sp, // Increased font size
+              fontSize = textSize,
               textAlign = TextAlign.Center,
               lineHeight = 14.sp,
             )
@@ -108,11 +115,11 @@ fun PlayerButtonChip(
               Icon(
                 imageVector = button.icon,
                 contentDescription = label,
-                modifier = Modifier.size(24.dp), 
+                modifier = Modifier.size(iconSize),
               )
               Text(
                 text = stringResource(R.string.player_button_chapter_preview),
-                fontSize = 15.sp, 
+                fontSize = textSize,
                 textAlign = TextAlign.Center,
                 lineHeight = 14.sp,
                 modifier = Modifier.padding(start = 8.dp),
@@ -124,7 +131,7 @@ fun PlayerButtonChip(
             Icon(
               imageVector = button.icon,
               contentDescription = label,
-              modifier = Modifier.size(24.dp).then(
+              modifier = Modifier.size(iconSize).then(
                 if (button == PlayerButton.VERTICAL_FLIP) Modifier.rotate(90f) else Modifier
               ),
             )

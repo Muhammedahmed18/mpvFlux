@@ -1,17 +1,13 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import app.marlboroadvance.mpvex.preferences.ThumbnailPosition
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -21,44 +17,30 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.AppearancePreferences
 import app.marlboroadvance.mpvex.preferences.BrowserPreferences
 import app.marlboroadvance.mpvex.preferences.GesturePreferences
-import app.marlboroadvance.mpvex.preferences.MultiChoiceSegmentedButton
 import app.marlboroadvance.mpvex.preferences.preference.collectAsState
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.preferences.components.ThemePicker
 import app.marlboroadvance.mpvex.ui.theme.DarkMode
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
 import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
-import app.marlboroadvance.mpvex.ui.browser.sheets.rememberAudioFolderPicker
-import app.marlboroadvance.mpvex.utils.storage.AudioFolderStore
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.collections.immutable.persistentListOf
-import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.Serializable
-import me.zhanghai.compose.preference.Preference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
-import me.zhanghai.compose.preference.SliderPreference
 import app.marlboroadvance.mpvex.ui.preferences.components.ListPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.PreferenceChoice
+import app.marlboroadvance.mpvex.ui.preferences.components.PreferenceSlider
 import app.marlboroadvance.mpvex.ui.preferences.components.SwitchPreference
 import androidx.compose.ui.text.AnnotatedString
 import org.koin.compose.koinInject
-import kotlin.math.roundToInt
 
 @Serializable
 object AppearancePreferencesScreen : Screen {
@@ -100,7 +82,7 @@ object AppearancePreferencesScreen : Screen {
                         navigationIcon = {
                             IconButton(onClick = backstack::removeLastOrNull) {
                                 Icon(
-                                    Icons.AutoMirrored.Rounded.ArrowBack,
+                                    Icons.AutoMirrored.Outlined.ArrowBack,
                                     contentDescription = stringResource(R.string.back),
                                     tint = MaterialTheme.colorScheme.secondary,
                                 )
@@ -128,35 +110,35 @@ object AppearancePreferencesScreen : Screen {
 
                         item {
                             PreferenceCard {
-                                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                                    MultiChoiceSegmentedButton(
-                                        choices = DarkMode.entries.map { stringResource(it.titleRes) }.toImmutableList(),
-                                        selectedIndices = persistentListOf(DarkMode.entries.indexOf(darkMode)),
-                                        onClick = { preferences.darkMode.set(DarkMode.entries[it]) },
-                                    )
-                                }
+                                PreferenceChoice(
+                                    options = DarkMode.entries,
+                                    selected = darkMode,
+                                    onSelect = { preferences.darkMode.set(it) },
+                                    label = { stringResource(it.titleRes) },
+                                )
+                            }
+                        }
 
-                                Spacer(modifier = Modifier.height(8.dp))
-
+                        item {
+                            PreferenceCard {
                                 val amoledMode by preferences.amoledMode.collectAsState()
 
                                 ThemePicker(
                                     currentTheme = appTheme,
                                     isDarkMode = isDarkMode,
                                     onThemeSelected = { preferences.appTheme.set(it) },
-                                    modifier = Modifier.padding(bottom = 8.dp),
+                                    modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
                                 )
-
 
                                 SwitchPreference(
                                     value = amoledMode,
                                     onValueChange = { newValue ->
                                         preferences.amoledMode.set(newValue)
                                     },
-                                    title = { 
+                                    title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_amoled_mode_title),
-                                        ) 
+                                        )
                                     },
                                     summary = {
                                         Text(
@@ -165,8 +147,11 @@ object AppearancePreferencesScreen : Screen {
                                     },
                                     enabled = darkMode != DarkMode.Light
                                 )
+                            }
+                        }
 
-
+                        item {
+                            PreferenceCard {
                                 val useSystemFont by preferences.useSystemFont.collectAsState()
                                 SwitchPreference(
                                     value = useSystemFont,
@@ -269,54 +254,42 @@ object AppearancePreferencesScreen : Screen {
 
 
                                 val unplayedOldVideoDays by preferences.unplayedOldVideoDays.collectAsState()
-                                SliderPreference(
-                                    value = unplayedOldVideoDays.toFloat(),
-                                    onValueChange = { preferences.unplayedOldVideoDays.set(it.roundToInt()) },
-                                    title = { 
+                                PreferenceSlider(
+                                    value = unplayedOldVideoDays,
+                                    onValueChangeFinished = { preferences.unplayedOldVideoDays.set(it) },
+                                    min = 1,
+                                    max = 30,
+                                    step = 1,
+                                    title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_unplayed_old_video_days_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
-                                        ) 
-                                    },
-                                    valueRange = 1f..30f,
-                                    summary = {
-                                        Text(
-                                            text = stringResource(
-                                                id = R.string.pref_appearance_unplayed_old_video_days_summary,
-                                                unplayedOldVideoDays,
-                                            ),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     },
-                                    onSliderValueChange = { preferences.unplayedOldVideoDays.set(it.roundToInt()) },
-                                    sliderValue = unplayedOldVideoDays.toFloat(),
-                                    enabled = showUnplayedOldVideoLabel
+                                    valueLabel = {
+                                        stringResource(
+                                            id = R.string.pref_appearance_unplayed_old_video_days_summary,
+                                            it,
+                                        )
+                                    },
+                                    enabled = showUnplayedOldVideoLabel,
                                 )
 
-
                                 val watchedThreshold by browserPreferences.watchedThreshold.collectAsState()
-                                SliderPreference(
-                                    value = watchedThreshold.toFloat(),
-                                    onValueChange = { browserPreferences.watchedThreshold.set(it.roundToInt()) },
-                                    sliderValue = watchedThreshold.toFloat(),
-                                    onSliderValueChange = { browserPreferences.watchedThreshold.set(it.roundToInt()) },
-                                    title = { 
+                                PreferenceSlider(
+                                    value = watchedThreshold,
+                                    onValueChangeFinished = { browserPreferences.watchedThreshold.set(it) },
+                                    min = 50,
+                                    max = 100,
+                                    step = 5,
+                                    title = {
                                         Text(
                                             text = stringResource(id = R.string.pref_appearance_watched_threshold_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
-                                        ) 
+                                        )
                                     },
-                                    valueRange = 50f..100f,
-                                    valueSteps = 9,
-                                    summary = {
-                                        Text(
-                                            text = stringResource(
-                                                id = R.string.pref_appearance_watched_threshold_summary,
-                                                watchedThreshold,
-                                            ),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    valueLabel = {
+                                        stringResource(
+                                            id = R.string.pref_appearance_watched_threshold_summary,
+                                            it,
                                         )
                                     },
                                 )
@@ -376,38 +349,6 @@ object AppearancePreferencesScreen : Screen {
 
                         item {
                             PreferenceCard {
-                                val context = LocalContext.current
-                                val audioTreeValue by browserPreferences.audioOutputTreeUri.collectAsState()
-                                var audioFolderName by remember { mutableStateOf<String?>(null) }
-                                LaunchedEffect(audioTreeValue) {
-                                    val treeUri = AudioFolderStore.parse(audioTreeValue)
-                                    audioFolderName = withContext(Dispatchers.IO) {
-                                        if (AudioFolderStore.hasAccess(context, treeUri)) {
-                                            AudioFolderStore.displayName(context, treeUri!!)
-                                        } else {
-                                            null
-                                        }
-                                    }
-                                }
-                                val pickAudioFolder = rememberAudioFolderPicker()
-                                Preference(
-                                    title = {
-                                        Text(
-                                            text = stringResource(R.string.pref_audio_folder_title),
-                                            style = MaterialTheme.typography.titleMediumEmphasized
-                                        )
-                                    },
-                                    summary = {
-                                        Text(
-                                            text = audioFolderName ?: stringResource(R.string.extract_audio_no_folder),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
-                                    },
-                                    onClick = pickAudioFolder,
-                                )
-
-
                                 val showAudioTab by browserPreferences.showAudioTab.collectAsState()
                                 SwitchPreference(
                                     value = showAudioTab,

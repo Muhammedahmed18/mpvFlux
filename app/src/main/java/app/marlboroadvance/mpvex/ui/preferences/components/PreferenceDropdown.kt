@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowDropDown
-import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -65,7 +65,7 @@ fun <T> ListPreference(
             leadingContent = icon,
             trailingContent = {
                 Icon(
-                    imageVector = Icons.Rounded.ArrowDropDown,
+                    imageVector = Icons.Outlined.ArrowDropDown,
                     contentDescription = null,
                     modifier = Modifier.rotate(arrowRotation),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -102,7 +102,7 @@ fun <T> ListPreference(
                     trailingIcon = if (selected) {
                         {
                             Icon(
-                                imageVector = Icons.Rounded.Check,
+                                imageVector = Icons.Outlined.Check,
                                 contentDescription = null,
                                 modifier = Modifier.size(20.dp),
                                 tint = MaterialTheme.colorScheme.primary,

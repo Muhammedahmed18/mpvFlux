@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -71,7 +71,7 @@ private fun SettingsDetailPlaceholder() {
         verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
     ) {
         Icon(
-            imageVector = Icons.Rounded.Settings,
+            imageVector = Icons.Outlined.Settings,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

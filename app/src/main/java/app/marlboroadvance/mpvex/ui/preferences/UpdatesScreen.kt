@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,7 +42,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -83,8 +84,7 @@ private const val RELEASES_URL = "https://github.com/${GitHubReleases.OWNER}/${G
  * release page on GitHub, and the auto-check setting. Nothing is downloaded or installed here;
  * updating happens from GitHub in the browser.
  *
- * The status card changes color, badge shape and content with the update state, and the screen
- * supports pull-to-refresh as an alternative to the "Check now" button.
+ * The status card changes color, badge shape and content with the update state.
  */
 @Serializable
 object UpdatesScreen : Screen {
@@ -126,11 +126,7 @@ object UpdatesScreen : Screen {
         )
       },
     ) { padding ->
-      PullToRefreshBox(
-        isRefreshing = state is UpdateState.Checking,
-        onRefresh = { if (manager.isSupported) manager.check() },
-        modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding()),
-      ) {
+      Box(modifier = Modifier.fillMaxSize().padding(top = padding.calculateTopPadding())) {
         LazyColumn(
           modifier = Modifier.fillMaxSize().readableContentWidth(),
           contentPadding = PaddingValues(
@@ -142,15 +138,7 @@ object UpdatesScreen : Screen {
           item { StatusCard(state = state, manager = manager, lastCheck = lastCheck) }
 
           (state as? UpdateState.Available)?.release?.let { release ->
-            item { PreferenceSectionHeader(title = stringResource(R.string.update_whats_new_in, release.version.toString())) }
-            item {
-              PreferenceCard {
-                CollapsibleReleaseNotes(
-                  markdown = release.notes.ifBlank { stringResource(R.string.update_no_notes) },
-                  modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                )
-              }
-            }
+            item { ReleaseNotesCard(release = release) }
           }
 
           item { PreferenceSectionHeader(title = stringResource(R.string.update_settings_header)) }
@@ -382,6 +370,46 @@ private fun StatusBody(
   }
 }
 
+/** "What's new in X": a tonal card with a badge + title header above the collapsible notes. */
+@Composable
+private fun ReleaseNotesCard(release: ReleaseInfo) {
+  Surface(
+    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+    shape = MaterialTheme.shapes.extraLarge,
+    color = MaterialTheme.colorScheme.surfaceContainerLow,
+    contentColor = MaterialTheme.colorScheme.onSurface,
+  ) {
+    Column(
+      modifier = Modifier.fillMaxWidth().padding(20.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+      ) {
+        TonalBadge(
+          icon = Icons.Outlined.AutoAwesome,
+          containerColor = MaterialTheme.colorScheme.secondaryContainer,
+          contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+          shape = CircleShape,
+          size = 40.dp,
+          iconSize = 22.dp,
+        )
+        Text(
+          text = stringResource(R.string.update_whats_new_in, release.version.toString()),
+          style = MaterialTheme.typography.titleMediumEmphasized,
+          modifier = Modifier.weight(1f),
+        )
+      }
+      CollapsibleReleaseNotes(
+        markdown = release.notes.ifBlank { stringResource(R.string.update_no_notes) },
+        modifier = Modifier.fillMaxWidth(),
+      )
+    }
+  }
+}
+
 private fun releasePageUrl(release: ReleaseInfo): String = release.htmlUrl.ifBlank { RELEASES_URL }
 
 /** Opens [url] in the user's browser. Only https links are opened. */
@@ -403,12 +431,31 @@ private fun TonalBadge(
   size: Dp,
   iconSize: Dp,
 ) {
+  TonalBadge(
+    icon = ImageVector.vectorResource(icon),
+    containerColor = containerColor,
+    contentColor = contentColor,
+    shape = shape,
+    size = size,
+    iconSize = iconSize,
+  )
+}
+
+@Composable
+private fun TonalBadge(
+  icon: ImageVector,
+  containerColor: Color,
+  contentColor: Color,
+  shape: Shape,
+  size: Dp,
+  iconSize: Dp,
+) {
   Box(
     modifier = Modifier.size(size).background(containerColor, shape),
     contentAlignment = Alignment.Center,
   ) {
     Icon(
-      imageVector = ImageVector.vectorResource(icon),
+      imageVector = icon,
       contentDescription = null,
       modifier = Modifier.size(iconSize),
       tint = contentColor,

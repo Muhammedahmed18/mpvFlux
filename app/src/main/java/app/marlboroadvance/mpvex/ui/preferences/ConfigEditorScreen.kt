@@ -10,8 +10,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.*
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -167,7 +167,7 @@ data class ConfigEditorScreen(
             navigationIcon = {
               IconButton(onClick = { backStack.removeLastOrNull() }) {
                 Icon(
-                  Icons.AutoMirrored.Rounded.ArrowBack,
+                  Icons.AutoMirrored.Outlined.ArrowBack,
                   contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary,
                 )
@@ -185,7 +185,7 @@ data class ConfigEditorScreen(
                     modifier = Modifier.scale(saveScale).padding(end = 8.dp)
                   ) {
                     Icon(
-                        Icons.Rounded.Check, 
+                        Icons.Outlined.Check, 
                         contentDescription = stringResource(R.string.save),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(28.dp)

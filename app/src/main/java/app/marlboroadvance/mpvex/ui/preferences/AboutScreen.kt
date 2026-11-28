@@ -14,7 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Bolt
@@ -31,7 +31,7 @@ import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.StarOutline
-import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -216,7 +216,7 @@ object AboutScreen : Screen {
             navigationIcon = {
               IconButton(onClick = backstack::removeLastOrNull) {
                 Icon(
-                  imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                  imageVector = Icons.AutoMirrored.Outlined.ArrowBack,
                   contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary,
                 )
@@ -536,7 +536,7 @@ object AboutScreen : Screen {
         modifier = Modifier.weight(1f),
       )
       Icon(
-        imageVector = Icons.Rounded.ChevronRight,
+        imageVector = Icons.Outlined.ChevronRight,
         contentDescription = null,
         tint = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.size(22.dp),

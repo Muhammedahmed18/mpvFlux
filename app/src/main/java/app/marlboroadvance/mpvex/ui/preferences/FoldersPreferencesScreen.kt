@@ -4,8 +4,8 @@ import android.app.Application
 import app.marlboroadvance.mpvex.ui.browser.components.rememberActionFeedbackState
 import app.marlboroadvance.mpvex.ui.browser.components.ActionFeedbackHost
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -30,12 +30,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowDropDown
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.FolderOff
-import androidx.compose.material.icons.rounded.RemoveCircle
-import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material.icons.outlined.ArrowDropDown
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.FolderOff
+import androidx.compose.material.icons.outlined.RemoveCircle
+import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Checkbox
@@ -135,7 +135,7 @@ object FoldersPreferencesScreen : Screen {
             onBackClick = backstack::removeLastOrNull,
             onDeleteClick = {
               val removed = selectionState.selectedIds.toSet()
-              updateHidden(blacklistedFolders - removed, R.plurals.selection_folders_unhidden, removed.size, Icons.Rounded.Visibility)
+              updateHidden(blacklistedFolders - removed, R.plurals.selection_folders_unhidden, removed.size, Icons.Outlined.Visibility)
               selectionState = selectionState.clear()
             },
             onSelectAll = { selectionState = selectionState.selectAll(blacklistedFoldersList) },
@@ -148,7 +148,7 @@ object FoldersPreferencesScreen : Screen {
                 if (!selectionState.isInSelectionMode && blacklistedFolders.isNotEmpty()) {
                     IconButton(onClick = { showClearAllDialog = true }) {
                         Icon(
-                            Icons.Rounded.Restore,
+                            Icons.Outlined.Restore,
                             contentDescription = stringResource(R.string.pref_folders_clear_all),
                             tint = MaterialTheme.colorScheme.error,
                         )
@@ -177,7 +177,7 @@ object FoldersPreferencesScreen : Screen {
 
         if (blacklistedFolders.isEmpty()) {
           EmptyState(
-            icon = Icons.Rounded.FolderOff,
+            icon = Icons.Outlined.FolderOff,
             title = stringResource(R.string.pref_folders_empty_title),
             message = stringResource(R.string.pref_folders_empty_message),
             modifier = Modifier
@@ -195,7 +195,7 @@ object FoldersPreferencesScreen : Screen {
                 isSelected = selectionState.isSelected(folderPath),
                 isInSelectionMode = selectionState.isInSelectionMode,
                 onRemove = {
-                  updateHidden(blacklistedFolders - folderPath, R.plurals.selection_folders_unhidden, 1, Icons.Rounded.Visibility)
+                  updateHidden(blacklistedFolders - folderPath, R.plurals.selection_folders_unhidden, 1, Icons.Outlined.Visibility)
                 },
                 onLongClick = {
                   selectionState = selectionState.toggle(folderPath)
@@ -237,7 +237,7 @@ object FoldersPreferencesScreen : Screen {
               verticalAlignment = Alignment.CenterVertically,
             ) {
               Icon(
-                imageVector = Icons.Rounded.Folder,
+                imageVector = Icons.Outlined.Folder,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
               )
@@ -264,7 +264,7 @@ object FoldersPreferencesScreen : Screen {
           }
         },
         onAddFolders = { folderPaths ->
-          updateHidden(blacklistedFolders + folderPaths, R.plurals.selection_folders_hidden, folderPaths.size, Icons.Rounded.VisibilityOff)
+          updateHidden(blacklistedFolders + folderPaths, R.plurals.selection_folders_hidden, folderPaths.size, Icons.Outlined.VisibilityOff)
         },
         sheetState = sheetState,
       )
@@ -278,7 +278,7 @@ object FoldersPreferencesScreen : Screen {
         confirmButton = {
           TextButton(
             onClick = {
-              updateHidden(emptySet(), R.plurals.selection_folders_unhidden, blacklistedFolders.size, Icons.Rounded.Visibility)
+              updateHidden(emptySet(), R.plurals.selection_folders_unhidden, blacklistedFolders.size, Icons.Outlined.Visibility)
               showClearAllDialog = false
             },
           ) {
@@ -363,7 +363,7 @@ private fun BlacklistedFolderItem(
       if (!isInSelectionMode) {
         IconButton(onClick = onRemove) {
           Icon(
-            imageVector = Icons.Rounded.RemoveCircle,
+            imageVector = Icons.Outlined.RemoveCircle,
             contentDescription = stringResource(R.string.delete),
             tint = MaterialTheme.colorScheme.error,
           )
@@ -431,7 +431,7 @@ private fun AddFolderBottomSheet(
           )
           if (!isLoading && availableFolders.isNotEmpty()) {
             Icon(
-              Icons.Rounded.ArrowDropDown,
+              Icons.Outlined.ArrowDropDown,
               contentDescription = stringResource(R.string.selection_options),
               modifier = Modifier.size(28.dp),
               tint = MaterialTheme.colorScheme.primary
@@ -474,7 +474,7 @@ private fun AddFolderBottomSheet(
           enabled = selectionState.isInSelectionMode && !isLoading,
         ) {
           Icon(
-            imageVector = Icons.Rounded.Check,
+            imageVector = Icons.Outlined.Check,
             contentDescription = stringResource(R.string.generic_confirm),
             tint = if (selectionState.isInSelectionMode && !isLoading) {
               MaterialTheme.colorScheme.primary

@@ -5,11 +5,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.DeleteSweep
-import androidx.compose.material.icons.rounded.FontDownload
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.FontDownload
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -112,7 +112,7 @@ object StorageScreen : Screen {
           navigationIcon = {
             IconButton(onClick = backstack::removeLastOrNull) {
               Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
+                Icons.AutoMirrored.Outlined.ArrowBack,
                 contentDescription = stringResource(R.string.back),
                 tint = MaterialTheme.colorScheme.secondary,
               )
@@ -148,21 +148,21 @@ object StorageScreen : Screen {
             CacheSizeRow(
               title = stringResource(R.string.pref_storage_fonts_title),
               summary = stringResource(R.string.pref_storage_fonts_summary),
-              icon = Icons.Rounded.FontDownload,
+              icon = Icons.Outlined.FontDownload,
               bytes = fontsBytes,
               onClick = { confirmClearFonts = true },
             )
             CacheSizeRow(
               title = stringResource(R.string.pref_storage_config_title),
               summary = stringResource(R.string.pref_storage_config_summary),
-              icon = Icons.Rounded.Settings,
+              icon = Icons.Outlined.Settings,
               bytes = configBytes,
               onClick = { confirmClearConfig = true },
             )
             CacheSizeRow(
               title = stringResource(R.string.pref_storage_temp_title),
               summary = stringResource(R.string.pref_storage_temp_summary),
-              icon = Icons.Rounded.DeleteSweep,
+              icon = Icons.Outlined.DeleteSweep,
               bytes = tempBytes,
               onClick = { confirmClearTemp = true },
             )
@@ -327,7 +327,7 @@ private fun ThumbnailStorageCard(
     ) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         PreferenceIcon(
-          imageVector = Icons.Rounded.Image,
+          imageVector = Icons.Outlined.Image,
           containerColor = MaterialTheme.colorScheme.primaryContainer,
           iconColor = MaterialTheme.colorScheme.onPrimaryContainer,
         )

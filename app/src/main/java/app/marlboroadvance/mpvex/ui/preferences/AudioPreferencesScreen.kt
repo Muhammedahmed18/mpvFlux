@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,7 +33,17 @@ import app.marlboroadvance.mpvex.ui.utils.readableContentWidth
 import kotlinx.serialization.Serializable
 import app.marlboroadvance.mpvex.ui.preferences.components.ListPreference
 import me.zhanghai.compose.preference.ProvidePreferenceLocals
-import me.zhanghai.compose.preference.SliderPreference
+import app.marlboroadvance.mpvex.ui.preferences.components.PreferenceSlider
+import app.marlboroadvance.mpvex.ui.browser.sheets.rememberAudioFolderPicker
+import app.marlboroadvance.mpvex.utils.storage.AudioFolderStore
+import app.marlboroadvance.mpvex.preferences.BrowserPreferences
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import app.marlboroadvance.mpvex.ui.preferences.components.SwitchPreference
 import org.koin.compose.koinInject
 
@@ -44,6 +54,7 @@ object AudioPreferencesScreen : Screen {
   override fun Content() {
     val backstack = LocalBackStack.current
     val preferences = koinInject<AudioPreferences>()
+    val browserPreferences = koinInject<BrowserPreferences>()
 
     val channelNames = AudioChannels.entries.associateWith { stringResource(it.title) }
 
@@ -68,7 +79,7 @@ object AudioPreferencesScreen : Screen {
             navigationIcon = {
               IconButton(onClick = backstack::removeLastOrNull) {
                 Icon(
-                  Icons.AutoMirrored.Rounded.ArrowBack,
+                  Icons.AutoMirrored.Outlined.ArrowBack,
                   contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary,
                 )
@@ -170,29 +181,52 @@ object AudioPreferencesScreen : Screen {
                 
 
                 val volumeBoostCap by preferences.volumeBoostCap.collectAsState()
-                SliderPreference(
-                  value = volumeBoostCap.toFloat(),
-                  onValueChange = { preferences.volumeBoostCap.set(it.toInt()) },
-                  title = { 
+                PreferenceSlider(
+                  value = volumeBoostCap,
+                  onValueChangeFinished = { preferences.volumeBoostCap.set(it) },
+                  min = 0,
+                  max = 200,
+                  step = 5,
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_audio_volume_boost_cap),
-                      style = MaterialTheme.typography.titleMediumEmphasized
-                    ) 
-                  },
-                  valueRange = 0f..200f,
-                  summary = {
-                    Text(
-                      text = if (volumeBoostCap == 0) {
-                        stringResource(R.string.generic_disabled)
-                      } else {
-                        volumeBoostCap.toString()
-                      },
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
-                  onSliderValueChange = { preferences.volumeBoostCap.set(it.toInt()) },
-                  sliderValue = volumeBoostCap.toFloat(),
+                  valueLabel = {
+                    if (it == 0) stringResource(R.string.generic_disabled) else it.toString()
+                  },
+                )
+              }
+            }
+
+            item {
+              PreferenceCard {
+                val context = LocalContext.current
+                val audioTreeValue by browserPreferences.audioOutputTreeUri.collectAsState()
+                var audioFolderName by remember { mutableStateOf<String?>(null) }
+                LaunchedEffect(audioTreeValue) {
+                  val treeUri = AudioFolderStore.parse(audioTreeValue)
+                  audioFolderName = withContext(Dispatchers.IO) {
+                    if (AudioFolderStore.hasAccess(context, treeUri)) {
+                      AudioFolderStore.displayName(context, treeUri!!)
+                    } else {
+                      null
+                    }
+                  }
+                }
+                val pickAudioFolder = rememberAudioFolderPicker()
+                Preference(
+                  title = {
+                    Text(
+                      text = stringResource(R.string.pref_audio_folder_title),
+                    )
+                  },
+                  summary = {
+                    Text(
+                      text = audioFolderName ?: stringResource(R.string.extract_audio_no_folder),
+                    )
+                  },
+                  onClick = pickAudioFolder,
                 )
               }
             }

@@ -7,11 +7,13 @@ import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -81,7 +84,7 @@ object DecoderPreferencesScreen : Screen {
             navigationIcon = {
               IconButton(onClick = backstack::removeLastOrNull) {
                 Icon(
-                  Icons.AutoMirrored.Rounded.ArrowBack,
+                  Icons.AutoMirrored.Outlined.ArrowBack,
                   contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary,
                 )
@@ -104,7 +107,7 @@ object DecoderPreferencesScreen : Screen {
             )
           ) {
             item {
-              PreferenceSectionHeader(title = stringResource(R.string.pref_decoder))
+              PreferenceSectionHeader(title = stringResource(R.string.pref_decoder_section_decoding))
             }
 
             item {
@@ -115,10 +118,10 @@ object DecoderPreferencesScreen : Screen {
                   value = currentProfile,
                   onValueChange = { preferences.profile.set(it.value) },
                   values = MPVProfile.entries,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_decoder_profile_title),
-                    ) 
+                    )
                   },
                   summary = {
                     Text(
@@ -127,21 +130,27 @@ object DecoderPreferencesScreen : Screen {
                   },
                 )
 
-
                 val tryHWDecoding by preferences.tryHWDecoding.collectAsState()
                 SwitchPreference(
                   value = tryHWDecoding,
                   onValueChange = {
                     preferences.tryHWDecoding.set(it)
                   },
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_decoder_try_hw_dec_title),
-                    ) 
+                    )
                   },
                 )
+              }
+            }
 
+            item {
+              PreferenceSectionHeader(title = stringResource(R.string.pref_decoder_section_rendering))
+            }
 
+            item {
+              PreferenceCard {
                 val gpuNext by preferences.gpuNext.collectAsState()
                 val useVulkan by preferences.useVulkan.collectAsState()
                 SwitchPreference(
@@ -153,10 +162,10 @@ object DecoderPreferencesScreen : Screen {
                       preferences.gpuNext.set(enabled)
                     }
                   },
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_decoder_gpu_next_title),
-                    ) 
+                    )
                   },
                   summary = {
                     Text(
@@ -165,44 +174,20 @@ object DecoderPreferencesScreen : Screen {
                   },
                 )
 
-                if (showGpuNextWarning) {
-                  AlertDialog(
-                    onDismissRequest = { showGpuNextWarning = false },
-                    title = { Text(stringResource(R.string.pref_decoder_gpu_next_enable_title), style = MaterialTheme.typography.headlineSmallEmphasized) },
-                    text = {
-                      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.pref_decoder_gpu_next_warning), style = MaterialTheme.typography.bodyMedium)
-                        Text(stringResource(R.string.pref_decoder_gpu_next_purple_screen_fix), style = MaterialTheme.typography.bodyMedium)
-                      }
-                    },
-                    confirmButton = {
-                      Button(onClick = {
-                        preferences.gpuNext.set(true)
-                        showGpuNextWarning = false
-                      }) {
-                        Text(stringResource(R.string.pref_decoder_gpu_next_enable_anyway), fontWeight = FontWeight.Bold)
-                      }
-                    },
-                    dismissButton = {
-                      TextButton(onClick = { showGpuNextWarning = false }) {
-                        Text(stringResource(R.string.generic_cancel))
-                      }
-                    },
-                    shape = MaterialTheme.shapes.extraLarge
-                  )
-                }
-
-
                 SwitchPreference(
                   value = useVulkan,
                   onValueChange = { enabled ->
                     preferences.useVulkan.set(enabled)
                   },
                   enabled = isVulkanSupported,
-                  title = { 
-                    Text(
-                      text = stringResource(R.string.pref_decoder_vulkan_title) + " (Experimental)",
-                    ) 
+                  title = {
+                    Row(
+                      verticalAlignment = Alignment.CenterVertically,
+                      horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                      Text(text = stringResource(R.string.pref_decoder_vulkan_title))
+                      ExperimentalBadge()
+                    }
                   },
                   summary = {
                     Text(
@@ -210,30 +195,26 @@ object DecoderPreferencesScreen : Screen {
                         if (isVulkanSupported) R.string.pref_decoder_vulkan_summary
                         else R.string.pref_decoder_vulkan_not_supported
                       ),
-                      color = if (isVulkanSupported) MaterialTheme.colorScheme.onSurfaceVariant
-                             else MaterialTheme.colorScheme.error,
                     )
                   },
                 )
-
 
                 val debanding by preferences.debanding.collectAsState()
                 ListPreference(
                   value = debanding,
                   onValueChange = { preferences.debanding.set(it) },
                   values = Debanding.entries,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_decoder_debanding_title),
-                    ) 
+                    )
                   },
                   summary = {
                     Text(
-                      text = debanding.name,
+                      text = stringResource(debanding.titleRes),
                     )
                   },
                 )
-
 
                 val useYUV420p by preferences.useYUV420P.collectAsState()
                 SwitchPreference(
@@ -241,10 +222,10 @@ object DecoderPreferencesScreen : Screen {
                   onValueChange = {
                     preferences.useYUV420P.set(it)
                   },
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_decoder_yuv420p_title),
-                    ) 
+                    )
                   },
                   summary = {
                     Text(
@@ -268,8 +249,53 @@ object DecoderPreferencesScreen : Screen {
             }
           }
         }
+
+        // Kept outside the preference cards: a dialog inside PreferenceCard would be
+        // counted as an extra (empty) segment and change the card's corner shapes.
+        if (showGpuNextWarning) {
+          AlertDialog(
+            onDismissRequest = { showGpuNextWarning = false },
+            title = { Text(stringResource(R.string.pref_decoder_gpu_next_enable_title), style = MaterialTheme.typography.headlineSmallEmphasized) },
+            text = {
+              Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.pref_decoder_gpu_next_warning), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.pref_decoder_gpu_next_purple_screen_fix), style = MaterialTheme.typography.bodyMedium)
+              }
+            },
+            confirmButton = {
+              Button(onClick = {
+                preferences.gpuNext.set(true)
+                showGpuNextWarning = false
+              }) {
+                Text(stringResource(R.string.pref_decoder_gpu_next_enable_anyway), fontWeight = FontWeight.Bold)
+              }
+            },
+            dismissButton = {
+              TextButton(onClick = { showGpuNextWarning = false }) {
+                Text(stringResource(R.string.generic_cancel))
+              }
+            },
+            shape = MaterialTheme.shapes.extraLarge
+          )
+        }
       }
     }
+  }
+}
+
+/** Small tertiary pill shown next to the title of experimental options. */
+@Composable
+private fun ExperimentalBadge() {
+  Surface(
+    shape = CircleShape,
+    color = MaterialTheme.colorScheme.tertiaryContainer,
+    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+  ) {
+    Text(
+      text = stringResource(R.string.pref_experimental_badge),
+      style = MaterialTheme.typography.labelSmall,
+      modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+    )
   }
 }
 

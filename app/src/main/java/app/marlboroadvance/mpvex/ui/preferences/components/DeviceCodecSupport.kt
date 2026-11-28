@@ -18,12 +18,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -41,10 +38,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.ui.preferences.PreferenceCard
+import app.marlboroadvance.mpvex.ui.preferences.PreferenceIcon
+import app.marlboroadvance.mpvex.ui.preferences.PreferenceItem
 import app.marlboroadvance.mpvex.utils.media.DeviceCodecReport
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -65,70 +67,54 @@ fun rememberDeviceCodecReport(): List<DeviceCodecReport.Entry>? {
 @Composable
 fun DeviceCodecSupportRow(onClick: () -> Unit) {
   val entries = rememberDeviceCodecReport()
-  Row(
-    modifier = Modifier
-      .fillMaxWidth()
-      .clickable(onClick = onClick)
-      .padding(horizontal = 20.dp, vertical = 14.dp),
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(16.dp),
-  ) {
-    TonalIcon(R.drawable.ic_sym_memory)
-    Column(modifier = Modifier.weight(1f)) {
-      Text(text = stringResource(R.string.codec_support_title), style = MaterialTheme.typography.titleMediumEmphasized)
-      Text(
-        text = entries?.let {
-          stringResource(R.string.codec_support_row_count, it.count { e -> e.hardware }, it.size)
-        } ?: stringResource(R.string.codec_support_checking),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-    }
-    Icon(
-      imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
-      contentDescription = null,
-      tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-  }
+  PreferenceItem(
+    title = stringResource(R.string.codec_support_title),
+    summary = entries?.let {
+      stringResource(R.string.codec_support_row_count, it.count { e -> e.hardware }, it.size)
+    } ?: stringResource(R.string.codec_support_checking),
+    icon = { PreferenceIcon(imageVector = ImageVector.vectorResource(R.drawable.ic_sym_memory)) },
+    onClick = onClick,
+    showChevron = true,
+  )
 }
 
-/** Top card of the screen: phone, hardware count, explanation and Copy report. */
+/** Top card of the screen: phone, hardware count and explanation, in one segment. */
 @Composable
 fun DeviceCodecSummaryCard(entries: List<DeviceCodecReport.Entry>) {
   PreferenceCard {
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(16.dp),
+    Column(
+      modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-      TonalIcon(R.drawable.ic_sym_memory)
-      Column(modifier = Modifier.weight(1f)) {
+      Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+      ) {
+        TonalIcon(R.drawable.ic_sym_memory)
+        Column(modifier = Modifier.weight(1f)) {
+          Text(
+            text = "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}",
+            style = MaterialTheme.typography.titleMediumEmphasized,
+          )
+          Text(
+            text = stringResource(R.string.codec_support_android_version, Build.VERSION.RELEASE),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+      }
+      Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-          text = "${Build.MANUFACTURER.replaceFirstChar { it.uppercase() }} ${Build.MODEL}",
-          style = MaterialTheme.typography.titleMediumEmphasized,
+          text = stringResource(R.string.codec_support_summary, entries.count { it.hardware }, entries.size),
+          style = MaterialTheme.typography.headlineSmallEmphasized,
         )
         Text(
-          text = stringResource(R.string.codec_support_android_version, Build.VERSION.RELEASE),
+          text = stringResource(R.string.codec_support_explainer),
           style = MaterialTheme.typography.bodyMedium,
           color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
       }
     }
-    Column(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-      verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-      Text(
-        text = stringResource(R.string.codec_support_summary, entries.count { it.hardware }, entries.size),
-        style = MaterialTheme.typography.titleMediumEmphasized,
-      )
-      Text(
-        text = stringResource(R.string.codec_support_explainer),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-      )
-    }
-    CopyReportRow(entries)
   }
 }
 
@@ -139,6 +125,31 @@ fun CodecGroupCard(entries: List<DeviceCodecReport.Entry>) {
     entries.forEach { entry ->
       CodecRow(entry)
     }
+  }
+}
+
+/** Top bar action: copies the plain-text codec report, handy for bug reports. */
+@Composable
+fun CopyCodecReportAction(entries: List<DeviceCodecReport.Entry>) {
+  val context = LocalContext.current
+  val copied = stringResource(R.string.codec_support_copied)
+  val label = stringResource(R.string.codec_support_copy_report)
+  val report = remember(entries) { DeviceCodecReport.asText(entries) }
+  IconButton(
+    onClick = {
+      context.getSystemService(ClipboardManager::class.java)
+        ?.setPrimaryClip(ClipData.newPlainText("MpvFlux codec support", report))
+      // Android 13+ shows its own "Copied" confirmation.
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
+      }
+    },
+  ) {
+    Icon(
+      imageVector = ImageVector.vectorResource(R.drawable.ic_sym_content_copy),
+      contentDescription = label,
+      tint = MaterialTheme.colorScheme.secondary,
+    )
   }
 }
 
@@ -160,6 +171,7 @@ private fun TonalIcon(icon: Int) {
 private fun CodecRow(entry: DeviceCodecReport.Entry) {
   var expanded by rememberSaveable(entry.label) { mutableStateOf(false) }
   val arrowRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "codec_expand")
+  val stateText = stringResource(if (expanded) R.string.cd_expanded else R.string.cd_collapsed)
 
   val details = if (entry.hardware) {
     listOfNotNull(
@@ -176,7 +188,8 @@ private fun CodecRow(entry: DeviceCodecReport.Entry) {
   Column(
     modifier = Modifier
       .fillMaxWidth()
-      .clickable { expanded = !expanded }
+      .clickable(role = Role.Button) { expanded = !expanded }
+      .semantics { stateDescription = stateText }
       .padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -225,28 +238,5 @@ private fun StatusChip(hardware: Boolean) {
       style = MaterialTheme.typography.labelLarge,
       modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
     )
-  }
-}
-
-@Composable
-private fun CopyReportRow(entries: List<DeviceCodecReport.Entry>) {
-  val context = LocalContext.current
-  val copied = stringResource(R.string.codec_support_copied)
-  val report = remember(entries) { DeviceCodecReport.asText(entries) }
-  Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-    FilledTonalButton(
-      onClick = {
-        context.getSystemService(ClipboardManager::class.java)
-          ?.setPrimaryClip(ClipData.newPlainText("MpvFlux codec support", report))
-        // Android 13+ shows its own "Copied" confirmation.
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-          Toast.makeText(context, copied, Toast.LENGTH_SHORT).show()
-        }
-      },
-    ) {
-      Icon(ImageVector.vectorResource(R.drawable.ic_sym_content_copy), contentDescription = null, modifier = Modifier.size(18.dp))
-      Box(modifier = Modifier.width(8.dp))
-      Text(stringResource(R.string.codec_support_copy_report))
-    }
   }
 }

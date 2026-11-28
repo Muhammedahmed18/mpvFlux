@@ -5,8 +5,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -42,7 +42,7 @@ fun PreferenceSwitch(
                 label = "preference_switch_icon",
             ) { on ->
                 Icon(
-                    imageVector = if (on) Icons.Rounded.Check else Icons.Rounded.Close,
+                    imageVector = if (on) Icons.Outlined.Check else Icons.Outlined.Close,
                     contentDescription = null,
                     modifier = Modifier.size(SwitchDefaults.IconSize),
                 )

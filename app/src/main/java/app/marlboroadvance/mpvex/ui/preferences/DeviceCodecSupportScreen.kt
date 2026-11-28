@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.presentation.Screen
 import app.marlboroadvance.mpvex.ui.preferences.components.CodecGroupCard
+import app.marlboroadvance.mpvex.ui.preferences.components.CopyCodecReportAction
 import app.marlboroadvance.mpvex.ui.preferences.components.DeviceCodecSummaryCard
 import app.marlboroadvance.mpvex.ui.preferences.components.rememberDeviceCodecReport
 import app.marlboroadvance.mpvex.ui.utils.LocalBackStack
@@ -61,11 +62,14 @@ object DeviceCodecSupportScreen : Screen {
           navigationIcon = {
             IconButton(onClick = backstack::removeLastOrNull) {
               Icon(
-                Icons.AutoMirrored.Rounded.ArrowBack,
+                Icons.AutoMirrored.Outlined.ArrowBack,
                 contentDescription = stringResource(R.string.back),
                 tint = MaterialTheme.colorScheme.secondary,
               )
             }
+          },
+          actions = {
+            if (entries != null) CopyCodecReportAction(entries)
           },
           scrollBehavior = scrollBehavior,
           large = true,

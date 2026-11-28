@@ -1,6 +1,7 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import android.content.ClipData
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
@@ -13,10 +14,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Clear
-import androidx.compose.material.icons.rounded.FileDownload
-import androidx.compose.material.icons.rounded.FileUpload
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Clear
+import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.FileUpload
 import androidx.compose.material3.*
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -31,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.util.fastJoinToString
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
@@ -113,7 +115,9 @@ object AdvancedPreferencesScreen : Screen {
 
     if (showImportDialog && importStats != null) {
       AlertDialog(
-        onDismissRequest = { showImportDialog = false },
+        // Non-dismissible: the user must restart so imported settings take effect.
+        onDismissRequest = {},
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
         title = { Text(stringResource(R.string.dialog_import_complete), style = MaterialTheme.typography.headlineSmallEmphasized) },
         text = {
           Text(
@@ -126,7 +130,7 @@ object AdvancedPreferencesScreen : Screen {
             style = MaterialTheme.typography.bodyMedium
           )
         },
-        confirmButton = { TextButton(onClick = { showImportDialog = false }) { Text(stringResource(R.string.generic_ok), fontWeight = FontWeight.Bold) } },
+        confirmButton = { TextButton(onClick = { restartApp(context) }) { Text(stringResource(R.string.generic_restart), fontWeight = FontWeight.Bold) } },
         shape = MaterialTheme.shapes.extraLarge
       )
     }
@@ -150,7 +154,7 @@ object AdvancedPreferencesScreen : Screen {
             navigationIcon = {
               IconButton(onClick = backStack::removeLastOrNull) {
                 Icon(
-                  Icons.AutoMirrored.Rounded.ArrowBack, 
+                  Icons.AutoMirrored.Outlined.ArrowBack, 
                   contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary
                 )
@@ -203,13 +207,13 @@ object AdvancedPreferencesScreen : Screen {
                 PreferenceItem(
                   title = stringResource(R.string.pref_export_settings_title),
                   summary = stringResource(R.string.pref_export_settings_summary),
-                  icon = { PreferenceIcon(Icons.Rounded.FileUpload, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
+                  icon = { PreferenceIcon(Icons.Outlined.FileUpload, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
                   onClick = { exportLauncher.launch(settingsManager.getDefaultExportFilename()) },
                 )
                 PreferenceItem(
                   title = stringResource(R.string.pref_import_settings_title),
                   summary = stringResource(R.string.pref_import_settings_summary),
-                  icon = { PreferenceIcon(Icons.Rounded.FileDownload, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
+                  icon = { PreferenceIcon(Icons.Outlined.FileDownload, containerColor = MaterialTheme.colorScheme.tertiaryContainer) },
                   onClick = { importLauncher.launch(arrayOf("text/xml", "application/xml", "*/*")) },
                 )
               }
@@ -229,7 +233,7 @@ object AdvancedPreferencesScreen : Screen {
                     }
                   },
                   onClick = { locationPicker.launch(null) },
-                  iconButtonIcon = { Icon(Icons.Rounded.Clear, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                  iconButtonIcon = { Icon(Icons.Outlined.Clear, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
                   onIconButtonClick = { preferences.mpvConfStorageUri.delete() },
                   iconButtonEnabled = mpvConfStorageLocation.isNotBlank(),
                 )
@@ -340,4 +344,13 @@ private fun getSimplifiedPathFromUri(uriString: String): String {
             path
         }
     } ?: uriString
+}
+
+/** Relaunches the app in a fresh process so imported settings are reloaded from storage. */
+private fun restartApp(context: Context) {
+    val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
+        ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        ?: return
+    context.startActivity(intent)
+    Runtime.getRuntime().exit(0)
 }

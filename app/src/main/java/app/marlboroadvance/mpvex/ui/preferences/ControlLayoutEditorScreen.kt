@@ -24,10 +24,10 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.AddCircle
-import androidx.compose.material.icons.rounded.RemoveCircle
-import androidx.compose.material.icons.rounded.Restore
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.AddCircle
+import androidx.compose.material.icons.outlined.RemoveCircle
+import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -124,6 +125,13 @@ data class ControlLayoutEditorScreen(
       )
     }
 
+    // Save every change right away, so the settings screen behind already shows the final list
+    // while the back transition runs instead of the old one.
+    LaunchedEffect(selectedButtons) {
+      val value = selectedButtons.joinToString(",")
+      if (prefToEdit.get() != value) prefToEdit.set(value)
+    }
+
     DisposableEffect(Unit) {
       onDispose { prefToEdit.set(selectedButtons.joinToString(",")) }
     }
@@ -175,12 +183,12 @@ data class ControlLayoutEditorScreen(
               },
               navigationIcon = {
                 IconButton(onClick = backstack::removeLastOrNull) {
-                  Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.back), tint = MaterialTheme.colorScheme.secondary)
+                  Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = stringResource(R.string.back), tint = MaterialTheme.colorScheme.secondary)
                 }
               },
               actions = {
                 IconButton(onClick = { showResetDialog = true }) {
-                  Icon(Icons.Rounded.Restore, contentDescription = stringResource(R.string.pref_layout_reset_default), tint = MaterialTheme.colorScheme.primary)
+                  Icon(Icons.Outlined.Restore, contentDescription = stringResource(R.string.pref_layout_reset_default), tint = MaterialTheme.colorScheme.primary)
                 }
               },
               scrollBehavior = scrollBehavior,
@@ -237,7 +245,7 @@ data class ControlLayoutEditorScreen(
                                  verticalArrangement = Arrangement.Center
                              ) {
                                  Icon(
-                                     imageVector = Icons.Rounded.AddCircle,
+                                     imageVector = Icons.Outlined.AddCircle,
                                      contentDescription = null,
                                      modifier = Modifier.size(48.dp).padding(bottom = 12.dp),
                                      tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
@@ -284,7 +292,7 @@ data class ControlLayoutEditorScreen(
                                     button = button,
                                     enabled = true,
                                     onClick = { selectedButtons = selectedButtons - button },
-                                    badgeIcon = Icons.Rounded.RemoveCircle,
+                                    badgeIcon = Icons.Outlined.RemoveCircle,
                                     badgeColor = MaterialTheme.colorScheme.error,
                                     elevation = elevation.dp,
                                 )
@@ -320,7 +328,7 @@ data class ControlLayoutEditorScreen(
                                     button = button,
                                     enabled = isEnabled,
                                     onClick = { selectedButtons = selectedButtons + button },
-                                    badgeIcon = Icons.Rounded.AddCircle,
+                                    badgeIcon = Icons.Outlined.AddCircle,
                                     badgeColor = if (isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
                                 )
                             }

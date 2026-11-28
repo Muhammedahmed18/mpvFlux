@@ -14,19 +14,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.NorthEast
-import androidx.compose.material.icons.rounded.Smartphone
-import androidx.compose.material.icons.rounded.SouthEast
-import androidx.compose.material.icons.rounded.SouthWest
-import androidx.compose.material.icons.rounded.VerticalAlignBottom
-import androidx.compose.material.icons.rounded.VerticalAlignTop
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.NorthEast
+import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.outlined.SouthEast
+import androidx.compose.material.icons.outlined.SouthWest
+import androidx.compose.material.icons.outlined.VerticalAlignBottom
+import androidx.compose.material.icons.outlined.VerticalAlignTop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -117,7 +120,7 @@ object PlayerControlsPreferencesScreen : Screen {
             navigationIcon = {
               IconButton(onClick = backstack::removeLastOrNull) {
                 Icon(
-                  Icons.AutoMirrored.Rounded.ArrowBack, 
+                  Icons.AutoMirrored.Outlined.ArrowBack, 
                   contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary,
                 )
@@ -147,19 +150,19 @@ object PlayerControlsPreferencesScreen : Screen {
               PreferenceCard {
                 LayoutRegionPreference(
                   title = stringResource(R.string.pref_layout_top_right_controls),
-                  icon = Icons.Rounded.NorthEast,
+                  icon = Icons.Outlined.NorthEast,
                   buttons = topRightButtons,
                   onClick = { backstack.add(ControlLayoutEditorScreen(ControlRegion.TOP_RIGHT)) },
                 )
                 LayoutRegionPreference(
                   title = stringResource(R.string.pref_layout_bottom_right_controls),
-                  icon = Icons.Rounded.SouthEast,
+                  icon = Icons.Outlined.SouthEast,
                   buttons = bottomRightButtons,
                   onClick = { backstack.add(ControlLayoutEditorScreen(ControlRegion.BOTTOM_RIGHT)) },
                 )
                 LayoutRegionPreference(
                   title = stringResource(R.string.pref_layout_bottom_left_controls),
-                  icon = Icons.Rounded.SouthWest,
+                  icon = Icons.Outlined.SouthWest,
                   buttons = bottomLeftButtons,
                   onClick = { backstack.add(ControlLayoutEditorScreen(ControlRegion.BOTTOM_LEFT)) },
                 )
@@ -174,7 +177,7 @@ object PlayerControlsPreferencesScreen : Screen {
               PreferenceCard {
                 LayoutRegionPreference(
                   title = stringResource(R.string.pref_layout_portrait_bottom_controls),
-                  icon = Icons.Rounded.Smartphone,
+                  icon = Icons.Outlined.Smartphone,
                   buttons = portraitBottomButtons,
                   onClick = { backstack.add(ControlLayoutEditorScreen(ControlRegion.PORTRAIT_BOTTOM)) },
                 )
@@ -187,10 +190,17 @@ object PlayerControlsPreferencesScreen : Screen {
 
             item {
               val seekbarStyle by appearancePrefs.seekbarStyle.collectAsState()
-              
+              val showSeekbarChapters by appearancePrefs.showSeekbarChapters.collectAsState()
+              val controlsPosition by appearancePrefs.controlsPosition.collectAsState()
+              val aboveText = stringResource(R.string.pref_controls_position_above)
+              val belowText = stringResource(R.string.pref_controls_position_below)
+
+              // One card for everything seekbar-related, so a change is visible in the preview
+              // right above it.
               PreferenceCard {
-                // One row: the three styles as connected buttons, with a live preview of the
-                // selected one that crossfades when the style changes.
+                // The three styles as connected buttons, with a live preview of the selected
+                // one on a tonal surface. The preview crossfades on style change and drops its
+                // chapter gaps when "show chapters" is off.
                 PreferenceChoice(
                   options = SeekbarStyle.entries.toList(),
                   selected = seekbarStyle,
@@ -199,24 +209,22 @@ object PlayerControlsPreferencesScreen : Screen {
                   footer = {
                     Crossfade(
                       targetState = seekbarStyle,
-                      modifier = Modifier.fillMaxWidth(),
+                      modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                       label = "seekbar_style_preview",
                     ) { style ->
                       Box(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center,
                       ) {
-                        SeekbarStylePreview(style = style, modifier = Modifier.scale(1.5f))
+                        SeekbarStylePreview(
+                          style = style,
+                          showChapters = showSeekbarChapters,
+                          modifier = Modifier.scale(1.5f),
+                        )
                       }
                     }
                   },
                 )
-              }
-            }
-
-            item {
-              val showSeekbarChapters by appearancePrefs.showSeekbarChapters.collectAsState()
-              PreferenceCard {
                 SwitchPreference(
                   value = showSeekbarChapters,
                   onValueChange = { appearancePrefs.showSeekbarChapters.set(it) },
@@ -231,21 +239,13 @@ object PlayerControlsPreferencesScreen : Screen {
                     )
                   },
                 )
-              }
-            }
-            
-            item {
-              val controlsPosition by appearancePrefs.controlsPosition.collectAsState()
-              val aboveText = stringResource(R.string.pref_controls_position_above)
-              val belowText = stringResource(R.string.pref_controls_position_below)
-              PreferenceCard {
                 PreferenceChoice(
                   options = ControlsPosition.entries.toList(),
                   selected = controlsPosition,
                   onSelect = { appearancePrefs.controlsPosition.set(it) },
                   label = { if (it == ControlsPosition.Below) belowText else aboveText },
                   icon = {
-                    if (it == ControlsPosition.Below) Icons.Rounded.VerticalAlignBottom else Icons.Rounded.VerticalAlignTop
+                    if (it == ControlsPosition.Below) Icons.Outlined.VerticalAlignBottom else Icons.Outlined.VerticalAlignTop
                   },
                   title = { Text(text = stringResource(R.string.pref_controls_position_title)) },
                 )
@@ -255,16 +255,9 @@ object PlayerControlsPreferencesScreen : Screen {
             item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_appearance_title))
             }
-            
+
             item {
               val hidePlayerButtonsBackground by appearancePrefs.hidePlayerButtonsBackground.collectAsState()
-              val playerTimeToDisappear by playerPrefs.playerTimeToDisappear.collectAsState()
-              val predefinedTimeValues = listOf(500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000)
-              val isCustomTimeValue = !predefinedTimeValues.contains(playerTimeToDisappear)
-              
-              var showCustomTimeDialog by remember { mutableStateOf(false) }
-              var customTimeValue by remember { mutableStateOf("") }
-              
               PreferenceCard {
                 SwitchPreference(
                   value = hidePlayerButtonsBackground,
@@ -272,8 +265,22 @@ object PlayerControlsPreferencesScreen : Screen {
                   title = { Text(text = stringResource(id = R.string.pref_appearance_hide_player_buttons_background_title)) },
                   summary = { Text(text = stringResource(id = R.string.pref_appearance_hide_player_buttons_background_summary)) },
                 )
-                
-                
+              }
+            }
+
+            item {
+              PreferenceSectionHeader(title = stringResource(R.string.pref_section_behavior))
+            }
+
+            item {
+              val playerTimeToDisappear by playerPrefs.playerTimeToDisappear.collectAsState()
+              val predefinedTimeValues = listOf(500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000)
+              val isCustomTimeValue = !predefinedTimeValues.contains(playerTimeToDisappear)
+
+              var showCustomTimeDialog by remember { mutableStateOf(false) }
+              var customTimeValue by remember { mutableStateOf("") }
+
+              PreferenceCard {
                 val showFileExtension by playerPrefs.showFileExtension.collectAsState()
                 SwitchPreference(
                   value = showFileExtension,
@@ -282,7 +289,6 @@ object PlayerControlsPreferencesScreen : Screen {
                   summary = { Text(stringResource(R.string.pref_player_show_file_extension_summary)) },
                 )
 
-                
                 PreferenceSlider(
                   value = playerTimeToDisappear,
                   onValueChangeFinished = { playerPrefs.playerTimeToDisappear.set(it) },
@@ -298,13 +304,16 @@ object PlayerControlsPreferencesScreen : Screen {
                     }
                   },
                   trailing = {
-                    TextButton(
+                    FilledTonalIconButton(
                       onClick = {
                         customTimeValue = playerTimeToDisappear.toString()
                         showCustomTimeDialog = true
                       },
                     ) {
-                      Text(text = stringResource(R.string.pref_exact_value))
+                      Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = stringResource(R.string.pref_exact_value),
+                      )
                     }
                   },
                 )
@@ -375,11 +384,27 @@ object PlayerControlsPreferencesScreen : Screen {
   ) {
     Preference(
       title = { Text(text = title) },
-      icon = { PreferenceIcon(icon) },
+      icon = {
+        Surface(
+          modifier = Modifier.size(40.dp),
+          shape = CircleShape,
+          color = MaterialTheme.colorScheme.secondaryContainer,
+        ) {
+          Box(contentAlignment = Alignment.Center) {
+            Icon(
+              imageVector = icon,
+              contentDescription = null,
+              tint = MaterialTheme.colorScheme.onSecondaryContainer,
+              modifier = Modifier.size(22.dp),
+            )
+          }
+        }
+      },
       summary = {
         if (buttons.isEmpty()) {
           Text(text = stringResource(R.string.pref_layout_region_empty))
         } else {
+          // The placed buttons sit directly on the card, with no tile behind them.
           FlowRow(
             modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -392,6 +417,7 @@ object PlayerControlsPreferencesScreen : Screen {
                 onClick = null,
                 badgeIcon = null,
                 badgeColor = null,
+                compact = true,
               )
             }
           }
@@ -399,7 +425,7 @@ object PlayerControlsPreferencesScreen : Screen {
       },
       trailingContent = {
         Icon(
-          imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+          imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
           contentDescription = null,
           tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

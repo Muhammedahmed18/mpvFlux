@@ -1,12 +1,17 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
 import androidx.compose.material3.LoadingIndicator
+import android.content.Context
 import android.content.Intent
 import android.graphics.Typeface
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.documentfile.provider.DocumentFile
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,37 +25,57 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieEncodings
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieFormats
 import app.marlboroadvance.mpvex.repository.wyzie.WyzieSources
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
@@ -88,12 +113,15 @@ object SubtitlesPreferencesScreen : Screen {
     val context = LocalContext.current
     val backstack = LocalBackStack.current
     val preferences = koinInject<SubtitlesPreferences>()
+    val screenScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
       modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
       containerColor = MaterialTheme.colorScheme.surface,
+      snackbarHost = { SnackbarHost(snackbarHostState) },
       topBar = {
         PreferenceTopBar(
           title = {
@@ -125,28 +153,46 @@ object SubtitlesPreferencesScreen : Screen {
         var showFontViewerSheet by remember { mutableStateOf(false) }
         var fontViewerEntries by remember { mutableStateOf<List<Pair<CustomFontEntry, FontFamily?>>>(emptyList()) }
         var isFontViewerLoading by remember { mutableStateOf(false) }
+        // A font removed from the list but not yet deleted from disk, so the user can still undo.
+        var pendingFontDelete by remember { mutableStateOf<CustomFontEntry?>(null) }
+        val fontSnackbarHostState = remember { SnackbarHostState() }
+
+        val commitPendingFontDelete: () -> Unit = {
+          pendingFontDelete?.let { entry ->
+            pendingFontDelete = null
+            screenScope.launch(Dispatchers.IO) {
+              runCatching { entry.file.delete() }
+              withContext(Dispatchers.Main) { fontLoadTrigger++ }
+            }
+          }
+        }
+
+        DisposableEffect(Unit) {
+          onDispose { pendingFontDelete?.let { runCatching { it.file.delete() } } }
+        }
 
         val fontFilePicker =
           rememberLauncherForActivityResult(
             ActivityResultContracts.OpenMultipleDocuments(),
           ) { uris ->
             if (uris.isEmpty()) return@rememberLauncherForActivityResult
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            screenScope.launch(Dispatchers.IO) {
               uris.forEach { uri -> copyFontFromUri(context, uri) }
               withContext(Dispatchers.Main) { fontLoadTrigger++ }
             }
           }
 
         LaunchedEffect(fontLoadTrigger) {
-          customFontEntries = loadCustomFontEntries(context)
+          customFontEntries = loadCustomFontEntries(context).filterNot { it == pendingFontDelete }
         }
 
         // Load typefaces for font viewer sheet when it opens or fonts are added
         LaunchedEffect(showFontViewerSheet, fontLoadTrigger) {
           if (!showFontViewerSheet) return@LaunchedEffect
           isFontViewerLoading = true
+          val pending = pendingFontDelete
           val entries = withContext(Dispatchers.IO) {
-            loadCustomFontEntries(context).map { entry ->
+            loadCustomFontEntries(context).filterNot { it == pending }.map { entry ->
               val fontFamily = runCatching {
                 FontFamily(Typeface.createFromFile(entry.file))
               }.getOrNull()
@@ -155,6 +201,28 @@ object SubtitlesPreferencesScreen : Screen {
           }
           fontViewerEntries = entries
           isFontViewerLoading = false
+        }
+
+        val removeFont: (CustomFontEntry) -> Unit = { entry ->
+          commitPendingFontDelete()
+          pendingFontDelete = entry
+          fontViewerEntries = fontViewerEntries.filterNot { it.first == entry }
+          screenScope.launch {
+            fontSnackbarHostState.currentSnackbarData?.dismiss()
+            val result = fontSnackbarHostState.showSnackbar(
+              message = context.getString(R.string.font_removed),
+              actionLabel = context.getString(R.string.mark_as_undo),
+              duration = SnackbarDuration.Short,
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+              if (pendingFontDelete == entry) {
+                pendingFontDelete = null
+                fontLoadTrigger++
+              }
+            } else if (pendingFontDelete == entry) {
+              commitPendingFontDelete()
+            }
+          }
         }
 
         val subtitleSaveFolder by preferences.subtitleSaveFolder.collectAsState()
@@ -268,33 +336,26 @@ object SubtitlesPreferencesScreen : Screen {
               )
 
 
-              Box(
-                modifier =
-                  Modifier
-                    .fillMaxWidth()
-                    .clickable { showFontViewerSheet = true }
-                    .padding(vertical = 16.dp, horizontal = 16.dp),
-              ) {
-                Column {
+              Preference(
+                title = {
                   Text(
                     stringResource(R.string.pref_subtitles_fonts_dir),
                     style = MaterialTheme.typography.titleMediumEmphasized,
                   )
-                  if (customFontEntries.isEmpty()) {
-                    Text(
-                      stringResource(R.string.not_set_system_fonts),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                  } else {
-                    Text(
-                      stringResource(R.string.fonts_loaded, customFontEntries.size),
-                      style = MaterialTheme.typography.bodySmall,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    )
-                  }
-                }
-              }
+                },
+                summary = {
+                  Text(
+                    text =
+                      if (customFontEntries.isEmpty()) {
+                        stringResource(R.string.not_set_system_fonts)
+                      } else {
+                        stringResource(R.string.fonts_loaded, customFontEntries.size)
+                      },
+                    color = MaterialTheme.colorScheme.outline,
+                  )
+                },
+                onClick = { showFontViewerSheet = true },
+              )
             }
           }
 
@@ -305,16 +366,16 @@ object SubtitlesPreferencesScreen : Screen {
 
           item {
             PreferenceCard {
+              val allLabel = stringResource(R.string.all)
+
               // Wyzie Sources
               MultiChoicePreference(
                 title = { Text(stringResource(R.string.pref_subtitles_sources), style = MaterialTheme.typography.titleMediumEmphasized) },
                 summary = {
-                  val summaryText = if (wyzieSources.isEmpty() || wyzieSources.contains("all")) {
-                    stringResource(R.string.all)
-                  } else {
-                    wyzieSources.mapNotNull { WyzieSources.ALL[it] }.joinToString(", ")
-                  }
-                  Text(summaryText, color = MaterialTheme.colorScheme.outline)
+                  Text(
+                    selectionSummary(wyzieSources, WyzieSources.ALL, allLabel),
+                    color = MaterialTheme.colorScheme.outline,
+                  )
                 },
                 values = WyzieSources.ALL,
                 selectedValues = wyzieSources,
@@ -325,15 +386,14 @@ object SubtitlesPreferencesScreen : Screen {
 
               // Languages
               val subdlLanguages by preferences.subdlLanguages.collectAsState()
+              val allLanguagesLabel = stringResource(R.string.all_languages)
               MultiChoicePreference(
                 title = { Text(stringResource(R.string.pref_subtitles_subdl_languages), style = MaterialTheme.typography.titleMediumEmphasized) },
                 summary = {
-                  val summaryText = if (subdlLanguages.isEmpty() || subdlLanguages.contains("all")) {
-                    stringResource(R.string.all_languages)
-                  } else {
-                    subdlLanguages.mapNotNull { WyzieLanguages.ALL[it] }.joinToString(", ")
-                  }
-                  Text(summaryText, color = MaterialTheme.colorScheme.outline)
+                  Text(
+                    selectionSummary(subdlLanguages, WyzieLanguages.ALL, allLanguagesLabel),
+                    color = MaterialTheme.colorScheme.outline,
+                  )
                 },
                 values = WyzieLanguages.SORTED,
                 selectedValues = subdlLanguages,
@@ -344,47 +404,55 @@ object SubtitlesPreferencesScreen : Screen {
 
               // Advanced Filters (Toggleable)
               var showAdvanced by remember { mutableStateOf(false) }
+              val chevronRotation by animateFloatAsState(
+                targetValue = if (showAdvanced) 180f else 0f,
+                label = "advancedChevron",
+              )
               Column(modifier = Modifier.fillMaxWidth()) {
                 Row(
                   modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showAdvanced = !showAdvanced }
-                    .padding(16.dp),
+                    .clickable(role = Role.Button) { showAdvanced = !showAdvanced }
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
                   verticalAlignment = Alignment.CenterVertically,
                   horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                   Text(
                     text = stringResource(R.string.pref_subtitles_advanced_filters),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleMediumEmphasized,
                   )
                   Icon(
-                    imageVector = if (showAdvanced) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = stringResource(
+                      if (showAdvanced) R.string.cd_expanded else R.string.cd_collapsed,
+                    ),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(chevronRotation),
                   )
                 }
 
-                if (showAdvanced) {
-                  Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                AnimatedVisibility(visible = showAdvanced) {
+                  Column(modifier = Modifier.fillMaxWidth()) {
                     SwitchPreference(
                       value = wyzieHearingImpaired,
                       onValueChange = { preferences.wyzieHearingImpaired.set(it) },
                       title = { Text(stringResource(R.string.pref_subtitles_hearing_impaired)) },
-                      summary = { Text(stringResource(R.string.pref_subtitles_hearing_impaired_summary)) }
+                      summary = {
+                        Text(
+                          stringResource(R.string.pref_subtitles_hearing_impaired_summary),
+                          color = MaterialTheme.colorScheme.outline,
+                        )
+                      }
                     )
 
 
                     MultiChoicePreference(
                       title = { Text(stringResource(R.string.pref_subtitles_formats), style = MaterialTheme.typography.titleMediumEmphasized) },
                       summary = {
-                        val summaryText = if (wyzieFormats.isEmpty() || wyzieFormats.contains("all")) {
-                          stringResource(R.string.all)
-                        } else {
-                          wyzieFormats.mapNotNull { WyzieFormats.ALL[it] }.joinToString(", ")
-                        }
-                        Text(summaryText, color = MaterialTheme.colorScheme.outline)
+                        Text(
+                          selectionSummary(wyzieFormats, WyzieFormats.ALL, allLabel),
+                          color = MaterialTheme.colorScheme.outline,
+                        )
                       },
                       values = WyzieFormats.ALL,
                       selectedValues = wyzieFormats,
@@ -396,49 +464,50 @@ object SubtitlesPreferencesScreen : Screen {
                     MultiChoicePreference(
                       title = { Text(stringResource(R.string.pref_subtitles_encodings), style = MaterialTheme.typography.titleMediumEmphasized) },
                       summary = {
-                        val summaryText = if (wyzieEncodings.isEmpty() || wyzieEncodings.contains("all")) {
-                          stringResource(R.string.all)
-                        } else {
-                          wyzieEncodings.mapNotNull { WyzieEncodings.ALL[it] }.joinToString(", ")
-                        }
-                        Text(summaryText, color = MaterialTheme.colorScheme.outline)
+                        Text(
+                          selectionSummary(wyzieEncodings, WyzieEncodings.ALL, allLabel),
+                          color = MaterialTheme.colorScheme.outline,
+                        )
                       },
                       values = WyzieEncodings.ALL,
                       selectedValues = wyzieEncodings,
                       onValuesChange = { preferences.wyzieEncodings.set(it) },
                       hasAllOption = true
                     )
-
-                    Spacer(modifier = Modifier.size(16.dp))
                   }
                 }
               }
+            }
+          }
 
-
-              // Wyzie Tag
-              Row(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                Text(
-                  text = stringResource(R.string.subtitle_search_provided_by),
-                  style = MaterialTheme.typography.bodySmall,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                  text = "sub.wyzie.io",
-                  style = MaterialTheme.typography.bodySmall,
-                  color = MaterialTheme.colorScheme.primary,
-                  fontWeight = FontWeight.Bold,
-                  modifier = Modifier.clickable {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://sub.wyzie.io"))
-                    context.startActivity(intent)
+          // Wyzie attribution (footer, outside the card)
+          item {
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+              horizontalArrangement = Arrangement.spacedBy(4.dp),
+              verticalAlignment = Alignment.CenterVertically,
+            ) {
+              Text(
+                text = stringResource(R.string.subtitle_search_provided_by),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+              )
+              Text(
+                text = stringResource(R.string.wyzie_host),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable(role = Role.Button) {
+                  val intent = Intent(Intent.ACTION_VIEW, Uri.parse(context.getString(R.string.wyzie_url)))
+                  runCatching { context.startActivity(intent) }.onFailure {
+                    screenScope.launch {
+                      snackbarHostState.showSnackbar(context.getString(R.string.about_no_browser))
+                    }
                   }
-                )
-              }
+                },
+              )
             }
           }
 
@@ -450,64 +519,101 @@ object SubtitlesPreferencesScreen : Screen {
           item {
             PreferenceCard {
               var showClearDialog by remember { mutableStateOf(false) }
-              val scope = androidx.compose.runtime.rememberCoroutineScope()
+              // Number of subtitle files in the save folder; -1 while counting.
+              var clearCount by remember { mutableIntStateOf(-1) }
+
+              LaunchedEffect(showClearDialog) {
+                if (showClearDialog) {
+                  clearCount = -1
+                  clearCount = withContext(Dispatchers.IO) {
+                    runCatching { listSubtitleFiles(context, subtitleSaveFolder).size }.getOrDefault(0)
+                  }
+                }
+              }
 
               // Location display
-              Box(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .clickable { saveLocationPicker.launch(null) }
-                  .padding(vertical = 16.dp, horizontal = 16.dp),
-              ) {
-                Column {
+              val folderPath = if (subtitleSaveFolder.isBlank()) {
+                stringResource(R.string.not_set_video_default)
+              } else {
+                val raw = Uri.parse(subtitleSaveFolder).path ?: subtitleSaveFolder
+                if (raw.contains(":")) raw.substringAfterLast(":") else raw
+              }
+              Preference(
+                title = {
                   Text(
                     stringResource(R.string.pref_subtitles_save_location),
                     style = MaterialTheme.typography.titleMediumEmphasized,
                   )
-                  val folderPath = if (subtitleSaveFolder.isBlank()) {
-                    stringResource(R.string.not_set_video_default)
-                  } else {
-                    val raw = Uri.parse(subtitleSaveFolder).path ?: subtitleSaveFolder
-                    if (raw.contains(":")) raw.substringAfterLast(":") else raw
-                  }
-                  Text(
-                    text = folderPath,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                  )
+                },
+                summary = { Text(folderPath, color = MaterialTheme.colorScheme.outline) },
+                onClick = { saveLocationPicker.launch(null) },
+              )
+
+
+              Column(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(horizontal = 16.dp, vertical = 16.dp),
+              ) {
+                Text(
+                  stringResource(R.string.pref_subtitles_clear_downloads),
+                  style = MaterialTheme.typography.titleMediumEmphasized,
+                )
+                Text(
+                  stringResource(R.string.pref_subtitles_clear_downloads_summary),
+                  style = MaterialTheme.typography.bodyMedium,
+                  color = MaterialTheme.colorScheme.outline,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                FilledTonalButton(
+                  onClick = { showClearDialog = true },
+                  enabled = subtitleSaveFolder.isNotBlank(),
+                  colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                  ),
+                ) {
+                  Text(stringResource(R.string.pref_storage_clear))
                 }
               }
-
-
-              Preference(
-                title = { Text(stringResource(R.string.pref_subtitles_clear_downloads), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.titleMediumEmphasized) },
-                summary = { Text(stringResource(R.string.pref_subtitles_clear_downloads_summary)) },
-                onClick = { showClearDialog = true },
-                enabled = subtitleSaveFolder.isNotBlank()
-              )
 
               if (showClearDialog) {
                 AlertDialog(
                   onDismissRequest = { showClearDialog = false },
+                  icon = { Icon(Icons.Default.Delete, contentDescription = null) },
                   title = { Text(stringResource(R.string.pref_subtitles_clear_downloads)) },
-                  text = { Text(stringResource(R.string.pref_subtitles_clear_downloads_confirmation)) },
+                  text = {
+                    Text(
+                      when {
+                        clearCount < 0 -> stringResource(R.string.pref_subtitles_clear_downloads_confirmation)
+                        clearCount == 0 -> stringResource(R.string.pref_subtitles_clear_downloads_none)
+                        else -> pluralStringResource(
+                          R.plurals.pref_subtitles_clear_downloads_confirmation_count,
+                          clearCount,
+                          clearCount,
+                        )
+                      },
+                    )
+                  },
                   confirmButton = {
                     TextButton(
+                      enabled = clearCount > 0,
                       onClick = {
                         showClearDialog = false
-                        scope.launch(Dispatchers.IO) {
-                          runCatching {
-                            val uri = Uri.parse(subtitleSaveFolder)
-                            val folder = DocumentFile.fromTreeUri(context, uri)
-                            folder?.listFiles()?.forEach { it.delete() }
-                            withContext(Dispatchers.Main) {
-                              android.widget.Toast.makeText(context, R.string.toast_subtitles_cleared, android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                          }.onFailure { e ->
-                            withContext(Dispatchers.Main) {
-                              android.widget.Toast.makeText(context, "Error: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
-                            }
+                        screenScope.launch {
+                          val result = withContext(Dispatchers.IO) {
+                            runCatching { listSubtitleFiles(context, subtitleSaveFolder).forEach { it.delete() } }
                           }
+                          val message = result.fold(
+                            onSuccess = { context.getString(R.string.toast_subtitles_cleared) },
+                            onFailure = {
+                              context.getString(
+                                R.string.pref_subtitles_clear_downloads_failed,
+                                it.localizedMessage ?: it.javaClass.simpleName,
+                              )
+                            },
+                          )
+                          snackbarHostState.showSnackbar(message)
                         }
                       }
                     ) {
@@ -530,6 +636,7 @@ object SubtitlesPreferencesScreen : Screen {
           val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
           ModalBottomSheet(
             onDismissRequest = {
+              commitPendingFontDelete()
               showFontViewerSheet = false
               fontViewerEntries = emptyList()
               isFontViewerLoading = false
@@ -549,87 +656,116 @@ object SubtitlesPreferencesScreen : Screen {
                 text = stringResource(R.string.installed_fonts),
                 style = MaterialTheme.typography.titleLargeEmphasized,
               )
-              IconButton(
+              FilledTonalButton(
                 onClick = {
                   fontFilePicker.launch(arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-otf", "*/*"))
                 },
               ) {
                 Icon(
                   Icons.Default.Add,
-                  contentDescription = stringResource(R.string.add_font),
-                  tint = MaterialTheme.colorScheme.primary,
+                  contentDescription = null,
+                  modifier = Modifier.size(18.dp),
                 )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.add_font))
               }
             }
 
-            val sheetScope = androidx.compose.runtime.rememberCoroutineScope()
-            if (isFontViewerLoading) {
-              Box(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .height(160.dp),
-                contentAlignment = Alignment.Center,
-              ) {
-                LoadingIndicator()
-              }
-            } else if (fontViewerEntries.isEmpty()) {
-              Box(
-                modifier = Modifier
-                  .fillMaxWidth()
-                  .height(160.dp),
-                contentAlignment = Alignment.Center,
-              ) {
-                Text(
-                  text = stringResource(R.string.no_fonts_installed),
-                  style = MaterialTheme.typography.bodyMedium,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-              }
-            } else {
-              LazyColumn {
-                items(fontViewerEntries, key = { it.first.familyName }) { (fontEntry, fontFamily) ->
-                  Row(
-                    modifier = Modifier
-                      .fillMaxWidth()
-                      .padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                  ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                      Text(
-                        text = fontEntry.familyName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontFamily = fontFamily,
-                        fontWeight = FontWeight.Medium,
-                      )
-                      Text(
-                        text = stringResource(R.string.font_preview_sample),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontFamily = fontFamily,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                      )
-                    }
-                    IconButton(
-                      onClick = {
-                        sheetScope.launch(Dispatchers.IO) {
-                          runCatching { fontEntry.file.delete() }
-                          withContext(Dispatchers.Main) {
-                            fontViewerEntries = fontViewerEntries.filterNot { it.first == fontEntry }
-                            fontLoadTrigger++
-                          }
+            Box(modifier = Modifier.fillMaxWidth()) {
+              if (isFontViewerLoading) {
+                Box(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+                  contentAlignment = Alignment.Center,
+                ) {
+                  LoadingIndicator()
+                }
+              } else if (fontViewerEntries.isEmpty()) {
+                Box(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp),
+                  contentAlignment = Alignment.Center,
+                ) {
+                  Text(
+                    text = stringResource(R.string.no_fonts_installed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                  )
+                }
+              } else {
+                LazyColumn {
+                  items(fontViewerEntries, key = { it.first.familyName }) { (fontEntry, fontFamily) ->
+                    val dismissState = rememberSwipeToDismissBoxState(
+                      confirmValueChange = { value ->
+                        if (value == SwipeToDismissBoxValue.EndToStart) {
+                          removeFont(fontEntry)
+                          true
+                        } else {
+                          false
+                        }
+                      },
+                    )
+                    SwipeToDismissBox(
+                      state = dismissState,
+                      enableDismissFromStartToEnd = false,
+                      backgroundContent = {
+                        Box(
+                          modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.errorContainer)
+                            .padding(end = 24.dp),
+                          contentAlignment = Alignment.CenterEnd,
+                        ) {
+                          Icon(
+                            Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                          )
                         }
                       },
                     ) {
-                      Icon(
-                        Icons.Default.Delete,
-                        contentDescription = stringResource(R.string.delete_font),
-                        tint = MaterialTheme.colorScheme.error,
-                      )
+                      Row(
+                        modifier = Modifier
+                          .fillMaxWidth()
+                          .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                          .padding(start = 16.dp, end = 4.dp, top = 12.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                      ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                          Text(
+                            text = fontEntry.familyName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontFamily = fontFamily,
+                            fontWeight = FontWeight.Medium,
+                          )
+                          Text(
+                            text = stringResource(R.string.font_preview_sample),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontFamily = fontFamily,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                          )
+                        }
+                        IconButton(onClick = { removeFont(fontEntry) }) {
+                          Icon(
+                            Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.delete_font),
+                            tint = MaterialTheme.colorScheme.error,
+                          )
+                        }
+                      }
                     }
+                    HorizontalDivider()
                   }
-                  HorizontalDivider()
+                  item { Spacer(Modifier.height(32.dp)) }
                 }
-                item { Spacer(Modifier.height(32.dp)) }
               }
+
+              SnackbarHost(
+                hostState = fontSnackbarHostState,
+                modifier = Modifier.align(Alignment.BottomCenter),
+              )
             }
           }
         }
@@ -638,6 +774,40 @@ object SubtitlesPreferencesScreen : Screen {
   }
 }
 
+/** Short summary for a multi-select value: "All", "English, Arabic" or "English, Arabic +3". */
+@Composable
+private fun selectionSummary(
+  selected: Set<String>,
+  values: Map<String, String>,
+  allLabel: String,
+): String {
+  if (selected.isEmpty() || selected.contains("all")) return allLabel
+  val names = selected.mapNotNull { values[it] }
+  if (names.isEmpty()) return selected.joinToString(", ")
+  val shown = names.take(2).joinToString(", ")
+  val remaining = names.size - 2
+  return if (remaining > 0) {
+    stringResource(R.string.pref_subtitles_selection_summary, shown, remaining)
+  } else {
+    shown
+  }
+}
+
+/** Extensions treated as subtitle files: the Wyzie formats plus the common ones. */
+private fun subtitleExtensions(): Set<String> =
+  WyzieFormats.ALL.keys.filter { it != "all" }.map { it.lowercase() }.toSet() +
+    setOf("srt", "vtt", "ass", "ssa", "sub")
+
+/** Subtitle files directly inside the chosen save folder. Other files are never touched. */
+private fun listSubtitleFiles(context: Context, folderUri: String): List<DocumentFile> {
+  val folder = DocumentFile.fromTreeUri(context, Uri.parse(folderUri)) ?: return emptyList()
+  val extensions = subtitleExtensions()
+  return folder.listFiles().filter {
+    it.isFile && it.name.orEmpty().substringAfterLast('.', "").lowercase() in extensions
+  }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MultiChoicePreference(
   title: @Composable () -> Unit,
@@ -647,66 +817,163 @@ fun MultiChoicePreference(
   onValuesChange: (Set<String>) -> Unit,
   hasAllOption: Boolean = false
 ) {
-  var showDialog by remember { mutableStateOf(false) }
+  var showSheet by remember { mutableStateOf(false) }
 
   Preference(
     title = title,
     summary = summary,
-    onClick = { showDialog = true }
+    onClick = { showSheet = true }
   )
 
-  if (showDialog) {
-    AlertDialog(
-      onDismissRequest = { showDialog = false },
-      title = title,
-      text = {
-        LazyColumn {
-          items(values.toList().size) { index ->
-            val entry = values.toList()[index]
-            val key = entry.first
-            val checked = if (hasAllOption && (selectedValues.isEmpty() || selectedValues.contains("all"))) {
-              key == "all"
-            } else {
-              selectedValues.contains(key)
-            }
+  if (showSheet) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    var query by remember { mutableStateOf("") }
 
-            Row(
-              modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
-                  val newSet = selectedValues.toMutableSet()
-                  if (hasAllOption) {
-                    if (key == "all") {
-                      newSet.clear()
-                      newSet.add("all")
-                    } else {
-                      newSet.remove("all")
-                      if (checked) newSet.remove(key) else newSet.add(key)
-                      if (newSet.isEmpty()) newSet.add("all")
-                    }
-                  } else {
-                    if (checked) newSet.remove(key) else newSet.add(key)
-                  }
-                  onValuesChange(newSet)
-                }
-                .padding(vertical = 8.dp),
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Checkbox(
-                checked = checked,
-                onCheckedChange = null
-              )
-              Spacer(modifier = Modifier.width(8.dp))
-              Text(text = entry.second)
-            }
-          }
-        }
-      },
-      confirmButton = {
-        TextButton(onClick = { showDialog = false }) {
-          Text(stringResource(android.R.string.ok))
+    val closeSheet: () -> Unit = {
+      scope.launch { sheetState.hide() }.invokeOnCompletion {
+        if (!sheetState.isVisible) showSheet = false
+      }
+    }
+
+    val isAll = hasAllOption && (selectedValues.isEmpty() || selectedValues.contains("all"))
+    val options = remember(values, hasAllOption) {
+      values.entries.filter { !(hasAllOption && it.key == "all") }
+    }
+    val filtered = remember(options, query) {
+      val needle = query.trim()
+      if (needle.isEmpty()) options else options.filter { it.value.contains(needle, ignoreCase = true) }
+    }
+
+    val toggle: (String) -> Unit = { key ->
+      val newSet = selectedValues.toMutableSet()
+      if (hasAllOption) newSet.remove("all")
+      if (!newSet.add(key)) newSet.remove(key)
+      if (hasAllOption && newSet.isEmpty()) newSet.add("all")
+      onValuesChange(newSet)
+    }
+
+    ModalBottomSheet(
+      onDismissRequest = { showSheet = false },
+      sheetState = sheetState,
+      shape = MaterialTheme.shapes.extraLarge,
+      containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 16.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Box(modifier = Modifier.weight(1f)) { title() }
+        TextButton(onClick = closeSheet) {
+          Text(stringResource(R.string.done))
         }
       }
-    )
+
+      OutlinedTextField(
+        value = query,
+        onValueChange = { query = it },
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 16.dp, vertical = 8.dp),
+        placeholder = { Text(stringResource(R.string.search)) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+        trailingIcon = {
+          if (query.isNotEmpty()) {
+            IconButton(onClick = { query = "" }) {
+              Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_clear_search))
+            }
+          }
+        },
+        singleLine = true,
+        shape = MaterialTheme.shapes.extraLarge,
+      )
+
+      val selectedEntries = if (isAll) {
+        emptyList()
+      } else {
+        selectedValues.mapNotNull { key -> values[key]?.let { key to it } }
+      }
+      if (selectedEntries.isNotEmpty()) {
+        Row(
+          modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+          horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+          selectedEntries.forEach { (key, label) ->
+            InputChip(
+              selected = true,
+              onClick = { toggle(key) },
+              label = { Text(label) },
+              trailingIcon = {
+                Icon(
+                  Icons.Default.Close,
+                  contentDescription = stringResource(R.string.remove),
+                  modifier = Modifier.size(InputChipDefaults.IconSize),
+                )
+              },
+            )
+          }
+        }
+      }
+
+      if (hasAllOption) {
+        SelectionRow(
+          label = stringResource(R.string.all),
+          checked = isAll,
+          onToggle = { onValuesChange(setOf("all")) },
+        )
+        HorizontalDivider()
+      }
+
+      if (filtered.isEmpty()) {
+        Box(
+          modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp),
+          contentAlignment = Alignment.Center,
+        ) {
+          Text(
+            text = stringResource(R.string.no_results_found),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+          )
+        }
+      } else {
+        LazyColumn {
+          items(filtered, key = { it.key }) { entry ->
+            SelectionRow(
+              label = entry.value,
+              checked = !isAll && selectedValues.contains(entry.key),
+              onToggle = { toggle(entry.key) },
+            )
+          }
+          item { Spacer(Modifier.height(32.dp)) }
+        }
+      }
+    }
+  }
+}
+
+@Composable
+private fun SelectionRow(
+  label: String,
+  checked: Boolean,
+  onToggle: () -> Unit,
+) {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .toggleable(value = checked, role = Role.Checkbox, onValueChange = { onToggle() })
+      .padding(horizontal = 16.dp, vertical = 12.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Checkbox(checked = checked, onCheckedChange = null)
+    Spacer(modifier = Modifier.width(16.dp))
+    Text(text = label, style = MaterialTheme.typography.bodyLarge)
   }
 }

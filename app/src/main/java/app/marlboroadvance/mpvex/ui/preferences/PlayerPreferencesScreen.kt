@@ -1,11 +1,11 @@
 package app.marlboroadvance.mpvex.ui.preferences
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -19,9 +19,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.preferences.PlayerPreferences
@@ -70,7 +70,7 @@ object PlayerPreferencesScreen : Screen {
             navigationIcon = {
               IconButton(onClick = backstack::removeLastOrNull) {
                 Icon(
-                  Icons.AutoMirrored.Rounded.ArrowBack,
+                  Icons.AutoMirrored.Outlined.ArrowBack,
                   contentDescription = stringResource(R.string.back),
                   tint = MaterialTheme.colorScheme.secondary,
                 )
@@ -92,6 +92,9 @@ object PlayerPreferencesScreen : Screen {
                 end = 8.dp
             )
           ) {
+            // ---------------------------------------------------------------
+            // Orientation & Display
+            // ---------------------------------------------------------------
             item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_section_orientation_display))
             }
@@ -112,10 +115,10 @@ object PlayerPreferencesScreen : Screen {
                   summary = {
                     Text(
                       text = orientationNames[orientation] ?: "",
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                   },
                 )
-
 
                 val rememberBrightness by preferences.rememberBrightness.collectAsState()
                 SwitchPreference(
@@ -127,7 +130,6 @@ object PlayerPreferencesScreen : Screen {
                     )
                   },
                 )
-
 
                 val keepScreenOnWhenPaused by preferences.keepScreenOnWhenPaused.collectAsState()
                 SwitchPreference(
@@ -144,10 +146,10 @@ object PlayerPreferencesScreen : Screen {
                         stringResource(R.string.pref_player_keep_screen_on_paused_summary_on)
                       else
                         stringResource(R.string.pref_player_keep_screen_on_paused_summary_off),
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                   },
                 )
-
 
                 val reduceMotion by preferences.reduceMotion.collectAsState()
                 SwitchPreference(
@@ -162,6 +164,9 @@ object PlayerPreferencesScreen : Screen {
               }
             }
 
+            // ---------------------------------------------------------------
+            // Playback & Resume
+            // ---------------------------------------------------------------
             item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_section_playback_resume))
             }
@@ -179,7 +184,6 @@ object PlayerPreferencesScreen : Screen {
                   },
                 )
 
-
                 val closeAfterEndOfVideo by preferences.closeAfterReachingEndOfVideo.collectAsState()
                 SwitchPreference(
                   value = closeAfterEndOfVideo,
@@ -193,6 +197,9 @@ object PlayerPreferencesScreen : Screen {
               }
             }
 
+            // ---------------------------------------------------------------
+            // Playlist & Autoplay
+            // ---------------------------------------------------------------
             item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_section_playlist_autoplay))
             }
@@ -214,10 +221,10 @@ object PlayerPreferencesScreen : Screen {
                         stringResource(R.string.pref_autoplay_next_video_summary)
                       else
                         stringResource(R.string.pref_autoplay_next_video_summary_off),
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                   },
                 )
-
 
                 val playlistMode by preferences.playlistMode.collectAsState()
                 SwitchPreference(
@@ -234,72 +241,72 @@ object PlayerPreferencesScreen : Screen {
                         stringResource(R.string.pref_autoplay_summary)
                       else
                         stringResource(R.string.pref_autoplay_summary_off),
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                   },
                 )
               }
             }
 
+            // ---------------------------------------------------------------
+            // Seeking
+            // ---------------------------------------------------------------
             item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_player_seeking_title))
             }
-            
+
             item {
               PreferenceCard {
                 val showDoubleTapOvals by preferences.showDoubleTapOvals.collectAsState()
                 SwitchPreference(
                   value = showDoubleTapOvals,
                   onValueChange = preferences.showDoubleTapOvals::set,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.show_splash_ovals_on_double_tap_to_seek),
-                    ) 
+                    )
                   },
                 )
-                
-                
+
                 val showSeekTimeWhileSeeking by preferences.showSeekTimeWhileSeeking.collectAsState()
                 SwitchPreference(
                   value = showSeekTimeWhileSeeking,
                   onValueChange = preferences.showSeekTimeWhileSeeking::set,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.show_time_on_double_tap_to_seek),
-                    ) 
+                    )
                   },
                 )
-                
-                
+
                 val usePreciseSeeking by preferences.usePreciseSeeking.collectAsState()
                 SwitchPreference(
                   value = usePreciseSeeking,
                   onValueChange = preferences.usePreciseSeeking::set,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_player_use_precise_seeking),
-                    ) 
+                    )
                   },
                 )
-                
-                
+
                 val customSkipDuration by preferences.customSkipDuration.collectAsState()
                 SliderPreference(
                   value = customSkipDuration.toFloat(),
                   onValueChange = { preferences.customSkipDuration.set(it.roundToInt()) },
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_player_custom_skip_duration_title),
-                      style = MaterialTheme.typography.titleMediumEmphasized
-                    ) 
+                    )
                   },
                   valueRange = 5f..180f,
                   summary = {
-                     val summaryText = stringResource(R.string.pref_player_custom_skip_duration_summary)
-                     Text(
-                       text = "$summaryText ($customSkipDuration s)",
-                       style = MaterialTheme.typography.bodyMedium,
-                       color = MaterialTheme.colorScheme.onSurfaceVariant
-                     )
+                    Text(
+                      text = stringResource(R.string.pref_player_custom_skip_duration_summary) +
+                        " (" + pluralStringResource(R.plurals.seconds, customSkipDuration, customSkipDuration) + ")",
+                      style = MaterialTheme.typography.bodyMedium,
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                   },
                   onSliderValueChange = { preferences.customSkipDuration.set(it.roundToInt()) },
                   sliderValue = customSkipDuration.toFloat(),
@@ -307,8 +314,11 @@ object PlayerPreferencesScreen : Screen {
               }
             }
 
+            // ---------------------------------------------------------------
+            // Gestures (touch + seek/speed merged into one section)
+            // ---------------------------------------------------------------
             item {
-              PreferenceSectionHeader(title = stringResource(R.string.pref_section_touch_gestures))
+              PreferenceSectionHeader(title = stringResource(R.string.pref_player_gestures))
             }
 
             item {
@@ -317,37 +327,37 @@ object PlayerPreferencesScreen : Screen {
                 SwitchPreference(
                   value = brightnessGesture,
                   onValueChange = preferences.brightnessGesture::set,
-                  title = { 
-                    Text(
-                      text = stringResource(R.string.pref_player_gestures_brightness),
-                    ) 
-                  },
-                )
-                
-                
-                val volumeGesture by preferences.volumeGesture.collectAsState()
-                SwitchPreference(
-                  value = volumeGesture,
-                  onValueChange = preferences.volumeGesture::set,
-                  title = { 
-                    Text(
-                      text = stringResource(R.string.pref_player_gestures_volume),
-                    ) 
-                  },
-                )
-                
-
-                val swapVolumeAndBrightness by preferences.swapVolumeAndBrightness.collectAsState()
-                SwitchPreference(
-                  value = swapVolumeAndBrightness,
-                  onValueChange = preferences.swapVolumeAndBrightness::set,
                   title = {
                     Text(
-                      text = stringResource(R.string.swap_the_volume_and_brightness_slider),
+                      text = stringResource(R.string.pref_player_gestures_brightness),
                     )
                   },
                 )
 
+                val volumeGesture by preferences.volumeGesture.collectAsState()
+                SwitchPreference(
+                  value = volumeGesture,
+                  onValueChange = preferences.volumeGesture::set,
+                  title = {
+                    Text(
+                      text = stringResource(R.string.pref_player_gestures_volume),
+                    )
+                  },
+                )
+
+                // Only relevant while at least one of the two slider gestures is on.
+                val swapVolumeAndBrightness by preferences.swapVolumeAndBrightness.collectAsState()
+                AnimatedVisibility(visible = brightnessGesture || volumeGesture) {
+                  SwitchPreference(
+                    value = swapVolumeAndBrightness,
+                    onValueChange = preferences.swapVolumeAndBrightness::set,
+                    title = {
+                      Text(
+                        text = stringResource(R.string.swap_the_volume_and_brightness_slider),
+                      )
+                    },
+                  )
+                }
 
                 val pinchToZoomGesture by preferences.pinchToZoomGesture.collectAsState()
                 SwitchPreference(
@@ -356,73 +366,71 @@ object PlayerPreferencesScreen : Screen {
                   title = {
                     Text(
                       text = stringResource(R.string.pref_player_gestures_pinch_to_zoom),
-                    ) 
+                    )
                   },
                 )
-              }
-            }
 
-            item {
-              PreferenceSectionHeader(title = stringResource(R.string.pref_section_seek_speed_gestures))
-            }
-
-            item {
-              PreferenceCard {
                 val horizontalSwipeToSeek by preferences.horizontalSwipeToSeek.collectAsState()
                 SwitchPreference(
                   value = horizontalSwipeToSeek,
                   onValueChange = preferences.horizontalSwipeToSeek::set,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_player_gestures_horizontal_swipe_to_seek),
-                    ) 
-                  },
-                )
-                
-                
-                val horizontalSwipeSensitivity by preferences.horizontalSwipeSensitivity.collectAsState()
-                SliderPreference(
-                  value = horizontalSwipeSensitivity,
-                  onValueChange = { preferences.horizontalSwipeSensitivity.set(it.toFixed(3)) },
-                  title = { 
-                    Text(
-                      text = stringResource(R.string.pref_player_gestures_horizontal_swipe_sensitivity),
-                      style = MaterialTheme.typography.titleMediumEmphasized
-                    ) 
-                  },
-                  valueRange = 0.020f..0.1f,
-                  summary = {
-                    val sensitivityPercent = (horizontalSwipeSensitivity * 1000).toInt()
-                    Text(
-                      text = stringResource(
-                        R.string.pref_player_gestures_horizontal_swipe_sensitivity_current_summary,
-                        sensitivityPercent,
-                        stringResource(
-                          when {
-                            sensitivityPercent < 30 -> R.string.pref_player_gestures_horizontal_swipe_sensitivity_low
-                            sensitivityPercent < 55 -> R.string.pref_player_gestures_horizontal_swipe_sensitivity_medium
-                            else -> R.string.pref_player_gestures_horizontal_swipe_sensitivity_high
-                          },
-                        ),
-                      ),
-                      style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                   },
-                  onSliderValueChange = { preferences.horizontalSwipeSensitivity.set(it.toFixed(3)) },
-                  sliderValue = horizontalSwipeSensitivity,
+                  summary = {
+                    Text(
+                      text = stringResource(R.string.pref_player_gestures_horizontal_swipe_to_seek_summary),
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                  },
                 )
-                
-                
+
+                // Sensitivity only matters while swipe-to-seek is on.
+                val horizontalSwipeSensitivity by preferences.horizontalSwipeSensitivity.collectAsState()
+                AnimatedVisibility(visible = horizontalSwipeToSeek) {
+                  SliderPreference(
+                    value = horizontalSwipeSensitivity,
+                    onValueChange = { preferences.horizontalSwipeSensitivity.set(it.toFixed(3)) },
+                    title = {
+                      Text(
+                        text = stringResource(R.string.pref_player_gestures_horizontal_swipe_sensitivity),
+                      )
+                    },
+                    valueRange = 0.020f..0.1f,
+                    summary = {
+                      // Scale is x/100, matching the "Current: %1$d/100" string.
+                      val sensitivityValue = (horizontalSwipeSensitivity * 1000).toInt()
+                      Text(
+                        text = stringResource(
+                          R.string.pref_player_gestures_horizontal_swipe_sensitivity_current_summary,
+                          sensitivityValue,
+                          stringResource(
+                            when {
+                              sensitivityValue < 30 -> R.string.pref_player_gestures_horizontal_swipe_sensitivity_low
+                              sensitivityValue < 55 -> R.string.pref_player_gestures_horizontal_swipe_sensitivity_medium
+                              else -> R.string.pref_player_gestures_horizontal_swipe_sensitivity_high
+                            },
+                          ),
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                      )
+                    },
+                    onSliderValueChange = { preferences.horizontalSwipeSensitivity.set(it.toFixed(3)) },
+                    sliderValue = horizontalSwipeSensitivity,
+                  )
+                }
+
                 val holdForMultipleSpeed by preferences.holdForMultipleSpeed.collectAsState()
                 SliderPreference(
                   value = holdForMultipleSpeed,
                   onValueChange = { preferences.holdForMultipleSpeed.set(it.toFixed(2)) },
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_player_gestures_hold_for_multiple_speed),
-                      style = MaterialTheme.typography.titleMediumEmphasized
-                    ) 
+                    )
                   },
                   valueRange = 0f..6f,
                   summary = {
@@ -430,35 +438,38 @@ object PlayerPreferencesScreen : Screen {
                       text = if (holdForMultipleSpeed == 0F) {
                         stringResource(R.string.generic_disabled)
                       } else {
-                        "%.2fx".format(holdForMultipleSpeed)
+                        stringResource(R.string.pref_player_speed_value, holdForMultipleSpeed)
                       },
                       style = MaterialTheme.typography.bodyMedium,
-                      color = MaterialTheme.colorScheme.onSurfaceVariant
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                   },
                   onSliderValueChange = { preferences.holdForMultipleSpeed.set(it.toFixed(2)) },
                   sliderValue = holdForMultipleSpeed,
                 )
-                
-                
+
                 val showDynamicSpeedOverlay by preferences.showDynamicSpeedOverlay.collectAsState()
                 SwitchPreference(
                   value = showDynamicSpeedOverlay,
                   onValueChange = preferences.showDynamicSpeedOverlay::set,
-                  title = { 
+                  title = {
                     Text(
                       text = stringResource(R.string.pref_dynamic_speed_overlay_title),
-                    ) 
+                    )
                   },
-                  summary = { 
+                  summary = {
                     Text(
                       text = stringResource(R.string.pref_dynamic_speed_overlay_summary),
-                    ) 
-                  }
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                  },
                 )
               }
             }
 
+            // ---------------------------------------------------------------
+            // Picture-in-Picture
+            // ---------------------------------------------------------------
             item {
               PreferenceSectionHeader(title = stringResource(R.string.pref_section_pip))
             }
@@ -477,6 +488,7 @@ object PlayerPreferencesScreen : Screen {
                   summary = {
                     Text(
                       text = stringResource(R.string.pref_auto_pip_summary),
+                      color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                   },
                 )
