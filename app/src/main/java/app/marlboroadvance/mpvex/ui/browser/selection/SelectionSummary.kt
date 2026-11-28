@@ -3,9 +3,7 @@ package app.marlboroadvance.mpvex.ui.browser.selection
 import app.marlboroadvance.mpvex.domain.browser.FileSystemItem
 import app.marlboroadvance.mpvex.domain.media.model.Video
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
-import java.util.Locale
-import kotlin.math.log10
-import kotlin.math.pow
+import app.marlboroadvance.mpvex.utils.storage.VideoScanUtils
 
 /**
  * Builds the "3.2 GB · 4h 12m" line shown under the selection count in the browser top bar.
@@ -45,7 +43,7 @@ object SelectionSummary {
 
     val sizePart =
       sizes.takeIf { it.isNotEmpty() }?.let {
-        prefix(incomplete = sizes.size < entries.size) + formatSize(it.sum())
+        prefix(incomplete = sizes.size < entries.size) + VideoScanUtils.formatFileSize(it.sum())
       }
     val durationPart =
       durations.takeIf { list -> list.any { it > 0 } }?.let {
@@ -68,13 +66,6 @@ object SelectionSummary {
     }
 
   private fun prefix(incomplete: Boolean) = if (incomplete) "≥ " else ""
-
-  private fun formatSize(bytes: Long): String {
-    if (bytes <= 0) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB", "TB")
-    val group = (log10(bytes.toDouble()) / log10(1024.0)).toInt().coerceIn(0, units.lastIndex)
-    return String.format(Locale.getDefault(), "%.1f %s", bytes / 1024.0.pow(group.toDouble()), units[group])
-  }
 
   private fun formatDuration(durationMs: Long): String {
     val totalSeconds = durationMs / 1000

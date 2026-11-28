@@ -238,18 +238,20 @@ object VideoScanUtils {
         }
     }
     
-    internal fun formatFileSize(bytes: Long): String {
+    /** Decimal (SI, 1000-based) size text, matching Android system apps. Single source for all size UI. */
+    fun formatFileSize(bytes: Long): String {
         if (bytes <= 0) return "0 B"
         val units = arrayOf("B", "KB", "MB", "GB", "TB")
-        val digitGroups = (log10(bytes.toDouble()) / log10(1024.0)).toInt()
+        val digitGroups = (log10(bytes.toDouble()) / log10(1000.0)).toInt().coerceIn(0, units.lastIndex)
         return String.format(
             Locale.getDefault(),
             "%.1f %s",
-            bytes / 1024.0.pow(digitGroups.toDouble()),
+            bytes / 1000.0.pow(digitGroups.toDouble()),
             units[digitGroups]
         )
     }
-    
+
+
     internal fun formatResolution(width: Int, height: Int): String {
         if (width <= 0 || height <= 0) return "--"
         

@@ -2,7 +2,6 @@ package app.marlboroadvance.mpvex.ui.browser.cards
 
 import android.content.Context
 import android.text.format.DateUtils
-import android.text.format.Formatter
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColor
 import androidx.compose.animation.core.Spring
@@ -59,6 +58,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import app.marlboroadvance.mpvex.R
 import app.marlboroadvance.mpvex.domain.media.model.VideoFolder
+import app.marlboroadvance.mpvex.utils.storage.VideoScanUtils
 
 @Immutable
 data class FolderCardSettings(
@@ -264,7 +264,7 @@ private fun FolderMetadataChips(
   // Formatted once per value instead of on every recomposition.
   val sizeText = remember(folder.totalSize, settings.showTotalSizeChip) {
     if (settings.showTotalSizeChip && folder.totalSize > 0) {
-      Formatter.formatShortFileSize(context, folder.totalSize)
+      VideoScanUtils.formatFileSize(folder.totalSize)
     } else {
       null
     }
